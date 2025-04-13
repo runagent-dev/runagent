@@ -1,0 +1,4 @@
+# runagent/templates/langgraph/advanced/requirements.txt
+langgraph>=0.0.15
+langchain>=0.0.191
+langchain-openai>=0.0.1
