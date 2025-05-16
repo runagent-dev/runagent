@@ -28,6 +28,7 @@ def cli():
     """RunAgent CLI - Deploy and manage AI agents."""
     pass
 
+
 # Add commands
 cli.add_command(init)
 cli.add_command(deploy)

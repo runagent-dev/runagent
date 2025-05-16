@@ -9,7 +9,7 @@ built with frameworks like LangGraph.
 __version__ = "0.1.0"
 
 from .client import RunAgentClient
-from .exceptions import RunAgentError, AuthenticationError
+from .client.exceptions import RunAgentError, AuthenticationError
 
 # Expose the client as the main interface
 __all__ = ["RunAgentClient", "RunAgentError", "AuthenticationError"]
