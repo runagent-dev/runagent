@@ -8,8 +8,8 @@ built with frameworks like LangGraph.
 
 __version__ = "0.1.0"
 
-from .client import RunAgentClient
-from .client.exceptions import RunAgentError, AuthenticationError
+# from .client import RunAgentClient
+# from .client.exceptions import RunAgentClientError, AuthenticationError
 
-# Expose the client as the main interface
-__all__ = ["RunAgentClient", "RunAgentError", "AuthenticationError"]
+# # Expose the client as the main interface
+# __all__ = ["RunAgentClient", "RunAgentClientError", "AuthenticationError"]
