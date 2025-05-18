@@ -9,7 +9,6 @@ import inquirer
 import typing as t
 from pathlib import Path
 # from runagent.storage.user import UserData
-from runagent.utils.url import get_api_url_base
 from runagent.constants import LOCAL_CACHE_DIRECTORY, USER_DATA_FILE_NAME, ENV_RUNAGENT_API_KEY, TemplateVariant, Framework, Base, DEFAULT_BASE_URL, ENV_RUNAGENT_BASE_URL
 from runagent.exceptions import ApiKeyError, ApiKeyNotProvidedError
 from runagent.client.file_handler import FileHandler
@@ -37,7 +36,7 @@ class RunAgentClient:
     ):
 
         self.api_key = api_key or Config.get_api_key()
-        self.base_url = base_url or get_api_url_base()
+        self.base_url = base_url or Config.get_base_url()
         self.cli_mode = cli_mode
         self.endpoint_handler = EndpointHandler(
             api_key=self.api_key,
