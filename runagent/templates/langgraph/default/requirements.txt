@@ -1,3 +1,0 @@
-# runagent/templates/langgraph/default/requirements.txt
-langgraph>=0.0.15
-langchain>=0.0.191
