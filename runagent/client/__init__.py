@@ -2,220 +2,238 @@
 """
 RunAgent client for deploying and managing AI agents.
 """
-
 import os
-import logging
-from typing import Dict, Any, Optional, List, Union
-import json
 import time
-import websocket
-import threading
+import click
+import inquirer
+import typing as t
+from pathlib import Path
+# from runagent.storage.user import UserData
+from runagent.utils.url import get_api_url_base
+from runagent.constants import LOCAL_CACHE_DIRECTORY, USER_DATA_FILE_NAME, ENV_RUNAGENT_API_KEY, TemplateVariant, Framework, Base, DEFAULT_BASE_URL, ENV_RUNAGENT_BASE_URL
+from runagent.exceptions import ApiKeyError, ApiKeyNotProvidedError
+from runagent.client.file_handler import FileHandler
+from runagent.templates import TemplateFactory
+from runagent.utils.config import Config
+from runagent.client.http import EndpointHandler
 
-from .api import ApiClient
-from .config import get_config, get_api_key
-from .utils import package_agent, validate_agent_directory, parse_agent_metadata
-from .exceptions import RunAgentError, AuthenticationError, DeploymentError
+_valid_keys: t.Set[str] = set()
+_clients: t.List["RunAgentClient"] = []
 
-logger = logging.getLogger(__name__)
+DEFAULT_FRAMEWORK = "langchain"
+DEFAULT_TEMPLATE = "basic"
+
 
 class RunAgentClient:
     """Client for interacting with the RunAgent service."""
-    
-    def __init__(self, api_key=None, base_url=None):
-        # Get API key and base URL from env, config, or arguments
-        self.api_key = api_key or get_api_key()
-        self.base_url = base_url or os.environ.get("RUNAGENT_API_URL") or get_config().get("base_url")
-        
-        if not self.api_key:
-            raise AuthenticationError("API key is required. Set it via constructor, RUNAGENT_API_KEY environment variable, or config file.")
-            
-        # Initialize API client
-        self.api = ApiClient(self.api_key, self.base_url)
-    
-    # def deploy(self, agent_path: str, agent_type: str = "langgraph") -> Dict[str, Any]:
-    #     """
-    #     Deploy an agent from the given path.
-        
-    #     Args:
-    #         agent_path: Path to the agent directory
-    #         agent_type: Type of agent framework (e.g., "langgraph")
-            
-    #     Returns:
-    #         Dict with deployment information
-    #     """
-    #     try:
-    #         # Validate agent directory
-    #         validate_agent_directory(agent_path)
-            
-    #         # Package agent
-    #         zip_path = package_agent(agent_path)
-            
-    #         # Upload agent
-    #         result = self.api.upload_file(
-    #             "deploy",
-    #             zip_path,
-    #             file_param_name="agent_code",
-    #             additional_data={"agent_type": agent_type}
+
+    _api_key: t.Optional[str] = None
+
+    def __init__(
+        self,
+        cli_mode: t.Optional[bool] = False,
+        api_key: t.Optional[str] = None,
+        base_url: t.Optional[str] = None,
+    ):
+
+        self.api_key = api_key or Config.get_api_key()
+        self.base_url = base_url or get_api_url_base()
+        self.cli_mode = cli_mode
+        self.endpoint_handler = EndpointHandler(
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
+        _clients.append(self)
+
+    @staticmethod
+    def get_latest() -> "RunAgentClient":
+        """Get latest composio client from the runtime stack."""
+        if len(_clients) == 0:
+            _ = RunAgentClient()
+        return _clients[-1]
+
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        self._api_key = value
+
+    # @property
+    # def http(self) -> HttpClient:
+    #     if not self._http:
+    #         self._http = HttpClient(
+    #             base_url=self.base_url,
+    #             api_key=self.api_key,
+    #             runtime=self.runtime,
     #         )
-            
-    #         # Clean up temporary zip file
-    #         try:
-    #             os.unlink(zip_path)
-    #         except:
-    #             pass
-            
-    #         return result
-            
-    #     except Exception as e:
-    #         raise DeploymentError(f"Failed to deploy agent: {e}")
-    
-    # def get_status(self, deployment_id: str) -> Dict[str, Any]:
-    #     """
-    #     Get the status of a deployed agent.
+    #     return self._http
+
+    # @http.setter
+    # def http(self, value: HttpClient) -> None:
+    #     self._http = value
+
+    def setup(self, base_url: str = None, api_key: str = None):
+        """Configure RunAgent CLI settings"""
+
+        if base_url is None:
+            # * source 1: CLI/SDK direct input
+            # * source 1.5: User config file
+            # * source 2: Environment Key
+            # * source 3: Default Value
+            base_url = Config.get_base_url()
+        else:
+            Config.set_base_url(base_url)
+            click.echo("✓ Saving base_url successful!")
+
+        if api_key is None:
+            # * source 1: CLI/SDK direct input
+            # * source 2: Environment Key
+            base_url = Config.get_api_key()
+
+        Config.set_api_key(api_key)
+        if api_key is not None:
+            click.echo("✓ Saving api_key successful!")
+
+        click.echo(f"Testing connection to {base_url}...")
+        try:
+            response = self.endpoint_handler.validate_api_key()
+            if response.status_code == 200:
+                click.echo("✓ Connection successful!")
+                user_data = response["user"]
+                for field, value in user_data.items():
+                    print(f"{field}: {value}")
+                    Config.set_user_config(field, value)
+
+            else:
+                click.echo(f"✗ Server returned status code {response.status_code}")
+                if not click.confirm("Continue anyway?"):
+                    return
+        except Exception as e:
+            click.echo(f"✗ Connection failed: {str(e)}")
+            if not click.confirm("Continue anyway?"):
+                return
+
+    @staticmethod
+    def validate_api_key(key: str, base_url: t.Optional[str] = None) -> str:
+        """Validate given API key."""
+        if key in _valid_keys:
+            return key
+
+        # base_url = base_url or get_api_url_base()
+        # response = requests.get(
+        #     url=base_url + str(v1 / "client" / "auth" / "client_info"),
+        #     headers={
+        #         "x-api-key": key,
+        #         "x-request-id": generate_request_id(),
+        #     },
+        #     timeout=60,
+        # )
+        # if response.status_code in (401, 403):
+        #     raise ApiKeyError("API Key is not valid!")
+
+        # if response.status_code != 200:
+        #     raise ApiKeyError(f"Unexpected error: HTTP {response.status_code}")
+
+        # _valid_keys.add(key)
+        return key
+
+    def init(
+        self,
+        folder: str,
+        framework: str = DEFAULT_FRAMEWORK,
+        template: str = DEFAULT_TEMPLATE
+    ):
+        """🚀 Initialize a new RunAgent project with framework selection"""
+        click.secho("🚀 Initializing RunAgent project...", fg='cyan', bold=True)
         
-    #     Args:
-    #         deployment_id: ID of the deployment
-            
-    #     Returns:
-    #         Dict with deployment status
-    #     """
-    #     return self.api.get(f"agents/{deployment_id}/status")
-    
-    # def list_deployments(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
-    #     """
-    #     List all deployments.
-        
-    #     Args:
-    #         status: Optional filter by status (e.g., "running", "failed")
-            
-    #     Returns:
-    #         List of deployment information
-    #     """
-    #     params = {}
-    #     if status:
-    #         params["status"] = status
-            
-    #     return self.api.get("deployments", params=params)
-    
-    # def run_agent(self, deployment_id: str, input_data: Dict[str, Any], webhook_url: Optional[str] = None) -> Dict[str, Any]:
-    #     """
-    #     Trigger an agent run.
-        
-    #     Args:
-    #         deployment_id: ID of the deployment
-    #         input_data: Input data for the agent
-    #         webhook_url: Optional webhook URL for result notification
-            
-    #     Returns:
-    #         Dict with execution information
-    #     """
-    #     payload = {
-    #         "input": input_data,
-    #     }
-        
-    #     if webhook_url:
-    #         payload["webhook_url"] = webhook_url
-            
-    #     return self.api.post(f"agents/{deployment_id}/run", json=payload)
-    
-    # def get_execution_status(self, deployment_id: str, execution_id: str) -> Dict[str, Any]:
-    #     """
-    #     Get the status of a specific execution.
-        
-    #     Args:
-    #         deployment_id: ID of the deployment
-    #         execution_id: ID of the execution
-            
-    #     Returns:
-    #         Dict with execution status
-    #     """
-    #     return self.api.get(f"agents/{deployment_id}/executions/{execution_id}/status")
-    
-    # def stream_logs(self, deployment_id: str, execution_id: Optional[str] = None, callback=None):
-    #     """
-    #     Stream logs from a deployment or execution.
-        
-    #     Args:
-    #         deployment_id: ID of the deployment
-    #         execution_id: Optional ID of a specific execution
-    #         callback: Function to call with each log message
-            
-    #     Returns:
-    #         WebSocket connection object with .close() method
-    #     """
-    #     # Determine WebSocket URL
-    #     if execution_id:
-    #         ws_url = f"ws://{self.base_url.replace('http://', '').replace('https://', '')}/execution-logs/{deployment_id}/{execution_id}"
-    #     else:
-    #         ws_url = f"ws://{self.base_url.replace('http://', '').replace('https://', '')}/logs/{deployment_id}"
-        
-    #     # Set up WebSocket connection
-    #     ws = websocket.WebSocketApp(
-    #         ws_url,
-    #         on_message=lambda ws, msg: callback(json.loads(msg)) if callback else print(msg),
-    #         on_error=lambda ws, err: logger.error(f"WebSocket error: {err}"),
-    #         on_close=lambda ws, close_status_code, close_msg: logger.debug("WebSocket connection closed")
-    #     )
-        
-    #     # Start WebSocket in a thread
-    #     thread = threading.Thread(target=ws.run_forever)
-    #     thread.daemon = True
-    #     thread.start()
-        
-    #     return ws
-    
-    # def delete_agent(self, deployment_id: str) -> Dict[str, Any]:
-    #     """
-    #     Delete a deployed agent.
-        
-    #     Args:
-    #         deployment_id: ID of the deployment
-            
-    #     Returns:
-    #         Dict with deletion status
-    #     """
-    #     return self.api.delete(f"agents/{deployment_id}")
-    
-    # def run_sandbox(self, agent_path: str, input_data: Dict[str, Any], agent_type: str = "langgraph") -> Dict[str, Any]:
-    #     """
-    #     Run an agent in sandbox mode.
-        
-    #     Args:
-    #         agent_path: Path to the agent directory
-    #         input_data: Input data for the agent
-    #         agent_type: Type of agent framework
-            
-    #     Returns:
-    #         Dict with sandbox execution results
-    #     """
-    #     try:
-    #         # Validate agent directory
-    #         validate_agent_directory(agent_path)
-            
-    #         # Package agent
-    #         zip_path = package_agent(agent_path)
-            
-    #         # Upload agent to sandbox
-    #         files = {"agent_code": open(zip_path, "rb")}
-    #         data = {
-    #             "agent_type": agent_type,
-    #             "input": json.dumps(input_data)
-    #         }
-            
-    #         result = self.api.upload_file(
-    #             "sandbox/run",
-    #             zip_path,
-    #             file_param_name="agent_code",
-    #             additional_data=data
-    #         )
-            
-    #         # Clean up temporary zip file
-    #         try:
-    #             os.unlink(zip_path)
-    #         except:
-    #             pass
-            
-    #         return result
-            
-    #     except Exception as e:
-    #         raise RunAgentError(f"Failed to run agent in sandbox: {e}")
+        # Simulate authentication check
+        click.secho("🔐 Checking authentication...", fg='yellow')
+        with click.progressbar(range(5), label='🔄 Authenticating') as bar:
+            for _ in bar:
+                time.sleep(0.2)
+
+        click.secho("✅ Authentication successful!\n", fg='green')
+
+        # Get folder name if not provided
+        if not folder:
+            folder = click.prompt(
+                "📁 Project folder name",
+                default=os.path.basename(os.getcwd())
+            )
+
+        project_dir = Path.cwd() / folder
+        # TODO: If already exist, raise proper error message
+        project_dir.mkdir(parents=True)
+        if framework is not None:
+            selected_framework = framework
+        else:
+            # Framework selection using inquirer
+            frameworks = [f.value for f in Framework]
+            framework_choices = []
+            for fw in frameworks:
+                emoji = "🧠" if "langchain" in fw.lower() else "🔧" if "langgraph" in fw.lower() else "📜" if "Flask" in fw.lower() else "⚙️"
+                framework_choices.append(f"{emoji} {fw}")
+
+            click.secho("🎯 Select a framework using arrow keys:", fg='blue')
+            questions = [
+                inquirer.List(
+                    'framework',
+                    message="",
+                    choices=framework_choices,
+                    carousel=True
+                )
+            ]
+            answers = inquirer.prompt(questions)
+            selected_framework = answers['framework'].split(' ', 1)[1]  # Extract framework name without emoji
+
+        # Template selection using inquirer
+
+        if template is not None:
+            selected_template = TemplateVariant.BASIC.value
+        else:
+            template_choices = [f"🔰 {TemplateVariant.BASIC.value}", f"🧠 {TemplateVariant.ADVANCED.value}"]
+
+            click.secho("\n🧱 Select template type using arrow keys:", fg='blue')
+            questions = [
+                inquirer.List(
+                    'template',
+                    message="",
+                    choices=template_choices,
+                    carousel=True)
+            ]
+            answers = inquirer.prompt(questions)
+            selected_template = answers['template'].split(' ', 1)[1]  # Extract template name without emoji
+
+        click.secho(f"\n🛠️  Selected framework: {selected_framework} ({selected_template})\n", fg='magenta', bold=True)
+
+        # Generate template files
+        try:
+            click.secho("📦 Generating project template...\n", fg='cyan')
+            template = TemplateFactory.get_template(selected_framework, selected_template)
+            files = template.generate_files()
+
+            for filename, content in files.items():
+                FileHandler.create_file(os.path.join(project_dir, filename), content)
+
+            config_content = {
+                "project_name": folder,
+                "framework": selected_framework,
+                "level": selected_template,
+                "version": "0.1.0",
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            Config.create_config(project_dir, config_content)
+
+            click.secho(f"✅ Successfully initialized RunAgent project in 📁 {folder}\n", fg='green', bold=True)
+
+            click.secho("🗂️  Files created:", fg='cyan')
+            for filename in files.keys():
+                click.echo(f"  - {filename}")
+
+            click.secho("\n📝 Next steps:", fg='yellow')
+            click.echo("  1️⃣  Edit the `agent.py` file to customize your agent")
+            click.echo("  2️⃣  Update your API keys in `.env`")
+            click.echo(f"  3️⃣  Run 'runagent deploy --folder {folder}' to deploy your agent 🚀")
+
+        except Exception as e:
+            click.secho(f"❌ Error: {str(e)}", fg='red', err=True)
+
