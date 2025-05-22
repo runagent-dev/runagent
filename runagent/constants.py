@@ -2,6 +2,11 @@ import os
 from pathlib import Path
 from enum import Enum
 
+TEMPLATE_REPO_URL = os.getenv("RUNAGENT_TEMPLATE_REPO", "https://github.com/runagent-dev/runagent.git")
+TEMPLATE_BRANCH = os.getenv("RUNAGENT_TEMPLATE_BRANCH", "main")
+TEMPLATE_PREPATH = os.getenv("RUNAGENT_TEMPLATE_PREPATH", "runagent/templates")
+
+
 ENV_RUNAGENT_API_KEY = "RUNAGENT_API_KEY"
 ENV_RUNAGENT_BASE_URL = "RUNAGENT_BASE_URL"
 ENV_LOCAL_CACHE_DIRECTORY = "RUNAGENT_CACHE_DIR"
@@ -20,8 +25,8 @@ LOCAL_CACHE_DIRECTORY = str(Path(_cache_dir) if _cache_dir is not None else Path
 
 try:
     Path(LOCAL_CACHE_DIRECTORY).mkdir(parents=True, exist_ok=True)
-    if not Path(LOCAL_CACHE_DIRECTORY).is_writable():
-        raise OSError
+    # if not Path(LOCAL_CACHE_DIRECTORY).is_writable():
+    #     raise OSError
 except OSError as e:
     raise RuntimeError(
         f"Cache directory {LOCAL_CACHE_DIRECTORY} is not writable please "
