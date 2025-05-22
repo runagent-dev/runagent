@@ -37,20 +37,34 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+ (project requires Python 3.9 or higher)
 - Git
 - pip
 - virtualenv (recommended)
 
+### Project Structure
+
+```
+runagent/
+├── runagent/          # Main package directory
+├── tests/             # Test files
+├── docs/              # Documentation
+├── pyproject.toml     # Project configuration and dependencies
+├── README.md          # Project overview
+└── CONTRIBUTING.md    # This file
+```
+
 ### Setup Steps
 
 1. Fork and clone the repository:
+   
 ```bash
-git clone https://github.com/YOUR_USERNAME/runagent.git
+git clone https://github.com/runagent-dev/runagent.git
 cd runagent
 ```
 
 2. Create and activate a virtual environment:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS
@@ -59,8 +73,45 @@ source .venv/bin/activate  # Linux/macOS
 ```
 
 3. Install development dependencies:
+   
 ```bash
+# Using pip
 pip install -e ".[dev]"
+
+# Or using Hatch (recommended)
+hatch env create
+hatch shell
+```
+
+### Development Workflow
+
+1. Create a new branch for your feature/fix:
+```bash
+git checkout -b feature/your-feature-name
+```
+
+2. Make your changes and run the development tools:
+
+```bash
+# Format code
+black runagent tests
+
+# Sort imports
+isort runagent tests
+
+# Run linter (Ruff)
+ruff check runagent tests
+
+# Run type checker
+mypy runagent tests
+
+# Run tests
+pytest
+```
+
+3. Install pre-commit hooks to automatically run checks:
+```bash
+pre-commit install
 ```
 
 ### Running Tests
@@ -74,9 +125,17 @@ pytest --cov=runagent
 
 # Run specific test file
 pytest tests/test_specific.py
+
+# Run tests in parallel
+pytest -n auto
+
+# Run specific test categories
+pytest -m unit      # Run unit tests
+pytest -m integration  # Run integration tests
+pytest -m e2e       # Run end-to-end tests
 ```
 
-### Code Style
+### Code Quality Tools
 
 We use several tools to maintain code quality:
 
@@ -90,9 +149,10 @@ black runagent tests
 isort runagent tests
 ```
 
-3. **flake8** for linting:
+3. **Ruff** for linting (replaces flake8):
 ```bash
-flake8 runagent tests
+ruff check runagent tests
+ruff format runagent tests  # Format code
 ```
 
 4. **mypy** for type checking:
@@ -100,12 +160,25 @@ flake8 runagent tests
 mypy runagent tests
 ```
 
-### Pre-commit Hooks
+### Using Hatch
 
-We use pre-commit hooks to ensure code quality. Install them with:
+Hatch is our build backend and can be used for various development tasks:
 
 ```bash
-pre-commit install
+# Create a new development environment
+hatch env create
+
+# Activate the environment
+hatch shell
+
+# Run tests
+hatch run test
+
+# Build the package
+hatch build
+
+# Clean build artifacts
+hatch clean
 ```
 
 ## Documentation
