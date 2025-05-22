@@ -53,7 +53,6 @@ dev = [
     "flake8>=7.0.0",
     "flake8-docstrings>=1.7.0",
     "mypy>=1.8.0",
-    "pre-commit>=3.6.0",
     "sphinx>=7.2.6",
     "sphinx-rtd-theme>=2.0.0",
     "sphinx-autodoc-typehints>=2.0.1",
