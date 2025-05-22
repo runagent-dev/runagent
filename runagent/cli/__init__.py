@@ -2,7 +2,6 @@
 """
 CLI package for RunAgent.
 """
+from .main import runagent
 
-from .main import cli
-
-__all__ = ["cli"]
+__all__ = ["runagent"]
