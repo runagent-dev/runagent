@@ -1,53 +1,206 @@
 # pyproject.toml
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "runagent"
 version = "0.1.0"
-description = "Deploy and manage AI agents easily"
+description = "A command-line tool and SDK for deploying, managing, and interacting with AI agents"
 readme = "README.md"
-requires-python = ">=3.8"
-license = {text = "MIT"}
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["ai", "agents", "automation", "cli", "sdk", "llm", "langchain", "langgraph"]
 authors = [
-    {name = "Sawradip Saha", email = "sawradip@runagent.live"}
+    { name = "Sawradip Saha", email = "sawradip0@gmail.com" }
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
 ]
 dependencies = [
-    "click>=8.0.0",
-    "requests>=2.25.0",
-    "websocket-client>=1.2.0",
-    "importlib_resources>=5.0.0; python_version < '3.9'",
+    "click>=8.1.7",
+    "requests>=2.31.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "inquirer>=3.1.3",
+    "rich>=13.7.0",
+    "pydantic>=2.6.1",
+    "typing-extensions>=4.9.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=6.0.0",
-    "pytest-cov>=2.12.0",
-    "black>=21.5b2",
-    "isort>=5.9.0",
-    "flake8>=3.9.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.5",
+    "pytest-xdist>=3.5.0",
+    "black>=24.1.1",
+    "isort>=5.13.2",
+    "flake8>=7.0.0",
+    "flake8-docstrings>=1.7.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+    "sphinx>=7.2.6",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-autodoc-typehints>=2.0.1",
+    "bandit>=1.7.7",
+    "safety>=2.3.5",
+    "coverage>=7.4.1",
+    "pytest-benchmark>=4.0.0",
+    "pytest-env>=1.1.3",
+    "pytest-sugar>=1.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/runagent-dev/runagent"
+Documentation = "https://docs.runagent.dev"
+Repository = "https://github.com/runagent-dev/runagent.git"
+Issues = "https://github.com/runagent-dev/runagent/issues"
+Discord = "https://discord.gg/runagent"
+Changelog = "https://github.com/runagent-dev/runagent/blob/main/CHANGELOG.md"
+Funding = "https://github.com/sponsors/runagent-dev"
+
 [project.scripts]
-runagent = "runagent.cli.main:cli"
+runagent = "runagent.cli.main:runagent"
 
-[tool.setuptools]
-include-package-data = true
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+include = '\.pyi?$'
+extend-exclude = '''
+# A regex preceded with ^/ will apply only to files and directories
+# in the root of the project.
+^/docs
+'''
 
-[tool.setuptools.packages.find]
-include = ["runagent*"]
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+skip = ["docs"]
 
-[tool.setuptools.package-data]
-"runagent.templates.langgraph.default" = ["*"]
-"runagent.templates.langgraph.advanced" = ["*"]
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=runagent --cov-report=term-missing --cov-report=html"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "slow: Tests that take longer to run",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["runagent"]
+omit = [
+    "tests/*",
+    "setup.py",
+    "docs/*",
+    "**/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+    "except ImportError:",
+    "def main",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+fail_under = 80
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "ANN", # flake8-annotations
+    "S",   # flake8-bandit
+    "BLE", # flake8-blind-except
+    "FBT", # flake8-boolean-trap
+    "COM", # flake8-commas
+    "DTZ", # flake8-datetimez
+    "T20", # flake8-print
+    "PT",  # flake8-pytest-style
+    "RSE", # flake8-raise
+    "RET", # flake8-return
+    "SLF", # flake8-self
+    "SIM", # flake8-simplify
+    "TID", # flake8-tidy-imports
+    "ARG", # flake8-unused-arguments
+    "PIE", # flake8-pie
+    "ERA", # eradicate
+    "PD",  # pandas-vet
+    "PGH", # pygrep-hooks
+    "PL",  # pylint
+    "TRY", # tryceratops
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "ANN001", # missing-type-self
+    "ANN002", # missing-type-cls
+    "ANN401", # dynamically-typed-expression
+]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["S101", "ANN", "PLR2004"]
+"docs/*" = ["E501", "F401"]
+
+[tool.ruff.isort]
+known-first-party = ["runagent"]
+
+[tool.ruff.mccabe]
+max-complexity = 10
+
+[tool.ruff.pycodestyle]
+max-doc-length = 88
