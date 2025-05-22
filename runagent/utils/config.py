@@ -229,3 +229,81 @@ class Config:
         
         with info_file.open('r') as f:
             return json.load(f)
+
+    # Add these methods to your Config class
+
+    @staticmethod
+    def clear_user_config() -> bool:
+        """
+        Clear all user configuration
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        config_dir = Path.home() / LOCAL_CACHE_DIRECTORY
+        config_file = config_dir / USER_DATA_FILE_NAME
+        
+        try:
+            if config_file.exists():
+                config_file.unlink()
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def is_configured() -> bool:
+        """
+        Check if RunAgent is properly configured
+        
+        Returns:
+            True if both API key and base URL are set
+        """
+        config = Config.get_user_config()
+        return bool(config.get('api_key') and config.get('base_url'))
+
+    @staticmethod
+    def get_config_status() -> t.Dict[str, t.Any]:
+        """
+        Get detailed configuration status
+        
+        Returns:
+            Dictionary with configuration details
+        """
+        config = Config.get_user_config()
+        return {
+            'configured': Config.is_configured(),
+            'api_key_set': bool(Config.get_api_key()),
+            'base_url': Config.get_base_url(),
+            'user_email': config.get('email'),
+            'user_name': config.get('name'),
+            'config_file_exists': (Path.home() / LOCAL_CACHE_DIRECTORY / USER_DATA_FILE_NAME).exists()
+        }
+
+    @staticmethod
+    def backup_config() -> t.Optional[str]:
+        """
+        Create a backup of current configuration (without API key for security)
+        
+        Returns:
+            Path to backup file or None if failed
+        """
+        config = Config.get_user_config()
+        if not config:
+            return None
+        
+        # Remove sensitive data from backup
+        backup_config = {k: v for k, v in config.items() if k != 'api_key'}
+        
+        backup_dir = Path.home() / LOCAL_CACHE_DIRECTORY / 'backups'
+        backup_dir.mkdir(exist_ok=True)
+        
+        import time
+        timestamp = int(time.time())
+        backup_file = backup_dir / f"config_backup_{timestamp}.json"
+        
+        try:
+            with backup_file.open('w') as f:
+                json.dump(backup_config, f, indent=2)
+            return str(backup_file)
+        except Exception:
+            return None
