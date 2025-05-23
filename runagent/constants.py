@@ -4,7 +4,7 @@ from enum import Enum
 
 TEMPLATE_REPO_URL = os.getenv("RUNAGENT_TEMPLATE_REPO", "https://github.com/runagent-dev/runagent.git")
 TEMPLATE_BRANCH = os.getenv("RUNAGENT_TEMPLATE_BRANCH", "main")
-TEMPLATE_PREPATH = os.getenv("RUNAGENT_TEMPLATE_PREPATH", "runagent/templates")
+TEMPLATE_PREPATH = os.getenv("RUNAGENT_TEMPLATE_PREPATH", "templates")
 
 
 ENV_RUNAGENT_API_KEY = "RUNAGENT_API_KEY"
