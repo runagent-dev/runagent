@@ -293,16 +293,16 @@ class RunAgentClient:
 
     def init(
         self,
-        framework: str,
-        template: str,
+        framework: str = None,
+        template: str = None, 
         folder: str = None,
         cli_mode: bool = None
     ):
         """🚀 Initialize a new RunAgent project with framework selection
         
         Args:
-            framework: Framework to use (required)
-            template: Template variant (required)
+            framework: Framework to use (defaults to 'langchain' in SDK mode)
+            template: Template variant (defaults to 'basic' in SDK mode)
             folder: Project folder name
             cli_mode: Enable interactive prompts (None = use instance default)
         """
@@ -367,7 +367,7 @@ class RunAgentClient:
                 )
         
         project_dir.mkdir(parents=True, exist_ok=True)
-        print(">>>", framework, ">>>", template)
+        
         # Get available templates from repository
         try:
             available_templates = self._get_available_templates(
@@ -382,23 +382,76 @@ class RunAgentClient:
             return False
 
         # Handle framework selection
-        selected_framework = self._select_framework(
-            framework,
-            available_templates,
-            cli_mode=cli_mode
-        )
-        if not selected_framework:
-            return False
+        if cli_mode:
+            # Interactive mode - let user select even if framework is provided
+            if not framework:
+                selected_framework = self._select_framework_interactive(available_templates)
+                if not selected_framework:
+                    return False
+            else:
+                # Validate provided framework
+                if framework not in available_templates:
+                    click.echo(f"❌ Framework '{framework}' not available. Available: {list(available_templates.keys())}")
+                    selected_framework = self._select_framework_interactive(available_templates)
+                    if not selected_framework:
+                        return False
+                else:
+                    selected_framework = framework
+        else:
+            # SDK mode - use defaults
+            if not framework:
+                framework = "langchain"  # Default framework
+            
+            # Validate framework exists
+            if framework not in available_templates:
+                # Fallback to first available framework if default doesn't exist
+                if available_templates:
+                    framework = list(available_templates.keys())[0]
+                    if not cli_mode:  # Only log in SDK mode
+                        print(f"Warning: Requested framework not found, using '{framework}' instead")
+                else:
+                    raise RuntimeError("No templates available from repository")
+            
+            selected_framework = framework
 
         # Handle template selection  
-        selected_template = self._select_template(
-            template,
-            available_templates,
-            selected_framework,
-            cli_mode=cli_mode
-        )
-        if not selected_template:
-            return False
+        if cli_mode:
+            # Interactive mode - let user select even if template is provided
+            if not template:
+                selected_template = self._select_template_interactive(
+                    available_templates, selected_framework
+                )
+                if not selected_template:
+                    return False
+            else:
+                # Validate provided template
+                framework_templates = available_templates.get(selected_framework, [])
+                if template not in framework_templates:
+                    click.echo(f"❌ Template '{template}' not available for framework '{selected_framework}'. Available: {framework_templates}")
+                    selected_template = self._select_template_interactive(
+                        available_templates, selected_framework
+                    )
+                    if not selected_template:
+                        return False
+                else:
+                    selected_template = template
+        else:
+            # SDK mode - use defaults
+            if not template:
+                template = "basic"  # Default template
+            
+            # Validate template exists
+            framework_templates = available_templates.get(selected_framework, [])
+            if template not in framework_templates:
+                # Fallback to first available template if default doesn't exist
+                if framework_templates:
+                    template = framework_templates[0]
+                    if not cli_mode:  # Only log in SDK mode
+                        print(f"Warning: Requested template not found, using '{template}' instead")
+                else:
+                    raise RuntimeError(f"No templates available for framework '{selected_framework}'")
+            
+            selected_template = template
 
         if cli_mode:
             click.secho(
@@ -407,6 +460,9 @@ class RunAgentClient:
                 fg='magenta',
                 bold=True
             )
+        else:
+            # In SDK mode, show what was selected
+            print(f"📦 Initializing project with {selected_framework}/{selected_template}")
 
         # Download and generate template files
         return self._download_and_setup_template(
@@ -416,6 +472,57 @@ class RunAgentClient:
             folder,
             cli_mode=cli_mode
         )
+
+    def _select_framework_interactive(self, available_templates: dict) -> str:
+        """Interactive framework selection for CLI mode"""
+        frameworks = list(available_templates.keys())
+        framework_choices = [
+            (
+                f"{'🧠' if 'langchain' in fw.lower() else '🔧' if 'langgraph' in fw.lower() else '📜' if 'llamaindex' in fw.lower() else '⚙️'} "
+                f"{fw}"
+            )
+            for fw in frameworks
+        ]
+
+        click.secho("🎯 Select a framework using arrow keys:", fg='blue')
+        questions = [
+            inquirer.List(
+                'framework',
+                message="",
+                choices=framework_choices,
+                carousel=True
+            )
+        ]
+        answers = inquirer.prompt(questions)
+        
+        if not answers:  # User cancelled
+            return None
+            
+        return answers['framework'].split(' ', 1)[1]  # Extract framework name
+
+    def _select_template_interactive(self, available_templates: dict, framework: str) -> str:
+        """Interactive template selection for CLI mode"""
+        framework_templates = available_templates.get(framework, [])
+        template_choices = [f"🔰 {tmpl}" for tmpl in framework_templates]
+
+        click.secho(
+            "\n🧱 Select template type using arrow keys:",
+            fg='blue'
+        )
+        questions = [
+            inquirer.List(
+                'template',
+                message="",
+                choices=template_choices,
+                carousel=True
+            )
+        ]
+        answers = inquirer.prompt(questions)
+        
+        if not answers:  # User cancelled
+            return None
+            
+        return answers['template'].split(' ', 1)[1]  # Extract template name
 
     def _get_available_templates(self, cli_mode: bool = False):
         """Fetch available templates from the git repository"""
@@ -551,6 +658,8 @@ class RunAgentClient:
         try:
             if cli_mode:
                 click.secho("📦 Downloading project template...", fg='cyan')
+            else:
+                print("📦 Downloading project template...")
             
             # Initialize template downloader
             downloader = TemplateDownloader(
@@ -566,6 +675,16 @@ class RunAgentClient:
                 target_folder=str(project_dir)
             )
             
+            # Verify essential files were downloaded
+            essential_files = ['main.py', 'agent.py', 'requirements.txt']
+            missing_files = []
+            for file in essential_files:
+                if not (project_dir / file).exists():
+                    missing_files.append(file)
+            
+            if missing_files:
+                raise RuntimeError(f"Template download incomplete. Missing files: {missing_files}")
+            
             # Create project configuration
             config_content = {
                 "project_name": folder,
@@ -577,6 +696,11 @@ class RunAgentClient:
                     "repo_url": TEMPLATE_REPO_URL,
                     "branch": TEMPLATE_BRANCH,
                     "path": f"{TEMPLATE_PREPATH}/{framework}/{template}"
+                },
+                "architecture": {
+                    "main_file": "main.py",
+                    "agent_file": "agent.py",
+                    "entry_point": "run"
                 }
             }
             Config.create_config(project_dir, config_content)
@@ -595,19 +719,23 @@ class RunAgentClient:
                     if (
                         file_path.is_file()
                         and not file_path.name.startswith('.')
+                        and file_path.name != 'runagent.config.json'  # Don't show config file
                     ):
                         relative_path = file_path.relative_to(project_dir)
                         click.echo(f"  - {relative_path}")
 
                 click.secho("\n📝 Next steps:", fg='yellow')
-                click.echo(
-                    "  1️⃣  Edit the configuration files to customize your agent"
-                )
-                click.echo("  2️⃣  Update your API keys in `.env` (if present)")
-                click.echo(
-                    f"  3️⃣  Run 'runagent deploy --folder {folder}' "
-                    "to deploy your agent 🚀"
-                )
+                click.echo("  1️⃣  Update your API keys in `.env` file")
+                click.echo("  2️⃣  Customize the agent logic in `agent.py`")
+                click.echo("  3️⃣  Test locally: `cd {folder} && python main.py`")
+                click.echo(f"  4️⃣  Deploy: `runagent deploy --folder {folder}`")
+            else:
+                # SDK mode - simpler output
+                print(f"✅ Successfully initialized RunAgent project in {folder}")
+                print(f"📁 Framework: {framework}")
+                print(f"📄 Template: {template}")
+                print("📋 Files created: main.py, agent.py, requirements.txt, .env")
+                print("🚀 Next: Update .env file and run 'python main.py' to test")
             
             return True
 
@@ -616,6 +744,7 @@ class RunAgentClient:
             if cli_mode:
                 click.secho(f"❌ {error_msg}", fg='red', err=True)
             else:
+                print(f"❌ {error_msg}")
                 raise RuntimeError(error_msg)
             return False
 

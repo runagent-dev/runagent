@@ -21,13 +21,34 @@ def teardown(yes):
 
 
 @click.command()
+@click.command()
 @click.option('--folder', help='Project folder name')
-@click.option('--framework', default=None, help='Framework to use (will show available options if not specified)')
-@click.option('--template', default=None, help='Template variant (will show available options if not specified)')
-def init(folder, framework, template):
-    """Initialize a new RunAgent project"""
-    client = RunAgentClient(cli_mode=True)
-    success = client.init(folder=folder, framework=framework, template=template)
+@click.option('--framework', default=None, help='Framework to use (langchain, langgraph, llamaindex). Defaults to langchain if not specified')
+@click.option('--template', default=None, help='Template variant (basic, advanced). Defaults to basic if not specified')
+@click.option('--non-interactive', is_flag=True, help='Skip interactive prompts and use defaults (langchain/basic)')
+def init(folder, framework, template, non_interactive):
+    """Initialize a new RunAgent project
+    
+    Examples:
+      runagent init                                    # Interactive mode
+      runagent init --non-interactive                  # Use defaults (langchain/basic)  
+      runagent init --framework langgraph             # Specify framework, prompt for template
+      runagent init --framework langchain --template advanced  # Specify both (no prompts)
+    """
+    
+    # Determine if we should use CLI mode
+    # CLI mode is disabled if --non-interactive is used OR if both framework and template are provided
+    use_cli_mode = not non_interactive and not (framework and template)
+    
+    client = RunAgentClient(cli_mode=use_cli_mode)
+    
+    # Call the init method
+    success = client.init(
+        framework=framework, 
+        template=template, 
+        folder=folder
+    )
+    
     if not success:
         raise click.ClickException("Project initialization failed")
 

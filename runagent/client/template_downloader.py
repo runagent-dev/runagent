@@ -83,8 +83,20 @@ class TemplateDownloader:
                         f"Template '{template_path}' not found in repository branch '{self.branch}'"
                     )
                 
-                # Copy all contents
+                # Copy all contents (including agent.py, main.py, requirements.txt, .env, etc.)
                 self._copy_directory_contents(template_source_dir, target_dir)
+                
+                # Verify essential files exist
+                essential_files = ['main.py', 'agent.py', 'requirements.txt']
+                missing_files = []
+                for file in essential_files:
+                    if not (target_dir / file).exists():
+                        missing_files.append(file)
+                
+                if missing_files:
+                    raise TemplateDownloadError(
+                        f"Template is missing essential files: {missing_files}"
+                    )
                 
             except git.exc.GitCommandError as e:
                 raise TemplateDownloadError(f"Git error: {e}")
@@ -152,7 +164,9 @@ class TemplateDownloader:
                         # Scan for template directories
                         for template_dir in framework_dir.iterdir():
                             if template_dir.is_dir() and not template_dir.name.startswith('.'):
-                                templates[framework_name].append(template_dir.name)
+                                # Verify this is a valid template (has main.py)
+                                if (template_dir / 'main.py').exists():
+                                    templates[framework_name].append(template_dir.name)
                 
                 return templates
                 
@@ -202,7 +216,7 @@ class TemplateDownloader:
                 if not template_source_dir.exists():
                     return None
                 
-                # Look for metadata files
+                # Collect template information
                 info = {
                     'framework': framework,
                     'template': template,
@@ -227,6 +241,10 @@ class TemplateDownloader:
                         info['metadata'] = metadata
                     except json.JSONDecodeError:
                         pass
+                
+                # Verify this is a valid template
+                required_files = ['main.py', 'agent.py']
+                info['valid'] = all((template_source_dir / f).exists() for f in required_files)
                 
                 return info
                 
