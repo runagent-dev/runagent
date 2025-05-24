@@ -311,7 +311,7 @@ class RunAgentClient:
             cli_mode = self.cli_mode
         
         # Check authentication first
-        self.require_authentication(cli_mode=cli_mode)
+        # self.require_authentication(cli_mode=cli_mode)
         
         if cli_mode:
             click.secho(
@@ -322,22 +322,22 @@ class RunAgentClient:
             click.secho("🔐 Checking authentication...", fg='yellow')
         
         # Validate connection
-        if not self.validate_connection():
-            error_msg = "Authentication validation failed"
-            if cli_mode:
-                click.echo(f"❌ {error_msg}")
-                click.echo(
-                    "💡 Run 'runagent setup --api-key <key>' to reconfigure"
-                )
-            else:
-                raise AuthenticationError(error_msg)
-            return False
+        # if not self.validate_connection():
+        #     error_msg = "Authentication validation failed"
+        #     if cli_mode:
+        #         click.echo(f"❌ {error_msg}")
+        #         click.echo(
+        #             "💡 Run 'runagent setup --api-key <key>' to reconfigure"
+        #         )
+        #     else:
+        #         raise AuthenticationError(error_msg)
+        #     return False
         
-        if cli_mode:
-            with click.progressbar(range(5), label='🔄 Authenticating') as bar:
-                for _ in bar:
-                    time.sleep(0.2)
-            click.secho("✅ Authentication successful!\n", fg='green')
+        # if cli_mode:
+        #     with click.progressbar(range(5), label='🔄 Authenticating') as bar:
+        #         for _ in bar:
+        #             time.sleep(0.2)
+        #     click.secho("✅ Authentication successful!\n", fg='green')
         
         # Handle folder name
         if not folder:

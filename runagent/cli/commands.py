@@ -1,4 +1,5 @@
 import click
+import inquirer
 from runagent.client import RunAgentClient
 
 
@@ -20,7 +21,6 @@ def teardown(yes):
     client.teardown(confirm=yes)
 
 
-@click.command()
 @click.command()
 @click.option('--folder', help='Project folder name')
 @click.option('--framework', default=None, help='Framework to use (langchain, langgraph, llamaindex). Defaults to langchain if not specified')
@@ -52,6 +52,7 @@ def init(folder, framework, template, non_interactive):
     if not success:
         raise click.ClickException("Project initialization failed")
 
+
 @click.command()
 @click.option('--list', 'action_list', is_flag=True, help='List all available templates')
 @click.option('--info', 'action_info', is_flag=True, help='Get detailed information about a specific template')
@@ -79,6 +80,7 @@ def template(action_list, action_info, framework, template, filter_framework, fo
         _handle_list_templates(client, filter_framework, format)
     elif action_info:
         _handle_template_info(client, framework, template)
+
 
 def _handle_list_templates(client, filter_framework, format):
     """Handle the --list action"""
@@ -121,6 +123,7 @@ def _handle_list_templates(client, filter_framework, format):
             
     except Exception as e:
         click.echo(f"❌ Error listing templates: {str(e)}")
+
 
 def _handle_template_info(client, framework, template):
     """Handle the --info action"""

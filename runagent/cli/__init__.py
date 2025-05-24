@@ -2,6 +2,5 @@
 """
 CLI package for RunAgent.
 """
-from .main import runagent
-
-__all__ = ["runagent"]
+# Only import what we need - don't import the old main
+pass

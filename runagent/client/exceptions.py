@@ -1,6 +1,7 @@
 """
 RunAgent SDK Custom exceptions.
 """
+import typing as t
 
 class ClientError(Exception):
     """Base exception for client errors."""
