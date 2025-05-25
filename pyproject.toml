@@ -40,6 +40,8 @@ dependencies = [
     "pydantic>=2.6.1",
     "GitPython>=3.1.43",
     "typing-extensions>=4.9.0",
+    "fastapi==0.115.12",
+    "uvicorn==0.34.1"
 ]
 
 [project.optional-dependencies]

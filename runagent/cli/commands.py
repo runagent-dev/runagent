@@ -186,7 +186,7 @@ def _handle_template_info(client, framework, template):
         click.echo(f"❌ Error getting template info: {str(e)}")
 
 
-
+# Add these new commands to your existing runagent/cli/commands.py file
 
 import click
 import json
@@ -198,8 +198,9 @@ console = Console()
 @click.command()
 @click.option('--folder', required=True, help='Folder containing agent files to deploy locally')
 @click.option('--framework', help='Framework type (auto-detected if not specified)')
-def deploy_local(folder, framework):
-    """Deploy agent locally for testing"""
+@click.option('--replace', help='Agent ID to replace (for capacity management)')
+def deploy_local(folder, framework, replace):
+    """Deploy agent locally for testing (max 5 agents)"""
     try:
         from runagent.client.local_client import LocalClient
         
@@ -211,16 +212,48 @@ def deploy_local(folder, framework):
             framework = _detect_framework(folder)
         
         local_client = LocalClient()
+        
+        # Check capacity if not replacing
+        if not replace:
+            capacity_info = local_client.get_capacity_info()
+            if capacity_info.get('is_full'):
+                console.print(f"\n⚠️ [yellow]Database at full capacity ({capacity_info.get('current_count')}/5 agents)[/yellow]")
+                console.print("💡 Available options:")
+                
+                agents = capacity_info.get('agents', [])
+                for i, agent in enumerate(agents):
+                    console.print(f"   {i+1}. Replace: [cyan]{agent['agent_id']}[/cyan] (deployed: {agent['deployed_at']})")
+                
+                oldest_agent = capacity_info.get('oldest_agent')
+                if oldest_agent:
+                    console.print(f"\n💡 Suggested command:")
+                    console.print(f"   [cyan]runagent deploy-local --folder {folder} --replace {oldest_agent['agent_id']}[/cyan]")
+                
+                raise click.ClickException("Database at capacity. Use --replace to replace an existing agent.")
+        
         result = local_client.deploy_agent(
             folder_path=folder,
-            metadata={'framework': framework}
+            metadata={'framework': framework},
+            replace_agent_id=replace
         )
         
         if result.get('success'):
-            click.echo(f"\n✅ {result.get('message')}")
+            click.echo(f"\n✅ {result.get('message', 'Deployment successful')}")
             click.echo(f"🆔 Agent ID: {result.get('agent_id')}")
+            
+            if replace:
+                click.echo(f"🔄 Replaced agent: {replace}")
         else:
-            raise click.ClickException(f"Local deployment failed: {result.get('error')}")
+            error_code = result.get('error_code')
+            if error_code == 'DATABASE_FULL':
+                capacity_info = result.get('capacity_info', {})
+                oldest_agent = capacity_info.get('oldest_agent', {}).get('agent_id')
+                suggestion = result.get('suggestion', '')
+                
+                console.print(f"\n💡 [yellow]Suggestion:[/yellow] {suggestion}")
+                raise click.ClickException(result.get('error'))
+            else:
+                raise click.ClickException(result.get('error'))
             
     except Exception as e:
         raise click.ClickException(str(e))
@@ -383,10 +416,11 @@ def deploy(folder, agent_id, local, framework, config):
 @click.option('--host', default='127.0.0.1', help='Host to bind the server to')
 @click.option('--debug', is_flag=True, help='Run server in debug mode')
 def serve(port, host, debug):
-    """Start local server for testing deployed agents"""
+    """Start local FastAPI server for testing deployed agents"""
     try:
         from runagent.server.local_server import LocalServer
         
+        console.print("⚡ Starting FastAPI server...")
         server = LocalServer(port=port, host=host)
         server.start(debug=debug)
         
@@ -515,6 +549,116 @@ def run(agent_id, input_file, message, local, timeout):
         raise click.ClickException(str(e))
 
 
+@click.command()
+@click.option('--cleanup-days', type=int, help='Clean up run records older than N days')
+@click.option('--agent-id', help='Show detailed info for specific agent')
+@click.option('--capacity', is_flag=True, help='Show detailed capacity information')
+def db_status(cleanup_days, agent_id, capacity):
+    """Show local database status and statistics"""
+    try:
+        from runagent.client.local_client import LocalClient
+        
+        local_client = LocalClient()
+        
+        if capacity:
+            # Show detailed capacity info
+            capacity_info = local_client.get_capacity_info()
+            
+            console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
+            console.print(f"Current: {capacity_info.get('current_count', 0)}/5 agents")
+            console.print(f"Remaining slots: {capacity_info.get('remaining_slots', 0)}")
+            console.print(f"Status: {'🔴 FULL' if capacity_info.get('is_full') else '🟢 Available'}")
+            
+            agents = capacity_info.get('agents', [])
+            if agents:
+                console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
+                for i, agent in enumerate(agents):
+                    status_icon = "🟢" if agent['status'] == 'deployed' else "🔴" if agent['status'] == 'error' else "🟡"
+                    age_label = "oldest" if i == 0 else "newest" if i == len(agents)-1 else ""
+                    console.print(f"  {i+1}. {status_icon} {agent['agent_id']} ({agent['framework']}) - {agent['deployed_at']} {age_label}")
+            
+            if capacity_info.get('is_full'):
+                oldest = capacity_info.get('oldest_agent', {})
+                console.print(f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]")
+                console.print(f"   [cyan]runagent deploy-local --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]")
+            
+            return
+        
+        if agent_id:
+            # Show specific agent info
+            result = local_client.get_agent_info(agent_id)
+            if result.get('success'):
+                agent_info = result['agent_info']
+                console.print(f"\n📊 [bold]Agent: {agent_id}[/bold]")
+                console.print(f"Status: {agent_info['status']}")
+                console.print(f"Framework: {agent_info['framework']}")
+                console.print(f"Deployed: {agent_info['deployed_at']}")
+                console.print(f"Source Path: {agent_info['folder_path']}")
+                console.print(f"Deployment Path: {agent_info['deployment_path']}")
+                console.print(f"Files Exist: {'✅' if agent_info.get('deployment_exists') else '❌'}")
+                console.print(f"Source Exists: {'✅' if agent_info.get('source_exists') else '❌'}")
+                
+                stats = agent_info.get('stats', {})
+                if stats:
+                    console.print(f"\n📈 [bold]Statistics:[/bold]")
+                    console.print(f"Total Runs: {stats.get('total_runs', 0)}")
+                    console.print(f"Success Rate: {stats.get('success_rate', 0)}%")
+                    console.print(f"Last Run: {stats.get('last_run', 'Never')}")
+                    console.print(f"Avg Execution Time: {stats.get('avg_execution_time', 'N/A')}s")
+                
+                recent_runs = agent_info.get('recent_runs', [])
+                if recent_runs:
+                    console.print(f"\n📝 [bold]Recent Runs:[/bold]")
+                    for run in recent_runs[:3]:
+                        status = "✅" if run['success'] else "❌"
+                        console.print(f"  {status} {run['started_at']} ({run.get('execution_time', 'N/A')}s)")
+            else:
+                console.print(f"❌ {result.get('error')}")
+        else:
+            # Show database stats
+            stats = local_client.get_database_stats()
+            capacity_info = local_client.get_capacity_info()
+            
+            if stats:
+                console.print("\n📊 [bold]Local Database Status[/bold]")
+                console.print(f"Capacity: {capacity_info.get('current_count', 0)}/5 agents ({'FULL' if capacity_info.get('is_full') else 'OK'})")
+                console.print(f"Total Runs: {stats.get('total_runs', 0)}")
+                console.print(f"Database Size: {stats.get('database_size_mb', 0)} MB")
+                console.print(f"Database Path: {stats.get('database_path', 'Unknown')}")
+                
+                status_counts = stats.get('agent_status_counts', {})
+                if status_counts:
+                    console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
+                    for status, count in status_counts.items():
+                        console.print(f"  {status}: {count}")
+                
+                # List agents
+                agents_result = local_client.list_local_agents()
+                if agents_result.get('success'):
+                    agents = agents_result.get('agents', [])
+                    if agents:
+                        console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
+                        for agent in agents:
+                            status_icon = "🟢" if agent['status'] == 'deployed' else "🔴" if agent['status'] == 'error' else "🟡"
+                            exists_icon = "📁" if agent.get('exists') else "❌"
+                            console.print(f"  {status_icon} {exists_icon} {agent['agent_id']} ({agent['framework']}) - {agent['status']}")
+                        
+                        console.print(f"\n💡 Use --agent-id <id> for detailed info")
+                        console.print(f"💡 Use --capacity for capacity management info")
+        
+        # Cleanup if requested
+        if cleanup_days:
+            console.print(f"\n🧹 Cleaning up run records older than {cleanup_days} days...")
+            cleanup_result = local_client.cleanup_old_runs(cleanup_days)
+            if cleanup_result.get('success'):
+                console.print(f"✅ {cleanup_result.get('message')}")
+            else:
+                console.print(f"❌ {cleanup_result.get('error')}")
+        
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+
 def _detect_framework(folder_path: str) -> str:
     """Detect framework from agent files"""
     folder = Path(folder_path)
@@ -553,3 +697,4 @@ def _detect_framework(folder_path: str) -> str:
             pass
     
     return 'unknown'
+
