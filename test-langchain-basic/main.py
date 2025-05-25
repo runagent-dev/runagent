@@ -48,7 +48,7 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
                 "type": "string",
                 "content": response,
                 "metadata": {
-                    "model_used": config.get("model", "gpt-4"),
+                    "model_used": config.get("model", "gpt-4o-mini"),
                     "framework": "langchain",
                     "template": "basic",
                     "execution_time": execution_time,

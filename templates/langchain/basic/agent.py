@@ -1,8 +1,8 @@
 from typing import Dict, Any
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 import os
 from dotenv import load_dotenv
 
@@ -16,7 +16,7 @@ class LangChainBasicAgent:
         self.config = config or {}
         self.llm = ChatOpenAI(
             temperature=self.config.get("temperature", 0.7),
-            model_name=self.config.get("model", "gpt-4o-mini"),
+            model=self.config.get("model", "gpt-4o-mini"),
             api_key=os.getenv("OPENAI_API_KEY")
         )
         self.memory = ConversationBufferMemory()
