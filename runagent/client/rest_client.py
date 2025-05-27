@@ -146,13 +146,16 @@ class RestClient:
     def _upload_to_server(self, zip_path: str, metadata: Dict, progress: Progress, task_id) -> Dict:
         """Upload zip file to middleware server"""
         try:
-            upload_url = f"{self.api_url}/api/v1/agents/upload"
+            # Change this line to use the correct endpoint
+            upload_url = f"{self.api_url}/agents/upload"  # Changed from /api/v1/agents/upload
             
             # Prepare files and data
             with open(zip_path, 'rb') as f:
                 files = {'file': (os.path.basename(zip_path), f, 'application/zip')}
                 data = {
-                    'metadata': json.dumps(metadata)
+                    'metadata_json': json.dumps(metadata),  # Changed from 'metadata' to 'metadata_json'
+                    'framework': metadata.get('framework', 'unknown'),
+                    'name': metadata.get('name', os.path.basename(zip_path).replace('.zip', ''))
                 }
                 
                 # Update progress during upload
@@ -170,7 +173,13 @@ class RestClient:
                 progress.update(task_id, completed=100)
             
             if response.status_code == 200:
-                return response.json()
+                result = response.json()
+                return {
+                    'success': result.get('success', False),
+                    'agent_id': result.get('agent_id'),
+                    'message': result.get('message', 'Upload completed'),
+                    'status': result.get('status', 'uploaded')
+                }
             else:
                 try:
                     error_data = response.json()
@@ -213,12 +222,10 @@ class RestClient:
         try:
             console.print(f"🚀 Starting agent: [bold magenta]{agent_id}[/bold magenta]")
             
-            start_url = f"{self.api_url}/api/v1/agents/{agent_id}/start"
+            # Change this line to use the correct endpoint
+            start_url = f"{self.api_url}/agents/{agent_id}/start"  # Changed from /api/v1/agents/{agent_id}/start
             
-            payload = {
-                'config': config or {},
-                'started_at': time.strftime('%Y-%m-%d %H:%M:%S')
-            }
+            payload = config or {}
             
             response = self.session.post(start_url, json=payload, timeout=60)
             
@@ -231,23 +238,23 @@ class RestClient:
                     console.print(Panel(
                         f"✅ [bold green]Agent started successfully![/bold green]\n"
                         f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                        f"🌐 Endpoint: [link]{endpoint}[/link]",
+                        f"🌐 Endpoint: [link]{self.api_url}{endpoint}[/link]",
                         title="🚀 Deployment Complete",
                         border_style="green"
                     ))
                     
                     # Update local deployment info
                     self._update_deployment_info(agent_id, {
-                        'status': 'running',
-                        'endpoint': endpoint,
-                        'started_at': payload['started_at']
+                        'status': 'deployed',
+                        'endpoint': f"{self.api_url}{endpoint}",
+                        'started_at': time.strftime('%Y-%m-%d %H:%M:%S')
                     })
                     
                     return {
                         'success': True,
                         'agent_id': agent_id,
-                        'endpoint': endpoint,
-                        'status': 'running'
+                        'endpoint': f"{self.api_url}{endpoint}",
+                        'status': 'deployed'
                     }
                 else:
                     return result

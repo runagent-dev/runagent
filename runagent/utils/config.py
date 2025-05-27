@@ -119,32 +119,25 @@ class Config:
     @staticmethod
     def get_base_url() -> str:
         """
-        Get API URL from user config or environment variable
+        Get API URL from environment variable first, then user config, then default
         
         Returns:
             API URL
         """
-            # * source 1: CLI/SDK direct input
-            # * source 1.5: User config file
-            # * source 2: Environment Key
-            # * source 3: Default Value
-
-        # Check user config
-        user_config = Config.get_user_config()
-        api_url = user_config.get('base_url')
-
-        # Check environment variable
-        if not api_url:
-            api_url = os.environ.get(ENV_RUNAGENT_BASE_URL)
+        # Check environment variable first
+        api_url = os.environ.get(ENV_RUNAGENT_BASE_URL)
         
+        # Check user config if no environment variable
+        if not api_url:
+            user_config = Config.get_user_config()
+            api_url = user_config.get('base_url')
+        
+        # Use default if nothing else is set
         if not api_url:
             api_url = DEFAULT_BASE_URL
             
-        # if not api_url.startswith(('http://', 'https://')):
-        #     api_url = f"http://{base_url}"
-
         return api_url
-        
+            
     @staticmethod
     def set_base_url(base_url: str) -> bool:
         """
