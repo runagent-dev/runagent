@@ -4,13 +4,16 @@ RunAgent client for deploying and managing AI agents.
 import os
 import time
 import click
+import zipfile
 import inquirer
+import tempfile
 import typing as t
 from pathlib import Path
 from runagent.constants import (
     TemplateVariant, Framework, TEMPLATE_REPO_URL,
     TEMPLATE_PREPATH, TEMPLATE_BRANCH
 )
+from runagent.client.exceptions import ValidationError
 from runagent.client.template_downloader import TemplateDownloader
 from runagent.utils.config import Config
 from runagent.client.http import EndpointHandler
@@ -298,12 +301,12 @@ class RunAgentClient:
         folder: str = None,
         cli_mode: bool = None
     ):
-        """🚀 Initialize a new RunAgent project with framework selection
+        """🚀 Initialize a new RunAgent agent with framework selection
         
         Args:
             framework: Framework to use (required)
             template: Template variant (required)
-            folder: Project folder name
+            folder: Agent folder name
             cli_mode: Enable interactive prompts (None = use instance default)
         """
         # Use instance cli_mode if not explicitly provided
@@ -315,7 +318,7 @@ class RunAgentClient:
         
         if cli_mode:
             click.secho(
-                "🚀 Initializing RunAgent project...",
+                "🚀 Initializing RunAgent agent...",
                 fg='cyan',
                 bold=True
             )
@@ -343,30 +346,30 @@ class RunAgentClient:
         if not folder:
             if cli_mode:
                 folder = click.prompt(
-                    "📁 Project folder name",
+                    "📁 Agent folder name",
                     default=os.path.basename(os.getcwd())
                 )
             else:
                 # Use current directory name as default
                 folder = os.path.basename(os.getcwd())
         
-        project_dir = Path.cwd() / folder
+        agent_dir = Path.cwd() / folder
         
         # Check if folder already exists and handle appropriately
-        if project_dir.exists() and any(project_dir.iterdir()):
+        if agent_dir.exists() and any(agent_dir.iterdir()):
             if cli_mode:
                 if not click.confirm(
                     f"⚠️  Folder '{folder}' already exists and is not empty. "
                     "Continue?"
                 ):
-                    click.echo("Project initialization cancelled.")
+                    click.echo("Agent initialization cancelled.")
                     return False
             else:
                 raise ValueError(
                     f"Folder '{folder}' already exists and is not empty"
                 )
         
-        project_dir.mkdir(parents=True, exist_ok=True)
+        agent_dir.mkdir(parents=True, exist_ok=True)
         print(">>>", framework, ">>>", template)
         # Get available templates from repository
         try:
@@ -410,7 +413,7 @@ class RunAgentClient:
 
         # Download and generate template files
         return self._download_and_setup_template(
-            project_dir,
+            agent_dir,
             selected_framework,
             selected_template,
             folder,
@@ -540,17 +543,17 @@ class RunAgentClient:
 
     def _download_and_setup_template(
         self,
-        project_dir: Path,
+        agent_dir: Path,
         framework: str,
         template: str,
         folder: str,
         cli_mode: bool = False
     ):
-        """Download template from git repository and set up the project"""
+        """Download template from git repository and set up the agent"""
         
         try:
             if cli_mode:
-                click.secho("📦 Downloading project template...", fg='cyan')
+                click.secho("📦 Downloading agent template...", fg='cyan')
             
             # Initialize template downloader
             downloader = TemplateDownloader(
@@ -558,17 +561,17 @@ class RunAgentClient:
                 branch=TEMPLATE_BRANCH
             )
             
-            # Download template to project directory
+            # Download template to agent directory
             downloader.download_template(
                 prepath=TEMPLATE_PREPATH,
                 framework=framework,
                 template=template,
-                target_folder=str(project_dir)
+                target_folder=str(agent_dir)
             )
             
-            # Create project configuration
+            # Create agent configuration
             config_content = {
-                "project_name": folder,
+                "agent_name": folder,
                 "framework": framework,
                 "template": template,
                 "version": "0.1.0",
@@ -579,11 +582,11 @@ class RunAgentClient:
                     "path": f"{TEMPLATE_PREPATH}/{framework}/{template}"
                 }
             }
-            Config.create_config(project_dir, config_content)
+            Config.create_config(agent_dir, config_content)
             
             if cli_mode:
                 click.secho(
-                    f"✅ Successfully initialized RunAgent project in "
+                    f"✅ Successfully initialized RunAgent agent in "
                     f"📁 {folder}\n",
                     fg='green',
                     bold=True
@@ -591,12 +594,12 @@ class RunAgentClient:
                 
                 # List created files
                 click.secho("🗂️  Files created:", fg='cyan')
-                for file_path in project_dir.rglob('*'):
+                for file_path in agent_dir.rglob('*'):
                     if (
                         file_path.is_file()
                         and not file_path.name.startswith('.')
                     ):
-                        relative_path = file_path.relative_to(project_dir)
+                        relative_path = file_path.relative_to(agent_dir)
                         click.echo(f"  - {relative_path}")
 
                 click.secho("\n📝 Next steps:", fg='yellow')
@@ -650,4 +653,110 @@ class RunAgentClient:
             else:
                 raise RuntimeError(error_msg)
             return None
+    def validate_agent(self, agent_dir: t.Union[str, Path]) -> t.Tuple[bool, t.Dict[str, t.Any]]:
+        """Validate the agent structure and configuration.
+        
+        Args:
+            agent_dir: Path to the agent directory
+            
+        Returns:
+            Tuple of (is_valid, metadata_dict)
+        """
+        agent_dir = Path(agent_dir)
+        metadata = {
+            "file_structure": {},
+            "total_size": 0,
+            "file_count": 0,
+            "config_exists": False,
+            "run_function_exists": False
+        }
+        
+        # Check if runagent config exists
+        config_path = agent_dir / "runagent.yaml"
+        if not config_path.exists():
+            return False, metadata
+        metadata["config_exists"] = True
+        
+        # Check if runagent.py exists and has run function
+        runagent_path = agent_dir / "runagent.py"
+        if runagent_path.exists():
+            try:
+                with open(runagent_path, 'r') as f:
+                    content = f.read()
+                    metadata["run_function_exists"] = "def run(" in content
+            except Exception:
+                pass
+        
+        # Collect file structure and metadata
+        for path in agent_dir.rglob("*"):
+            if path.is_file():
+                rel_path = str(path.relative_to(agent_dir))
+                size = path.stat().st_size
+                metadata["file_structure"][rel_path] = {
+                    "size": size,
+                    "type": path.suffix
+                }
+                metadata["total_size"] += size
+                metadata["file_count"] += 1
+        
+        is_valid = metadata["config_exists"] and metadata["run_function_exists"]
+        return is_valid, metadata
 
+    def upload_agent(self, agent_dir: t.Union[str, Path] = None) -> bool:
+        """Upload an agent to RunAgent.
+        
+        Args:
+            agent_dir: Path to agent directory (defaults to current directory)
+            
+        Returns:
+            bool: True if upload was successful
+        """
+        if agent_dir is None:
+            agent_dir = Path.cwd()
+        else:
+            agent_dir = Path(agent_dir)
+        
+        # Validate agent
+        is_valid, metadata = self.validate_agent(agent_dir)
+        if not is_valid:
+            error_msg = "Invalid agent structure. Make sure runagent.yaml exists and runagent.py contains a run function."
+            if self.cli_mode:
+                click.secho(f"❌ {error_msg}", fg='red', err=True)
+            else:
+                raise ValidationError(error_msg)
+            return False
+        
+        try:
+            # Create temporary directory for zip
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                zip_path = temp_path / "agent.zip"
+                
+                # Create zip file
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for path in agent_dir.rglob("*"):
+                        if path.is_file():
+                            arcname = str(path.relative_to(agent_dir))
+                            zipf.write(path, arcname)
+                
+                # Upload agent
+                response = self.endpoint_handler.upload_agent(
+                    project_zip=zip_path,
+                    metadata=metadata
+                )
+                
+                if self.cli_mode:
+                    if response.get("status") == ResponseStatus.SUCCESS.value:
+                        click.secho("✅ Agent uploaded successfully!", fg='green')
+                    else:
+                        click.secho(f"❌ Upload failed: {response.get('message')}", fg='red', err=True)
+                
+                return response.get("status") == ResponseStatus.SUCCESS.value
+                
+        except Exception as e:
+            error_msg = f"Error uploading agent: {str(e)}"
+            if self.cli_mode:
+                click.secho(f"❌ {error_msg}", fg='red', err=True)
+            else:
+                raise RuntimeError(error_msg)
+            return False
