@@ -1,0 +1,24 @@
+name: "basic_agent"
+description: "A simple agent that responds to basic queries"
+
+framework: "langgraph"
+source-template: 
+
+
+# Environment configuration
+environment:
+  # API keys and secrets
+  OPENAI_API_KEY: gefkwjrhewlkhfrl
+
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "agent.log"
+
+# Security settings
+security:
+  rate_limit: 100  # requests per minute
+  allowed_origins: ["*"]
+  require_auth: false
