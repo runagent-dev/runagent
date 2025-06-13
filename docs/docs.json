@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "RunAgent",
   "colors": {
     "primary": "#006AD4",
     "light": "#007FFF",
@@ -57,14 +57,9 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://runagent.live/docs",
-          "icon": "book-open-cover"
-        },
-        {
           "anchor": "Community",
           "href": "https://runagent.live/community",
-          "icon": "slack"
+          "icon": "discord"
         },
         {
           "anchor": "Blog",
@@ -81,21 +76,21 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:sawradip@runagent.live"
+        "label": "Dashboard",
+        "href": "https://runagent.live/dashboard"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Get API Key",
+      "href": "https://runagent.live/profile"
     }
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/run_agent",
+      "github": "https://github.com/runagent-dev/runagent",
+      "linkedin": "https://linkedin.com/company/runagent"
     }
   }
 }
