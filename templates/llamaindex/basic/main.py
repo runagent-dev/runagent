@@ -1,16 +1,16 @@
 from typing import Dict, Any
 import time
-from agent import LangGraphBasicAgent
+from agent import LlamaIndexBasicAgent
 
 def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main entry point for the LangGraph Basic agent
+    Main entry point for the LlamaIndex Basic agent
     
     Args:
         input_data: Dictionary containing:
             - messages: List of message objects with 'role' and 'content'
             - config: Optional configuration parameters
-            - context: Optional context data
+            - documents: Optional list of additional documents to index
             
     Returns:
         Dictionary with result, errors, and success status
@@ -21,7 +21,7 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
         # Extract data
         config = input_data.get("config", {})
         messages = input_data.get("messages", [])
-        context = input_data.get("context", {})
+        additional_docs = input_data.get("documents", [])
         
         if not messages:
             return {
@@ -37,10 +37,14 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
             }
         
         # Initialize agent
-        agent = LangGraphBasicAgent(config)
+        agent = LlamaIndexBasicAgent(config)
+        
+        # Add additional documents if provided
+        if additional_docs:
+            agent.add_documents(additional_docs)
         
         # Process messages
-        response = agent.process_messages(messages, context)
+        response = agent.process_messages(messages)
         
         # Calculate execution time
         execution_time = time.time() - start_time
@@ -48,14 +52,15 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "result": {
                 "type": "string",
-                "content": response["response"],
+                "content": response["answer"],
                 "metadata": {
                     "model_used": config.get("model", "gpt-4"),
-                    "framework": "langgraph",
+                    "framework": "llamaindex",
                     "template": "basic",
                     "execution_time": execution_time,
-                    "graph_structure": agent.get_graph_structure(),
-                    "steps_taken": response.get("steps_taken", 1),
+                    "index_stats": agent.get_index_stats(),
+                    "sources_used": len(response.get("source_nodes", [])),
+                    "source_nodes": response.get("source_nodes", []),
                     "conversation_length": len(messages)
                 }
             },

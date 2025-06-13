@@ -1,9 +1,10 @@
-# RunAgent
+# RunAgent - Production Depolyment of AI Agents
 
-[![PyPI version](https://badge.fury.io/py/runagent.svg)](https://badge.fury.io/py/runagent)
+[![PyPI](https://img.shields.io/pypi/v/runagent)](https://pypi.org/project/runagent/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/runagent)](https://pypi.org/project/runagent/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/runagent.svg)](https://pypi.org/project/runagent/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.runagent.dev)
+[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.runagent.live)
 [![Discord](https://img.shields.io/discord/1234567890?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/runagent)
 
 RunAgent is a powerful command-line tool and SDK for deploying, managing, and interacting with AI agents. Built with modern Python practices, it provides a seamless experience for both developers and AI practitioners.

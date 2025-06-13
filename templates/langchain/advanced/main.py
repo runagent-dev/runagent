@@ -1,16 +1,15 @@
 from typing import Dict, Any
 import time
-from agent import LangGraphBasicAgent
+from agent import LangChainAdvancedAgent
 
 def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main entry point for the LangGraph Basic agent
+    Main entry point for the LangChain Advanced agent
     
     Args:
         input_data: Dictionary containing:
             - messages: List of message objects with 'role' and 'content'
             - config: Optional configuration parameters
-            - context: Optional context data
             
     Returns:
         Dictionary with result, errors, and success status
@@ -18,10 +17,9 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
     start_time = time.time()
     
     try:
-        # Extract data
+        # Extract configuration
         config = input_data.get("config", {})
         messages = input_data.get("messages", [])
-        context = input_data.get("context", {})
         
         if not messages:
             return {
@@ -37,10 +35,10 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
             }
         
         # Initialize agent
-        agent = LangGraphBasicAgent(config)
+        agent = LangChainAdvancedAgent(config)
         
         # Process messages
-        response = agent.process_messages(messages, context)
+        response = agent.process_messages(messages)
         
         # Calculate execution time
         execution_time = time.time() - start_time
@@ -48,15 +46,16 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "result": {
                 "type": "string",
-                "content": response["response"],
+                "content": response["output"],
                 "metadata": {
                     "model_used": config.get("model", "gpt-4"),
-                    "framework": "langgraph",
-                    "template": "basic",
+                    "framework": "langchain",
+                    "template": "advanced",
                     "execution_time": execution_time,
-                    "graph_structure": agent.get_graph_structure(),
-                    "steps_taken": response.get("steps_taken", 1),
-                    "conversation_length": len(messages)
+                    "tools_available": agent.get_available_tools(),
+                    "tools_used": response.get("tools_used", []),
+                    "conversation_length": len(messages),
+                    "intermediate_steps": len(response.get("intermediate_steps", []))
                 }
             },
             "errors": [],

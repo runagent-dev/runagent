@@ -89,6 +89,7 @@ celerybeat-schedule
 .venv
 env/
 venv/
+run/
 ENV/
 env.bak/
 venv.bak/
@@ -138,3 +139,9 @@ Desktop.ini
 *.swp
 *.swo
 *~
+test-*/
+# Ignore deployments folder
+deployments/
+.deployments/
+
+

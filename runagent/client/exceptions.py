@@ -3,7 +3,6 @@ RunAgent SDK Custom exceptions.
 """
 import typing as t
 
-
 class ClientError(Exception):
     """Base exception for client errors."""
     def __init__(self, message: str, status_code: t.Optional[int] = None, response: t.Optional[t.Any] = None):

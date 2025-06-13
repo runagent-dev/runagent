@@ -244,6 +244,7 @@ class EndpointHandler(HttpHandler):
             return self._get(f"/resources/{resource_id}")
         except ClientError as e:
             if e.status_code == 404:
+                
                 console.print(f"[yellow]Resource with ID {resource_id} not found.[/yellow]")
                 return {"status": ResponseStatus.ERROR.value, "message": f"Resource with ID {resource_id} not found"}
             else:

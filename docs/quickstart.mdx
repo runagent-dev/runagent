@@ -1,5 +1,5 @@
 ---
-title: 'RunAgnet Quickstart'
+title: 'Quickstart'
 description: 'Start building awesome documentation in under 5 minutes'
 ---
 
@@ -20,22 +20,11 @@ Learn how to update your docs locally and deploy them to the public.
   </Accordion>
   <Accordion icon="rectangle-terminal" title="Preview changes">
     Previewing helps you make sure your changes look as intended. We built a
-    command line interface to render these changes locally. 
-    1. Install the
+    command line interface to render these changes locally. 1. Install the
     [Mintlify CLI](https://www.npmjs.com/package/mintlify) to preview the
     documentation changes locally with this command: ``` npm i -g mintlify ```
     2. Run the following command at the root of your documentation (where
-    `docs.json` is): ``` mintlify dev ```
-    <Note>
-      If you’re currently using the legacy ```mint.json``` configuration file, please update the Mintlify CLI:
-
-
-      ```npm i -g mintlify@latest```
-      And run the new upgrade command in your docs repository:
-
-      ```mintlify upgrade```
-      You should now be using the new ```docs.json``` configuration file. Feel free to delete the ```mint.json``` file from your repository.
-    </Note>
+    `mint.json` is): ``` mintlify dev ```
   </Accordion>
 </AccordionGroup>
 
@@ -66,32 +55,32 @@ Add content directly in your files with MDX syntax and React components. You can
 
 <CardGroup>
 
-<Card title="Add Content With MDX" icon="file" href="/essentials/markdown">
-  Add content to your docs with MDX syntax.
+<Card title="Style Your Docs" icon="paintbrush" href="/settings/global">
+  Add flair to your docs with personalized branding.
 </Card>
 
 <Card
-  title="Add Code Blocks"
+  title="Add API Endpoints"
   icon="square-code"
-  href="/essentials/code"
+  href="/api-playground/configuration"
 >
-  Add code directly to your docs with syntax highlighting.
+  Implement your OpenAPI spec and enable API user interaction.
 </Card>
 
 <Card
-  title="Add Images"
-  icon="image"
-  href="/essentials/images"
+  title="Integrate Analytics"
+  icon="chart-mixed"
+  href="/analytics/supported-integrations"
 >
-  Add images to your docs to make them more engaging.
+  Draw insights from user interactions with your documentation.
 </Card>
 
 <Card
-  title="Add Custom Components"
-  icon="puzzle-piece"
-  href="/essentials/reusable-snippets"
+  title="Host on a Custom Domain"
+  icon="browser"
+  href="/settings/custom-domain/subdomain"
 >
-  Add templates to your docs to make them more reusable.
+  Keep your docs on your own website's subdomain.
 </Card>
 
 </CardGroup>

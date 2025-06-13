@@ -1,10 +1,10 @@
 from typing import Dict, Any
 import time
-from agent import LangGraphBasicAgent
+from agent import LangGraphAdvancedAgent
 
 def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main entry point for the LangGraph Basic agent
+    Main entry point for the LangGraph Advanced agent
     
     Args:
         input_data: Dictionary containing:
@@ -37,7 +37,7 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
             }
         
         # Initialize agent
-        agent = LangGraphBasicAgent(config)
+        agent = LangGraphAdvancedAgent(config)
         
         # Process messages
         response = agent.process_messages(messages, context)
@@ -48,14 +48,16 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "result": {
                 "type": "string",
-                "content": response["response"],
+                "content": response["final_answer"],
                 "metadata": {
                     "model_used": config.get("model", "gpt-4"),
                     "framework": "langgraph",
-                    "template": "basic",
+                    "template": "advanced",
                     "execution_time": execution_time,
                     "graph_structure": agent.get_graph_structure(),
-                    "steps_taken": response.get("steps_taken", 1),
+                    "tools_available": agent.get_available_tools(),
+                    "tools_used": response.get("tools_used", []),
+                    "steps_taken": response.get("steps_taken", 0),
                     "conversation_length": len(messages)
                 }
             },
