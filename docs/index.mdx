@@ -1,71 +1,75 @@
 ---
 title: Introduction
-description: "Welcome to the home of your new documentation"
+description: "RunAgent: Easy Serverless Deployment for AI Agents"
 ---
 
 <img
   className="block dark:hidden"
   src="/images/hero.png"
-  alt="Hero Light"
+  alt="RunAgent Hero Light"
 />
 <img
   className="hidden dark:block"
   src="/images/hero.png"
-  alt="Hero Dark"
+  alt="RunAgent Hero Dark"
 />
 
-## Setting up
+## What is RunAgent?
 
-The first step to world-class documentation is setting up your editing environments.
+**RunAgent** is a unified platform for deploying, managing, and scaling AI agents—no matter which framework you use. Whether your agent is built with LangChain, LangGraph, or any other popular library, RunAgent makes it simple to go from local code to a production-ready, serverless deployment in minutes.
 
-<CardGroup cols={2}>
-  <Card
-    title="Edit Your Docs"
-    icon="pen-to-square"
-    href="https://mintlify.com/docs/quickstart"
-  >
-    Get your docs set up locally for easy development
-  </Card>
-  <Card
-    title="Preview Changes"
-    icon="image"
-    href="https://mintlify.com/docs/development"
-  >
-    Preview your changes before you push to make sure they're perfect
-  </Card>
-</CardGroup>
+- **Framework Agnostic:** Deploy agents built with LangChain, LangGraph, and more.
+- **Serverless & Scalable:** Instantly scale your agents with zero infrastructure management.
+- **Unified Dashboard:** Monitor, manage, and analyze all your deployed agents in one place.
 
-## Make it yours
+## How It Works
 
-Update your docs to your brand and add valuable content for the best user conversion.
+Getting started with RunAgent is fast and easy:
 
 <CardGroup cols={2}>
   <Card
-    title="Customize Style"
-    icon="palette"
-    href="https://mintlify.com/docs/settings/global"
+    title="Install CLI"
+    icon="terminal"
+    href="https://pypi.org/project/runagent/"
   >
-    Customize your docs to your company's colors and brands
+    <code>pip install runagent</code>
+    <br />
+    Install the RunAgent CLI to get started.
   </Card>
   <Card
-    title="Reference APIs"
-    icon="code"
-    href="https://mintlify.com/docs/api-playground/openapi"
+    title="Initialize Your Project"
+    icon="rocket"
+    href="/quickstart"
   >
-    Automatically generate endpoints from an OpenAPI spec
+    <code>runagent init --framework langgraph</code>
+    <br />
+    Scaffold a ready-to-deploy agent template for your favorite framework.
   </Card>
   <Card
-    title="Add Components"
-    icon="screwdriver-wrench"
-    href="https://mintlify.com/docs/content/components/accordions"
+    title="Convert & Deploy"
+    icon="cloud-arrow-up"
+    href="/essentials/deployment"
   >
-    Build interactive features and designs to guide your users
+    <code>runagent deploy .</code>
+    <br />
+    Convert your agent to the RunAgent format and deploy it serverlessly with a single command.
   </Card>
   <Card
-    title="Get Inspiration"
-    icon="stars"
-    href="https://mintlify.com/customers"
+    title="Try & Integrate"
+    icon="plug"
+    href="/api-reference/introduction"
   >
-    Check out our showcase of our favorite documentation
+    Instantly test your agent from the dashboard, or invoke it via the Python SDK, REST API, or upcoming JS/Rust SDKs.
   </Card>
 </CardGroup>
+
+## Why RunAgent?
+
+- **Super Easy to Use:** Deploy and update agents with a single command.
+- **Unified Monitoring:** View all your agents, usage stats, and logs in one dashboard.
+- **Flexible Integration:** Invoke agents from the web UI, Python SDK, REST API, or (soon) JS/Rust SDKs.
+- **Production Ready:** Built for reliability, scalability, and security.
+
+---
+
+Ready to deploy your first agent? Head to the [Quickstart](quickstart) or explore the docs to learn more!
