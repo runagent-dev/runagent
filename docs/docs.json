@@ -58,32 +58,36 @@
       "anchors": [
         {
           "anchor": "Community",
-          "href": "https://runagent.live/community",
+          "href": "https://run-agent.ai/community",
           "icon": "discord"
         },
         {
           "anchor": "Blog",
-          "href": "https://runagent.live/blog",
+          "href": "https://run-agent.ai/blog",
           "icon": "newspaper"
         }
       ]
     }
   },
   "logo": {
-    "light": "/logo/light.png",
-    "dark": "/logo/dark.png"
+    "light": "/logo/RunAgent_logo_dark.svg",
+    "dark": "/logo/RunAgent_logo_dark.svg"
   },
   "navbar": {
     "links": [
       {
+        "label": "Github",
+        "href": "https:/github.com/runagent-dev/runagent"
+      },
+      {
         "label": "Dashboard",
-        "href": "https://runagent.live/dashboard"
+        "href": "https://run-agent.ai/dashboard"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get API Key",
-      "href": "https://runagent.live/profile"
+      "href": "https://run-agent.ai/profile"
     }
   },
   "footer": {
