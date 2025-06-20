@@ -1,6 +1,24 @@
+"""
+CLI commands that use the restructured SDK internally.
+"""
+
 import click
-import inquirer
-from runagent.client import RunAgentClient
+import json
+import requests
+from pathlib import Path
+from rich.console import Console
+
+# Import the new SDK
+from runagent import RunAgent
+from runagent.client.exceptions import (
+    RunAgentError,
+    AuthenticationError,
+    ValidationError,
+    TemplateError,
+    ConnectionError
+)
+
+console = Console()
 
 
 @click.command()
@@ -9,285 +27,343 @@ from runagent.client import RunAgentClient
 @click.option('--force', is_flag=True, help='Force reconfiguration')
 def setup(api_key, base_url, force):
     """Setup RunAgent authentication"""
-    client = RunAgentClient(cli_mode=True)  # Enable interactive mode
-    client.setup(api_key=api_key, base_url=base_url, force=force)
+    try:
+        sdk = RunAgent()
+        
+        # Check if already configured
+        if sdk.is_configured() and not force:
+            config_status = sdk.get_config_status()
+            console.print("⚠️ RunAgent is already configured:")
+            console.print(f"   Base URL: [blue]{config_status.get('base_url')}[/blue]")
+            console.print(f"   User: [green]{config_status.get('user_info', {}).get('email', 'Unknown')}[/green]")
+            
+            if not click.confirm("Do you want to reconfigure?"):
+                return
+        
+        # Configure SDK
+        sdk.configure(api_key=api_key, base_url=base_url, save=True)
+        
+        console.print("✅ [green]Setup completed successfully![/green]")
+        
+        # Show user info
+        config_status = sdk.get_config_status()
+        user_info = config_status.get('user_info', {})
+        if user_info:
+            console.print("\n👤 [bold]User Information:[/bold]")
+            for key, value in user_info.items():
+                console.print(f"   {key}: [cyan]{value}[/cyan]")
+        
+    except AuthenticationError as e:
+        console.print(f"❌ [red]Authentication failed:[/red] {e}")
+        raise click.ClickException("Setup failed")
+    except Exception as e:
+        console.print(f"❌ [red]Setup error:[/red] {e}")
+        raise click.ClickException("Setup failed")
 
 
 @click.command()
 @click.option('--yes', is_flag=True, help='Skip confirmation')
 def teardown(yes):
     """Remove RunAgent configuration"""
-    client = RunAgentClient(cli_mode=True)  # Enable interactive mode
-    client.teardown(confirm=yes)
+    try:
+        sdk = RunAgent()
+        
+        if not yes:
+            config_status = sdk.get_config_status()
+            if config_status.get('configured'):
+                console.print("📋 [bold]Current configuration:[/bold]")
+                console.print(f"   Base URL: [blue]{config_status.get('base_url')}[/blue]")
+                user_info = config_status.get('user_info', {})
+                if user_info.get('email'):
+                    console.print(f"   User: [green]{user_info.get('email')}[/green]")
+            
+            if not click.confirm("⚠️ This will remove all RunAgent configuration. Continue?"):
+                console.print("Teardown cancelled.")
+                return
+        
+        # Clear configuration
+        sdk.config.clear()
+        
+        console.print("✅ [green]RunAgent teardown completed successfully![/green]")
+        console.print("💡 Run [cyan]'runagent setup --api-key <key>'[/cyan] to reconfigure")
+        
+    except Exception as e:
+        console.print(f"❌ [red]Teardown error:[/red] {e}")
+        raise click.ClickException("Teardown failed")
 
 
 @click.command()
 @click.option('--folder', help='Project folder name')
-@click.option('--framework', default=None, help='Framework to use (langchain, langgraph, llamaindex). Defaults to langchain if not specified')
-@click.option('--template', default=None, help='Template variant (basic, advanced). Defaults to basic if not specified')
-@click.option('--non-interactive', is_flag=True, help='Skip interactive prompts and use defaults (langchain/basic)')
-def init(folder, framework, template, non_interactive):
-    """Initialize a new RunAgent project
+@click.option('--framework', default=None, help='Framework to use (langchain, langgraph, llamaindex)')
+@click.option('--template', default=None, help='Template variant (basic, advanced)')
+@click.option('--non-interactive', is_flag=True, help='Skip interactive prompts')
+@click.option('--overwrite', is_flag=True, help='Overwrite existing folder')
+def init(folder, framework, template, non_interactive, overwrite):
+    """Initialize a new RunAgent project"""
     
-    Examples:
-      runagent init                                    # Interactive mode
-      runagent init --non-interactive                  # Use defaults (langchain/basic)  
-      runagent init --framework langgraph             # Specify framework, prompt for template
-      runagent init --framework langchain --template advanced  # Specify both (no prompts)
-    """
-    
-    # Determine if we should use CLI mode
-    # CLI mode is disabled if --non-interactive is used OR if both framework and template are provided
-    use_cli_mode = not non_interactive and not (framework and template)
-    
-    client = RunAgentClient(cli_mode=use_cli_mode)
-    
-    # Call the init method
-    success = client.init(
-        framework=framework, 
-        template=template, 
-        folder=folder
-    )
-    
-    if not success:
+    try:
+        sdk = RunAgent()
+        
+        # Get folder name
+        if not folder:
+            if non_interactive:
+                folder = "runagent-project"
+            else:
+                folder = click.prompt("📁 Project folder name", default="runagent-project")
+        
+        # Interactive framework selection
+        if not non_interactive and not framework:
+            templates = sdk.list_templates()
+            frameworks = list(templates.keys())
+            
+            console.print("🎯 [bold]Available frameworks:[/bold]")
+            for i, fw in enumerate(frameworks, 1):
+                console.print(f"  {i}. {fw}")
+            
+            choice = click.prompt(
+                "Select framework",
+                type=click.IntRange(1, len(frameworks)),
+                default=1
+            )
+            framework = frameworks[choice - 1]
+        
+        # Interactive template selection
+        if not non_interactive and not template:
+            templates = sdk.list_templates(framework)
+            template_list = templates.get(framework, ['basic'])
+            
+            console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
+            for i, tmpl in enumerate(template_list, 1):
+                console.print(f"  {i}. {tmpl}")
+            
+            choice = click.prompt(
+                "Select template",
+                type=click.IntRange(1, len(template_list)),
+                default=1
+            )
+            template = template_list[choice - 1]
+        
+        # Use defaults if not specified
+        framework = framework or "langchain"
+        template = template or "basic"
+        
+        console.print(f"\n🚀 [bold]Initializing project:[/bold]")
+        console.print(f"   Folder: [cyan]{folder}[/cyan]")
+        console.print(f"   Framework: [magenta]{framework}[/magenta]")
+        console.print(f"   Template: [yellow]{template}[/yellow]")
+        
+        # Initialize project
+        success = sdk.init_project(
+            folder=folder,
+            framework=framework,
+            template=template,
+            overwrite=overwrite
+        )
+        
+        if success:
+            console.print(f"\n✅ [green]Project initialized successfully![/green]")
+            console.print(f"📁 Created: [cyan]{folder}[/cyan]")
+            
+            # Show next steps
+            console.print("\n📝 [bold]Next steps:[/bold]")
+            console.print(f"  1️⃣ [cyan]cd {folder}[/cyan]")
+            console.print(f"  2️⃣ Update your API keys in [yellow].env[/yellow] file")
+            console.print(f"  3️⃣ Test locally: [cyan]python main.py[/cyan]")
+            console.print(f"  4️⃣ Deploy: [cyan]runagent deploy-local --folder {folder}[/cyan]")
+        
+    except TemplateError as e:
+        console.print(f"❌ [red]Template error:[/red] {e}")
+        raise click.ClickException("Project initialization failed")
+    except FileExistsError as e:
+        console.print(f"❌ [red]Folder exists:[/red] {e}")
+        console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
+        raise click.ClickException("Project initialization failed")
+    except Exception as e:
+        console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
 
 
 @click.command()
 @click.option('--list', 'action_list', is_flag=True, help='List all available templates')
-@click.option('--info', 'action_info', is_flag=True, help='Get detailed information about a specific template')
+@click.option('--info', 'action_info', is_flag=True, help='Get detailed template information')
 @click.option('--framework', help='Framework name (required for --info)')
 @click.option('--template', help='Template name (required for --info)')
-@click.option('--filter-framework', help='Filter templates by framework when listing')
-@click.option('--format', type=click.Choice(['table', 'json', 'yaml']), default='table', help='Output format')
+@click.option('--filter-framework', help='Filter templates by framework')
+@click.option('--format', type=click.Choice(['table', 'json']), default='table', help='Output format')
 def template(action_list, action_info, framework, template, filter_framework, format):
-    """Manage project templates - list available templates or get detailed information"""
+    """Manage project templates"""
     
     if not action_list and not action_info:
-        click.echo("❌ Please specify either --list or --info")
-        click.echo("Usage examples:")
-        click.echo("  runagent template --list")
-        click.echo("  runagent template --info --framework langchain --template basic")
+        console.print("❌ Please specify either [cyan]--list[/cyan] or [cyan]--info[/cyan]")
         raise click.ClickException("No action specified")
     
-    if action_list and action_info:
-        click.echo("❌ Please specify only one action: --list or --info")
-        raise click.ClickException("Multiple actions specified")
-    
-    client = RunAgentClient(cli_mode=True)
-    
-    if action_list:
-        _handle_list_templates(client, filter_framework, format)
-    elif action_info:
-        _handle_template_info(client, framework, template)
-
-
-def _handle_list_templates(client, filter_framework, format):
-    """Handle the --list action"""
     try:
-        available_templates = client.list_templates()
+        sdk = RunAgent()
         
-        if not available_templates:
-            click.echo("❌ No templates available")
-            return
+        if action_list:
+            templates = sdk.list_templates(framework=filter_framework)
+            
+            if format == 'json':
+                console.print(json.dumps(templates, indent=2))
+            else:
+                console.print("📋 [bold cyan]Available Templates:[/bold cyan]")
+                for framework_name, template_list in templates.items():
+                    console.print(f"\n🎯 [bold blue]{framework_name}:[/bold blue]")
+                    for tmpl in template_list:
+                        console.print(f"  • {tmpl}")
+                
+                console.print(f"\n💡 Use [cyan]'runagent template --info --framework <fw> --template <tmpl>'[/cyan] for details")
         
-        # Apply framework filter if specified
-        if filter_framework:
-            if filter_framework not in available_templates:
-                click.echo(f"❌ Framework '{filter_framework}' not found")
-                click.echo(f"Available frameworks: {', '.join(available_templates.keys())}")
-                return
-            available_templates = {filter_framework: available_templates[filter_framework]}
-        
-        # Output in different formats
-        if format == 'json':
-            import json
-            click.echo(json.dumps(available_templates, indent=2))
-        elif format == 'yaml':
-            try:
-                import yaml
-                click.echo(yaml.dump(available_templates, default_flow_style=False))
-            except ImportError:
-                click.echo("❌ PyYAML not installed. Using JSON format instead.")
-                import json
-                click.echo(json.dumps(available_templates, indent=2))
-        else:  # table format (default)
-            click.secho("📋 Available Templates:", fg='cyan', bold=True)
+        elif action_info:
+            if not framework or not template:
+                console.print("❌ Both [cyan]--framework[/cyan] and [cyan]--template[/cyan] are required for --info")
+                raise click.ClickException("Missing required parameters")
             
-            for framework_name, templates in available_templates.items():
-                click.secho(f"\n🎯 {framework_name}:", fg='blue', bold=True)
-                for tmpl in templates:
-                    click.echo(f"  - {tmpl}")
+            template_info = sdk.get_template_info(framework, template)
             
-            click.echo(f"\n💡 Use 'runagent template --info --framework <framework> --template <template>' for details")
-            
-    except Exception as e:
-        click.echo(f"❌ Error listing templates: {str(e)}")
-
-
-def _handle_template_info(client, framework, template):
-    """Handle the --info action"""
-    if not framework or not template:
-        click.echo("❌ Both --framework and --template are required for --info")
-        click.echo("Usage: runagent template --info --framework <framework> --template <template>")
-        raise click.ClickException("Missing required parameters")
-    
-    try:
-        from runagent.constants import TEMPLATE_REPO_URL, TEMPLATE_BRANCH, TEMPLATE_PREPATH
-        from runagent.client.template_downloader import TemplateDownloader
-        
-        downloader = TemplateDownloader(TEMPLATE_REPO_URL, TEMPLATE_BRANCH)
-        info = downloader.get_template_info(TEMPLATE_PREPATH, framework, template)
-        
-        if info:
-            click.secho(f"📋 Template Information: {framework}/{template}", fg='cyan', bold=True)
-            click.echo(f"Framework: {info['framework']}")
-            click.echo(f"Template: {info['template']}")
-            
-            if 'metadata' in info:
-                metadata = info['metadata']
-                if 'description' in metadata:
-                    click.echo(f"Description: {metadata['description']}")
-                if 'requirements' in metadata:
-                    click.echo(f"Requirements: {', '.join(metadata['requirements'])}")
-                if 'version' in metadata:
-                    click.echo(f"Version: {metadata['version']}")
-                if 'author' in metadata:
-                    click.echo(f"Author: {metadata['author']}")
-            
-            click.echo(f"\n📁 Structure:")
-            click.echo(f"Files: {', '.join(info['files'])}")
-            if info['directories']:
-                click.echo(f"Directories: {', '.join(info['directories'])}")
-            
-            if 'readme' in info:
-                click.echo(f"\n📖 README:")
-                click.echo("-" * 50)
-                click.echo(info['readme'])
-                click.echo("-" * 50)
-            
-            click.echo(f"\n🚀 To use this template:")
-            click.echo(f"runagent init --framework {framework} --template {template}")
-            
-        else:
-            click.echo(f"❌ Template '{framework}/{template}' not found")
-            
-            # Suggest available templates for the framework
-            try:
-                available_templates = client.list_templates()
-                if framework in available_templates:
-                    click.echo(f"Available templates for {framework}: {', '.join(available_templates[framework])}")
+            if template_info:
+                console.print(f"📋 [bold cyan]Template: {framework}/{template}[/bold cyan]")
+                console.print(f"Framework: [magenta]{template_info['framework']}[/magenta]")
+                console.print(f"Template: [yellow]{template_info['template']}[/yellow]")
+                
+                if 'metadata' in template_info:
+                    metadata = template_info['metadata']
+                    if 'description' in metadata:
+                        console.print(f"Description: {metadata['description']}")
+                    if 'requirements' in metadata:
+                        console.print(f"Requirements: {', '.join(metadata['requirements'])}")
+                
+                console.print(f"\n📁 [bold]Structure:[/bold]")
+                console.print(f"Files: {', '.join(template_info['files'])}")
+                if template_info.get('directories'):
+                    console.print(f"Directories: {', '.join(template_info['directories'])}")
+                
+                if 'readme' in template_info:
+                    console.print(f"\n📖 [bold]README:[/bold]")
+                    console.print("-" * 50)
+                    console.print(template_info['readme'][:500] + "..." if len(template_info['readme']) > 500 else template_info['readme'])
+                    console.print("-" * 50)
+                
+                console.print(f"\n🚀 [bold]To use this template:[/bold]")
+                console.print(f"[cyan]runagent init --framework {framework} --template {template}[/cyan]")
+            else:
+                console.print(f"❌ Template [yellow]{framework}/{template}[/yellow] not found")
+                
+                # Show available templates
+                templates = sdk.list_templates()
+                if framework in templates:
+                    console.print(f"Available templates for {framework}: {', '.join(templates[framework])}")
                 else:
-                    click.echo(f"Available frameworks: {', '.join(available_templates.keys())}")
-            except:
-                pass
-            
+                    console.print(f"Available frameworks: {', '.join(templates.keys())}")
+    
     except Exception as e:
-        click.echo(f"❌ Error getting template info: {str(e)}")
+        console.print(f"❌ [red]Template error:[/red] {e}")
+        raise click.ClickException("Template operation failed")
 
-
-# Add these new commands to your existing runagent/cli/commands.py file
-
-import click
-import json
-from pathlib import Path
-from rich.console import Console
-
-console = Console()
 
 @click.command()
-@click.option('--folder', required=True, help='Folder containing agent files to deploy locally')
+@click.option('--folder', required=True, help='Folder containing agent files')
 @click.option('--framework', help='Framework type (auto-detected if not specified)')
 @click.option('--replace', help='Agent ID to replace (for capacity management)')
 def deploy_local(folder, framework, replace):
-    """Deploy agent locally for testing (max 5 agents)"""
+    """Deploy agent locally for testing"""
+    
     try:
-        from runagent.client.local_client import LocalClient
+        sdk = RunAgent()
         
+        # Validate folder
         if not Path(folder).exists():
             raise click.ClickException(f"Folder not found: {folder}")
         
-        # Detect framework if not provided
-        if not framework:
-            framework = _detect_framework(folder)
+        console.print(f"🚀 [bold]Deploying agent locally...[/bold]")
+        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
         
-        local_client = LocalClient()
-        
-        # Check capacity if not replacing
-        if not replace:
-            capacity_info = local_client.get_capacity_info()
-            if capacity_info.get('is_full'):
-                console.print(f"\n⚠️ [yellow]Database at full capacity ({capacity_info.get('current_count')}/5 agents)[/yellow]")
-                console.print("💡 Available options:")
-                
-                agents = capacity_info.get('agents', [])
-                for i, agent in enumerate(agents):
-                    console.print(f"   {i+1}. Replace: [cyan]{agent['agent_id']}[/cyan] (deployed: {agent['deployed_at']})")
-                
-                oldest_agent = capacity_info.get('oldest_agent')
-                if oldest_agent:
-                    console.print(f"\n💡 Suggested command:")
-                    console.print(f"   [cyan]runagent deploy-local --folder {folder} --replace {oldest_agent['agent_id']}[/cyan]")
-                
-                raise click.ClickException("Database at capacity. Use --replace to replace an existing agent.")
-        
-        result = local_client.deploy_agent(
-            folder_path=folder,
-            metadata={'framework': framework},
+        # Deploy agent
+        result = sdk.deploy_local(
+            folder=folder,
+            framework=framework,
             replace_agent_id=replace
         )
         
         if result.get('success'):
-            click.echo(f"\n✅ {result.get('message', 'Deployment successful')}")
-            click.echo(f"🆔 Agent ID: {result.get('agent_id')}")
+            agent_id = result['agent_id']
+            console.print(f"\n✅ [green]Local deployment successful![/green]")
+            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
             
             if replace:
-                click.echo(f"🔄 Replaced agent: {replace}")
+                console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
+            
+            # Show capacity info
+            capacity = sdk.get_local_capacity()
+            console.print(f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used")
+            
+            console.print(f"\n💡 [bold]Next steps:[/bold]")
+            console.print(f"  • Start server: [cyan]runagent serve[/cyan]")
+            console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
         else:
             error_code = result.get('error_code')
             if error_code == 'DATABASE_FULL':
                 capacity_info = result.get('capacity_info', {})
-                oldest_agent = capacity_info.get('oldest_agent', {}).get('agent_id')
-                suggestion = result.get('suggestion', '')
+                console.print(f"\n❌ [red]Database at full capacity![/red]")
+                console.print(f"📊 Current: {capacity_info.get('current_count', 0)}/5 agents")
                 
-                console.print(f"\n💡 [yellow]Suggestion:[/yellow] {suggestion}")
+                oldest_agent = capacity_info.get('oldest_agent', {}).get('agent_id')
+                if oldest_agent:
+                    console.print(f"\n💡 [yellow]Suggested command:[/yellow]")
+                    console.print(f"[cyan]runagent deploy-local --folder {folder} --replace {oldest_agent}[/cyan]")
+                
                 raise click.ClickException(result.get('error'))
             else:
                 raise click.ClickException(result.get('error'))
-            
+    
+    except ValidationError as e:
+        console.print(f"❌ [red]Validation error:[/red] {e}")
+        raise click.ClickException("Deployment failed")
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Deployment error:[/red] {e}")
+        raise click.ClickException("Deployment failed")
 
 
 @click.command()
-@click.option('--folder', required=True, help='Folder containing agent files to upload')
+@click.option('--folder', required=True, help='Folder containing agent files')
 @click.option('--framework', help='Framework type (auto-detected if not specified)')
 def upload(folder, framework):
     """Upload agent to remote server"""
+    
     try:
-        from runagent.client.rest_client import RestClient
+        sdk = RunAgent()
         
+        # Check authentication
+        if not sdk.is_configured():
+            console.print("❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first")
+            raise click.ClickException("Authentication required")
+        
+        # Validate folder
         if not Path(folder).exists():
             raise click.ClickException(f"Folder not found: {folder}")
         
-        # Detect framework if not provided
-        if not framework:
-            framework = _detect_framework(folder)
+        console.print(f"📤 [bold]Uploading agent...[/bold]")
+        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
         
-        rest_client = RestClient()
-        result = rest_client.upload_agent(
-            folder_path=folder,
-            metadata={'framework': framework}
-        )
+        # Upload agent
+        result = sdk.upload_agent(folder=folder, framework=framework)
         
         if result.get('success'):
-            click.echo(f"\n✅ {result.get('message')}")
-            click.echo(f"🆔 Agent ID: {result.get('agent_id')}")
+            agent_id = result['agent_id']
+            console.print(f"\n✅ [green]Upload successful![/green]")
+            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+            console.print(f"\n💡 [bold]Next step:[/bold]")
+            console.print(f"[cyan]runagent start --id {agent_id}[/cyan]")
         else:
-            raise click.ClickException(f"Upload failed: {result.get('error')}")
-            
+            raise click.ClickException(result.get('error'))
+    
+    except AuthenticationError as e:
+        console.print(f"❌ [red]Authentication error:[/red] {e}")
+        raise click.ClickException("Upload failed")
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Upload error:[/red] {e}")
+        raise click.ClickException("Upload failed")
 
 
 @click.command()
@@ -295,10 +371,16 @@ def upload(folder, framework):
 @click.option('--config', help='JSON configuration for deployment')
 def start(agent_id, config):
     """Start an uploaded agent on remote server"""
+    
     try:
-        from runagent.client.rest_client import RestClient
+        sdk = RunAgent()
         
-        # Parse config if provided
+        # Check authentication
+        if not sdk.is_configured():
+            console.print("❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first")
+            raise click.ClickException("Authentication required")
+        
+        # Parse config
         config_dict = {}
         if config:
             try:
@@ -306,17 +388,24 @@ def start(agent_id, config):
             except json.JSONDecodeError:
                 raise click.ClickException("Invalid JSON in config parameter")
         
-        rest_client = RestClient()
-        result = rest_client.start_agent(agent_id, config_dict)
+        console.print(f"🚀 [bold]Starting agent...[/bold]")
+        console.print(f"🆔 Agent ID: [magenta]{agent_id}[/magenta]")
+        
+        # Start agent
+        result = sdk.start_remote_agent(agent_id, config_dict)
         
         if result.get('success'):
-            click.echo(f"\n✅ Agent started successfully!")
-            click.echo(f"🌐 Endpoint: {result.get('endpoint')}")
+            console.print(f"\n✅ [green]Agent started successfully![/green]")
+            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
-            raise click.ClickException(f"Start failed: {result.get('error')}")
-            
+            raise click.ClickException(result.get('error'))
+    
+    except AuthenticationError as e:
+        console.print(f"❌ [red]Authentication error:[/red] {e}")
+        raise click.ClickException("Start failed")
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Start error:[/red] {e}")
+        raise click.ClickException("Start failed")
 
 
 @click.command()
@@ -327,121 +416,110 @@ def start(agent_id, config):
 @click.option('--config', help='JSON configuration for deployment')
 def deploy(folder, agent_id, local, framework, config):
     """Deploy agent (upload + start) or deploy locally"""
+    
     try:
+        sdk = RunAgent()
+        
         if local:
             # Local deployment
             if not folder:
                 raise click.ClickException("--folder is required for local deployment")
             
+            # Use deploy_local command logic
+            ctx = click.get_current_context()
+            ctx.invoke(deploy_local, folder=folder, framework=framework)
+            return
+        
+        # Remote deployment
+        if not sdk.is_configured():
+            console.print("❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first")
+            raise click.ClickException("Authentication required")
+        
+        # Parse config
+        config_dict = {}
+        if config:
+            try:
+                config_dict = json.loads(config)
+            except json.JSONDecodeError:
+                raise click.ClickException("Invalid JSON in config parameter")
+        
+        if folder:
+            # Full deployment (upload + start)
             if not Path(folder).exists():
                 raise click.ClickException(f"Folder not found: {folder}")
             
-            # Detect framework if not provided
-            if not framework:
-                framework = _detect_framework(folder)
+            console.print(f"🎯 [bold]Full deployment (upload + start)...[/bold]")
+            console.print(f"📁 Source: [cyan]{folder}[/cyan]")
             
-            from runagent.client.local_client import LocalClient
-            local_client = LocalClient()
-            result = local_client.deploy_agent(
-                folder_path=folder,
-                metadata={'framework': framework}
+            result = sdk.deploy_remote(
+                folder=folder,
+                framework=framework,
+                config=config_dict
             )
             
             if result.get('success'):
-                click.echo(f"\n✅ {result.get('message')}")
-                click.echo(f"🆔 Agent ID: {result.get('agent_id')}")
+                console.print(f"\n✅ [green]Full deployment successful![/green]")
+                console.print(f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
+                console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
             else:
-                raise click.ClickException(f"Local deployment failed: {result.get('error')}")
+                raise click.ClickException(result.get('error'))
+        
+        elif agent_id:
+            # Start existing agent
+            ctx = click.get_current_context()
+            ctx.invoke(start, agent_id=agent_id, config=config)
         
         else:
-            # Remote deployment
-            from runagent.client.rest_client import RestClient
-            rest_client = RestClient()
-            
-            if folder:
-                # Upload + Start
-                if not Path(folder).exists():
-                    raise click.ClickException(f"Folder not found: {folder}")
-                
-                # Detect framework if not provided
-                if not framework:
-                    framework = _detect_framework(folder)
-                
-                # Parse config if provided
-                config_dict = {}
-                if config:
-                    try:
-                        config_dict = json.loads(config)
-                    except json.JSONDecodeError:
-                        raise click.ClickException("Invalid JSON in config parameter")
-                
-                result = rest_client.deploy_agent(
-                    folder_path=folder,
-                    metadata={'framework': framework}
-                )
-                
-                if result.get('success'):
-                    click.echo(f"\n✅ {result.get('message')}")
-                    click.echo(f"🆔 Agent ID: {result.get('agent_id')}")
-                    click.echo(f"🌐 Endpoint: {result.get('endpoint')}")
-                else:
-                    raise click.ClickException(f"Deployment failed: {result.get('error')}")
-            
-            elif agent_id:
-                # Start existing agent
-                config_dict = {}
-                if config:
-                    try:
-                        config_dict = json.loads(config)
-                    except json.JSONDecodeError:
-                        raise click.ClickException("Invalid JSON in config parameter")
-                
-                result = rest_client.start_agent(agent_id, config_dict)
-                
-                if result.get('success'):
-                    click.echo(f"\n✅ Agent started successfully!")
-                    click.echo(f"🌐 Endpoint: {result.get('endpoint')}")
-                else:
-                    raise click.ClickException(f"Start failed: {result.get('error')}")
-            
-            else:
-                raise click.ClickException("Either --folder (for upload+start) or --id (for start only) is required")
-            
+            raise click.ClickException("Either --folder (for upload+start) or --id (for start only) is required")
+    
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Deployment error:[/red] {e}")
+        raise click.ClickException("Deployment failed")
 
 
 @click.command()
-@click.option('--port', default=8450, help='Port to run the local server on')
-@click.option('--host', default='127.0.0.1', help='Host to bind the server to')
+@click.option('--port', default=8450, help='Port to run server on')
+@click.option('--host', default='127.0.0.1', help='Host to bind server to')
 @click.option('--debug', is_flag=True, help='Run server in debug mode')
 def serve(port, host, debug):
     """Start local FastAPI server for testing deployed agents"""
+    
     try:
-        from runagent.server.local_server import LocalServer
+        sdk = RunAgent()
         
-        console.print("⚡ Starting FastAPI server...")
-        server = LocalServer(port=port, host=host)
-        server.start(debug=debug)
+        console.print(f"⚡ [bold]Starting local server...[/bold]")
+        console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
+        console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
         
+        # Start server (this will block)
+        sdk.start_local_server(port=port, host=host, debug=debug)
+    
     except KeyboardInterrupt:
         console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Server error:[/red] {e}")
+        raise click.ClickException("Server failed to start")
 
 
 @click.command()
 @click.option('--id', 'agent_id', required=True, help='Agent ID to run')
 @click.option('--input', 'input_file', help='Path to input JSON file')
-@click.option('--message', '-m', help='Simple message to send to the agent')
+@click.option('--message', '-m', help='Simple message to send to agent')
 @click.option('--local', is_flag=True, help='Run agent locally')
+@click.option('--direct', is_flag=True, help='Run agent directly (bypass HTTP server)')
 @click.option('--timeout', default=300, help='Maximum wait time in seconds')
-def run(agent_id, input_file, message, local, timeout):
+def run(agent_id, input_file, message, local, direct, timeout):
     """Run a deployed agent"""
+    
     try:
-        # Prepare input data
-        input_data = {}
+        sdk = RunAgent()
         
+        # Check authentication for remote runs
+        if not local and not sdk.is_configured():
+            console.print("❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first")
+            raise click.ClickException("Authentication required for remote runs")
+        
+        # Prepare input
         if input_file:
             if not Path(input_file).exists():
                 raise click.ClickException(f"Input file not found: {input_file}")
@@ -449,133 +527,152 @@ def run(agent_id, input_file, message, local, timeout):
             with open(input_file, 'r') as f:
                 try:
                     input_data = json.load(f)
+                    messages = input_data.get('messages', [])
                 except json.JSONDecodeError:
                     raise click.ClickException(f"Invalid JSON in input file: {input_file}")
         
         elif message:
-            input_data = {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": message
-                    }
-                ]
-            }
+            messages = [{"role": "user", "content": message}]
+        
         else:
             # Interactive mode
-            click.echo("Enter your message (press Enter twice to submit):")
+            console.print("Enter your message (press Enter twice to submit):")
             lines = []
             while True:
-                line = input()
-                if line == "" and lines:
-                    break
-                lines.append(line)
+                try:
+                    line = input()
+                    if line == "" and lines:
+                        break
+                    lines.append(line)
+                except (EOFError, KeyboardInterrupt):
+                    console.print("\n❌ Input cancelled")
+                    return
             
             message_text = '\n'.join(lines)
-            input_data = {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": message_text
-                    }
-                ]
-            }
+            messages = [{"role": "user", "content": message_text}]
         
+        # Determine execution method
         if local:
-            # Run locally
-            from runagent.client.local_client import LocalClient
-            
-            console.print(f"🏠 Running agent locally: [cyan]{agent_id}[/cyan]")
-            
-            local_client = LocalClient()
-            result = local_client.run_agent(agent_id, input_data)
-            
-        else:
-            # Run remotely
-            import requests
-            import time
-            
-            # Get deployment info
-            deployments_dir = Path.cwd() / ".deployments"
-            info_file = deployments_dir / f"{agent_id}.json"
-            
-            if not info_file.exists():
-                raise click.ClickException(f"No deployment info found for agent {agent_id}")
-            
-            with open(info_file, 'r') as f:
-                deployment_info = json.load(f)
-            
-            endpoint = deployment_info.get('endpoint')
-            if not endpoint:
-                raise click.ClickException(f"No endpoint found for agent {agent_id}")
-            
-            console.print(f"🌐 Running agent remotely: [cyan]{agent_id}[/cyan]")
-            console.print(f"📡 Endpoint: [blue]{endpoint}[/blue]")
-            
-            start_time = time.time()
-            response = requests.post(endpoint, json=input_data, timeout=timeout)
-            execution_time = time.time() - start_time
-            
-            if response.status_code == 200:
-                result = response.json()
+            if direct:
+                console.print(f"🏃 [bold]Running agent directly (bypass server)...[/bold]")
+                execution_method = "Direct"
+                
+                # Use direct execution method
+                input_data = {"messages": messages}
+                result = sdk.local.run_agent_direct(agent_id, input_data)
             else:
-                raise click.ClickException(f"Agent execution failed: HTTP {response.status_code}")
+                console.print(f"🏃 [bold]Running agent via local server...[/bold]")
+                execution_method = "Local Server"
+                
+                # Check if server is running first
+                server_status = sdk.local.check_server_status()
+                if not server_status.get('running'):
+                    console.print(f"❌ [red]Local server not running![/red]")
+                    console.print(f"💡 Start server with: [cyan]runagent serve[/cyan]")
+                    console.print(f"💡 Or use direct execution: [cyan]runagent run --id {agent_id} --local --direct[/cyan]")
+                    raise click.ClickException("Local server not available")
+                
+                console.print(f"✅ [green]Server is running at {server_status['url']}[/green]")
+                
+                # Run via HTTP server
+                result = sdk.run_agent(
+                    agent_id=agent_id,
+                    messages=messages,
+                    local=True
+                )
+        else:
+            console.print(f"🏃 [bold]Running agent remotely...[/bold]")
+            execution_method = "Remote"
+            
+            # Run remotely
+            result = sdk.run_agent(
+                agent_id=agent_id,
+                messages=messages,
+                local=False
+            )
         
-        # Display result
+        console.print(f"🆔 Agent: [magenta]{agent_id}[/magenta]")
+        console.print(f"📍 Method: [cyan]{execution_method}[/cyan]")
+        
+        # Run the agent
+        import time
+        start_time = time.time()
+        execution_time = time.time() - start_time
+        
+        # Display results
         if result.get('success'):
-            console.print("\n✅ [bold green]Agent execution completed![/bold green]")
+            console.print(f"\n✅ [green]Agent execution completed![/green]")
             
-            if 'result' in result and result['result']:
-                agent_result = result['result']
-                content = agent_result.get('content', '')
-                
-                console.print(f"\n📄 [bold]Result:[/bold]")
-                console.print(content)
-                
-                # Show metadata if available
-                if 'metadata' in agent_result:
-                    metadata = agent_result['metadata']
-                    console.print(f"\n📊 [bold]Metadata:[/bold]")
-                    for key, value in metadata.items():
-                        console.print(f"  • {key}: {value}")
+            agent_result = result.get('result', {})
+            content = agent_result.get('content', '')
             
-            if not local:
-                console.print(f"\n⏱️ Total time: {execution_time:.2f}s")
+            console.print(f"\n📄 [bold]Response:[/bold]")
+            console.print(content)
+            
+            # Show metadata
+            metadata = agent_result.get('metadata', {})
+            if metadata:
+                console.print(f"\n📊 [bold]Metadata:[/bold]")
+                for key, value in metadata.items():
+                    if key != 'execution_time':  # Skip since we show our own
+                        console.print(f"  • {key}: [cyan]{value}[/cyan]")
+            
+            # Show execution time from result or calculate our own
+            if 'execution_time' in result:
+                total_time = result['execution_time']
+            else:
+                total_time = execution_time
+            
+            console.print(f"\n⏱️ Total time: [yellow]{total_time:.2f}s[/yellow]")
         else:
             error_msg = result.get('error', 'Unknown error')
-            raise click.ClickException(f"Agent execution failed: {error_msg}")
+            console.print(f"\n❌ [red]Agent execution failed:[/red] {error_msg}")
             
+            # Show suggestions based on error type
+            if 'Server not reachable' in error_msg or 'Connection' in error_msg:
+                console.print(f"💡 [yellow]Suggestion:[/yellow] Start the server with [cyan]runagent serve[/cyan]")
+                console.print(f"💡 [yellow]Alternative:[/yellow] Use direct execution with [cyan]--direct[/cyan] flag")
+            
+            raise click.ClickException("Agent run failed")
+    
+    except ConnectionError as e:
+        console.print(f"❌ [red]Connection error:[/red] {e}")
+        console.print(f"💡 [yellow]Suggestion:[/yellow] Start the server with [cyan]runagent serve[/cyan]")
+        raise click.ClickException("Connection failed")
     except Exception as e:
-        raise click.ClickException(str(e))
+        console.print(f"❌ [red]Run error:[/red] {e}")
+        raise click.ClickException("Agent run failed")
+
 
 
 @click.command()
-@click.option('--cleanup-days', type=int, help='Clean up run records older than N days')
+@click.option('--cleanup-days', type=int, help='Clean up records older than N days')
 @click.option('--agent-id', help='Show detailed info for specific agent')
 @click.option('--capacity', is_flag=True, help='Show detailed capacity information')
 def db_status(cleanup_days, agent_id, capacity):
     """Show local database status and statistics"""
+    
     try:
-        from runagent.client.local_client import LocalClient
-        
-        local_client = LocalClient()
+        sdk = RunAgent()
         
         if capacity:
             # Show detailed capacity info
-            capacity_info = local_client.get_capacity_info()
+            capacity_info = sdk.get_local_capacity()
             
             console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
-            console.print(f"Current: {capacity_info.get('current_count', 0)}/5 agents")
-            console.print(f"Remaining slots: {capacity_info.get('remaining_slots', 0)}")
-            console.print(f"Status: {'🔴 FULL' if capacity_info.get('is_full') else '🟢 Available'}")
+            console.print(f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
+            console.print(f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]")
+            
+            status = "🔴 FULL" if capacity_info.get('is_full') else "🟢 Available"
+            console.print(f"Status: {status}")
             
             agents = capacity_info.get('agents', [])
             if agents:
                 console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
                 for i, agent in enumerate(agents):
                     status_icon = "🟢" if agent['status'] == 'deployed' else "🔴" if agent['status'] == 'error' else "🟡"
-                    age_label = "oldest" if i == 0 else "newest" if i == len(agents)-1 else ""
-                    console.print(f"  {i+1}. {status_icon} {agent['agent_id']} ({agent['framework']}) - {agent['deployed_at']} {age_label}")
+                    age_label = " (oldest)" if i == 0 else " (newest)" if i == len(agents)-1 else ""
+                    console.print(f"  {i+1}. {status_icon} [magenta]{agent['agent_id']}[/magenta] ({agent['framework']}) - {agent['deployed_at']}{age_label}")
             
             if capacity_info.get('is_full'):
                 oldest = capacity_info.get('oldest_agent', {})
@@ -586,115 +683,78 @@ def db_status(cleanup_days, agent_id, capacity):
         
         if agent_id:
             # Show specific agent info
-            result = local_client.get_agent_info(agent_id)
+            result = sdk.get_agent_info(agent_id, local=True)
+            
             if result.get('success'):
                 agent_info = result['agent_info']
                 console.print(f"\n📊 [bold]Agent: {agent_id}[/bold]")
-                console.print(f"Status: {agent_info['status']}")
-                console.print(f"Framework: {agent_info['framework']}")
-                console.print(f"Deployed: {agent_info['deployed_at']}")
-                console.print(f"Source Path: {agent_info['folder_path']}")
-                console.print(f"Deployment Path: {agent_info['deployment_path']}")
-                console.print(f"Files Exist: {'✅' if agent_info.get('deployment_exists') else '❌'}")
-                console.print(f"Source Exists: {'✅' if agent_info.get('source_exists') else '❌'}")
+                console.print(f"Status: [cyan]{agent_info['status']}[/cyan]")
+                console.print(f"Framework: [magenta]{agent_info['framework']}[/magenta]")
+                console.print(f"Deployed: [yellow]{agent_info['deployed_at']}[/yellow]")
+                console.print(f"Source Path: [blue]{agent_info['folder_path']}[/blue]")
+                console.print(f"Deployment Path: [blue]{agent_info['deployment_path']}[/blue]")
+                
+                exists_status = "✅" if agent_info.get('deployment_exists') else "❌"
+                source_status = "✅" if agent_info.get('source_exists') else "❌"
+                console.print(f"Files Exist: {exists_status}")
+                console.print(f"Source Exists: {source_status}")
                 
                 stats = agent_info.get('stats', {})
                 if stats:
                     console.print(f"\n📈 [bold]Statistics:[/bold]")
-                    console.print(f"Total Runs: {stats.get('total_runs', 0)}")
-                    console.print(f"Success Rate: {stats.get('success_rate', 0)}%")
-                    console.print(f"Last Run: {stats.get('last_run', 'Never')}")
-                    console.print(f"Avg Execution Time: {stats.get('avg_execution_time', 'N/A')}s")
-                
-                recent_runs = agent_info.get('recent_runs', [])
-                if recent_runs:
-                    console.print(f"\n📝 [bold]Recent Runs:[/bold]")
-                    for run in recent_runs[:3]:
-                        status = "✅" if run['success'] else "❌"
-                        console.print(f"  {status} {run['started_at']} ({run.get('execution_time', 'N/A')}s)")
+                    console.print(f"Total Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
+                    console.print(f"Success Rate: [green]{stats.get('success_rate', 0)}%[/green]")
+                    console.print(f"Last Run: [yellow]{stats.get('last_run', 'Never')}[/yellow]")
+                    avg_time = stats.get('avg_execution_time')
+                    if avg_time:
+                        console.print(f"Avg Execution Time: [cyan]{avg_time}s[/cyan]")
             else:
-                console.print(f"❌ {result.get('error')}")
-        else:
-            # Show database stats
-            stats = local_client.get_database_stats()
-            capacity_info = local_client.get_capacity_info()
+                console.print(f"❌ [red]{result.get('error')}[/red]")
+            return
+        
+        # Show general database stats
+        stats = sdk.get_local_stats()
+        capacity_info = sdk.get_local_capacity()
+        
+        console.print("\n📊 [bold]Local Database Status[/bold]")
+        
+        current_count = capacity_info.get('current_count', 0)
+        is_full = capacity_info.get('is_full', False)
+        status = "FULL" if is_full else "OK"
+        console.print(f"Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red]" if is_full else f"Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])")
+        
+        console.print(f"Total Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
+        console.print(f"Database Size: [yellow]{stats.get('database_size_mb', 0)} MB[/yellow]")
+        console.print(f"Database Path: [blue]{stats.get('database_path', 'Unknown')}[/blue]")
+        
+        # Show agent status breakdown
+        status_counts = stats.get('agent_status_counts', {})
+        if status_counts:
+            console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
+            for status, count in status_counts.items():
+                console.print(f"  [cyan]{status}[/cyan]: {count}")
+        
+        # List agents
+        agents = sdk.list_local_agents()
+        if agents:
+            console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
+            for agent in agents:
+                status_icon = "🟢" if agent['status'] == 'deployed' else "🔴" if agent['status'] == 'error' else "🟡"
+                exists_icon = "📁" if agent.get('exists') else "❌"
+                console.print(f"  {status_icon} {exists_icon} [magenta]{agent['agent_id']}[/magenta] ({agent['framework']}) - {agent['status']}")
             
-            if stats:
-                console.print("\n📊 [bold]Local Database Status[/bold]")
-                console.print(f"Capacity: {capacity_info.get('current_count', 0)}/5 agents ({'FULL' if capacity_info.get('is_full') else 'OK'})")
-                console.print(f"Total Runs: {stats.get('total_runs', 0)}")
-                console.print(f"Database Size: {stats.get('database_size_mb', 0)} MB")
-                console.print(f"Database Path: {stats.get('database_path', 'Unknown')}")
-                
-                status_counts = stats.get('agent_status_counts', {})
-                if status_counts:
-                    console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
-                    for status, count in status_counts.items():
-                        console.print(f"  {status}: {count}")
-                
-                # List agents
-                agents_result = local_client.list_local_agents()
-                if agents_result.get('success'):
-                    agents = agents_result.get('agents', [])
-                    if agents:
-                        console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
-                        for agent in agents:
-                            status_icon = "🟢" if agent['status'] == 'deployed' else "🔴" if agent['status'] == 'error' else "🟡"
-                            exists_icon = "📁" if agent.get('exists') else "❌"
-                            console.print(f"  {status_icon} {exists_icon} {agent['agent_id']} ({agent['framework']}) - {agent['status']}")
-                        
-                        console.print(f"\n💡 Use --agent-id <id> for detailed info")
-                        console.print(f"💡 Use --capacity for capacity management info")
+            console.print(f"\n💡 Use [cyan]--agent-id <id>[/cyan] for detailed info")
+            console.print(f"💡 Use [cyan]--capacity[/cyan] for capacity management info")
         
         # Cleanup if requested
         if cleanup_days:
-            console.print(f"\n🧹 Cleaning up run records older than {cleanup_days} days...")
-            cleanup_result = local_client.cleanup_old_runs(cleanup_days)
+            console.print(f"\n🧹 Cleaning up records older than {cleanup_days} days...")
+            cleanup_result = sdk.cleanup_local_database(cleanup_days)
             if cleanup_result.get('success'):
-                console.print(f"✅ {cleanup_result.get('message')}")
+                console.print(f"✅ [green]{cleanup_result.get('message')}[/green]")
             else:
-                console.print(f"❌ {cleanup_result.get('error')}")
-        
+                console.print(f"❌ [red]{cleanup_result.get('error')}[/red]")
+    
     except Exception as e:
-        raise click.ClickException(str(e))
-
-
-def _detect_framework(folder_path: str) -> str:
-    """Detect framework from agent files"""
-    folder = Path(folder_path)
-    
-    # Check main.py for framework imports
-    main_file = folder / 'main.py'
-    agent_file = folder / 'agent.py'
-    
-    framework_keywords = {
-        'langgraph': ['langgraph', 'StateGraph', 'Graph'],
-        'langchain': ['langchain', 'ConversationChain', 'AgentExecutor'],
-        'llamaindex': ['llama_index', 'VectorStoreIndex', 'QueryEngine']
-    }
-    
-    for file_to_check in [main_file, agent_file]:
-        if file_to_check.exists():
-            try:
-                content = file_to_check.read_text().lower()
-                
-                for framework, keywords in framework_keywords.items():
-                    if any(keyword.lower() in content for keyword in keywords):
-                        return framework
-            except:
-                continue
-    
-    # Check requirements.txt
-    req_file = folder / 'requirements.txt'
-    if req_file.exists():
-        try:
-            content = req_file.read_text().lower()
-            
-            for framework, keywords in framework_keywords.items():
-                if any(keyword.lower() in content for keyword in keywords):
-                    return framework
-        except:
-            pass
-    
-    return 'unknown'
-
+        console.print(f"❌ [red]Database status error:[/red] {e}")
+        raise click.ClickException("Failed to get database status")

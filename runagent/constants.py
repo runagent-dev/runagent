@@ -21,8 +21,8 @@ ENV_RUNAGENT_LOGGING_LEVEL = "RUNAGENT_LOGGING_LEVEL"
 # Local Configuration
 LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
 USER_DATA_FILE_NAME = "user_data.json"
-# DEFAULT_BASE_URL = "http://localhost:8330/"
 DEFAULT_BASE_URL = "http://52.237.88.147:8330/"
+# DEFAULT_BASE_URL = "http://52.237.88.147:8330/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
 
 # Setup cache directory
