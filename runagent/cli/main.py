@@ -9,19 +9,17 @@ def runagent():
     """RunAgent CLI - Deploy and manage AI agents easily"""
     pass
 
-# Add all existing commands
-runagent.add_command(commands.init)
 runagent.add_command(commands.setup)
 runagent.add_command(commands.teardown)
+runagent.add_command(commands.init)
 runagent.add_command(commands.template)
-
-# Add new deployment commands
 runagent.add_command(commands.deploy_local)
 runagent.add_command(commands.upload)
 runagent.add_command(commands.start)
 runagent.add_command(commands.deploy)
 runagent.add_command(commands.serve)
 runagent.add_command(commands.run)
+runagent.add_command(commands.db_status)
 
 if __name__ == '__main__':
     runagent()

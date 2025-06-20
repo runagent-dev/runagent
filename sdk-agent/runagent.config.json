@@ -1,0 +1,17 @@
+{
+  "agent_name": "sdk-agent",
+  "framework": "langchain",
+  "template": "basic",
+  "version": "0.1.0",
+  "created_at": "2025-06-17 18:14:15",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "branch": "radeen/cli-update",
+    "path": "templates/langchain/basic"
+  },
+  "architecture": {
+    "main_file": "main.py",
+    "agent_file": "agent.py",
+    "entry_point": "run"
+  }
+}
