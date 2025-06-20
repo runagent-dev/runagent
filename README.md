@@ -1,11 +1,38 @@
-# RunAgent - Production Depolyment of AI Agents
+<p align="center">
+  <a href="https://run-agent.ai//#gh-dark-mode-only">
+    <img src="./docs/logo/logo_dark.svg" width="318px" alt="Composio logo" />
+  </a>
+  <a href="https://run-agent.ai//#gh-light-mode-only">
+    <img src="./docs/logo/logo_light.svg" width="318px" alt="Composio Logo" />
+  </a>
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/runagent)](https://pypi.org/project/runagent/)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/runagent)](https://pypi.org/project/runagent/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/runagent.svg)](https://pypi.org/project/runagent/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.runagent.live)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/runagent)
+
+<h2 align="center">
+  Simple Serverless Depolyment for AI Agents
+</h2>
+
+
+<p align="center">
+  <a href="https://pypi.org/project/runagent/">
+    <img src="https://img.shields.io/pypi/v/runagent" alt="PyPI" />
+  </a>
+  <a href="https://pypi.org/project/runagent/">
+    <img src="https://img.shields.io/pypi/dm/runagent" alt="PyPI - Downloads" />
+  </a>
+  <a href="https://pypi.org/project/runagent/">
+    <img src="https://img.shields.io/pypi/pyversions/runagent.svg" alt="Python Versions" />
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  </a>
+  <a href="https://docs.runagent.live">
+    <img src="https://img.shields.io/badge/docs-latest-brightgreen.svg" alt="Documentation" />
+  </a>
+  <a href="https://discord.gg/runagent">
+    <img src="https://img.shields.io/discord/1234567890?color=7289DA&label=Discord&logo=discord&logoColor=white" alt="Discord" />
+  </a>
+</p>
 
 RunAgent is a powerful command-line tool and SDK for deploying, managing, and interacting with AI agents. Built with modern Python practices, it provides a seamless experience for both developers and AI practitioners.
 
