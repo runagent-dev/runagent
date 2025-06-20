@@ -70,10 +70,8 @@
     }
   },
   "logo": {
-    "light": "/logo/RunAgent_logo_dark.svg",
-    "dark": "/logo/RunAgent_logo_dark.svg",
-    "width": 200,
-    "height": 100,
+    "light": "/logo/logo_dark.svg",
+    "dark": "/logo/logo_dark.svg"
   },
   "navbar": {
     "links": [
