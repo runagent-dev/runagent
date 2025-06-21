@@ -57,6 +57,11 @@
     "global": {
       "anchors": [
         {
+          "anchor": "Github",
+          "href": "https://github.com/runagent-dev/runagent",
+          "icon": "github"
+        },
+        {
           "anchor": "Community",
           "href": "https://run-agent.ai/community",
           "icon": "discord"
@@ -77,7 +82,7 @@
     "links": [
       {
         "label": "Github",
-        "href": "https:/github.com/runagent-dev/runagent"
+        "href": "https://github.com/runagent-dev/runagent"
       },
       {
         "label": "Dashboard",
