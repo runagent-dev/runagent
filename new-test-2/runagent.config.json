@@ -9,9 +9,11 @@
     "branch": "radeen/cli-update",
     "path": "templates/langchain/basic"
   },
-  "architecture": {
-    "main_file": "main.py",
-    "agent_file": "agent.py",
-    "entry_point": "run"
+  "agent_architecture": {
+    "entrypoint_file": "main.py",
+    "entrypoint_module": "run"
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "sk-proj-1234567890"
   }
 }
