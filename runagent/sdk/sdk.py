@@ -13,7 +13,7 @@ from .template_manager import TemplateManager
 from .deployment import RemoteDeployment
 from .exceptions import ValidationError, AuthenticationError
 from runagent.utils.agent import validate_agent, detect_framework
-from .db import DBManager
+from .db import DBService
 from runagent.sdk.server.local_server import LocalServer
 from runagent.utils.agent import validate_agent
 
@@ -45,7 +45,7 @@ class RunAgentSDK:
         
         # Initialize managers
         self.templates = TemplateManager()
-        self.db_manager = DBManager()
+        self.db_service = DBService()
         # self.local = LocalDeployment(self.config)
         self.remote = RemoteDeployment(self.config)
 

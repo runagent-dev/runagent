@@ -21,7 +21,7 @@ class RemoteDeployment:
         """
         self.config = config
         self.client = RestClient(
-            api_url=config.base_url,
+            base_url=config.base_url,
             api_key=config.api_key
         )
     
