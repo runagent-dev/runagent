@@ -3,6 +3,7 @@ from runagent.utils.schema import EntryPoint
 from pathlib import Path
 from typing import Dict
 
+
 class LangGraphExecutor(GenericExecutor):
     def __init__(self, agent_dir: Path, agent_entrypoints: Dict[str, EntryPoint]):
         super().__init__(agent_dir, agent_entrypoints)
@@ -14,20 +15,17 @@ class LangGraphExecutor(GenericExecutor):
         if "invoke" in agent_entrypoints:
             ep = agent_entrypoints["invoke"]
             self._invoke_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file,
-                ep.module
+                self.agent_dir / ep.file, ep.module
             )
         if "stream" in agent_entrypoints:
             ep = agent_entrypoints["stream"]
             self._stream_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file,
-                ep.module
+                self.agent_dir / ep.file, ep.module
             )
         if "stream_token" in agent_entrypoints:
             ep = agent_entrypoints["stream_token"]
             self._stream_token_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file,
-                ep.module
+                self.agent_dir / ep.file, ep.module
             )
 
     def invoke(self, *input_args, **input_kwargs):

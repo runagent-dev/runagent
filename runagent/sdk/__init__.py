@@ -10,7 +10,7 @@ from .exceptions import (
     AuthenticationError,
     ValidationError,
     ConnectionError,
-    ServerError
+    ServerError,
 )
 
 # Main SDK class for easy import
@@ -23,9 +23,9 @@ __version__ = "0.1.0"
 __all__ = [
     "RunAgentSDK",
     "RunAgent",
-    "RunAgentError", 
+    "RunAgentError",
     "AuthenticationError",
     "ValidationError",
     "ConnectionError",
-    "ServerError"
+    "ServerError",
 ]

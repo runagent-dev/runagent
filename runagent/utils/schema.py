@@ -6,6 +6,7 @@ from datetime import datetime
 
 class TemplateSource(BaseModel):
     """Template source configuration"""
+
     repo_url: str = Field(..., description="GitHub repository URL")
     author: str = Field(..., description="Template Author name")
     path: str = Field(..., description="Path to template in repository")
@@ -13,6 +14,7 @@ class TemplateSource(BaseModel):
 
 class EntryPoint(BaseModel):
     """Entrypoint configuration"""
+
     file: str = Field(..., description="Entrypoint file")
     module: str = Field(..., description="Entrypoint module name")
     type: str = Field(..., description="Entrypoint type")
@@ -20,11 +22,13 @@ class EntryPoint(BaseModel):
 
 class AgentArchitecture(BaseModel):
     """Agent architecture configuration"""
+
     entrypoints: List[EntryPoint] = Field(..., description="List of entrypoints")
 
 
 class RunAgentConfig(BaseModel):
     """Schema for runagent.config.json"""
+
     agent_name: str = Field(..., description="Name of the agent")
     description: str = Field(..., description="Description of the agent")
     framework: str = Field(..., description="Framework used (langchain, etc)")

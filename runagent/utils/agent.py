@@ -12,53 +12,60 @@ from runagent.utils.imports import PackageImporter
 def get_agent_config(folder_path: Path) -> t.Optional[dict]:
     """
     Get agent configuration from runagent.config.json file.
-    
+
     Args:
         folder_path: Path to agent folder
-        
+
     Returns:
         Config dict if found, None otherwise
     """
     # Try JSON config first
     config_path_json = folder_path / AGENT_CONFIG_FILE_NAME
-    
+
     # Try YAML config paths
-    config_path_yaml = folder_path / AGENT_CONFIG_FILE_NAME.replace('.json', '.yaml')
-    config_path_yml = folder_path / AGENT_CONFIG_FILE_NAME.replace('.json', '.yml')
-    
+    config_path_yaml = folder_path / AGENT_CONFIG_FILE_NAME.replace(".json", ".yaml")
+    config_path_yml = folder_path / AGENT_CONFIG_FILE_NAME.replace(".json", ".yml")
+
     if config_path_json.exists():
         with config_path_json.open() as f:
             try:
                 config_data = json.load(f)
             except Exception as e:
                 raise ValueError(f"Invalid JSON config file: {str(e)}")
-                
+
     elif config_path_yaml.exists() or config_path_yml.exists():
         try:
             import yaml
-            yaml_path = config_path_yaml if config_path_yaml.exists() else config_path_yml
+
+            yaml_path = (
+                config_path_yaml if config_path_yaml.exists() else config_path_yml
+            )
             with yaml_path.open() as f:
-                config_data = yaml.safe_load(f)     
+                config_data = yaml.safe_load(f)
                 # return RunAgentConfig(**config_data)
         except Exception as e:
             raise ValueError(f"Invalid YAML config file: {str(e)}")
     else:
-        raise ValueError(f"No config file found. Tried: {config_path_json}, {config_path_yaml}, {config_path_yml}")
+        raise ValueError(
+            f"No config file found. Tried: {config_path_json}, {config_path_yaml}, {config_path_yml}"
+        )
 
     # Check for .env file and load environment variables
-    env_path = folder_path / '.env'
+    env_path = folder_path / ".env"
     if env_path.exists():
         try:
             from dotenv import dotenv_values
+
             env_vars = dotenv_values(env_path)
-            
+
             # Update env_vars in config data
-            config_data['env_vars'].update(env_vars)
+            config_data["env_vars"].update(env_vars)
         except Exception as e:
             raise ValueError(f"Error loading .env file: {str(e)}")
 
     return RunAgentConfig(**config_data)
- 
+
+
 def detect_framework(folder_path: Path) -> str:
     """
     Detect framework from agent's runagent.config.json file.
@@ -75,13 +82,15 @@ def detect_framework(folder_path: Path) -> str:
     return framework
 
 
-def validate_agent(folder: Path, dynamic_loading: bool = False) -> t.Tuple[bool, t.Dict[str, t.Any]]:
+def validate_agent(
+    folder: Path, dynamic_loading: bool = False
+) -> t.Tuple[bool, t.Dict[str, t.Any]]:
     """
     Validate agent project structure.
-    
+
     Args:
         folder: Path to agent folder
-        
+
     Returns:
         Tuple of (is_valid, validation_details)
     """
@@ -89,22 +98,22 @@ def validate_agent(folder: Path, dynamic_loading: bool = False) -> t.Tuple[bool,
     if not folder_path.exists():
         return False, {
             "valid": False,
-            "error_msgs": [f"Agent Folder not found: {folder}"]
+            "error_msgs": [f"Agent Folder not found: {folder}"],
         }
-    
+
     validation_details = {
         "valid": False,
         "folder_exists": True,
         "files_found": [],
-        "missing_files": [], 
+        "missing_files": [],
         "success_msgs": [],
         "error_msgs": [],
-        "warning_msgs": []
+        "warning_msgs": [],
     }
 
     suggested_files = ["requirements.txt"]
     unwanted_files = [".env"]
-    
+
     # Check for runagent.config.json and validate schema
     try:
         config = get_agent_config(folder_path)
@@ -112,12 +121,12 @@ def validate_agent(folder: Path, dynamic_loading: bool = False) -> t.Tuple[bool,
         validation_details["success_msgs"].append(
             f"Found and validated {AGENT_CONFIG_FILE_NAME}"
         )
-        
+
         # Validate each entrypoint dynamically
         for entrypoint in config.agent_architecture.entrypoints:
             entrypoint_file = folder_path / entrypoint.file
             module_name = entrypoint.module
-            
+
             if not entrypoint_file.exists():
                 validation_details["error_msgs"].append(
                     f"Entrypoint file not found: {entrypoint_file}"
@@ -189,17 +198,17 @@ def validate_agent(folder: Path, dynamic_loading: bool = False) -> t.Tuple[bool,
     except Exception as e:
         validation_details["error_msgs"].append(f"Failed to detect framework: {str(e)}")
         validation_details["valid"] = False
-    
+
     # Overall validation
     validation_details["valid"] = (
-        len(validation_details["missing_files"]) == 0 and
-        len(validation_details["error_msgs"]) == 0
+        len(validation_details["missing_files"]) == 0
+        and len(validation_details["error_msgs"]) == 0
     )
-    
+
     # If validation failed but no error messages, add generic error
     if not validation_details["valid"] and not validation_details["error_msgs"]:
         validation_details["error_msgs"].append(
             "Agent validation failed - missing required components"
         )
-    
+
     return validation_details["valid"], validation_details

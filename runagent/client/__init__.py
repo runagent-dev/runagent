@@ -3,6 +3,4 @@ from .client import RunAgentClient
 
 
 # Expose the main components for easy import
-__all__ = [
-    "RunAgentClient"
-]
+__all__ = ["RunAgentClient"]

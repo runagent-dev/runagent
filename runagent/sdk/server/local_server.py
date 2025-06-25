@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 import subprocess
 import sys
-import uuid 
+import uuid
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -25,19 +25,27 @@ console = Console()
 
 class AgentInputArgs(BaseModel):
     """Request model for agent execution"""
-    input_args: List[Any] = Field(default={}, description="Input data for agent invocation")
-    input_kwargs: Dict[str, Any] = Field(default={}, description="Input data for agent invocation")
+
+    input_args: List[Any] = Field(
+        default={}, description="Input data for agent invocation"
+    )
+    input_kwargs: Dict[str, Any] = Field(
+        default={}, description="Input data for agent invocation"
+    )
 
 
 # Pydantic Models
 class AgentRunRequest(BaseModel):
     """Request model for agent execution"""
-    input_data: AgentInputArgs = Field(default={}, description="Input data for agent invocation")
 
+    input_data: AgentInputArgs = Field(
+        default={}, description="Input data for agent invocation"
+    )
 
 
 class AgentRunResponse(BaseModel):
     """Response model for agent execution"""
+
     success: bool
     output_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -47,6 +55,7 @@ class AgentRunResponse(BaseModel):
 
 class CapacityInfo(BaseModel):
     """Database capacity information"""
+
     current_count: int
     max_capacity: int
     remaining_slots: int
@@ -56,9 +65,10 @@ class CapacityInfo(BaseModel):
 
 class AgentInfo(BaseModel):
     """Agent information and endpoints"""
+
     message: str
     version: str
-    host: str 
+    host: str
     port: int
     config: Dict[str, Any]
     endpoints: Dict[str, str]
@@ -66,9 +76,15 @@ class AgentInfo(BaseModel):
 
 class LocalServer:
     """FastAPI-based local server for testing deployed agents"""
-    
-    def __init__(self, db_service: DBService, agent_id: str, agent_path: Path, 
-                 port: int = 8450, host: str = "127.0.0.1"):
+
+    def __init__(
+        self,
+        db_service: DBService,
+        agent_id: str,
+        agent_path: Path,
+        port: int = 8450,
+        host: str = "127.0.0.1",
+    ):
         self.db_service = db_service
         self.port = port
         self.host = host
@@ -95,9 +111,7 @@ class LocalServer:
             os.environ[key] = str(value)
 
         self.agentic_executor = get_executor(
-            self.agent_path,
-            self.agent_framework,
-            self.agent_entrypoints
+            self.agent_path, self.agent_framework, self.agent_entrypoints
         )
 
         # Add agent to database if it doesn't exist
@@ -108,15 +122,13 @@ class LocalServer:
                 agent_path=str(self.agent_path),
                 host=self.host,
                 port=self.port,
-                framework=self.agent_framework
+                framework=self.agent_framework,
             )
             if not result["success"]:
                 console.print(
                     f"[red]Failed to add agent to database: {result['error']}[/red]"
                 )
-                raise Exception(
-                    f"Failed to add agent to database: {result['error']}"
-                )
+                raise Exception(f"Failed to add agent to database: {result['error']}")
 
         self.app = FastAPI(
             title=f"RunAgent API - {self.agent_name}",
@@ -144,7 +156,7 @@ class LocalServer:
                 _ = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "-r", req_txt_path],
                     capture_output=False,  # Shows output directly
-                    check=True
+                    check=True,
                 )
             except subprocess.CalledProcessError as e:
                 raise Exception(
@@ -155,16 +167,16 @@ class LocalServer:
     def from_id(agent_id: str) -> "LocalServer":
         """
         Create LocalServer instance from an agent ID.
-        
+
         Args:
             agent_id: ID of the agent to serve
             db_manager: Database manager instance
             port: Port to run server on
             host: Host to bind to
-            
+
         Returns:
             LocalServer instance
-            
+
         Raises:
             Exception: If agent not found in database
         """
@@ -179,20 +191,22 @@ class LocalServer:
             agent_id=agent_id,
             port=agent["port"],
             host=agent["host"],
-            db_service=db_service
+            db_service=db_service,
         )
 
     @staticmethod
-    def from_path(path: str, port: int = 8450, host: str = "127.0.0.1") -> "LocalServer":
+    def from_path(
+        path: str, port: int = 8450, host: str = "127.0.0.1"
+    ) -> "LocalServer":
         """
         Create LocalServer instance from an agent path.
-        
+
         Args:
             path: Path to agent directory
             db_manager: Database manager instance
             port: Port to run server on
             host: Host to bind to
-            
+
         Returns:
             LocalServer instance
         """
@@ -204,7 +218,7 @@ class LocalServer:
                 "Database is full. Refer to our docs at "
                 "https://docs.runagent.ai/local-server for more information."
             )
-        
+
         # Add agent entry to database
         agent_id = str(uuid.uuid4())
         db_service.add_agent(
@@ -213,25 +227,26 @@ class LocalServer:
             host=host,
             port=port,
             framework=detect_framework(path),
-            status="ready"
+            status="ready",
         )
         return LocalServer(
             agent_path=path,
             agent_id=agent_id,
             port=port,
             host=host,
-            db_service=db_service
+            db_service=db_service,
         )
 
     def install_req_txt(self, req_txt):
         _ = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", req_txt],
             capture_output=False,  # Shows output directly
-            check=True
+            check=True,
         )
 
     def _setup_routes(self):
         """Setup FastAPI routes"""
+
         @self.app.get("/", response_model=AgentInfo)
         async def home():
             """Root endpoint showing server info and available agents"""
@@ -248,15 +263,18 @@ class LocalServer:
                         "GET /": "Agent info",
                         "GET /health": "Health check",
                         "POST /api/v1/agents/{agent_id}/run": "Run an agent",
-                    }
+                    },
                 )
-                
+
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to get server info: {str(e)}"
+                    detail=f"Failed to get server info: {str(e)}",
                 )
-        @self.app.post("/api/v1/agents/{agent_id}/execute/generic", response_model=AgentRunResponse)
+
+        @self.app.post(
+            "/api/v1/agents/{agent_id}/execute/generic", response_model=AgentRunResponse
+        )
         async def run_agent(agent_id: str, request: AgentRunRequest):
             """Run a deployed agent"""
             start_time = time.time()
@@ -264,12 +282,13 @@ class LocalServer:
             try:
 
                 console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
-                console.print(f"🔍 Entrypoint: [cyan]{self.agent_entrypoints['generic'].file}[/cyan]")
+                console.print(
+                    f"🔍 Entrypoint: [cyan]{self.agent_entrypoints['generic'].file}[/cyan]"
+                )
                 console.print(f"🔍 Input data: [cyan]{request.input_data}[/cyan]")
 
                 result = self.agentic_executor.generic(
-                    *request.input_data.input_args,
-                    **request.input_data.input_kwargs
+                    *request.input_data.input_args, **request.input_data.input_kwargs
                 )
                 execution_time = time.time() - start_time
 
@@ -279,26 +298,26 @@ class LocalServer:
                     input_data=request.input_data,
                     output_data=result,
                     success=True,
-                    execution_time=execution_time
+                    execution_time=execution_time,
                 )
 
                 console.print(
                     f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
                     f"{execution_time:.2f}s"
                 )
-                
+
                 return AgentRunResponse(
                     success=True,
                     output_data=result,
                     error=None,
                     execution_time=execution_time,
-                    agent_id=agent_id
+                    agent_id=agent_id,
                 )
-                
+
             except Exception as e:
                 error_msg = f"Server error running agent {agent_id}: {str(e)}"
                 execution_time = time.time() - start_time
-                
+
                 # Record failed run in database
                 self.db_service.record_agent_run(
                     agent_id=agent_id,
@@ -306,16 +325,14 @@ class LocalServer:
                     output_data=None,
                     success=False,
                     error_message=error_msg,
-                    execution_time=execution_time
+                    execution_time=execution_time,
                 )
 
                 console.print(f"💥 [red]{error_msg}[/red]")
-                
+
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=error_msg
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
                 )
-        
 
         @self.app.get("/health")
         async def health_check():
@@ -325,32 +342,36 @@ class LocalServer:
                 "server": "RunAgent FastAPI Local Server",
                 "timestamp": datetime.now().isoformat(),
                 "uptime_seconds": time.time() - self.start_time,
-                "version": "1.0.0"
+                "version": "1.0.0",
             }
 
     def extract_endpoints(self):
         endpoints = []
-        
+
         for route in self.app.routes:
-            if len(getattr(route, 'methods', list())) == 1 and hasattr(route, 'path'):
+            if len(getattr(route, "methods", list())) == 1 and hasattr(route, "path"):
                 # Get the endpoint function
-                endpoint_func = route.endpoint if hasattr(route, 'endpoint') else None
-                
+                endpoint_func = route.endpoint if hasattr(route, "endpoint") else None
+
                 # Extract description from docstring or route description
                 description = ""
                 if endpoint_func and endpoint_func.__doc__:
                     description = endpoint_func.__doc__.strip()
-                elif hasattr(route, 'description') and route.description:
+                elif hasattr(route, "description") and route.description:
                     description = route.description
-                
-                endpoints.append({
-                    'path': route.path,
-                    'methods': list(route.methods),
-                    'name': route.name,
-                    'description': description,
-                    'function_name': endpoint_func.__name__ if endpoint_func else None
-                })
-        
+
+                endpoints.append(
+                    {
+                        "path": route.path,
+                        "methods": list(route.methods),
+                        "name": route.name,
+                        "description": description,
+                        "function_name": (
+                            endpoint_func.__name__ if endpoint_func else None
+                        ),
+                    }
+                )
+
         return endpoints
 
     def start(self, debug: bool = False):
@@ -360,16 +381,18 @@ class LocalServer:
             console.print(
                 f"🌐 Server URL: [bold blue]http://{self.host}:{self.port}[/bold blue]"
             )
-            
+
             # Print available endpoints
             console.print("\n📋 Available endpoints:")
-            
+
             endpoints = self.extract_endpoints()
             for endpoint in endpoints:
-                route_path = endpoint['path']
-                route_methods = endpoint['methods'][0]
-                route_description = endpoint['description']
-                console.print(f"   • [cyan]{route_methods}  {route_path}[/cyan] - {route_description}")
+                route_path = endpoint["path"]
+                route_methods = endpoint["methods"][0]
+                route_description = endpoint["description"]
+                console.print(
+                    f"   • [cyan]{route_methods}  {route_path}[/cyan] - {route_description}"
+                )
 
             console.print("\n💡 [yellow]Use Ctrl+C to stop the server[/yellow]")
 
@@ -379,7 +402,7 @@ class LocalServer:
             console.print(
                 f"🔧 Debug mode: [{debug_color}]{debug_status}[/{debug_color}]"
             )
-            
+
             # Print docs URL
             console.print(
                 f"📖 API Docs: [link]http://{self.host}:{self.port}/docs[/link]\n"
@@ -394,14 +417,12 @@ class LocalServer:
                 port=self.port,
                 log_level="debug" if debug else "info",
                 access_log=debug,
-                reload=False  # Disable auto-reload for stability
+                reload=False,  # Disable auto-reload for stability
             )
 
         except OSError as e:
             if "Address already in use" in str(e):
-                console.print(
-                    f"💥 [red]Port {self.port} is already in use![/red]"
-                )
+                console.print(f"💥 [red]Port {self.port} is already in use![/red]")
                 console.print(
                     f"💡 Try using a different port: "
                     f"[cyan]runagent serve --port {self.port + 1}[/cyan]"
@@ -425,5 +446,5 @@ class LocalServer:
             "url": f"http://{self.host}:{self.port}",
             "docs_url": f"http://{self.host}:{self.port}/docs",
             "status": "running",
-            "server_type": "FastAPI"
+            "server_type": "FastAPI",
         }

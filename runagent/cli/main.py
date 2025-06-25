@@ -3,6 +3,7 @@
 import click
 from . import commands
 
+
 # Update your CLI group
 @click.group()
 def runagent():
@@ -22,5 +23,5 @@ runagent.add_command(commands.serve)
 runagent.add_command(commands.run)
 runagent.add_command(commands.db_status)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     runagent()

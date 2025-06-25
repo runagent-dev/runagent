@@ -3,7 +3,9 @@ from pathlib import Path
 from enum import Enum
 
 # Template Repository Configuration
-TEMPLATE_REPO_URL = os.getenv("RUNAGENT_TEMPLATE_REPO", "https://github.com/runagent-dev/runagent.git")
+TEMPLATE_REPO_URL = os.getenv(
+    "RUNAGENT_TEMPLATE_REPO", "https://github.com/runagent-dev/runagent.git"
+)
 TEMPLATE_BRANCH = os.getenv("RUNAGENT_TEMPLATE_BRANCH", "radeen/cli-update")
 TEMPLATE_PREPATH = os.getenv("RUNAGENT_TEMPLATE_PREPATH", "templates")
 
@@ -27,7 +29,11 @@ AGENT_CONFIG_FILE_NAME = "runagent.config.json"
 
 # Setup cache directory
 _cache_dir = os.environ.get(ENV_LOCAL_CACHE_DIRECTORY)
-LOCAL_CACHE_DIRECTORY = str(Path(_cache_dir) if _cache_dir is not None else Path(LOCAL_CACHE_DIRECTORY_PATH).expanduser())
+LOCAL_CACHE_DIRECTORY = str(
+    Path(_cache_dir)
+    if _cache_dir is not None
+    else Path(LOCAL_CACHE_DIRECTORY_PATH).expanduser()
+)
 
 try:
     Path(LOCAL_CACHE_DIRECTORY).mkdir(parents=True, exist_ok=True)
@@ -38,6 +44,7 @@ except OSError as e:
         "environment variable."
     ) from e
 
+
 # Framework Enums
 class Framework(str, Enum):
     LANGGRAPH = "langgraph"
@@ -45,6 +52,7 @@ class Framework(str, Enum):
     LLAMAINDEX = "llamaindex"
     CREWAI = "crewai"
     AUTOGEN = "autogen"
+
 
 class TemplateVariant(str, Enum):
     BASIC = "basic"

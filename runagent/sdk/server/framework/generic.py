@@ -17,8 +17,7 @@ class GenericExecutor:
         if "generic" in self.agent_entrypoints:
             ep = self.agent_entrypoints["generic"]
             self._generic_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file,
-                ep.module
+                self.agent_dir / ep.file, ep.module
             )
 
     def generic(self, *input_args, **input_kwargs):
