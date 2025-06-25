@@ -10,7 +10,7 @@ class RunAgentClient:
         self.local = local
 
         if local:
-            agent_info = self.sdk.db_manager.get_agent(agent_id)
+            agent_info = self.sdk.db_service.get_agent(agent_id)
             if not agent_info:
                 raise ValueError(f"Agent {agent_id} not found in local DB")
             self.agent_info = agent_info

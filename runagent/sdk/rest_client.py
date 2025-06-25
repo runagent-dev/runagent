@@ -782,61 +782,61 @@ class RestClient:
                 'error': f'Connection failed: {str(e)}'
             }
 
-def run_agent_generic(
-    self,
-    agent_id: str,
-    input_args: list = None,
-    input_kwargs: dict = None,
-    execution_type: str = "generic"
-) -> Dict:
-    """
-    Execute an agent with given parameters
-    
-    Args:
-        agent_id: ID of the agent to execute
-        query: Query string to send to the agent
-        num_solutions: Number of solutions to request
-        input_args: List of positional arguments for the agent
-        input_kwargs: Dictionary of keyword arguments for the agent
-        execution_type: Type of execution (default: "generic")
+    def run_agent_generic(
+        self,
+        agent_id: str,
+        input_args: list = None,
+        input_kwargs: dict = None,
+        execution_type: str = "generic"
+    ) -> Dict:
+        """
+        Execute an agent with given parameters
         
-    Returns:
-        Execution result from the agent
-    """
-    try:
-        console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
-
-        # Prepare request data
-        request_data = {
-            "input_data": {
-                "input_args": input_args,
-                "input_kwargs": input_kwargs
-            }
-        }
-        
-        # Execute the agent
-        try:
-            result = self.http.post(
-                f"/agents/{agent_id}/execute/generic",
-                data=request_data,
-                timeout=120  # Longer timeout for agent execution
-            )
+        Args:
+            agent_id: ID of the agent to execute
+            query: Query string to send to the agent
+            num_solutions: Number of solutions to request
+            input_args: List of positional arguments for the agent
+            input_kwargs: Dictionary of keyword arguments for the agent
+            execution_type: Type of execution (default: "generic")
             
-            if result.get('success', True):  # Assume success if not explicitly false
-                console.print("✅ [bold green]Agent execution completed![/bold green]")
-                return result
-            else:
-                console.print(f"❌ [bold red]Agent execution failed: {result.get('error', 'Unknown error')}[/bold red]")
-                return result
+        Returns:
+            Execution result from the agent
+        """
+        try:
+            console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
+
+            # Prepare request data
+            request_data = {
+                "input_data": {
+                    "input_args": input_args,
+                    "input_kwargs": input_kwargs
+                }
+            }
+            
+            # Execute the agent
+            try:
+                result = self.http.post(
+                    f"/agents/{agent_id}/execute/generic",
+                    data=request_data,
+                    timeout=120  # Longer timeout for agent execution
+                )
                 
-        except (ClientError, ServerError, ConnectionError) as e:
+                if result.get('success', True):  # Assume success if not explicitly false
+                    console.print("✅ [bold green]Agent execution completed![/bold green]")
+                    return result
+                else:
+                    console.print(f"❌ [bold red]Agent execution failed: {result.get('error', 'Unknown error')}[/bold red]")
+                    return result
+                    
+            except (ClientError, ServerError, ConnectionError) as e:
+                return {
+                    'success': False,
+                    'error': f"Agent execution failed: {e.message}"
+                }
+                
+        except Exception as e:
             return {
                 'success': False,
-                'error': f"Agent execution failed: {e.message}"
+                'error': f"Execute agent failed: {str(e)}"
             }
-            
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f"Execute agent failed: {str(e)}"
-        }
