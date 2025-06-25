@@ -1,17 +1,23 @@
 {
   "agent_name": "new-test-2",
+  "description": "A simple agent that responds to basic queries",
   "framework": "langchain",
   "template": "basic",
   "version": "0.1.0",
   "created_at": "2025-06-17 13:42:03",
   "template_source": {
     "repo_url": "https://github.com/runagent-dev/runagent.git",
-    "branch": "radeen/cli-update",
-    "path": "templates/langchain/basic"
+    "path": "templates/langchain/basic",
+    "au"
   },
   "agent_architecture": {
-    "entrypoint_file": "main.py",
-    "entrypoint_module": "run"
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "run",
+        "type": "generic"
+      }
+    ]
   },
   "env_vars": {
     "OPENAI_API_KEY": "sk-proj-1234567890"
