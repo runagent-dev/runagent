@@ -238,22 +238,22 @@ class HttpHandler:
 class RestClient:
     """Client for remote server deployment via REST API - ENHANCED VERSION"""
     
-    def __init__(self, api_url: Optional[str] = None, api_key: Optional[str] = None, api_prefix: Optional[str] = "/api/v1"):
+    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None, api_prefix: Optional[str] = "/api/v1"):
         """
         Initialize REST client for middleware server
         
         Args:
-            api_url: URL of the middleware server
+            base_url: URL of the middleware server
             api_key: API key for authentication
             api_prefix: API prefix path
         """
-        self.api_url = api_url or Config.get_base_url()
+        self.base_url = base_url or Config.get_base_url()
         self.api_key = api_key or Config.get_api_key()
         
-        self.api_url = self.api_url.rstrip('/') + api_prefix
+        self.base_url = self.base_url.rstrip('/') + api_prefix
         
         # Initialize HTTP handler
-        self.http = HttpHandler(api_key=self.api_key, base_url=self.api_url)
+        self.http = HttpHandler(api_key=self.api_key, base_url=self.base_url)
         
         # Cache for limits to avoid repeated API calls
         self._limits_cache = None
@@ -390,7 +390,7 @@ class RestClient:
             }
             
             # Upload to server
-            console.print(f"🌐 Uploading to: [bold blue]{self.api_url}[/bold blue]")
+            console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
             
             with Progress(
                 SpinnerColumn(),
@@ -416,13 +416,13 @@ class RestClient:
                     **upload_metadata,
                     'agent_id': agent_id,
                     'remote': True,
-                    'api_url': self.api_url
+                    'base_url': self.base_url
                 })
                 
                 console.print(Panel(
                     f"✅ [bold green]Upload successful![/bold green]\n"
                     f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                    f"🌐 Server: [blue]{self.api_url}[/blue]",
+                    f"🌐 Server: [blue]{self.base_url}[/blue]",
                     title="📤 Upload Complete",
                     border_style="green"
                 ))
@@ -430,7 +430,7 @@ class RestClient:
                 return {
                     'success': True,
                     'agent_id': agent_id,
-                    'api_url': self.api_url,
+                    'base_url': self.base_url,
                     'message': f'Agent uploaded. Use "runagent start --id {agent_id}" to deploy, or "runagent deploy --id {agent_id}" for direct deployment.'
                 }
             else:
@@ -596,7 +596,7 @@ class RestClient:
                     console.print(Panel(
                         f"✅ [bold green]Agent started successfully![/bold green]\n"
                         f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                        f"🌐 Endpoint: [link]{self.api_url}{endpoint}[/link]",
+                        f"🌐 Endpoint: [link]{self.base_url}{endpoint}[/link]",
                         title="🚀 Deployment Complete",
                         border_style="green"
                     ))
@@ -604,14 +604,14 @@ class RestClient:
                     # Update local deployment info
                     self._update_deployment_info(agent_id, {
                         'status': 'deployed',
-                        'endpoint': f"{self.api_url}{endpoint}",
+                        'endpoint': f"{self.base_url}{endpoint}",
                         'started_at': time.strftime('%Y-%m-%d %H:%M:%S')
                     })
                     
                     return {
                         'success': True,
                         'agent_id': agent_id,
-                        'endpoint': f"{self.api_url}{endpoint}",
+                        'endpoint': f"{self.base_url}{endpoint}",
                         'status': 'deployed'
                     }
                 else:
@@ -756,7 +756,7 @@ class RestClient:
                         'api_connected': True,
                         'api_authenticated': limits_result.get('api_validated', False),
                         'enhanced_limits': limits_result.get('enhanced_limits', False),
-                        'api_url': self.api_url
+                        'base_url': self.base_url
                     }
                 else:
                     return {
@@ -764,7 +764,7 @@ class RestClient:
                         'api_connected': True,
                         'api_authenticated': False,
                         'enhanced_limits': False,
-                        'api_url': self.api_url,
+                        'base_url': self.base_url,
                         'message': 'No API key provided'
                     }
                     
