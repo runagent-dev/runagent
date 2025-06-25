@@ -3,10 +3,10 @@
 Debug script to identify why agent 732e45b2 is failing
 """
 
-import sys
 import importlib.util
-import traceback
 import os
+import sys
+import traceback
 from pathlib import Path
 
 

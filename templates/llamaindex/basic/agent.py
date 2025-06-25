@@ -1,9 +1,10 @@
-from typing import Dict, Any, List
-from llama_index.core import VectorStoreIndex, Document, Settings
-from llama_index.llms.openai import OpenAI
-from llama_index.embeddings.openai import OpenAIEmbedding
 import os
+from typing import Any, Dict, List
+
 from dotenv import load_dotenv
+from llama_index.core import Document, Settings, VectorStoreIndex
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.llms.openai import OpenAI
 
 # Load environment variables
 load_dotenv()

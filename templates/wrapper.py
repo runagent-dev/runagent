@@ -1,8 +1,9 @@
 import functools
-from typing import Dict, Any
+from typing import Any, Dict
+
 from runagent.logging.log_manager import LogManager
-from runagent.monitoring.status_manager import StatusManager
 from runagent.monitoring.agent_status import AgentState
+from runagent.monitoring.status_manager import StatusManager
 
 
 def with_logging(framework: str, agent_id: str):

@@ -1,12 +1,13 @@
-from typing import Dict, Any, List
-from langchain.chat_models import ChatOpenAI
+import os
+from typing import Any, Dict, List
+
+from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.schema import AIMessage, HumanMessage
 from langchain.tools import tool
-from langchain.schema import HumanMessage, AIMessage
-import os
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()

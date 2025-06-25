@@ -2,15 +2,15 @@
 SDK Configuration management.
 """
 
-import os
 import json
+import os
 import typing as t
 from pathlib import Path
 
 from ..constants import (
+    DEFAULT_BASE_URL,
     ENV_RUNAGENT_API_KEY,
     ENV_RUNAGENT_BASE_URL,
-    DEFAULT_BASE_URL,
     LOCAL_CACHE_DIRECTORY,
     USER_DATA_FILE_NAME,
 )

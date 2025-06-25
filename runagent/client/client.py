@@ -1,6 +1,6 @@
 from runagent.sdk import RunAgentSDK
 from runagent.sdk.rest_client import RestClient
-from runagent.utils.agent import validate_agent, detect_framework
+from runagent.utils.agent import detect_framework, validate_agent
 
 
 class RunAgentClient:

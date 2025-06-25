@@ -1,8 +1,8 @@
-from runagent.utils.schema import RunAgentConfig
-from runagent.utils.imports import PackageImporter
 from pathlib import Path
 from typing import Dict
-from runagent.utils.schema import EntryPoint
+
+from runagent.utils.imports import PackageImporter
+from runagent.utils.schema import EntryPoint, RunAgentConfig
 
 
 class GenericExecutor:

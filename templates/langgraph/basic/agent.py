@@ -1,8 +1,9 @@
-from typing import Dict, Any, TypedDict
-from langchain.chat_models import ChatOpenAI
-from langgraph.graph import Graph, END
 import os
+from typing import Any, Dict, TypedDict
+
 from dotenv import load_dotenv
+from langchain.chat_models import ChatOpenAI
+from langgraph.graph import END, Graph
 
 # Load environment variables
 load_dotenv()

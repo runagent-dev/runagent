@@ -2,10 +2,11 @@
 
 import shutil
 import tempfile
+import typing as t
 from pathlib import Path
+
 import git
 from git import Repo
-import typing as t
 
 
 class TemplateDownloadError(Exception):

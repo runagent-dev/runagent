@@ -1,10 +1,11 @@
-from typing import Dict, Any
-from langchain_openai import ChatOpenAI
+import os
+from typing import Any, Dict
+
+from dotenv import load_dotenv
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import HumanMessage, AIMessage
-import os
-from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_openai import ChatOpenAI
 
 # Load environment variables
 load_dotenv()

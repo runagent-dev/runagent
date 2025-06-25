@@ -1,22 +1,24 @@
-import os
-import json
-import zipfile
-import tempfile
-import requests
-import time
 import base64
+import json
+import os
+import tempfile
+import time
 import typing as t
-from typing import Dict, Any, Optional
+import zipfile
 from pathlib import Path
+from typing import Any, Dict, Optional
+
+import requests
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
-    BarColumn,
     TimeElapsedColumn,
 )
+
 from runagent.utils.config import Config
 
 console = Console()

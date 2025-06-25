@@ -5,9 +5,9 @@ Template management for the SDK.
 import typing as t
 from pathlib import Path
 
-from ..constants import TEMPLATE_REPO_URL, TEMPLATE_BRANCH, TEMPLATE_PREPATH
-from .template_downloader import TemplateDownloader
+from ..constants import TEMPLATE_BRANCH, TEMPLATE_PREPATH, TEMPLATE_REPO_URL
 from .exceptions import ValidationError
+from .template_downloader import TemplateDownloader
 
 
 class TemplateManager:
@@ -140,6 +140,7 @@ class TemplateManager:
     def _create_project_config(self, folder_path: Path, framework: str, template: str):
         """Create project configuration file"""
         import time
+
         from ..utils.config import Config
 
         config_content = {

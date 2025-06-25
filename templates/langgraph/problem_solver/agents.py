@@ -6,10 +6,11 @@ Two-agent workflow with simple functions and easy-to-understand prompts.
 Perfect for LangGraph demos and tutorials.
 """
 
-from typing import TypedDict, List
-from langgraph.graph import StateGraph, END
+from typing import List, TypedDict
+
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
 
 
 # Simple state definition

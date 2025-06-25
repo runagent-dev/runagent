@@ -2,21 +2,20 @@
 CLI commands that use the restructured SDK internally.
 """
 
-import click
 import json
 
 # import requests
 from pathlib import Path
+
+import click
 from rich.console import Console
 
 # Import the new SDK
 from runagent import RunAgent
-from runagent.sdk.exceptions import (
-    # RunAgentError,
+from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
-    ValidationError,
     TemplateError,
-    # ConnectionError
+    ValidationError,
 )
 
 console = Console()

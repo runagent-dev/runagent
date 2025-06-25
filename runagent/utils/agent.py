@@ -1,12 +1,12 @@
+import importlib
 import json
 import sys
-import importlib
-from pathlib import Path
 import typing as t
+from pathlib import Path
 
 from runagent.constants import AGENT_CONFIG_FILE_NAME
-from runagent.utils.schema import RunAgentConfig
 from runagent.utils.imports import PackageImporter
+from runagent.utils.schema import RunAgentConfig
 
 
 def get_agent_config(folder_path: Path) -> t.Optional[dict]:
