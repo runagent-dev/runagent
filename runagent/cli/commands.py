@@ -493,29 +493,29 @@ def deploy(folder, agent_id, local, framework, config):
                 default='.')
 def serve(port, host, debug, path):
     """Start local FastAPI server for testing deployed agents"""
-    sdk = RunAgent()
+    # sdk = RunAgent()
     
-    console.print("⚡ [bold]Starting local server...[/bold]")
-    console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
-    console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
+    # console.print("⚡ [bold]Starting local server...[/bold]")
+    # console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
+    # console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
     
-    # Start server (this will block)
-    sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
-    # try:
-    #     sdk = RunAgent()
+    # # Start server (this will block)
+    # sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
+    try:
+        sdk = RunAgent()
         
-    #     console.print("⚡ [bold]Starting local server...[/bold]")
-    #     console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
-    #     console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
+        console.print("⚡ [bold]Starting local server...[/bold]")
+        console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
+        console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
         
-    #     # Start server (this will block)
-    #     sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
+        # Start server (this will block)
+        sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
     
-    # except KeyboardInterrupt:
-    #     console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
-    # except Exception as e:
-    #     console.print(f"❌ [red]Server error:[/red] {e}")
-    #     raise click.ClickException("Server failed to start")
+    except KeyboardInterrupt:
+        console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
+    except Exception as e:
+        console.print(f"❌ [red]Server error:[/red] {e}")
+        raise click.ClickException("Server failed to start")
 
 
 @click.command()
