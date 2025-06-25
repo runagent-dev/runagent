@@ -9,6 +9,7 @@ def runagent():
     """RunAgent CLI - Deploy and manage AI agents easily"""
     pass
 
+
 runagent.add_command(commands.setup)
 runagent.add_command(commands.teardown)
 runagent.add_command(commands.init)

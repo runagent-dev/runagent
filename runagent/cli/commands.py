@@ -4,18 +4,18 @@ CLI commands that use the restructured SDK internally.
 
 import click
 import json
-import requests
+# import requests
 from pathlib import Path
 from rich.console import Console
 
 # Import the new SDK
 from runagent import RunAgent
-from runagent.client.exceptions import (
-    RunAgentError,
+from runagent.sdk.exceptions import (
+    # RunAgentError,
     AuthenticationError,
     ValidationError,
     TemplateError,
-    ConnectionError
+    # ConnectionError
 )
 
 console = Console()
@@ -481,24 +481,41 @@ def deploy(folder, agent_id, local, framework, config):
 @click.option('--port', default=8450, help='Port to run server on')
 @click.option('--host', default='127.0.0.1', help='Host to bind server to')
 @click.option('--debug', is_flag=True, help='Run server in debug mode')
-def serve(port, host, debug):
+@click.argument('path',
+                type=click.Path(
+                    exists=True,        # Path must exist
+                    file_okay=False,    # Don't allow files
+                    dir_okay=True,      # Allow directories only
+                    readable=True,      # Must be readable
+                    resolve_path=True,  # Convert to absolute path
+                    path_type=Path      # Return as pathlib.Path object
+                ),
+                default='.')
+def serve(port, host, debug, path):
     """Start local FastAPI server for testing deployed agents"""
+    sdk = RunAgent()
     
-    try:
-        sdk = RunAgent()
-        
-        console.print(f"⚡ [bold]Starting local server...[/bold]")
-        console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
-        console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
-        
-        # Start server (this will block)
-        sdk.start_local_server(port=port, host=host, debug=debug)
+    console.print("⚡ [bold]Starting local server...[/bold]")
+    console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
+    console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
     
-    except KeyboardInterrupt:
-        console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
-    except Exception as e:
-        console.print(f"❌ [red]Server error:[/red] {e}")
-        raise click.ClickException("Server failed to start")
+    # Start server (this will block)
+    sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
+    # try:
+    #     sdk = RunAgent()
+        
+    #     console.print("⚡ [bold]Starting local server...[/bold]")
+    #     console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
+    #     console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
+        
+    #     # Start server (this will block)
+    #     sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
+    
+    # except KeyboardInterrupt:
+    #     console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
+    # except Exception as e:
+    #     console.print(f"❌ [red]Server error:[/red] {e}")
+    #     raise click.ClickException("Server failed to start")
 
 
 @click.command()
