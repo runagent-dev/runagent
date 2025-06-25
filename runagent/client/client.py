@@ -26,12 +26,6 @@ class RunAgentClient:
         else:
             self.rest_client = RestClient()
 
-    def _run_local(self, agent_id: str, input_data: dict):
-        return self.sdk.run_agent(agent_id, input_data)
-
-    def _run_remote(self, agent_id: str, input_data: dict):
-        return self.rest_client.run_agent(agent_id, input_data)
-
     def run(self, input_args: list = None, input_kwargs: dict = None):
         return self.rest_client.run_agent_generic(
             self.agent_id,
