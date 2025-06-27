@@ -182,3 +182,64 @@ def get_solutions(query: str, num_solutions: int = 3):
     print(result["validated_results"])
 
     return result
+
+
+# Create workflow
+app = create_workflow()
+
+
+if __name__ == "__main__":
+    for out in app.stream(
+        {
+            "query": "How to I fix my broken phone?",
+            "num_solutions": 4,
+        }
+    ):
+        print(out)
+        print("-" * 50)
+# Set up initial state
+# initial_state = {
+#     "query": query,
+#     "num_solutions": min(max(num_solutions, 1), 5),  # Keep between 1-5
+#     "solutions": [],
+#     "validated_results": "",
+# }
+# def stream_solutions(query: str, num_solutions: int = 3):
+#     """
+#     Main function to solve problems
+
+#     Args:
+#         query: Your problem description
+#         num_solutions: How many solutions you want (1-5)
+
+#     Returns:
+#         Complete analysis with validated solutions
+#     """
+#     print(f"\n🚀 Starting Problem Solving Workflow")
+#     print(f"Problem: {query}")
+#     print(f"Requested solutions: {num_solutions}")
+#     print("-" * 50)
+
+#     # Create workflow
+#     app = create_workflow()
+
+#     # Set up initial state
+#     initial_state = {
+#         "query": query,
+#         "num_solutions": min(max(num_solutions, 1), 5),  # Keep between 1-5
+#         "solutions": [],
+#         "validated_results": "",
+#     }
+
+#     # Run the workflow
+#     result = app.invoke(initial_state)
+
+#     # Print results nicely
+#     print("\n📋 SOLUTIONS FOUND:")
+#     for i, solution in enumerate(result["solutions"], 1):
+#         print(f"{i}. {solution}")
+
+#     print(f"\n🎯 VALIDATION RESULTS:")
+#     print(result["validated_results"])
+
+#     return result

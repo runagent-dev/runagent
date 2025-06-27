@@ -14,8 +14,13 @@
     "entrypoints": [
       {
         "file": "agents.py",
-        "module": "get_solutions",
+        "module": "app.invoke",
         "type": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "app.stream",
+        "type": "generic_stream"
       }
     ]
   },

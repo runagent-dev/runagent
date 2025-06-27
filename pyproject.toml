@@ -41,7 +41,9 @@ dependencies = [
     "GitPython>=3.1.43",
     "typing-extensions>=4.9.0",
     "fastapi==0.115.12",
-    "uvicorn==0.34.1"
+    "uvicorn==0.34.1",
+    "sqlalchemy==2.0.41",
+    "websockets==15.0.1"
 ]
 
 [project.optional-dependencies]

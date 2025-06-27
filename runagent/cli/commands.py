@@ -553,14 +553,7 @@ def deploy(folder, agent_id, local, framework, config):
 )
 def serve(port, host, debug, path):
     """Start local FastAPI server for testing deployed agents"""
-    # sdk = RunAgent()
 
-    # console.print("⚡ [bold]Starting local server...[/bold]")
-    # console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
-    # console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
-
-    # # Start server (this will block)
-    # sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
     try:
         sdk = RunAgent()
 

@@ -777,6 +777,45 @@ class DBService:
                 console.print(f"Error getting agent from database: {e}")
                 return None
 
+    def get_agent_by_path(self, agent_path: str) -> Optional[Dict]:
+        """Get agent information by agent path"""
+        with self.db_manager.get_session() as session:
+            try:
+                # Normalize path for comparison
+                normalized_path = str(Path(agent_path).resolve())
+                
+                agent = session.query(Agent).filter(
+                    Agent.agent_path == normalized_path
+                ).first()
+                
+                if not agent:
+                    return None
+
+                return {
+                    "agent_id": agent.agent_id,
+                    "agent_path": agent.agent_path,
+                    "host": agent.host,
+                    "port": agent.port,
+                    "framework": agent.framework,
+                    "status": agent.status,
+                    "deployed_at": (
+                        agent.deployed_at.isoformat() if agent.deployed_at else None
+                    ),
+                    "last_run": agent.last_run.isoformat() if agent.last_run else None,
+                    "run_count": agent.run_count,
+                    "success_count": agent.success_count,
+                    "error_count": agent.error_count,
+                    "created_at": (
+                        agent.created_at.isoformat() if agent.created_at else None
+                    ),
+                    "updated_at": (
+                        agent.updated_at.isoformat() if agent.updated_at else None
+                    ),
+                }
+            except Exception as e:
+                console.print(f"Error getting agent by path from database: {e}")
+                return None
+                
     def list_agents(self, status: str = None) -> List[Dict]:
         """List all agents, optionally filtered by status"""
         with self.db_manager.get_session() as session:

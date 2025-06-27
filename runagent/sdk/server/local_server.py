@@ -8,71 +8,25 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from rich.console import Console
-
+from enum import Enum
 from runagent.sdk.db import DBService
 from runagent.sdk.server.framework import get_executor
 from runagent.utils.agent import detect_framework, get_agent_config
+from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponse, WebSocketActionType, WebSocketAgentRequest, EntryPointType
 from runagent.utils.imports import PackageImporter
+from runagent.utils.schema import MessageType
+from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 
 console = Console()
 
-
-class AgentInputArgs(BaseModel):
-    """Request model for agent execution"""
-
-    input_args: List[Any] = Field(
-        default={}, description="Input data for agent invocation"
-    )
-    input_kwargs: Dict[str, Any] = Field(
-        default={}, description="Input data for agent invocation"
-    )
-
-
-# Pydantic Models
-class AgentRunRequest(BaseModel):
-    """Request model for agent execution"""
-
-    input_data: AgentInputArgs = Field(
-        default={}, description="Input data for agent invocation"
-    )
-
-
-class AgentRunResponse(BaseModel):
-    """Response model for agent execution"""
-
-    success: bool
-    output_data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    execution_time: Optional[float] = None
-    agent_id: str
-
-
-class CapacityInfo(BaseModel):
-    """Database capacity information"""
-
-    current_count: int
-    max_capacity: int
-    remaining_slots: int
-    is_full: bool
-    agents: List[Dict[str, Any]]
-
-
-class AgentInfo(BaseModel):
-    """Agent information and endpoints"""
-
-    message: str
-    version: str
-    host: str
-    port: int
-    config: Dict[str, Any]
-    endpoints: Dict[str, str]
 
 
 class LocalServer:
@@ -91,7 +45,6 @@ class LocalServer:
         self.host = host
         self.agent_id = agent_id
         self.agent_path = agent_path
-
         self.importer = PackageImporter(verbose=True)
 
         self.agent_config = get_agent_config(agent_path)
@@ -147,8 +100,10 @@ class LocalServer:
             allow_headers=["*"],
         )
         # Setup routes
+        self.websocket_handler = AgentWebSocketHandler(self.db_service)
         self._setup_routes()
-
+        self._setup_websocket_routes()
+    
     def _install_dependencies(self):
         """Install agent dependencies from requirements.txt if it exists"""
         req_txt_path = self.agent_path / "requirements.txt"
@@ -163,7 +118,7 @@ class LocalServer:
                 raise Exception(
                     f"Failed to install dependencies from {req_txt_path}: {str(e)}"
                 )
-
+                
     @staticmethod
     def from_id(agent_id: str) -> "LocalServer":
         """
@@ -171,9 +126,6 @@ class LocalServer:
 
         Args:
             agent_id: ID of the agent to serve
-            db_manager: Database manager instance
-            port: Port to run server on
-            host: Host to bind to
 
         Returns:
             LocalServer instance
@@ -187,68 +139,120 @@ class LocalServer:
         if agent is None:
             raise Exception(f"Agent {agent_id} not found in local database")
 
+        # Display existing agent information
+        console.print(f"🔍 [yellow]Found agent by ID: {agent_id}[/yellow]")
+        console.print(f"📋 [cyan]Agent Details:[/cyan]")
+        console.print(f"   • Agent ID: [bold magenta]{agent['agent_id']}[/bold magenta]")
+        console.print(f"   • Path: [blue]{agent['agent_path']}[/blue]")
+        console.print(f"   • Host: [blue]{agent['host']}[/blue]")
+        console.print(f"   • Port: [blue]{agent['port']}[/blue]")
+        console.print(f"   • Framework: [green]{agent['framework']}[/green]")
+        console.print(f"   • Status: [yellow]{agent['status']}[/yellow]")
+        console.print(f"   • Deployed: [dim]{agent['deployed_at']}[/dim]")
+        console.print(f"   • Total Runs: [cyan]{agent['run_count']}[/cyan]")
+        console.print(f"   • Success Rate: [green]{agent['success_count']}/{agent['run_count']}[/green]")
+        
+        if agent['last_run']:
+            console.print(f"   • Last Run: [dim]{agent['last_run']}[/dim]")
+        
+        console.print(f"\n🔄 [green]Loading existing agent configuration[/green]")
+
         return LocalServer(
-            agent_path=Path(agent["agent_path"]),
+            db_service=db_service,
             agent_id=agent_id,
+            agent_path=Path(agent["agent_path"]),
             port=agent["port"],
             host=agent["host"],
-            db_service=db_service,
         )
 
+    # Modified from_path method for LocalServer class
     @staticmethod
     def from_path(
         path: str, port: int = 8450, host: str = "127.0.0.1"
     ) -> "LocalServer":
         """
         Create LocalServer instance from an agent path.
+        If an agent from the same path already exists, use that agent's configuration.
 
         Args:
             path: Path to agent directory
-            db_manager: Database manager instance
-            port: Port to run server on
-            host: Host to bind to
+            port: Port to run server on (ignored if existing agent found)
+            host: Host to bind to (ignored if existing agent found)
 
         Returns:
             LocalServer instance
         """
         db_service = DBService()
+        agent_path = Path(path).resolve()
 
-        capacity_info = db_service.get_database_capacity_info()
-        if capacity_info["is_full"]:
-            raise Exception(
-                "Database is full. Refer to our docs at "
-                "https://docs.runagent.ai/local-server for more information."
+        # Check if an agent from this path already exists
+        existing_agent = db_service.get_agent_by_path(str(agent_path))
+        
+        if existing_agent:
+            # Agent already exists - use existing configuration
+            console.print(f"🔍 [yellow]Found existing agent for path: {agent_path}[/yellow]")
+            console.print(f"📋 [cyan]Agent Details:[/cyan]")
+            console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
+            console.print(f"   • Host: [blue]{existing_agent['host']}[/blue]")
+            console.print(f"   • Port: [blue]{existing_agent['port']}[/blue]")
+            console.print(f"   • Framework: [green]{existing_agent['framework']}[/green]")
+            console.print(f"   • Status: [yellow]{existing_agent['status']}[/yellow]")
+            console.print(f"   • Deployed: [dim]{existing_agent['deployed_at']}[/dim]")
+            console.print(f"   • Total Runs: [cyan]{existing_agent['run_count']}[/cyan]")
+            console.print(f"   • Success Rate: [green]{existing_agent['success_count']}/{existing_agent['run_count']}[/green]")
+            
+            if existing_agent['last_run']:
+                console.print(f"   • Last Run: [dim]{existing_agent['last_run']}[/dim]")
+            
+            console.print(f"\n🔄 [green]Reusing existing agent configuration[/green]")
+            
+            return LocalServer(
+                agent_path=agent_path,
+                agent_id=existing_agent['agent_id'],
+                port=existing_agent['port'],  # Use existing port
+                host=existing_agent['host'],  # Use existing host
+                db_service=db_service,
             )
+        
+        else:
+            # No existing agent - create new one
+            console.print(f"🆕 [green]Creating new agent for path: {agent_path}[/green]")
+            
+            capacity_info = db_service.get_database_capacity_info()
+            if capacity_info["is_full"]:
+                raise Exception(
+                    "Database is full. Refer to our docs at "
+                    "https://docs.runagent.ai/local-server for more information."
+                )
 
-        # Add agent entry to database
-        agent_id = str(uuid.uuid4())
-        db_service.add_agent(
-            agent_id=agent_id,
-            agent_path=str(path),
-            host=host,
-            port=port,
-            framework=detect_framework(path),
-            status="ready",
-        )
-        return LocalServer(
-            agent_path=path,
-            agent_id=agent_id,
-            port=port,
-            host=host,
-            db_service=db_service,
-        )
-
-    def install_req_txt(self, req_txt):
-        _ = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", req_txt],
-            capture_output=False,  # Shows output directly
-            check=True,
-        )
+            # Add agent entry to database
+            agent_id = str(uuid.uuid4())
+            result = db_service.add_agent(
+                agent_id=agent_id,
+                agent_path=str(agent_path),
+                host=host,
+                port=port,
+                framework=detect_framework(path),
+                status="ready",
+            )
+            
+            if not result["success"]:
+                raise Exception(f"Failed to add agent to database: {result['error']}")
+            
+            console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
+            
+            return LocalServer(
+                agent_path=agent_path,
+                agent_id=agent_id,
+                port=port,
+                host=host,
+                db_service=db_service,
+            )
 
     def _setup_routes(self):
         """Setup FastAPI routes"""
 
-        @self.app.get("/", response_model=AgentInfo)
+        @self.app.get("/api/v1", response_model=AgentInfo)
         async def home():
             """Root endpoint showing server info and available agents"""
             try:
@@ -273,6 +277,17 @@ class LocalServer:
                     detail=f"Failed to get server info: {str(e)}",
                 )
 
+        @self.app.get("/api/v1/health")
+        async def health_check():
+            """Health check endpoint"""
+            return {
+                "status": "healthy",
+                "server": "RunAgent FastAPI Local Server",
+                "timestamp": datetime.now().isoformat(),
+                "uptime_seconds": time.time() - self.start_time,
+                "version": "1.0.0",
+            }
+
         @self.app.post(
             "/api/v1/agents/{agent_id}/execute/generic", response_model=AgentRunResponse
         )
@@ -282,9 +297,12 @@ class LocalServer:
 
             try:
 
+                if EntryPointType.GENERIC not in self.agent_entrypoints:
+                    raise ValueError("No `generic` entrypoint found in agent config")
+                
                 console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
                 console.print(
-                    f"🔍 Entrypoint: [cyan]{self.agent_entrypoints['generic'].file}[/cyan]"
+                    f"🔍 Entrypoint: [cyan]{self.agent_entrypoints[EntryPointType.GENERIC].file}[/cyan]"
                 )
                 console.print(f"🔍 Input data: [cyan]{request.input_data}[/cyan]")
 
@@ -335,16 +353,18 @@ class LocalServer:
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
                 )
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint"""
-            return {
-                "status": "healthy",
-                "server": "RunAgent FastAPI Local Server",
-                "timestamp": datetime.now().isoformat(),
-                "uptime_seconds": time.time() - self.start_time,
-                "version": "1.0.0",
-            }
+    def _setup_websocket_routes(self):
+        """Add WebSocket routes to your existing FastAPI app"""
+        print(self.agent_entrypoints)
+        @self.app.websocket("/api/v1/agents/{agent_id}/execute/generic_stream")
+        async def run_agent_stream(websocket: WebSocket, agent_id: str):
+            """WebSocket endpoint for agent streaming"""
+            # Validate agent exists
+
+            if EntryPointType.GENERIC_STREAM not in self.agent_entrypoints:
+                raise ValueError("No `generic_stream` entrypoint found in agent config")
+
+            await self.websocket_handler.handle_agent_stream(websocket, agent_id, self.agentic_executor.generic_stream)
 
     def extract_endpoints(self):
         endpoints = []

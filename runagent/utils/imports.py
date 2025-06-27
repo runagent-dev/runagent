@@ -134,12 +134,18 @@ class DependencyAnalyzer:
 
 class PackageImporter:
     """
-    Simplified package importer that resolves entry points to callable functions
+    Enhanced package importer that resolves entry points to any Python object
 
     Usage:
         importer = PackageImporter()
+        # For functions (backward compatibility)
         run_function = importer.resolve_import(entrypoint_filepath, "run")
         output = run_function(input)
+        
+        # For any object (new functionality)
+        my_class = importer.resolve_import(entrypoint_filepath, "MyClass")
+        my_variable = importer.resolve_import(entrypoint_filepath, "MY_CONSTANT")
+        my_object = importer.resolve_object(entrypoint_filepath, "some_object")
     """
 
     def __init__(self, verbose: bool = True):
@@ -154,21 +160,32 @@ class PackageImporter:
         self.package_name: str = ""
         self.project_root: Optional[Path] = None
 
-    def resolve_import(self, entrypoint_filepath: str, function_name: str) -> Callable:
+    def resolve_import(self, entrypoint_filepath: str, object_name: str) -> Any:
         """
-        Resolve an entry point file and return a specific function from it
+        Resolve an entry point file and return a specific object from it
+        
+        This method maintains backward compatibility while supporting any object type.
+        It no longer restricts to callable objects only.
 
         Args:
-            entrypoint_filepath: Path to the Python file containing the function
-            function_name: Name of the function to extract
+            entrypoint_filepath: Path to the Python file containing the object
+            object_name: Name of the object to extract (function, class, variable, etc.)
 
         Returns:
-            The callable function
+            The requested object (function, class, variable, etc.)
 
         Example:
             importer = PackageImporter()
+            # Functions
             run_function = importer.resolve_import("./my_project/main.py", "run")
             result = run_function({"input": "data"})
+            
+            # Classes
+            MyClass = importer.resolve_import("./my_project/models.py", "MyClass")
+            instance = MyClass()
+            
+            # Variables/Constants
+            config = importer.resolve_import("./my_project/config.py", "CONFIG")
         """
         entrypoint_path = Path(entrypoint_filepath)
 
@@ -188,7 +205,7 @@ class PackageImporter:
         if self.verbose:
             logger.info(f"🎯 Resolving entry point: {entrypoint_filepath}")
             logger.info(f"📁 Project root: {self.project_root}")
-            logger.info(f"🔍 Looking for function: {function_name}")
+            logger.info(f"🔍 Looking for object: {object_name}")
 
         try:
             # Add project root to sys.path
@@ -203,33 +220,197 @@ class PackageImporter:
             # Load the specific entry point module
             entry_module = self._load_entry_point_module(entrypoint_path)
 
-            # Extract the function
-            if not hasattr(entry_module, function_name):
+            # Extract the object
+            if not hasattr(entry_module, object_name):
                 raise AttributeError(
-                    f"Function '{function_name}' not found in {entrypoint_filepath}"
+                    f"Object '{object_name}' not found in {entrypoint_filepath}"
                 )
 
-            target_function = getattr(entry_module, function_name)
-
-            if not callable(target_function):
-                raise TypeError(
-                    f"'{function_name}' in {entrypoint_filepath} is not callable"
-                )
+            target_object = getattr(entry_module, object_name)
 
             if self.verbose:
-                logger.info(f"✅ Successfully resolved: {function_name}")
-                logger.info(f"   Function: {target_function}")
-                if hasattr(target_function, "__doc__") and target_function.__doc__:
-                    logger.info(
-                        f"   Doc: {target_function.__doc__.strip().split('.')[0]}"
-                    )
+                object_type = self._get_object_type_description(target_object)
+                logger.info(f"✅ Successfully resolved: {object_name}")
+                logger.info(f"   Object: {target_object}")
+                logger.info(f"   Type: {object_type}")
+                
+                # Show docstring if available
+                if hasattr(target_object, "__doc__") and target_object.__doc__:
+                    doc_preview = target_object.__doc__.strip().split('\n')[0][:100]
+                    logger.info(f"   Doc: {doc_preview}{'...' if len(doc_preview) == 100 else ''}")
 
-            return target_function
+            return target_object
 
         except Exception as e:
             logger.error(f"❌ Failed to resolve entry point: {e}")
             self._cleanup()
             raise
+
+    def resolve_object(self, entrypoint_filepath: str, object_name: str) -> Any:
+        """
+        Alias for resolve_import for clearer semantics when importing non-callable objects
+        
+        Args:
+            entrypoint_filepath: Path to the Python file containing the object
+            object_name: Name of the object to extract
+
+        Returns:
+            The requested object
+        """
+        return self.resolve_import(entrypoint_filepath, object_name)
+
+    def resolve_multiple(self, entrypoint_filepath: str, *object_names: str) -> Tuple[Any, ...]:
+        """
+        Resolve multiple objects from the same module efficiently
+        
+        Args:
+            entrypoint_filepath: Path to the Python file containing the objects
+            *object_names: Names of the objects to extract
+
+        Returns:
+            Tuple of the requested objects in the same order
+
+        Example:
+            importer = PackageImporter()
+            func, MyClass, config = importer.resolve_multiple(
+                "./my_project/main.py", "run", "MyClass", "CONFIG"
+            )
+        """
+        if not object_names:
+            raise ValueError("At least one object name must be provided")
+
+        entrypoint_path = Path(entrypoint_filepath)
+
+        if not entrypoint_path.exists():
+            raise FileNotFoundError(
+                f"Entry point file not found: {entrypoint_filepath}"
+            )
+
+        if not entrypoint_path.suffix == ".py":
+            raise ValueError(
+                f"Entry point must be a Python file: {entrypoint_filepath}"
+            )
+
+        # Find the project root
+        self.project_root = self._find_project_root(entrypoint_path)
+
+        if self.verbose:
+            logger.info(f"🎯 Resolving multiple objects from: {entrypoint_filepath}")
+            logger.info(f"📁 Project root: {self.project_root}")
+            logger.info(f"🔍 Looking for objects: {', '.join(object_names)}")
+
+        try:
+            # Add project root to sys.path
+            project_parent = str(self.project_root.parent)
+            if project_parent not in sys.path:
+                sys.path.insert(0, project_parent)
+
+            # Load the package structure if it exists
+            if self._is_package_structure():
+                self._load_package_structure()
+
+            # Load the specific entry point module
+            entry_module = self._load_entry_point_module(entrypoint_path)
+
+            # Extract all objects
+            resolved_objects = []
+            for object_name in object_names:
+                if not hasattr(entry_module, object_name):
+                    raise AttributeError(
+                        f"Object '{object_name}' not found in {entrypoint_filepath}"
+                    )
+                
+                target_object = getattr(entry_module, object_name)
+                resolved_objects.append(target_object)
+
+                if self.verbose:
+                    object_type = self._get_object_type_description(target_object)
+                    logger.info(f"✅ Resolved {object_name}: {object_type}")
+
+            return tuple(resolved_objects)
+
+        except Exception as e:
+            logger.error(f"❌ Failed to resolve objects: {e}")
+            self._cleanup()
+            raise
+
+    def list_available_objects(self, entrypoint_filepath: str) -> Dict[str, str]:
+        """
+        List all available objects in a module with their types
+        
+        Args:
+            entrypoint_filepath: Path to the Python file to inspect
+
+        Returns:
+            Dictionary mapping object names to their type descriptions
+
+        Example:
+            importer = PackageImporter()
+            objects = importer.list_available_objects("./my_project/main.py")
+            print(objects)
+            # {'run': 'function', 'MyClass': 'class', 'CONFIG': 'dict', ...}
+        """
+        entrypoint_path = Path(entrypoint_filepath)
+
+        if not entrypoint_path.exists():
+            raise FileNotFoundError(
+                f"Entry point file not found: {entrypoint_filepath}"
+            )
+
+        try:
+            # Set up the environment
+            self.project_root = self._find_project_root(entrypoint_path)
+            
+            project_parent = str(self.project_root.parent)
+            if project_parent not in sys.path:
+                sys.path.insert(0, project_parent)
+
+            if self._is_package_structure():
+                self._load_package_structure()
+
+            # Load the module
+            entry_module = self._load_entry_point_module(entrypoint_path)
+
+            # Get all public objects (not starting with _)
+            available_objects = {}
+            for name in dir(entry_module):
+                if not name.startswith('_'):  # Skip private/magic methods
+                    obj = getattr(entry_module, name)
+                    obj_type = self._get_object_type_description(obj)
+                    available_objects[name] = obj_type
+
+            return available_objects
+
+        except Exception as e:
+            logger.error(f"❌ Failed to list objects: {e}")
+            self._cleanup()
+            raise
+
+    def _get_object_type_description(self, obj: Any) -> str:
+        """Get a human-readable description of an object's type"""
+        import types
+        
+        if callable(obj):
+            if isinstance(obj, type):
+                return "class"
+            elif isinstance(obj, types.FunctionType):
+                return "function"
+            elif isinstance(obj, types.MethodType):
+                return "method"
+            elif isinstance(obj, types.BuiltinFunctionType):
+                return "builtin_function"
+            elif hasattr(obj, '__call__'):
+                return "callable"
+            else:
+                return "callable_object"
+        elif isinstance(obj, types.ModuleType):
+            return "module"
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return type(obj).__name__
+        elif isinstance(obj, (list, tuple, dict, set)):
+            return type(obj).__name__
+        else:
+            return type(obj).__name__
 
     def _find_project_root(self, entrypoint_path: Path) -> Path:
         """Find the root directory of the project"""
@@ -546,3 +727,46 @@ class PackageImporter:
             "loaded_modules": list(self.loaded_modules.keys()),
             "failed_modules": list(self.failed_modules),
         }
+
+
+# Example usage and backward compatibility demonstration
+if __name__ == "__main__":
+    # Initialize the importer
+    importer = PackageImporter()
+    
+    # Example 1: Import a function (backward compatible)
+    try:
+        run_func = importer.resolve_import("./my_project/main.py", "run")
+        print(f"Imported function: {run_func}")
+    except Exception as e:
+        print(f"Could not import function: {e}")
+    
+    # Example 2: Import a class
+    try:
+        MyClass = importer.resolve_import("./my_project/models.py", "MyClass")
+        print(f"Imported class: {MyClass}")
+    except Exception as e:
+        print(f"Could not import class: {e}")
+    
+    # Example 3: Import a variable/constant
+    try:
+        config = importer.resolve_import("./my_project/config.py", "CONFIG")
+        print(f"Imported config: {config}")
+    except Exception as e:
+        print(f"Could not import config: {e}")
+    
+    # Example 4: Import multiple objects at once
+    try:
+        func, cls, var = importer.resolve_multiple(
+            "./my_project/main.py", "run", "MyClass", "CONSTANT"
+        )
+        print(f"Imported multiple: {func}, {cls}, {var}")
+    except Exception as e:
+        print(f"Could not import multiple: {e}")
+    
+    # Example 5: List available objects
+    try:
+        available = importer.list_available_objects("./my_project/main.py")
+        print(f"Available objects: {available}")
+    except Exception as e:
+        print(f"Could not list objects: {e}")
