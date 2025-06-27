@@ -7,7 +7,7 @@ built with frameworks like LangGraph, LangChain, and LlamaIndex.
 
 __version__ = "0.1.0"
 
-from .client import RunAgentClient
+from .client import RunAgentClient, AsyncRunAgentClient
 
 # Import the main SDK components
 from .sdk import (
@@ -27,6 +27,7 @@ __all__ = [
     "RunAgent",
     "RunAgentSDK",
     "RunAgentClient",
+    "AsyncRunAgentClient",
     "RunAgentError",
     "AuthenticationError",
     "ValidationError",

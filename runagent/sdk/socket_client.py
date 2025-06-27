@@ -25,7 +25,7 @@ class SocketClient:
         self.base_socket_url = base_socket_url.rstrip("/") + api_prefix
         self.api_key = api_key or Config.get_api_key()
         self.serializer = CoreSerializer()
-    
+        
     async def run_agent_generic_stream_async(self, agent_id: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
         """Stream agent execution results (async version)"""
         uri = f"{self.base_socket_url}/agents/{agent_id}/execute/generic_stream"
@@ -48,11 +48,14 @@ class SocketClient:
                 data=request.dict()
             )
             
-            await websocket.send(json.dumps(start_msg.to_dict()))
+            # Use serialize_message like the sync version
+            serialized_msg = self.serializer.serialize_message(start_msg)
+            await websocket.send(serialized_msg)
             
             # Receive and yield chunks
             async for raw_message in websocket:
-                safe_msg = self.serializer.deserialize(raw_message)
+                # Use deserialize_message like the sync version
+                safe_msg = self.serializer.deserialize_message(raw_message)
                 
                 if safe_msg.error:
                     raise Exception(f"Stream error: {safe_msg.error}")
@@ -115,26 +118,3 @@ class SocketClient:
                 else:
                     # Yield the actual chunk data
                     yield safe_msg.data.get("content", safe_msg.data)
-
-
-# Usage examples:
-
-# Async usage (your current approach):
-async def example_async():
-    client = SocketClient()
-    async for chunk in client.run_agent_generic_stream("agent123", "input1", param="value"):
-        print(f"Received chunk: {chunk}")
-
-# Sync usage (new approach):
-def example_sync():
-    client = SocketClient()
-    for chunk in client.run_agent_generic_stream_sync("agent123", "input1", param="value"):
-        print(f"Received chunk: {chunk}")
-
-# Running the examples:
-if __name__ == "__main__":
-    # Run async version
-    asyncio.run(example_async())
-    
-    # Run sync version
-    example_sync()

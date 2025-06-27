@@ -1,7 +1,7 @@
 from runagent.sdk import RunAgentSDK
 from runagent.sdk.rest_client import RestClient
 from runagent.utils.agent import detect_framework, validate_agent
-from runagent.sdk.socket_handler import SocketClient
+from runagent.sdk.socket_client import SocketClient
 
 
 class RunAgentClient:
@@ -44,11 +44,12 @@ class RunAgentClient:
 class AsyncRunAgentClient(RunAgentClient):
 
     async def run_generic(self, *input_args, **input_kwargs):
-        return await self.rest_client.run_agent_generic(
+        return self.rest_client.run_agent_generic(
             self.agent_id, input_args=input_args, input_kwargs=input_kwargs
         )
 
     async def run_generic_stream(self, *input_args, **input_kwargs):
-        return await self.socket_client.run_agent_generic_stream_async(
-            self.agent_id, input_args=input_args, input_kwargs=input_kwargs
-        )
+        async for item in self.socket_client.run_agent_generic_stream_async(
+            self.agent_id, *input_args, **input_kwargs
+        ):
+            yield item
