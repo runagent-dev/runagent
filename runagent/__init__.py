@@ -7,19 +7,30 @@ built with frameworks like LangGraph, LangChain, and LlamaIndex.
 
 __version__ = "0.1.0"
 
-# Import the main SDK components
-from .client import RunAgentSDK, RunAgentError, AuthenticationError, ValidationError, ConnectionError, ServerError
+from .client import RunAgentClient, AsyncRunAgentClient
 
-# Main export - this is what was missing!
+# Import the main SDK components
+from .sdk import (
+    AuthenticationError,
+    ConnectionError,
+    RunAgentError,
+    RunAgentSDK,
+    ServerError,
+    ValidationError,
+)
+
+# Main export
 RunAgent = RunAgentSDK
 
 # Expose the main components for easy import
 __all__ = [
-    "RunAgent", 
+    "RunAgent",
     "RunAgentSDK",
-    "RunAgentError", 
+    "RunAgentClient",
+    "AsyncRunAgentClient",
+    "RunAgentError",
     "AuthenticationError",
-    "ValidationError", 
+    "ValidationError",
     "ConnectionError",
-    "ServerError"
+    "ServerError",
 ]

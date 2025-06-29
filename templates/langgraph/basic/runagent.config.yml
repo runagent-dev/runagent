@@ -1,24 +1,20 @@
-name: "basic_agent"
+agent_name: "basic_agent"
 description: "A simple agent that responds to basic queries"
+framework: "langgraph" 
+template: "basic"
+version: "0.1.0"
+created_at: "2024-01-17 13:42:03"
 
-framework: "langgraph"
-source-template: 
+template_source:
+  repo_url: "https://github.com/runagent-dev/runagent.git"
+  path: "templates/langgraph/basic"
+  author: "radeen"
 
+agent_architecture:
+  entrypoints:
+    - file: "main.py"
+      module: "run"
+      type: "generic"
 
-# Environment configuration
-environment:
-  # API keys and secrets
-  OPENAI_API_KEY: gefkwjrhewlkhfrl
-
-
-# Logging configuration
-logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "agent.log"
-
-# Security settings
-security:
-  rate_limit: 100  # requests per minute
-  allowed_origins: ["*"]
-  require_auth: false
+env_vars:
+  OPENAI_API_KEY: "sk-proj-1234567890"
