@@ -14,7 +14,7 @@
     "entrypoints": [
       {
         "file": "agents.py",
-        "module": "lg_app.invoke",
+        "module": "app.invoke",
         "type": "generic"
       }
     ]

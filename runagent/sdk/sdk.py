@@ -46,6 +46,7 @@ class RunAgentSDK:
         self.templates = TemplateManager()
         self.db_service = DBService()
         # self.local = LocalDeployment(self.config)
+        self.local = LocalDeploymentManager(self.db_service)
         self.remote = RemoteDeployment(self.config)
 
         # Validate configuration on initialization
@@ -507,3 +508,114 @@ class RunAgentSDK:
     # String representation
     def __repr__(self):
         return f"RunAgentSDK(configured={self.is_configured()})"
+
+
+
+
+class LocalDeploymentManager:
+    """Manager for local agent deployments"""
+    
+    def __init__(self, db_service):
+        self.db_service = db_service
+    
+    def list_agents(self) -> t.List[t.Dict[str, t.Any]]:
+        """List all locally deployed agents"""
+        agents = self.db_service.list_agents()
+        
+        # Add additional info like file existence
+        for agent in agents:
+            agent_path = Path(agent["agent_path"])
+            agent["exists"] = agent_path.exists()
+            agent["deployment_exists"] = agent_path.exists()
+            agent["source_exists"] = agent_path.exists()
+        
+        return agents
+    
+    def get_capacity_info(self) -> t.Dict[str, t.Any]:
+        """Get local database capacity information"""
+        return self.db_service.get_database_capacity_info()
+    
+    def get_agent_info(self, agent_id: str) -> t.Dict[str, t.Any]:
+        """Get comprehensive information about a local agent"""
+        agent_data = self.db_service.get_agent(agent_id)
+        if not agent_data:
+            return {"success": False, "error": f"Agent {agent_id} not found"}
+        
+        # Add file existence checks
+        agent_path = Path(agent_data["agent_path"])
+        
+        # Get agent statistics
+        stats = self.db_service.get_agent_stats(agent_id)
+        
+        return {
+            "success": True,
+            "agent_info": {
+                **agent_data,
+                "deployment_exists": agent_path.exists(),
+                "source_exists": agent_path.exists(),
+                "deployment_path": str(agent_path),
+                "folder_path": str(agent_path),
+                "stats": stats,
+            }
+        }
+    
+    def delete_agent(self, agent_id: str) -> t.Dict[str, t.Any]:
+        """Delete agent (disabled for safety)"""
+        return {
+            "success": False,
+            "error": "Agent deletion is disabled for safety. Use database cleanup instead.",
+        }
+    
+    def cleanup_old_records(self, days_old: int = 30) -> t.Dict[str, t.Any]:
+        """Clean up old database records"""
+        try:
+            deleted_count = self.db_service.cleanup_old_runs(days_old)
+            return {
+                "success": True,
+                "message": f"Cleaned up {deleted_count} old run records",
+                "deleted_count": deleted_count,
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def get_database_stats(self) -> t.Dict[str, t.Any]:
+        """Get database statistics"""
+        return self.db_service.get_database_stats()
+    
+    def run_agent(self, agent_id: str, input_data: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        """Run agent locally via HTTP"""
+        try:
+            agent_info = self.db_service.get_agent(agent_id)
+            if not agent_info:
+                return {"success": False, "error": f"Agent {agent_id} not found"}
+            
+            # Try to connect to the agent's server
+            import requests
+            import time
+            
+            start_time = time.time()
+            url = f"http://{agent_info['host']}:{agent_info['port']}/api/v1/agents/{agent_id}/execute/generic"
+            
+            try:
+                response = requests.post(url, json={"input_data": input_data}, timeout=30)
+                execution_time = time.time() - start_time
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    result["execution_time"] = execution_time
+                    return result
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Server returned status {response.status_code}: {response.text}",
+                        "execution_time": execution_time,
+                    }
+            except requests.exceptions.RequestException as e:
+                execution_time = time.time() - start_time
+                return {
+                    "success": False,
+                    "error": f"Server not reachable: {str(e)}",
+                    "execution_time": execution_time,
+                }
+        except Exception as e:
+            return {"success": False, "error": str(e)}

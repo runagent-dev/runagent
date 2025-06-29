@@ -727,11 +727,42 @@ def run(agent_id, input_file, message, local, direct, timeout):
 @click.option("--cleanup-days", type=int, help="Clean up records older than N days")
 @click.option("--agent-id", help="Show detailed info for specific agent")
 @click.option("--capacity", is_flag=True, help="Show detailed capacity information")
-def db_status(cleanup_days, agent_id, capacity):
+@click.option("--servers", is_flag=True, help="Show running server status")
+def db_status(cleanup_days, agent_id, capacity, servers):
     """Show local database status and statistics"""
 
     try:
         sdk = RunAgent()
+
+        if servers:
+            # Show server status
+            capacity_info = sdk.get_local_capacity()
+            
+            console.print(f"\n🖥️ [bold]Server Status[/bold]")
+            
+            running_servers = capacity_info.get("running_servers", [])
+            stopped_servers = capacity_info.get("stopped_servers", [])
+            
+            if running_servers:
+                console.print(f"\n🟢 [bold]Running Servers ({len(running_servers)}):[/bold]")
+                for server in running_servers:
+                    console.print(f"   • [green]{server['agent_id']}[/green] - {server['framework']} on {server['host']}:{server['port']}")
+                    console.print(f"     Runs: {server['run_count']}, Last: {server['last_run'] or 'Never'}")
+            
+            if stopped_servers:
+                console.print(f"\n🔴 [bold]Stopped Servers ({len(stopped_servers)}):[/bold]")
+                for server in stopped_servers:
+                    console.print(f"   • [red]{server['agent_id']}[/red] - {server['framework']} on {server['host']}:{server['port']}")
+                    console.print(f"     Runs: {server['run_count']}, Last: {server['last_run'] or 'Never'}")
+            
+            summary = capacity_info.get("server_summary", {})
+            console.print(f"\n📊 [bold]Summary:[/bold]")
+            console.print(f"   Total Agents: [cyan]{summary.get('total_agents', 0)}[/cyan]")
+            console.print(f"   Running Servers: [green]{summary.get('running_servers', 0)}[/green]")
+            console.print(f"   Stopped Servers: [red]{summary.get('stopped_servers', 0)}[/red]")
+            console.print(f"   Unique Ports: [yellow]{summary.get('unique_ports', 0)}[/yellow]")
+            
+            return
 
         if capacity:
             # Show detailed capacity info
@@ -739,16 +770,16 @@ def db_status(cleanup_days, agent_id, capacity):
 
             console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
             console.print(
-                f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents"
+                f"Current: [cyan]{capacity_info.get('current_count', 0)}/{capacity_info.get('max_capacity', 5)}[/cyan] agents"
             )
             console.print(
                 f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]"
             )
 
-            status = "🔴 FULL" if capacity_info.get("is_full") else "🟢 Available"
+            status = "🔴 FULL" if capacity_info.get('is_full') else "🟢 Available"
             console.print(f"Status: {status}")
 
-            agents = capacity_info.get("agents", [])
+            agents = capacity_info.get('agents', [])
             if agents:
                 console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
                 for i, agent in enumerate(agents):
@@ -763,11 +794,11 @@ def db_status(cleanup_days, agent_id, capacity):
                         else " (newest)" if i == len(agents) - 1 else ""
                     )
                     console.print(
-                        f"  {i+1}. {status_icon} [magenta]{agent['agent_id']}[/magenta] ({agent['framework']}) - {agent['deployed_at']}{age_label}"
+                        f"  {i+1}. {status_icon} [magenta]{agent['agent_id']}[/magenta] ({agent['framework']}) - {agent['host']}:{agent['port']}{age_label}"
                     )
 
-            if capacity_info.get("is_full"):
-                oldest = capacity_info.get("oldest_agent", {})
+            if capacity_info.get('is_full'):
+                oldest = capacity_info.get('oldest_agent', {})
                 console.print(
                     f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]"
                 )
@@ -776,6 +807,9 @@ def db_status(cleanup_days, agent_id, capacity):
                 )
 
             return
+    except Exception as e:
+        console.print(f"❌ [red]Database status error:[/red] {e}")
+        raise click.ClickException("Failed to get database status")
 
         if agent_id:
             # Show specific agent info

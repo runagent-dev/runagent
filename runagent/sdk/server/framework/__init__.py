@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Dict
 
 from runagent.sdk.server.framework.langgraph import LangGraphExecutor
+from runagent.sdk.server.framework.langchain import LangChainExecutor
 from runagent.sdk.server.framework.generic import GenericExecutor
-
 from runagent.utils.schema import EntryPoint, EntryPointType
 
 
@@ -17,11 +17,13 @@ def get_executor(
             valid_entrypoint_found = True
             break
     if not valid_entrypoint_found:
-        raise ValueError(f"No valid entrypoint type found in agent configuration. Valid types are: {[t.value for t in EntrypointType]}")
+        raise ValueError(f"No valid entrypoint type found in agent configuration. Valid types are: {[t.value for t in EntryPointType]}")
 
     if framework == "langgraph":
         return LangGraphExecutor(agent_dir, agent_entrypoints)
-    elif framework in ["langchain", "llamaindex", "crewai", "autogen"]:
+    elif framework == "langchain":
+        return LangChainExecutor(agent_dir, agent_entrypoints)
+    elif framework in ["llamaindex", "crewai", "autogen", "letta"]:
         # Use generic executor for other frameworks
         return GenericExecutor(agent_dir, agent_entrypoints)
     else:

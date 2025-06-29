@@ -51,8 +51,7 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
                     "model_used": config.get("model", "gpt-4o-mini"),
                     "framework": "langchain",
                     "template": "basic",
-                    "execution_time": execution_time,
-                    "conversation_length": len(messages),
+                    "execution_time": execution_time
                 },
             },
             "errors": [],
