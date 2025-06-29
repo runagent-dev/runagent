@@ -165,19 +165,19 @@ class LocalServer:
             host=agent["host"],
         )
 
-    # Modified from_path method for LocalServer class
     @staticmethod
     def from_path(
         path: str, port: int = 8450, host: str = "127.0.0.1"
     ) -> "LocalServer":
         """
         Create LocalServer instance from an agent path.
-        If an agent from the same path already exists, use that agent's configuration.
+        If an agent from the same path already exists, use that agent's configuration
+        but allow port/host override.
 
         Args:
             path: Path to agent directory
-            port: Port to run server on (ignored if existing agent found)
-            host: Host to bind to (ignored if existing agent found)
+            port: Port to run server on
+            host: Host to bind to
 
         Returns:
             LocalServer instance
@@ -189,7 +189,7 @@ class LocalServer:
         existing_agent = db_service.get_agent_by_path(str(agent_path))
         
         if existing_agent:
-            # Agent already exists - use existing configuration
+            # Agent already exists - use existing configuration but allow port/host override
             console.print(f"🔍 [yellow]Found existing agent for path: {agent_path}[/yellow]")
             console.print(f"📋 [cyan]Agent Details:[/cyan]")
             console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
@@ -204,13 +204,33 @@ class LocalServer:
             if existing_agent['last_run']:
                 console.print(f"   • Last Run: [dim]{existing_agent['last_run']}[/dim]")
             
-            console.print(f"\n🔄 [green]Reusing existing agent configuration[/green]")
+            # Check if we're using different port/host than stored
+            if port != existing_agent['port'] or host != existing_agent['host']:
+                console.print(f"🔄 [yellow]Overriding server config:[/yellow]")
+                console.print(f"   • New Host: [blue]{host}[/blue] (was {existing_agent['host']})")
+                console.print(f"   • New Port: [blue]{port}[/blue] (was {existing_agent['port']})")
+                
+                # Update the database with new host/port using proper SQLAlchemy syntax
+                try:
+                    from sqlalchemy import text
+                    with db_service.db_manager.get_session() as session:
+                        session.execute(
+                            text("UPDATE agents SET host = :host, port = :port WHERE agent_id = :agent_id"),
+                            {"host": host, "port": port, "agent_id": existing_agent['agent_id']}
+                        )
+                        session.commit()
+                    console.print(f"✅ [green]Database updated with new server config[/green]")
+                except Exception as e:
+                    console.print(f"⚠️ [yellow]Warning: Could not update database: {e}[/yellow]")
+                    console.print(f"   Server will still run on requested port {port}")
+            else:
+                console.print(f"🔄 [green]Reusing existing agent configuration[/green]")
             
             return LocalServer(
                 agent_path=agent_path,
                 agent_id=existing_agent['agent_id'],
-                port=existing_agent['port'],  # Use existing port
-                host=existing_agent['host'],  # Use existing host
+                port=port,  # Use the requested port
+                host=host,  # Use the requested host
                 db_service=db_service,
             )
         
@@ -248,7 +268,6 @@ class LocalServer:
                 host=host,
                 db_service=db_service,
             )
-
     def _setup_routes(self):
         """Setup FastAPI routes"""
 
