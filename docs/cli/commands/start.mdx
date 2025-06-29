@@ -1,0 +1,67 @@
+---
+title: 'runagent start'
+description: 'Start an uploaded agent on remote server'
+---
+
+## Synopsis
+
+```bash
+runagent start [UPLOAD_ID] [OPTIONS]
+```
+
+## Description
+
+Start a previously uploaded agent on RunAgent infrastructure.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--env`, `-e` | Environment name | production |
+| `--instances` | Number of instances | 1 |
+| `--wait` | Wait for startup | true |
+
+## Examples
+
+```bash
+# Start uploaded agent
+runagent start upload_abc123
+
+# Start with multiple instances
+runagent start upload_abc123 --instances 3
+
+# Start in staging environment
+runagent start upload_abc123 --env staging
+
+# Start without waiting
+runagent start upload_abc123 --no-wait
+```
+
+## Startup Process
+
+1. Allocates resources
+2. Initializes container
+3. Loads environment variables
+4. Starts agent process
+5. Runs health checks
+
+## Output
+
+```
+Starting agent upload_abc123...
+Allocating resources... ✓
+Initializing container... ✓
+Loading environment... ✓
+Starting agent... ✓
+Health check... ✓
+
+Agent started successfully!
+Agent ID: agent-xyz789
+Status: Running
+Endpoint: https://api.run-agent.ai/agents/xyz789
+```
+
+## See Also
+
+- [`runagent upload`](/cli/commands/upload) - Upload agent first
+- [`runagent status`](/cli/commands/status) - Check running status

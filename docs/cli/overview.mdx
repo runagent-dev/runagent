@@ -1,0 +1,306 @@
+---
+title: 'CLI Overview'
+description: 'Master the RunAgent command-line interface'
+icon: 'terminal'
+---
+
+The RunAgent CLI is your primary tool for creating, testing, and deploying AI agents. It provides a simple yet powerful interface for managing the entire agent lifecycle.
+
+## Installation
+
+```bash
+pip install runagent
+```
+
+Verify installation:
+```bash
+runagent --version
+```
+
+## Global Options
+
+All RunAgent commands support these global options:
+
+| Option | Description |
+|--------|-------------|
+| `--help` | Show help message and exit |
+| `--version` | Display RunAgent version |
+| `--verbose` | Enable verbose output |
+| `--quiet` | Suppress non-error output |
+
+## Available Commands
+
+<CardGroup cols={2}>
+  <Card title="init" icon="sparkles" href="/cli/commands/init">
+    Initialize a new agent project
+  </Card>
+  <Card title="serve" icon="server" href="/cli/commands/serve">
+    Run agent locally for testing
+  </Card>
+  <Card title="deploy" icon="rocket" href="/cli/commands/deploy">
+    Deploy agent to production
+  </Card>
+  <Card title="run" icon="play" href="/cli/commands/run">
+    Execute a deployed agent
+  </Card>
+  <Card title="upload" icon="upload" href="/cli/commands/upload">
+    Upload agent to server
+  </Card>
+  <Card title="start" icon="power-off" href="/cli/commands/start">
+    Start uploaded agent
+  </Card>
+  <Card title="setup" icon="gear" href="/cli/commands/setup">
+    Configure authentication
+  </Card>
+  <Card title="template" icon="copy" href="/cli/commands/template">
+    Manage project templates
+  </Card>
+</CardGroup>
+
+## Command Structure
+
+RunAgent follows a consistent command structure:
+
+```bash
+runagent [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS] [ARGUMENTS]
+```
+
+Examples:
+```bash
+runagent init my-agent --framework langgraph
+runagent serve . --port 8080
+runagent deploy . --env production
+runagent run agent-id --input '{"query": "Hello"}'
+```
+
+## Common Workflows
+
+### Development Workflow
+
+<Steps>
+  <Step title="Create Project">
+    ```bash
+    runagent init my-agent --framework langgraph
+    cd my-agent
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Configure Environment">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your API keys
+    ```
+  </Step>
+  <Step title="Test Locally">
+    ```bash
+    runagent serve .
+    ```
+  </Step>
+  <Step title="Deploy">
+    ```bash
+    runagent deploy .
+    ```
+  </Step>
+</Steps>
+
+### Quick Commands Reference
+
+<Tabs>
+  <Tab title="Project Management">
+    ```bash
+    # Create new project
+    runagent init PROJECT_NAME
+    
+    # List available templates
+    runagent template list
+    
+    # Create from specific template
+    runagent init PROJECT_NAME --template chatbot
+    ```
+  </Tab>
+  <Tab title="Development">
+    ```bash
+    # Start local server
+    runagent serve .
+    
+    # Use custom port
+    runagent serve . --port 8080
+    
+    # Enable hot reload
+    runagent serve . --reload
+    ```
+  </Tab>
+  <Tab title="Deployment">
+    ```bash
+    # Deploy locally
+    runagent deploy . --local
+    
+    # Upload to server
+    runagent upload .
+    
+    # Start uploaded agent
+    runagent start AGENT_ID
+    ```
+  </Tab>
+  <Tab title="Execution">
+    ```bash
+    # Run deployed agent
+    runagent run AGENT_ID --input '{"key": "value"}'
+    
+    # Run with file input
+    runagent run AGENT_ID --input-file input.json
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration Management
+
+### Authentication Setup
+
+```bash
+# Initial setup
+runagent setup
+
+# Remove configuration
+runagent teardown
+```
+
+The setup command creates a configuration file at:
+- Linux/Mac: `~/.runagent/config.json`
+- Windows: `%USERPROFILE%\.runagent\config.json`
+
+### Environment Variables
+
+RunAgent CLI respects these environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `RUNAGENT_API_KEY` | API key for authentication |
+| `RUNAGENT_API_URL` | Custom API endpoint |
+| `RUNAGENT_CONFIG_PATH` | Custom config file location |
+| `RUNAGENT_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+## Output Formats
+
+Most commands support different output formats:
+
+```bash
+# Default human-readable output
+runagent list
+
+# JSON output for scripting
+runagent list --json
+
+# Minimal output
+runagent list --quiet
+```
+
+## Error Handling
+
+RunAgent provides clear error messages:
+
+```bash
+$ runagent serve nonexistent
+Error: Directory 'nonexistent' does not exist
+
+$ runagent run invalid-id
+Error: Agent 'invalid-id' not found
+```
+
+### Common Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Command line usage error |
+| 3 | Configuration error |
+| 4 | Network/API error |
+| 5 | Authentication error |
+
+## Advanced Usage
+
+### Piping and Scripting
+
+```bash
+# Pipe input from file
+cat input.json | runagent run AGENT_ID --input -
+
+# Use in scripts
+if runagent serve . --check; then
+    echo "Agent configuration valid"
+else
+    echo "Configuration errors found"
+    exit 1
+fi
+```
+
+### Aliases and Shortcuts
+
+Add to your shell configuration:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+alias ra='runagent'
+alias ras='runagent serve .'
+alias rad='runagent deploy .'
+
+# Function for quick agent creation
+new-agent() {
+    runagent init "$1" --framework langgraph && cd "$1"
+}
+```
+
+## Debugging
+
+Enable verbose output for troubleshooting:
+
+```bash
+# Verbose mode
+runagent --verbose serve .
+
+# Debug logging
+RUNAGENT_LOG_LEVEL=DEBUG runagent serve .
+
+# Dry run (coming soon)
+runagent deploy . --dry-run
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Version Control">
+    Always commit your `runagent.config.json` but never commit `.env` files
+  </Accordion>
+  <Accordion title="Test Before Deploying">
+    Use `runagent serve` to test locally before deploying
+  </Accordion>
+  <Accordion title="Use Templates">
+    Start with templates for faster development
+  </Accordion>
+  <Accordion title="Automate with Scripts">
+    Use the CLI in CI/CD pipelines for automated deployments
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+```bash
+# General help
+runagent --help
+
+# Command-specific help
+runagent init --help
+runagent serve --help
+
+# Check version
+runagent --version
+```
+
+<Info>
+  Join our [Discord community](https://discord.gg/runagent) for support and discussions
+</Info>

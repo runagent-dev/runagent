@@ -1,0 +1,178 @@
+---
+title: 'Frameworks Overview'
+description: 'Deploy agents built with any AI framework'
+---
+
+## Supported Frameworks
+
+RunAgent is designed to work with any AI agent framework. We provide first-class support for popular frameworks while allowing custom implementations.
+
+<CardGroup cols={2}>
+  <Card title="LangGraph" icon="diagram-project" href="/frameworks/langgraph">
+    Build stateful, multi-step agents with graph-based workflows
+  </Card>
+  <Card title="CrewAI" icon="users" href="/frameworks/crewai">
+    Create multi-agent systems with role-based collaboration
+  </Card>
+  <Card title="Agno" icon="brain" href="/frameworks/agno">
+    Develop agents with built-in memory and reasoning
+  </Card>
+  <Card title="Letta" icon="message" href="/frameworks/letta">
+    Build conversational agents with long-term memory
+  </Card>
+</CardGroup>
+
+## Framework Comparison
+
+| Framework | Best For | Key Features | Learning Curve |
+|-----------|----------|--------------|----------------|
+| LangGraph | Complex workflows | State machines, cycles | Medium |
+| CrewAI | Multi-agent systems | Role assignment, delegation | Low |
+| Agno | Reasoning tasks | Memory, planning | Medium |
+| Letta | Conversations | Context retention | Low |
+| Custom | Specific needs | Full control | Varies |
+
+## Choosing a Framework
+
+### LangGraph
+Choose LangGraph when you need:
+- Complex multi-step workflows
+- Conditional branching
+- State management
+- Cycles and loops in agent logic
+
+### CrewAI
+Choose CrewAI when you need:
+- Multiple specialized agents
+- Task delegation
+- Collaborative problem-solving
+- Role-based agent design
+
+### Agno
+Choose Agno when you need:
+- Advanced reasoning capabilities
+- Built-in memory systems
+- Planning and goal-setting
+- Adaptive behavior
+
+### Letta
+Choose Letta when you need:
+- Long-running conversations
+- Personality consistency
+- Memory across sessions
+- Natural dialogue flow
+
+### Custom Framework
+Choose custom when you need:
+- Specific requirements not met by others
+- Integration with proprietary systems
+- Maximum performance optimization
+- Complete control over implementation
+
+## Quick Start Examples
+
+<Tabs>
+  <Tab title="LangGraph">
+    ```bash
+    runagent init my-agent --framework langgraph
+    cd my-agent
+    # Edit agents.py with your LangGraph logic
+    runagent serve .
+    ```
+  </Tab>
+  <Tab title="CrewAI">
+    ```bash
+    runagent init my-crew --framework crewai
+    cd my-crew
+    # Define your crew in crew.py
+    runagent serve .
+    ```
+  </Tab>
+  <Tab title="Custom">
+    ```bash
+    runagent init my-custom --framework custom
+    cd my-custom
+    # Implement your agent logic
+    runagent serve .
+    ```
+  </Tab>
+</Tabs>
+
+## Framework Integration
+
+All frameworks integrate with RunAgent through:
+
+1. **Standardized Entrypoints**: Define how to invoke your agent
+2. **Configuration**: Specify framework in `runagent.config.json`
+3. **Environment Management**: Handle API keys and settings
+4. **Deployment**: Same process regardless of framework
+
+## Best Practices by Framework
+
+<AccordionGroup>
+  <Accordion title="LangGraph Best Practices">
+    - Keep graphs simple and readable
+    - Use appropriate state persistence
+    - Handle edge cases in transitions
+    - Test each node independently
+  </Accordion>
+  <Accordion title="CrewAI Best Practices">
+    - Define clear agent roles
+    - Minimize agent dependencies
+    - Use appropriate delegation patterns
+    - Monitor inter-agent communication
+  </Accordion>
+  <Accordion title="Custom Framework Best Practices">
+    - Follow RunAgent conventions
+    - Implement proper error handling
+    - Document your approach
+    - Consider open-sourcing if general-purpose
+  </Accordion>
+</AccordionGroup>
+
+## Performance Considerations
+
+| Framework | Memory Usage | Latency | Scalability |
+|-----------|--------------|---------|-------------|
+| LangGraph | Medium | Low | High |
+| CrewAI | High | Medium | Medium |
+| Agno | Medium | Medium | High |
+| Letta | Low | Low | High |
+| Custom | Varies | Varies | Varies |
+
+## Migration Between Frameworks
+
+RunAgent makes it easy to switch frameworks:
+
+1. **Keep business logic separate** from framework code
+2. **Use consistent interfaces** for inputs/outputs
+3. **Test thoroughly** after migration
+4. **Update configuration** in `runagent.config.json`
+
+## Community Frameworks
+
+We're always adding support for new frameworks. Coming soon:
+- AutoGen
+- BabyAGI
+- AgentGPT
+- Custom community frameworks
+
+## Contributing Framework Support
+
+Want to add support for a new framework?
+
+1. Check our [contribution guidelines](https://github.com/runagent-dev/runagent/contribute)
+2. Create a template for the framework
+3. Add documentation
+4. Submit a pull request
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangGraph Guide" icon="diagram-project" href="/frameworks/langgraph">
+    Build your first LangGraph agent
+  </Card>
+  <Card title="CrewAI Guide" icon="users" href="/frameworks/crewai">
+    Create a multi-agent crew
+  </Card>
+</CardGroup>

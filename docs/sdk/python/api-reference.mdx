@@ -1,0 +1,229 @@
+---
+title: 'Python SDK API Reference'
+description: 'Complete API reference for RunAgent Python SDK'
+---
+
+## RunAgentClient
+
+Synchronous client for interacting with RunAgent.
+
+### Constructor
+
+```python
+RunAgentClient(
+    agent_id: str,
+    api_key: Optional[str] = None,
+    base_url: str = "https://api.run-agent.ai",
+    timeout: int = 30,
+    max_retries: int = 3,
+    headers: Optional[Dict[str, str]] = None
+)
+```
+
+#### Parameters
+
+- `agent_id` (str): The ID of your deployed agent
+- `api_key` (str, optional): API key for authentication
+- `base_url` (str): Base URL for API endpoints
+- `timeout` (int): Request timeout in seconds
+- `max_retries` (int): Maximum number of retry attempts
+- `headers` (dict, optional): Additional headers
+
+### Methods
+
+#### run_generic
+
+```python
+run_generic(
+    input_data: Dict[str, Any],
+    timeout: Optional[int] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]
+```
+
+Run agent with generic input/output.
+
+**Parameters:**
+- `input_data`: Dictionary containing input for the agent
+- `timeout`: Override default timeout
+- `headers`: Additional headers for this request
+
+**Returns:** Dictionary with agent response
+
+#### run_generic_stream
+
+```python
+run_generic_stream(
+    input_data: Dict[str, Any],
+    timeout: Optional[int] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> Generator[str, None, None]
+```
+
+Stream agent responses in real-time.
+
+**Parameters:**
+- `input_data`: Dictionary containing input for the agent
+- `timeout`: Override default timeout
+- `headers`: Additional headers for this request
+
+**Returns:** Generator yielding response chunks
+
+## AsyncRunAgentClient
+
+Asynchronous client for interacting with RunAgent.
+
+### Constructor
+
+```python
+AsyncRunAgentClient(
+    agent_id: str,
+    api_key: Optional[str] = None,
+    base_url: str = "https://api.run-agent.ai",
+    timeout: int = 30,
+    max_retries: int = 3,
+    headers: Optional[Dict[str, str]] = None
+)
+```
+
+Parameters are the same as `RunAgentClient`.
+
+### Methods
+
+#### run_generic
+
+```python
+async run_generic(
+    input_data: Dict[str, Any],
+    timeout: Optional[int] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]
+```
+
+Async version of run_generic.
+
+#### run_generic_stream
+
+```python
+async run_generic_stream(
+    input_data: Dict[str, Any],
+    timeout: Optional[int] = None,
+    headers: Optional[Dict[str, str]] = None
+) -> AsyncGenerator[str, None]
+```
+
+Async generator for streaming responses.
+
+## Exceptions
+
+### RunAgentError
+
+Base exception for all RunAgent errors.
+
+```python
+class RunAgentError(Exception):
+    def __init__(self, message: str, code: Optional[str] = None, details: Optional[Dict] = None):
+        self.message = message
+        self.code = code
+        self.details = details
+```
+
+### Specific Exceptions
+
+- `AuthenticationError`: Invalid or missing API key
+- `AgentNotFoundError`: Agent ID doesn't exist
+- `ValidationError`: Invalid input data
+- `RateLimitError`: Too many requests
+- `TimeoutError`: Request timed out
+- `NetworkError`: Network-related errors
+
+## Type Definitions
+
+```python
+from typing import Dict, Any, Optional, Generator, AsyncGenerator
+
+# Input/Output types
+InputData = Dict[str, Any]
+OutputData = Dict[str, Any]
+
+# Stream types
+StreamChunk = str
+StreamGenerator = Generator[StreamChunk, None, None]
+AsyncStreamGenerator = AsyncGenerator[StreamChunk, None]
+```
+
+## Configuration
+
+### Environment Variables
+
+- `RUNAGENT_API_KEY`: Default API key
+- `RUNAGENT_API_URL`: Override base URL
+- `RUNAGENT_TIMEOUT`: Default timeout
+- `RUNAGENT_LOG_LEVEL`: Logging level
+
+### Configuration File
+
+Location: `~/.runagent/config.json`
+
+```json
+{
+  "api_key": "your-api-key",
+  "api_url": "https://api.run-agent.ai",
+  "timeout": 30,
+  "retry_config": {
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "retry_backoff": 2.0
+  }
+}
+```
+
+## Complete Example
+
+```python
+from runagent import RunAgentClient, RunAgentError
+import asyncio
+
+# Synchronous example
+def sync_example():
+    client = RunAgentClient(agent_id="agent-123")
+    
+    try:
+        # Simple request
+        result = client.run_generic({"query": "Hello"})
+        print(f"Response: {result}")
+        
+        # Streaming
+        for chunk in client.run_generic_stream({"query": "Tell a story"}):
+            print(chunk, end="")
+            
+    except RunAgentError as e:
+        print(f"Error: {e.message}")
+
+# Asynchronous example
+async def async_example():
+    from runagent import AsyncRunAgentClient
+    
+    client = AsyncRunAgentClient(agent_id="agent-123")
+    
+    # Concurrent requests
+    tasks = [
+        client.run_generic({"query": f"Question {i}"})
+        for i in range(5)
+    ]
+    results = await asyncio.gather(*tasks)
+    
+    # Streaming
+    async for chunk in client.run_generic_stream({"query": "Stream test"}):
+        print(chunk, end="")
+
+# Run examples
+sync_example()
+asyncio.run(async_example())
+```
+
+## See Also
+
+- [Getting Started](/sdk/python/getting-started) - Introduction to the SDK
+- [Examples](/resources/examples) - More code examples
+- [API Introduction](/api-reference/introduction) - REST API documentation

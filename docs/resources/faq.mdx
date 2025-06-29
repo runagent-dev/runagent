@@ -1,0 +1,324 @@
+---
+title: 'Frequently Asked Questions'
+description: 'Common questions about RunAgent'
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is RunAgent?">
+    RunAgent is a platform for deploying AI agents to production. It provides:
+    - Framework-agnostic deployment
+    - Automatic scaling and monitoring
+    - Simple CLI and SDK interfaces
+    - Support for all major AI frameworks
+    
+    Think of it as "Vercel for AI agents" - deploy with one command and let us handle the infrastructure.
+  </Accordion>
+  
+  <Accordion title="Which AI frameworks are supported?">
+    Currently supported:
+    - LangGraph
+    - CrewAI
+    - Agno
+    - Letta
+    - Custom Python frameworks
+    
+    Coming soon:
+    - AutoGen
+    - BabyAGI
+    - AgentGPT
+    
+    You can use any Python-based framework with our custom framework option.
+  </Accordion>
+  
+  <Accordion title="How does pricing work?">
+    **Local deployment**: Free forever
+    
+    **Cloud deployment** (coming soon):
+    - Free tier: 1,000 requests/month
+    - Pro: $29/month for 50,000 requests
+    - Enterprise: Custom pricing
+    
+    See [pricing page](https://run-agent.ai/pricing) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Getting Started
+
+<AccordionGroup>
+  <Accordion title="How do I install RunAgent?">
+    Simply use pip:
+    ```bash
+    pip install runagent
+    ```
+    
+    For development with all dependencies:
+    ```bash
+    pip install "runagent[dev]"
+    ```
+  </Accordion>
+  
+  <Accordion title="Do I need to rewrite my existing agent?">
+    No! RunAgent works with your existing code. Just:
+    1. Add a `runagent.config.json` file
+    2. Define your entrypoints
+    3. Deploy
+    
+    Your agent logic remains unchanged.
+  </Accordion>
+  
+  <Accordion title="What are entrypoints?">
+    Entrypoints are functions RunAgent calls to interact with your agent:
+    
+    ```python
+    # Standard entrypoint
+    def invoke(input_data: dict) -> dict:
+        return {"result": "processed"}
+    
+    # Streaming entrypoint
+    def stream(input_data: dict):
+        for chunk in process():
+            yield chunk
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="What Python versions are supported?">
+    RunAgent supports Python 3.8 and above:
+    - Python 3.8
+    - Python 3.9
+    - Python 3.10
+    - Python 3.11
+    - Python 3.12
+  </Accordion>
+  
+  <Accordion title="Can I use custom dependencies?">
+    Yes! Add any dependencies to your `requirements.txt`:
+    ```txt
+    openai>=1.0.0
+    requests>=2.31.0
+    pandas>=2.0.0
+    your-custom-package>=1.0.0
+    ```
+    
+    RunAgent will install them during deployment.
+  </Accordion>
+  
+  <Accordion title="How do I handle secrets and API keys?">
+    **Local development**: Use `.env` files
+    ```bash
+    OPENAI_API_KEY=sk-...
+    DATABASE_URL=postgresql://...
+    ```
+    
+    **Production**: Set in deployment configuration
+    ```bash
+    runagent deploy . --env OPENAI_API_KEY=$OPENAI_API_KEY
+    ```
+    
+    Secrets are encrypted at rest and never logged.
+  </Accordion>
+  
+  <Accordion title="What are the resource limits?">
+    **Default limits**:
+    - Memory: 512MB (configurable up to 8GB)
+    - Timeout: 30 seconds (configurable up to 900s)
+    - Payload size: 10MB
+    - Concurrent requests: Based on plan
+    
+    Configure in `runagent.config.json`:
+    ```json
+    {
+      "deployment": {
+        "memory": "2GB",
+        "timeout": 120
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Deployment Questions
+
+<AccordionGroup>
+  <Accordion title="What's the difference between local and cloud deployment?">
+    **Local deployment**:
+    - Runs on your machine
+    - Free forever
+    - Good for development and testing
+    - Requires your machine to be running
+    
+    **Cloud deployment**:
+    - Runs on RunAgent infrastructure
+    - Auto-scaling and high availability
+    - Monitoring and logging included
+    - Accessible from anywhere
+  </Accordion>
+  
+  <Accordion title="How do I update a deployed agent?">
+    Simply deploy again with the same name:
+    ```bash
+    # Updates existing deployment
+    runagent deploy . --name my-agent
+    ```
+    
+    RunAgent handles:
+    - Zero-downtime updates
+    - Automatic rollback on failure
+    - Version history
+  </Accordion>
+  
+  <Accordion title="Can I deploy multiple versions?">
+    Yes! Use different names or environments:
+    ```bash
+    # Production version
+    runagent deploy . --name agent-prod --env production
+    
+    # Staging version
+    runagent deploy . --name agent-staging --env staging
+    
+    # Development version
+    runagent deploy . --name agent-dev --env development
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## SDK Questions
+
+<AccordionGroup>
+  <Accordion title="Which languages have SDKs?">
+    **Available now**:
+    - Python
+    
+    **Coming soon**:
+    - JavaScript/TypeScript (Q2 2024)
+    - Rust (Q2 2024)
+    - Go (Q3 2024)
+    
+    You can always use the REST API directly from any language.
+  </Accordion>
+  
+  <Accordion title="How do I handle streaming responses?">
+    **Python SDK**:
+    ```python
+    for chunk in client.run_generic_stream(input_data):
+        print(chunk, end="", flush=True)
+    ```
+    
+    **Direct API**:
+    Use Server-Sent Events (SSE) with appropriate client library.
+  </Accordion>
+  
+  <Accordion title="Is the SDK thread-safe?">
+    Yes, the SDK clients are thread-safe. You can:
+    - Share a client instance across threads
+    - Use in async contexts with AsyncRunAgentClient
+    - Handle concurrent requests
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="My agent works locally but fails when deployed">
+    Common causes:
+    1. **Missing environment variables** - Check all are set
+    2. **File path issues** - Use relative paths
+    3. **Dependency versions** - Pin specific versions
+    4. **Resource limits** - Increase memory/timeout
+    
+    Debug with:
+    ```bash
+    runagent logs <deployment-id>
+    ```
+  </Accordion>
+  
+  <Accordion title="How do I debug performance issues?">
+    1. **Add logging** to identify slow operations
+    2. **Use profiling** to find bottlenecks
+    3. **Check logs** for errors or warnings
+    4. **Monitor metrics** (coming soon)
+    
+    ```python
+    import time
+    start = time.time()
+    # operation
+    print(f"Took {time.time() - start}s")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="How should I structure my agent project?">
+    Recommended structure:
+    ```
+    my-agent/
+    ├── agent.py           # Main agent code
+    ├── utils/             # Helper functions
+    ├── prompts/           # Prompt templates
+    ├── tests/             # Unit tests
+    ├── runagent.config.json
+    ├── requirements.txt
+    ├── .env.example
+    └── README.md
+    ```
+  </Accordion>
+  
+  <Accordion title="Should I use sync or async?">
+    **Use sync when**:
+    - Simple request/response
+    - No concurrent operations
+    - Easier to debug
+    
+    **Use async when**:
+    - Multiple API calls
+    - I/O intensive operations
+    - Need better performance
+  </Accordion>
+</AccordionGroup>
+
+## Community & Support
+
+<AccordionGroup>
+  <Accordion title="How do I get help?">
+    1. **Documentation**: [docs.run-agent.ai](https://docs.run-agent.ai)
+    2. **Discord**: [discord.gg/runagent](https://discord.gg/runagent)
+    3. **GitHub Issues**: For bugs and features
+    4. **Email**: support@run-agent.ai for critical issues
+  </Accordion>
+  
+  <Accordion title="Can I contribute to RunAgent?">
+    Yes! We welcome contributions:
+    - Code contributions via GitHub
+    - Documentation improvements
+    - Bug reports and feature requests
+    - Community SDKs and templates
+    
+    See our [contributing guide](https://github.com/runagent-dev/runagent/CONTRIBUTING.md).
+  </Accordion>
+  
+  <Accordion title="Is RunAgent open source?">
+    The RunAgent CLI and SDKs are open source (MIT license). The deployment infrastructure is proprietary but offers a generous free tier.
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Ask on Discord" icon="discord">
+    Get help from the community
+    
+    [Join Discord →](https://discord.gg/runagent)
+  </Card>
+  <Card title="Contact Support" icon="envelope">
+    For account or billing questions
+    
+    [Email Us →](mailto:support@run-agent.ai)
+  </Card>
+</CardGroup>

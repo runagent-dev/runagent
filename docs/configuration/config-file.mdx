@@ -1,0 +1,344 @@
+---
+title: 'Configuration File'
+description: 'Understanding runagent.config.json'
+---
+
+The `runagent.config.json` file is the heart of your RunAgent project. It defines how your agent is configured, deployed, and executed.
+
+## Basic Structure
+
+```json
+{
+  "agent_name": "problem_solver",
+  "description": "A simple agent that responds to basic queries",
+  "framework": "langgraph",
+  "template": "problem_solver",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/langgraph/problem_solver",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "app.invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "app.stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "CUSTOM_VAR": "fixed_value"
+  }
+}
+```
+
+## Configuration Fields
+
+### Core Fields
+
+<ParamField path="agent_name" type="string" required>
+  Unique identifier for your agent. Used in deployment and SDK initialization.
+  
+  - Must be lowercase
+  - Can contain letters, numbers, hyphens, and underscores
+  - Maximum 50 characters
+</ParamField>
+
+<ParamField path="description" type="string">
+  Human-readable description of what your agent does. Displayed in dashboards and listings.
+</ParamField>
+
+<ParamField path="framework" type="string" required>
+  The AI framework your agent uses. Supported values:
+  - `langgraph`
+  - `crewai`
+  - `agno`
+  - `letta`
+  - `custom`
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  Semantic version of your agent. Follow [SemVer](https://semver.org/) format.
+</ParamField>
+
+### Template Information
+
+<ParamField path="template" type="string">
+  Name of the template used to create this project. Helps with updates and migration.
+</ParamField>
+
+<ParamField path="template_source" type="object">
+  Source information for the template:
+  
+  <Expandable title="properties">
+    <ParamField path="repo_url" type="string">
+      Git repository URL containing the template
+    </ParamField>
+    
+    <ParamField path="path" type="string">
+      Path within the repository to the template
+    </ParamField>
+    
+    <ParamField path="author" type="string">
+      Template author's identifier
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Agent Architecture
+
+<ParamField path="agent_architecture" type="object" required>
+  Defines how RunAgent interacts with your code:
+  
+  <Expandable title="properties">
+    <ParamField path="entrypoints" type="array" required>
+      List of entrypoint configurations. Each entrypoint defines a way to invoke your agent.
+      
+      <Expandable title="entrypoint object">
+        <ParamField path="file" type="string" required>
+          Python file containing the entrypoint
+        </ParamField>
+        
+        <ParamField path="module" type="string" required>
+          Dot-notation path to the callable object (e.g., `app.invoke`)
+        </ParamField>
+        
+        <ParamField path="type" type="string" required>
+          Type of entrypoint. Supported values:
+          - `generic` - Standard request/response
+          - `generic_stream` - Streaming responses
+          - `async` - Asynchronous invocation
+          - `batch` - Batch processing
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Environment Variables
+
+<ParamField path="env_vars" type="object">
+  Environment variables for your agent. Supports two formats:
+  
+  1. **Dynamic substitution**: `"${VAR_NAME}"` - Reads from environment
+  2. **Fixed values**: `"fixed_value"` - Uses the literal value
+  
+  <Warning>
+    Never hardcode sensitive values like API keys. Always use dynamic substitution.
+  </Warning>
+</ParamField>
+
+## Entrypoint Types
+
+### Generic Entrypoint
+
+Standard request/response pattern:
+
+```python
+# agents.py
+def invoke(input_data: dict) -> dict:
+    """Process input and return result"""
+    query = input_data.get("query")
+    # Process the query
+    return {"result": "processed result"}
+
+app = {"invoke": invoke}
+```
+
+Configuration:
+```json
+{
+  "file": "agents.py",
+  "module": "app.invoke",
+  "type": "generic"
+}
+```
+
+### Streaming Entrypoint
+
+For real-time response streaming:
+
+```python
+# agents.py
+def stream(input_data: dict):
+    """Generator that yields chunks"""
+    query = input_data.get("query")
+    for chunk in process_streaming(query):
+        yield chunk
+
+app = {"stream": stream}
+```
+
+Configuration:
+```json
+{
+  "file": "agents.py",
+  "module": "app.stream",
+  "type": "generic_stream"
+}
+```
+
+## Advanced Configuration
+
+### Multiple Entrypoints
+
+You can define multiple entrypoints for different use cases:
+
+```json
+{
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "app.chat",
+        "type": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "app.analyze",
+        "type": "generic"
+      },
+      {
+        "file": "streaming.py",
+        "module": "streamer.process",
+        "type": "generic_stream"
+      }
+    ]
+  }
+}
+```
+
+### Environment Variable Patterns
+
+```json
+{
+  "env_vars": {
+    // Dynamic from environment
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    
+    // Fixed value
+    "MODEL_NAME": "gpt-4",
+    
+    // With default fallback (coming soon)
+    "TEMPERATURE": "${TEMPERATURE:-0.7}",
+    
+    // Complex values
+    "CONFIG_JSON": "${CONFIG_JSON}"
+  }
+}
+```
+
+## Validation
+
+RunAgent validates your configuration on:
+- `runagent init` - When creating a project
+- `runagent serve` - Before starting local server
+- `runagent deploy` - Before deployment
+
+Common validation errors:
+
+<AccordionGroup>
+  <Accordion title="Missing required fields">
+    Ensure all required fields (`agent_name`, `framework`, `version`, `agent_architecture`) are present.
+  </Accordion>
+  
+  <Accordion title="Invalid entrypoint module">
+    Check that the module path is correct and the file exists.
+    
+    ```bash
+    # Verify the module can be imported
+    python -c "from agents import app; print(app.invoke)"
+    ```
+  </Accordion>
+  
+  <Accordion title="Unsupported framework">
+    Use one of the supported frameworks or `"custom"` for others.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Semantic Versioning" icon="code-branch">
+    Follow SemVer for your version numbers to track changes properly
+  </Card>
+  
+  <Card title="Document Entrypoints" icon="book">
+    Add comments in your code explaining what each entrypoint does
+  </Card>
+  
+  <Card title="Environment Variables" icon="key">
+    Never hardcode secrets. Always use environment variable substitution
+  </Card>
+  
+  <Card title="Validate Locally" icon="check">
+    Test your configuration with `runagent serve` before deploying
+  </Card>
+</CardGroup>
+
+## Example Configurations
+
+<Tabs>
+  <Tab title="LangGraph Agent">
+    ```json
+    {
+      "agent_name": "customer_support",
+      "description": "AI customer support agent",
+      "framework": "langgraph",
+      "version": "2.1.0",
+      "agent_architecture": {
+        "entrypoints": [
+          {
+            "file": "support_agent.py",
+            "module": "agent.handle_query",
+            "type": "generic"
+          },
+          {
+            "file": "support_agent.py",
+            "module": "agent.chat_stream",
+            "type": "generic_stream"
+          }
+        ]
+      },
+      "env_vars": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "SUPPORT_DB_URL": "${DATABASE_URL}",
+        "MAX_TOKENS": "2000"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="CrewAI Agent">
+    ```json
+    {
+      "agent_name": "research_crew",
+      "description": "Multi-agent research system",
+      "framework": "crewai",
+      "version": "1.0.0",
+      "agent_architecture": {
+        "entrypoints": [
+          {
+            "file": "crew.py",
+            "module": "research_crew.kickoff",
+            "type": "generic"
+          }
+        ]
+      },
+      "env_vars": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "SERPER_API_KEY": "${SERPER_API_KEY}"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>

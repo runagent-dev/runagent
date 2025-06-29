@@ -1,0 +1,272 @@
+---
+title: 'CrewAI Framework'
+description: 'Deploy CrewAI multi-agent systems with RunAgent'
+---
+
+## Overview
+
+CrewAI enables you to create collaborative AI agent teams where multiple agents work together, each with specific roles and capabilities. Perfect for complex tasks requiring diverse expertise.
+
+## Quick Start
+
+```bash
+# Create a CrewAI project
+runagent init my-crew --framework crewai
+
+# Navigate to project
+cd my-crew
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test locally
+runagent serve .
+```
+
+## Project Structure
+
+```
+my-crew/
+├── crew.py            # Crew definition
+├── agents.py          # Agent definitions
+├── tasks.py           # Task definitions
+├── tools.py           # Custom tools
+├── runagent.config.json
+├── requirements.txt
+└── .env.example
+```
+
+## Basic CrewAI Implementation
+
+```python
+# crew.py
+from crewai import Crew, Agent, Task
+from langchain.llms import OpenAI
+
+# Define agents
+researcher = Agent(
+    role='Research Analyst',
+    goal='Find and analyze information',
+    backstory='Expert at finding and synthesizing information',
+    verbose=True,
+    allow_delegation=False,
+    llm=OpenAI(temperature=0.7)
+)
+
+writer = Agent(
+    role='Content Writer',
+    goal='Create compelling content',
+    backstory='Skilled writer with expertise in technical content',
+    verbose=True,
+    allow_delegation=True,
+    llm=OpenAI(temperature=0.7)
+)
+
+# Define tasks
+research_task = Task(
+    description='Research {topic} and provide key findings',
+    agent=researcher
+)
+
+writing_task = Task(
+    description='Write an article about {topic} based on research',
+    agent=writer
+)
+
+# Create crew
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    verbose=True
+)
+
+# RunAgent entrypoints
+def invoke(input_data):
+    topic = input_data.get("topic", "AI trends")
+    result = crew.kickoff({"topic": topic})
+    return {"result": result}
+
+def stream(input_data):
+    # Stream crew execution logs
+    topic = input_data.get("topic", "AI trends")
+    for log in crew.kickoff_stream({"topic": topic}):
+        yield log
+```
+
+## Configuration
+
+```json
+{
+  "agent_name": "research_crew",
+  "description": "Multi-agent research and writing crew",
+  "framework": "crewai",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "crew.py",
+        "module": "invoke",
+        "type": "generic"
+      },
+      {
+        "file": "crew.py",
+        "module": "stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "SERPER_API_KEY": "${SERPER_API_KEY}"
+  }
+}
+```
+
+## Advanced Patterns
+
+### Hierarchical Crew
+
+```python
+# Manager agent that delegates
+manager = Agent(
+    role='Project Manager',
+    goal='Coordinate team efforts',
+    backstory='Experienced in managing complex projects',
+    allow_delegation=True
+)
+
+# Specialized agents
+designer = Agent(
+    role='UI Designer',
+    goal='Create beautiful designs',
+    allow_delegation=False
+)
+
+developer = Agent(
+    role='Developer',
+    goal='Implement solutions',
+    allow_delegation=False
+)
+
+# Crew with hierarchy
+crew = Crew(
+    agents=[manager, designer, developer],
+    tasks=[planning_task, design_task, implementation_task],
+    manager_llm=OpenAI(temperature=0.5),
+    process="hierarchical"
+)
+```
+
+### Custom Tools
+
+```python
+from crewai import Tool
+
+# Define custom tools
+def search_database(query: str) -> str:
+    # Your database search logic
+    return f"Results for: {query}"
+
+db_tool = Tool(
+    name="Database Search",
+    func=search_database,
+    description="Search internal database"
+)
+
+# Assign tools to agents
+analyst = Agent(
+    role='Data Analyst',
+    tools=[db_tool],
+    llm=OpenAI()
+)
+```
+
+### Sequential vs Parallel Execution
+
+```python
+# Sequential execution (default)
+sequential_crew = Crew(
+    agents=[agent1, agent2, agent3],
+    tasks=[task1, task2, task3],
+    process="sequential"
+)
+
+# Parallel execution
+parallel_crew = Crew(
+    agents=[agent1, agent2, agent3],
+    tasks=[task1, task2, task3],
+    process="parallel"
+)
+```
+
+## Best Practices
+
+1. **Agent Design**
+   - Give each agent a clear, specific role
+   - Write detailed backstories for better performance
+   - Limit delegation to avoid infinite loops
+
+2. **Task Definition**
+   - Make tasks specific and measurable
+   - Include all necessary context
+   - Define clear expected outputs
+
+3. **Resource Management**
+   - Monitor token usage across agents
+   - Set appropriate temperatures
+   - Use caching for repeated queries
+
+## Common Use Cases
+
+### Research Team
+
+```python
+# Specialized research crew
+research_crew = Crew(
+    agents=[
+        web_researcher,
+        data_analyst,
+        fact_checker,
+        report_writer
+    ],
+    tasks=[
+        gather_data_task,
+        analyze_task,
+        verify_task,
+        compile_report_task
+    ]
+)
+```
+
+### Content Creation
+
+```python
+# Content production crew
+content_crew = Crew(
+    agents=[
+        topic_researcher,
+        outline_creator,
+        content_writer,
+        editor
+    ],
+    tasks=[
+        research_task,
+        outline_task,
+        writing_task,
+        editing_task
+    ]
+)
+```
+
+## Deployment Considerations
+
+- Test crew coordination locally
+- Monitor agent interactions
+- Set reasonable timeouts
+- Handle partial failures gracefully
+
+## See Also
+
+- [CrewAI Documentation](https://docs.crewai.com)
+- [Framework Overview](/frameworks/overview)
+- [Examples](/resources/examples)

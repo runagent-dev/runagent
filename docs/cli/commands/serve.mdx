@@ -1,0 +1,175 @@
+---
+title: 'runagent serve'
+description: 'Start local development server for testing agents'
+---
+
+## Synopsis
+
+```bash
+runagent serve [PATH] [OPTIONS]
+```
+
+## Description
+
+The `serve` command starts a local FastAPI server for testing your agent before deployment. It provides hot reload, logging, and debugging capabilities.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--port`, `-p` | Port to run server on | `8000` |
+| `--host`, `-h` | Host to bind to | `127.0.0.1` |
+| `--reload` | Enable auto-reload | `true` in dev |
+| `--no-reload` | Disable auto-reload | - |
+| `--workers`, `-w` | Number of worker processes | `1` |
+| `--log-level` | Logging level | `info` |
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Serve current directory
+runagent serve .
+
+# Serve specific project
+runagent serve ~/projects/my-agent
+
+# Custom port
+runagent serve . --port 8080
+```
+
+### Advanced Usage
+
+```bash
+# Production-like settings
+runagent serve . --no-reload --workers 4
+
+# Debug mode
+runagent serve . --log-level debug
+
+# Expose to network
+runagent serve . --host 0.0.0.0
+```
+
+## Available Endpoints
+
+Once running, your agent exposes:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Welcome page |
+| `/health` | GET | Health check |
+| `/invoke` | POST | Invoke agent |
+| `/stream` | POST | Stream responses |
+| `/docs` | GET | API documentation |
+
+## Testing Your Agent
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+### Invoke Agent
+
+```bash
+curl -X POST http://localhost:8000/invoke \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Hello, agent!"}'
+```
+
+### Stream Response
+
+```bash
+curl -X POST http://localhost:8000/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Tell me a story"}' \
+  --no-buffer
+```
+
+## Development Features
+
+### Hot Reload
+
+Changes to your agent code automatically restart the server:
+
+```
+INFO:     Detected change in 'agent.py'
+INFO:     Reloading...
+```
+
+### Request Logging
+
+All requests are logged with details:
+
+```
+INFO:     127.0.0.1:53234 - "POST /invoke HTTP/1.1" 200 OK
+DEBUG:    Request body: {"query": "test"}
+DEBUG:    Response time: 0.123s
+```
+
+### Error Display
+
+Errors show full traceback in development:
+
+```
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "agent.py", line 42, in process
+    ...
+```
+
+## Configuration
+
+The server reads from `runagent.config.json`:
+
+```json
+{
+  "dev_server": {
+    "port": 8000,
+    "reload": true,
+    "log_level": "info"
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port Already in Use">
+    ```bash
+    # Find process using port
+    lsof -i :8000  # macOS/Linux
+    netstat -ano | findstr :8000  # Windows
+    
+    # Use different port
+    runagent serve . --port 8080
+    ```
+  </Accordion>
+  
+  <Accordion title="Import Errors">
+    Ensure you're in the right directory and dependencies are installed:
+    ```bash
+    pwd  # Check current directory
+    pip install -r requirements.txt
+    ```
+  </Accordion>
+  
+  <Accordion title="Reload Not Working">
+    Some file changes might not trigger reload:
+    ```bash
+    # Force reload with file touch
+    touch agent.py
+    
+    # Or restart manually
+    Ctrl+C and runagent serve .
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [`runagent deploy`](/cli/commands/deploy) - Deploy to production
+- [`runagent logs`](/cli/commands/logs) - View logs

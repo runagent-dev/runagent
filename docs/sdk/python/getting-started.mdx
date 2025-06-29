@@ -1,0 +1,300 @@
+---
+title: 'Getting Started with Python SDK'
+description: 'Start using the RunAgent Python SDK'
+---
+
+The RunAgent Python SDK provides a simple and powerful interface for interacting with your deployed agents. It supports both synchronous and asynchronous operations, with built-in streaming capabilities.
+
+## Installation
+
+Install the SDK using pip:
+
+```bash
+pip install runagent
+```
+
+<Info>
+  The SDK is included with the main `runagent` package. No separate installation needed.
+</Info>
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from runagent import RunAgentClient
+
+# Initialize the client
+client = RunAgentClient(agent_id="your-agent-id")
+
+# Simple invocation
+result = client.run_generic({
+    "query": "What's the capital of France?",
+    "context": "Geography question"
+})
+
+print(result)
+```
+
+### With API Key
+
+```python
+from runagent import RunAgentClient
+
+# Initialize with API key
+client = RunAgentClient(
+    agent_id="your-agent-id",
+    api_key="your-api-key"  # Optional if set in environment
+)
+```
+
+## Authentication
+
+The SDK supports multiple authentication methods:
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```bash
+    export RUNAGENT_API_KEY="your-api-key"
+    ```
+    
+    ```python
+    # SDK will automatically use the environment variable
+    client = RunAgentClient(agent_id="your-agent-id")
+    ```
+  </Tab>
+  <Tab title="Direct API Key">
+    ```python
+    client = RunAgentClient(
+        agent_id="your-agent-id",
+        api_key="your-api-key"
+    )
+    ```
+  </Tab>
+  <Tab title="Config File">
+    ```python
+    # Uses ~/.runagent/config.json by default
+    client = RunAgentClient(agent_id="your-agent-id")
+    ```
+  </Tab>
+</Tabs>
+
+## Response Formats
+
+### Standard Response
+
+```python
+result = client.run_generic({
+    "query": "Explain quantum computing",
+    "max_length": 200
+})
+
+# Result is a dictionary
+print(result["answer"])
+print(result["confidence"])
+print(result["sources"])
+```
+
+### Streaming Response
+
+```python
+# Stream responses for real-time output
+for chunk in client.run_generic_stream({
+    "query": "Write a story about AI"
+}):
+    print(chunk, end="", flush=True)
+```
+
+## Error Handling
+
+The SDK provides comprehensive error handling:
+
+```python
+from runagent import RunAgentClient, RunAgentError
+
+client = RunAgentClient(agent_id="your-agent-id")
+
+try:
+    result = client.run_generic({"query": "Hello"})
+except RunAgentError as e:
+    print(f"RunAgent error: {e}")
+    print(f"Error code: {e.code}")
+    print(f"Error details: {e.details}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Common Error Types
+
+| Error | Description |
+|-------|-------------|
+| `AuthenticationError` | Invalid or missing API key |
+| `AgentNotFoundError` | Agent ID doesn't exist |
+| `ValidationError` | Invalid input data |
+| `TimeoutError` | Request timed out |
+| `RateLimitError` | Too many requests |
+
+## Configuration Options
+
+```python
+from runagent import RunAgentClient
+
+client = RunAgentClient(
+    agent_id="your-agent-id",
+    api_key="your-api-key",
+    base_url="https://api.run-agent.ai",  # Custom API endpoint
+    timeout=30,  # Request timeout in seconds
+    max_retries=3,  # Number of retry attempts
+    verify_ssl=True  # SSL certificate verification
+)
+```
+
+## Input Validation
+
+The SDK validates inputs before sending requests:
+
+```python
+# This will raise ValidationError if required fields are missing
+try:
+    result = client.run_generic({})  # Missing required 'query' field
+except ValidationError as e:
+    print(f"Validation failed: {e}")
+```
+
+## Logging
+
+Enable logging for debugging:
+
+```python
+import logging
+
+# Enable debug logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Now SDK operations will print debug information
+client = RunAgentClient(agent_id="your-agent-id")
+result = client.run_generic({"query": "Test"})
+```
+
+## Complete Examples
+
+### Question-Answering Bot
+
+```python
+from runagent import RunAgentClient
+
+def ask_agent(question):
+    client = RunAgentClient(agent_id="qa-bot-agent")
+    
+    try:
+        result = client.run_generic({
+            "query": question,
+            "max_tokens": 500,
+            "temperature": 0.7
+        })
+        return result.get("answer", "No answer available")
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# Usage
+answer = ask_agent("What is machine learning?")
+print(answer)
+```
+
+### Interactive Chat
+
+```python
+from runagent import RunAgentClient
+
+def chat_with_agent():
+    client = RunAgentClient(agent_id="chat-agent")
+    
+    print("Chat started. Type 'quit' to exit.")
+    
+    while True:
+        user_input = input("\nYou: ")
+        if user_input.lower() == 'quit':
+            break
+        
+        print("\nAgent: ", end="")
+        for chunk in client.run_generic_stream({
+            "query": user_input,
+            "conversation_id": "session-123"
+        }):
+            print(chunk, end="", flush=True)
+        print()  # New line after response
+
+# Start chat
+chat_with_agent()
+```
+
+### Batch Processing
+
+```python
+from runagent import RunAgentClient
+import json
+
+def process_batch(items):
+    client = RunAgentClient(agent_id="processor-agent")
+    results = []
+    
+    for item in items:
+        try:
+            result = client.run_generic({
+                "data": item,
+                "operation": "analyze"
+            })
+            results.append({
+                "input": item,
+                "output": result,
+                "status": "success"
+            })
+        except Exception as e:
+            results.append({
+                "input": item,
+                "output": None,
+                "status": "error",
+                "error": str(e)
+            })
+    
+    return results
+
+# Process multiple items
+items = ["data1", "data2", "data3"]
+results = process_batch(items)
+print(json.dumps(results, indent=2))
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Reuse Clients" icon="recycle">
+    Create client instances once and reuse them for multiple requests
+  </Card>
+  <Card title="Handle Errors" icon="shield">
+    Always implement proper error handling for production use
+  </Card>
+  <Card title="Use Streaming" icon="water">
+    Use streaming for long responses to improve user experience
+  </Card>
+  <Card title="Set Timeouts" icon="clock">
+    Configure appropriate timeouts based on your agent's complexity
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Synchronous Client" icon="circle-play" href="/sdk/python/sync-client">
+    Deep dive into synchronous operations
+  </Card>
+  <Card title="Asynchronous Client" icon="rotate" href="/sdk/python/async-client">
+    Learn about async/await support
+  </Card>
+  <Card title="Streaming Responses" icon="stream" href="/sdk/python/streaming">
+    Master real-time streaming
+  </Card>
+  <Card title="API Reference" icon="book" href="/sdk/python/api-reference">
+    Complete API documentation
+  </Card>
+</CardGroup>

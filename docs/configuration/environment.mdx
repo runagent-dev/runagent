@@ -1,0 +1,298 @@
+---
+title: 'Environment Variables'
+description: 'Managing environment variables and secrets in RunAgent'
+---
+
+## Overview
+
+Environment variables are used to configure your agent without hardcoding sensitive information. RunAgent provides secure methods for managing environment variables across development and production.
+
+## Local Development
+
+### Using .env Files
+
+Create a `.env` file in your project root:
+
+```bash
+# .env
+OPENAI_API_KEY=sk-...
+DATABASE_URL=postgresql://localhost/mydb
+REDIS_URL=redis://localhost:6379
+DEBUG=true
+LOG_LEVEL=info
+```
+
+Load in your agent:
+
+```python
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Access variables
+api_key = os.getenv("OPENAI_API_KEY")
+debug = os.getenv("DEBUG", "false").lower() == "true"
+```
+
+### Best Practices
+
+1. **Never commit .env files**
+   ```gitignore
+   # .gitignore
+   .env
+   .env.local
+   .env.*.local
+   ```
+
+2. **Provide .env.example**
+   ```bash
+   # .env.example
+   OPENAI_API_KEY=your-api-key-here
+   DATABASE_URL=postgresql://localhost/mydb
+   DEBUG=false
+   ```
+
+3. **Validate required variables**
+   ```python
+   required_vars = ["OPENAI_API_KEY", "DATABASE_URL"]
+   missing = [var for var in required_vars if not os.getenv(var)]
+   
+   if missing:
+       raise ValueError(f"Missing required environment variables: {missing}")
+   ```
+
+## Configuration in runagent.config.json
+
+### Dynamic Substitution
+
+Use `${VAR_NAME}` syntax for runtime substitution:
+
+```json
+{
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "MODEL_NAME": "gpt-4",
+    "TEMPERATURE": "${TEMPERATURE:-0.7}"
+  }
+}
+```
+
+### Variable Types
+
+1. **Dynamic variables** - Loaded from environment
+   ```json
+   "API_KEY": "${API_KEY}"
+   ```
+
+2. **Static values** - Hardcoded (non-sensitive only)
+   ```json
+   "MODEL_VERSION": "v1.0"
+   ```
+
+3. **With defaults** (coming soon)
+   ```json
+   "TIMEOUT": "${TIMEOUT:-30}"
+   ```
+
+## Production Deployment
+
+### Setting Variables
+
+When deploying, set environment variables:
+
+```bash
+# Local deployment
+OPENAI_API_KEY=sk-... runagent deploy . --local
+
+# Cloud deployment (coming soon)
+runagent deploy . \
+  --env OPENAI_API_KEY=$OPENAI_API_KEY \
+  --env DATABASE_URL=$DATABASE_URL
+```
+
+### Security Best Practices
+
+1. **Use secret management services**
+   - AWS Secrets Manager
+   - Google Secret Manager
+   - Azure Key Vault
+   - HashiCorp Vault
+
+2. **Rotate keys regularly**
+   - Set expiration reminders
+   - Use versioned secrets
+   - Update without downtime
+
+3. **Limit scope**
+   - Use read-only credentials where possible
+   - Create service-specific API keys
+   - Apply principle of least privilege
+
+## Common Patterns
+
+### Configuration Classes
+
+```python
+# config.py
+import os
+from dataclasses import dataclass
+
+@dataclass
+class Config:
+    openai_api_key: str
+    model_name: str = "gpt-4"
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    
+    @classmethod
+    def from_env(cls):
+        return cls(
+            openai_api_key=os.environ["OPENAI_API_KEY"],
+            model_name=os.getenv("MODEL_NAME", "gpt-4"),
+            temperature=float(os.getenv("TEMPERATURE", "0.7")),
+            max_tokens=int(os.getenv("MAX_TOKENS", "1000"))
+        )
+
+# Usage
+config = Config.from_env()
+```
+
+### Environment-Specific Settings
+
+```python
+# settings.py
+import os
+
+ENV = os.getenv("ENVIRONMENT", "development")
+
+CONFIGS = {
+    "development": {
+        "debug": True,
+        "log_level": "DEBUG",
+        "cache_enabled": False
+    },
+    "staging": {
+        "debug": False,
+        "log_level": "INFO",
+        "cache_enabled": True
+    },
+    "production": {
+        "debug": False,
+        "log_level": "WARNING",
+        "cache_enabled": True
+    }
+}
+
+settings = CONFIGS[ENV]
+```
+
+### Validation
+
+```python
+# validate_env.py
+import os
+import sys
+
+def validate_environment():
+    errors = []
+    
+    # Required variables
+    required = {
+        "OPENAI_API_KEY": "OpenAI API key",
+        "DATABASE_URL": "Database connection string"
+    }
+    
+    for var, description in required.items():
+        if not os.getenv(var):
+            errors.append(f"Missing {description} ({var})")
+    
+    # Validate formats
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if api_key and not api_key.startswith("sk-"):
+        errors.append("Invalid OpenAI API key format")
+    
+    if errors:
+        print("Environment validation failed:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
+
+# Run validation on startup
+validate_environment()
+```
+
+## Special Variables
+
+### RunAgent System Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RUNAGENT_LOG_LEVEL` | Logging level | `INFO` |
+| `RUNAGENT_TIMEOUT` | Request timeout | `30` |
+| `RUNAGENT_MAX_RETRIES` | Retry attempts | `3` |
+
+### Framework-Specific
+
+```python
+# LangChain
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "..."
+
+# OpenAI
+os.environ["OPENAI_API_KEY"] = "..."
+os.environ["OPENAI_ORGANIZATION"] = "..."
+```
+
+## Troubleshooting
+
+### Variable Not Found
+
+```python
+# Debug which variables are available
+print("Available environment variables:")
+for key, value in os.environ.items():
+    if key.startswith("RUNAGENT_") or key in ["OPENAI_API_KEY"]:
+        print(f"{key}={value[:5]}...")  # Show only first 5 chars
+```
+
+### Loading Order
+
+1. System environment variables
+2. `.env` file (local development)
+3. RunAgent configuration (deployment)
+4. Runtime overrides
+
+### Common Issues
+
+1. **Quotes in .env files**
+   ```bash
+   # Wrong
+   API_KEY="sk-abc123"
+   
+   # Correct
+   API_KEY=sk-abc123
+   ```
+
+2. **Spaces around equals**
+   ```bash
+   # Wrong
+   API_KEY = sk-abc123
+   
+   # Correct
+   API_KEY=sk-abc123
+   ```
+
+3. **Multiline values**
+   ```bash
+   # Use quotes for multiline
+   PROMPT="This is a
+   multiline prompt"
+   ```
+
+## See Also
+
+- [Configuration File](/configuration/config-file) - Config structure
+- [Security Best Practices](/deployment/cloud-deployment) - Production security
+- [Local Development](/deployment/local-development) - Development setup

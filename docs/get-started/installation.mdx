@@ -1,0 +1,205 @@
+---
+title: 'Installation'
+description: 'Install RunAgent CLI and SDK on your system'
+icon: 'download'
+---
+
+## System Requirements
+
+Before installing RunAgent, ensure your system meets these requirements:
+
+- **Python**: 3.8 or higher
+- **pip**: Latest version recommended
+- **Operating System**: Windows, macOS, or Linux
+- **Memory**: At least 4GB RAM recommended
+- **Storage**: 500MB free space
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="pip (Recommended)">
+    Install the latest stable version:
+    
+    ```bash
+    pip install runagent
+    ```
+    
+    Or install with all optional dependencies:
+    
+    ```bash
+    pip install "runagent[all]"
+    ```
+  </Tab>
+  
+  <Tab title="pipx">
+    For isolated installation:
+    
+    ```bash
+    pipx install runagent
+    ```
+    
+    This keeps RunAgent separate from your other Python packages.
+  </Tab>
+  
+  <Tab title="From Source">
+    Install the development version:
+    
+    ```bash
+    git clone https://github.com/runagent-dev/runagent.git
+    cd runagent
+    pip install -e .
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    Using Docker (coming soon):
+    
+    ```bash
+    docker pull runagent/cli:latest
+    docker run -it runagent/cli --help
+    ```
+  </Tab>
+</Tabs>
+
+## Verify Installation
+
+After installation, verify RunAgent is properly installed:
+
+```bash
+runagent --version
+```
+
+You should see output like:
+```
+RunAgent CLI version 1.0.0
+```
+
+## Platform-Specific Notes
+
+<AccordionGroup>
+  <Accordion title="Windows">
+    On Windows, you may need to:
+    
+    1. Run as Administrator for first-time setup
+    2. Add Python Scripts to PATH:
+       ```powershell
+       $env:Path += ";$env:APPDATA\Python\Python38\Scripts"
+       ```
+    3. Use `python -m runagent` if `runagent` command isn't found
+  </Accordion>
+  
+  <Accordion title="macOS">
+    On macOS:
+    
+    1. You might need to use `pip3` instead of `pip`
+    2. If using Homebrew Python:
+       ```bash
+       brew install python@3.8
+       pip3 install runagent
+       ```
+  </Accordion>
+  
+  <Accordion title="Linux">
+    On Linux:
+    
+    1. You may need to install Python dev packages:
+       ```bash
+       # Ubuntu/Debian
+       sudo apt-get install python3-dev python3-pip
+       
+       # Fedora/RHEL
+       sudo dnf install python3-devel
+       ```
+    2. Use `--user` flag to install locally:
+       ```bash
+       pip install --user runagent
+       ```
+  </Accordion>
+</AccordionGroup>
+
+## Virtual Environment (Recommended)
+
+We recommend using a virtual environment:
+
+```bash
+# Create virtual environment
+python -m venv runagent-env
+
+# Activate it
+# On Windows:
+runagent-env\Scripts\activate
+# On Unix or MacOS:
+source runagent-env/bin/activate
+
+# Install RunAgent
+pip install runagent
+```
+
+## Upgrading
+
+To upgrade to the latest version:
+
+```bash
+pip install --upgrade runagent
+```
+
+Check for updates:
+```bash
+pip list --outdated | grep runagent
+```
+
+## Uninstalling
+
+To remove RunAgent:
+
+```bash
+pip uninstall runagent
+
+# Also remove configuration (optional)
+runagent teardown
+```
+
+## Troubleshooting Installation
+
+<AccordionGroup>
+  <Accordion title="Permission Denied">
+    If you get permission errors:
+    ```bash
+    pip install --user runagent
+    ```
+  </Accordion>
+  
+  <Accordion title="Command Not Found">
+    If `runagent` command isn't found after installation:
+    
+    1. Check if it's in your PATH:
+       ```bash
+       which runagent
+       # or
+       where runagent  # Windows
+       ```
+    
+    2. Try using the module directly:
+       ```bash
+       python -m runagent
+       ```
+  </Accordion>
+  
+  <Accordion title="SSL Certificate Errors">
+    For SSL/TLS errors:
+    ```bash
+    pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org runagent
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Deploy your first agent
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/get-started/core-concepts">
+    Understand RunAgent architecture
+  </Card>
+</CardGroup>

@@ -1,0 +1,82 @@
+---
+title: 'runagent template'
+description: 'Manage project templates'
+---
+
+## Synopsis
+
+```bash
+runagent template [COMMAND] [OPTIONS]
+```
+
+## Description
+
+Manage RunAgent project templates. List, preview, and update available templates.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `list` | List all available templates |
+| `info` | Show template details |
+| `update` | Update templates to latest version |
+| `create` | Create custom template |
+
+## Examples
+
+### List Templates
+
+```bash
+runagent template list
+
+Available templates:
+  langgraph:
+    - problem-solver: Multi-step reasoning agent
+    - chatbot: Conversational AI assistant
+    - researcher: Web research agent
+  
+  crewai:
+    - crew-basic: Simple crew setup
+    - research-crew: Research team
+    
+  custom:
+    - minimal: Bare minimum setup
+    - api-agent: REST API integration
+```
+
+### Template Info
+
+```bash
+runagent template info problem-solver
+
+Template: problem-solver
+Framework: langgraph
+Description: Multi-step reasoning agent with tool use
+Author: runagent-dev
+Updated: 2024-01-15
+Size: 2.3 KB
+
+Files:
+  - agent.py
+  - tools.py
+  - prompts.py
+  - runagent.config.json
+  - requirements.txt
+```
+
+### Update Templates
+
+```bash
+runagent template update
+
+Checking for updates...
+Updated templates:
+  - problem-solver (v1.0.1 → v1.0.2)
+  - chatbot (v2.0.0 → v2.1.0)
+
+Templates updated successfully!
+```
+
+## See Also
+
+- [`runagent init`](/cli/commands/init) - Create project from template
