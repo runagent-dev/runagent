@@ -7,24 +7,19 @@
   "created_at": "2025-06-25 13:42:03",
   "template_source": {
     "repo_url": "https://github.com/runagent-dev/runagent.git",
-    "path": "templates/langgraph/problem_solver",
+    "path": "/home/riamdriad5/runagent/runagent/templates/langgraph/problem_solver",
     "author": "sawradip"
   },
   "agent_architecture": {
     "entrypoints": [
       {
         "file": "agents.py",
-        "module": "app.invoke",
+        "module": "lg_app.invoke",
         "type": "generic"
-      },
-      {
-        "file": "agents.py",
-        "module": "app.stream",
-        "type": "generic_stream"
       }
     ]
   },
   "env_vars": {
-    "OPENAI_API_KEY": "sk-proj-1234567890"
+    "OPENAI_API_KEY": "Your OPENAI_API_KEY"
   }
 }

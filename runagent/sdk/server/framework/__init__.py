@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Dict
 
 from runagent.sdk.server.framework.langgraph import LangGraphExecutor
+from runagent.sdk.server.framework.generic import GenericExecutor
+
 from runagent.utils.schema import EntryPoint, EntryPointType
 
 
@@ -19,5 +21,8 @@ def get_executor(
 
     if framework == "langgraph":
         return LangGraphExecutor(agent_dir, agent_entrypoints)
+    elif framework in ["langchain", "llamaindex", "crewai", "autogen"]:
+        # Use generic executor for other frameworks
+        return GenericExecutor(agent_dir, agent_entrypoints)
     else:
         raise ValueError(f"Framework {framework} not supported yet.")

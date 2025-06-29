@@ -119,7 +119,7 @@ def solve_problem(query: str, num_solutions: int = 3):
     print("-" * 50)
 
     # Create workflow
-    app = create_workflow()
+    lg_app = create_workflow()
 
     # Set up initial state
     initial_state = {
@@ -130,7 +130,7 @@ def solve_problem(query: str, num_solutions: int = 3):
     }
 
     # Run the workflow
-    result = app.invoke(initial_state)
+    result = lg_app.invoke(initial_state)
 
     # Print results nicely
     print("\n📋 SOLUTIONS FOUND:")
@@ -160,7 +160,7 @@ def get_solutions(query: str, num_solutions: int = 3):
     print("-" * 50)
 
     # Create workflow
-    app = create_workflow()
+    lg_app = create_workflow()
 
     # Set up initial state
     initial_state = {
@@ -171,7 +171,7 @@ def get_solutions(query: str, num_solutions: int = 3):
     }
 
     # Run the workflow
-    result = app.invoke(initial_state)
+    result = lg_app.invoke(initial_state)
 
     # Print results nicely
     print("\n📋 SOLUTIONS FOUND:")
@@ -185,11 +185,11 @@ def get_solutions(query: str, num_solutions: int = 3):
 
 
 # Create workflow
-app = create_workflow()
+lg_app = create_workflow()
 
 
 if __name__ == "__main__":
-    for out in app.stream(
+    for out in lg_app.stream(
         {
             "query": "How to I fix my broken phone?",
             "num_solutions": 4,
