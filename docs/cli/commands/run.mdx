@@ -1,0 +1,64 @@
+---
+title: 'runagent run'
+description: 'Run a deployed agent'
+---
+
+## Synopsis
+
+```bash
+runagent run [AGENT_ID] [OPTIONS]
+```
+
+## Description
+
+Execute a deployed agent with input data and receive the response.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--input`, `-i` | JSON input data | Required |
+| `--input-file`, `-f` | Read input from file | - |
+| `--output`, `-o` | Output file path | stdout |
+| `--stream` | Enable streaming output | false |
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Run with inline input
+runagent run agent-123 --input '{"query": "Hello"}'
+
+# Run with file input
+runagent run agent-123 --input-file request.json
+
+# Save output to file
+runagent run agent-123 --input '{"query": "Test"}' --output result.json
+```
+
+### Streaming
+
+```bash
+# Stream responses
+runagent run agent-123 --input '{"query": "Tell me a story"}' --stream
+```
+
+## Input Format
+
+The input must be valid JSON:
+
+```json
+{
+  "query": "Your question here",
+  "parameters": {
+    "temperature": 0.7,
+    "max_tokens": 150
+  }
+}
+```
+
+## See Also
+
+- [`runagent deploy`](/cli/commands/deploy) - Deploy an agent first
+- [`runagent status`](/cli/commands/status) - Check agent status

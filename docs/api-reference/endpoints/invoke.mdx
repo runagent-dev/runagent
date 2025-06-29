@@ -1,0 +1,232 @@
+---
+title: 'Invoke Agent'
+description: 'Synchronously invoke an agent'
+---
+
+## POST /v1/agents/\{agent_id\}/invoke
+
+Invoke an agent and receive a synchronous response.
+
+### Request
+
+```bash
+POST https://api.run-agent.ai/v1/agents/{agent_id}/invoke
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+```
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  The unique identifier of the agent to invoke
+</ParamField>
+
+### Request Body
+
+<ParamField body="query" type="string" required>
+  The input query or prompt for the agent
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  Additional parameters for the agent
+  
+  <Expandable title="properties">
+    <ParamField body="temperature" type="number">
+      Sampling temperature (0.0 to 2.0)
+    </ParamField>
+    
+    <ParamField body="max_tokens" type="integer">
+      Maximum tokens in response
+    </ParamField>
+    
+    <ParamField body="context" type="object">
+      Additional context for the agent
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="session_id" type="string">
+  Session ID for maintaining conversation context
+</ParamField>
+
+### Response
+
+<ResponseField name="result" type="object" required>
+  The agent's response
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Token usage information
+  
+  <Expandable title="properties">
+    <ResponseField name="prompt_tokens" type="integer">
+      Tokens used in the prompt
+    </ResponseField>
+    
+    <ResponseField name="completion_tokens" type="integer">
+      Tokens used in the response
+    </ResponseField>
+    
+    <ResponseField name="total_tokens" type="integer">
+      Total tokens used
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Additional metadata
+  
+  <Expandable title="properties">
+    <ResponseField name="execution_time" type="number">
+      Time taken in seconds
+    </ResponseField>
+    
+    <ResponseField name="agent_version" type="string">
+      Version of the agent
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Basic Invocation
+
+<CodeGroup>
+  ```bash cURL
+  curl -X POST https://api.run-agent.ai/v1/agents/agent-123/invoke \
+    -H "Authorization: Bearer YOUR_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "query": "What is the weather like in San Francisco?"
+    }'
+  ```
+  
+  ```python Python
+  import requests
+  
+  response = requests.post(
+      "https://api.run-agent.ai/v1/agents/agent-123/invoke",
+      headers={
+          "Authorization": "Bearer YOUR_API_KEY",
+          "Content-Type": "application/json"
+      },
+      json={
+          "query": "What is the weather like in San Francisco?"
+      }
+  )
+  
+  result = response.json()
+  print(result["result"])
+  ```
+  
+  ```javascript JavaScript
+  const response = await fetch(
+    'https://api.run-agent.ai/v1/agents/agent-123/invoke',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        query: 'What is the weather like in San Francisco?'
+      })
+    }
+  );
+  
+  const result = await response.json();
+  console.log(result.result);
+  ```
+</CodeGroup>
+
+### With Parameters
+
+```json
+{
+  "query": "Write a story about AI",
+  "parameters": {
+    "temperature": 0.8,
+    "max_tokens": 500,
+    "style": "science fiction"
+  },
+  "session_id": "user-123-session"
+}
+```
+
+### Response Example
+
+```json
+{
+  "result": {
+    "answer": "The weather in San Francisco is currently 65°F with partly cloudy skies.",
+    "confidence": 0.95,
+    "sources": ["current_weather_api"]
+  },
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 18,
+    "total_tokens": 42
+  },
+  "metadata": {
+    "execution_time": 1.23,
+    "agent_version": "1.0.0",
+    "request_id": "req_abc123"
+  }
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+Missing required field:
+
+```json
+{
+  "error": {
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Field 'query' is required",
+    "status": 400
+  }
+}
+```
+
+### 404 Not Found
+
+Agent doesn't exist:
+
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent 'agent-123' not found",
+    "status": 404
+  }
+}
+```
+
+### 429 Rate Limited
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests",
+    "status": 429,
+    "retry_after": 60
+  }
+}
+```
+
+## Best Practices
+
+1. **Include Session ID** for conversations to maintain context
+2. **Set Appropriate Timeouts** as agent processing can take time
+3. **Handle Errors Gracefully** with retry logic for 5xx errors
+4. **Monitor Token Usage** to optimize costs
+
+## See Also
+
+- [Stream Endpoint](/api-reference/endpoints/stream) - For streaming responses
+- [Authentication](/api-reference/authentication) - API authentication
+- [Error Handling](/api-reference/errors) - Error responses

@@ -1,0 +1,321 @@
+---
+title: 'Stream Agent Response'
+description: 'Stream agent responses in real-time'
+---
+
+## POST /v1/agents/\{agent_id\}/stream
+
+Stream agent responses using Server-Sent Events (SSE) for real-time output.
+
+### Request
+
+```bash
+POST https://api.run-agent.ai/v1/agents/{agent_id}/stream
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+Accept: text/event-stream
+```
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  The unique identifier of the agent
+</ParamField>
+
+### Request Body
+
+Same as the [invoke endpoint](/api-reference/endpoints/invoke):
+
+<ParamField body="query" type="string" required>
+  The input query for the agent
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  Additional parameters
+</ParamField>
+
+<ParamField body="session_id" type="string">
+  Session ID for context
+</ParamField>
+
+### Response Format
+
+Server-Sent Events stream with the following event types:
+
+```
+event: start
+data: {"message": "Stream started"}
+
+event: chunk
+data: {"content": "The weather in "}
+
+event: chunk
+data: {"content": "San Francisco is "}
+
+event: done
+data: {"message": "Stream complete", "usage": {...}}
+```
+
+## Event Types
+
+### start
+Sent when streaming begins
+
+```
+event: start
+data: {"message": "Stream started", "session_id": "abc123"}
+```
+
+### chunk
+Content chunks as they're generated
+
+```
+event: chunk
+data: {"content": "Hello, ", "index": 0}
+```
+
+### error
+Error during streaming
+
+```
+event: error
+data: {"error": "Processing failed", "code": "STREAM_ERROR"}
+```
+
+### done
+Stream completion with metadata
+
+```
+event: done
+data: {
+  "message": "Stream complete",
+  "usage": {
+    "total_tokens": 150
+  },
+  "execution_time": 2.5
+}
+```
+
+## Examples
+
+### JavaScript (Browser)
+
+```javascript
+const eventSource = new EventSource(
+  'https://api.run-agent.ai/v1/agents/agent-123/stream',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (event.type === 'chunk') {
+    // Append chunk to output
+    document.getElementById('output').innerHTML += data.content;
+  }
+};
+
+eventSource.onerror = (error) => {
+  console.error('Stream error:', error);
+  eventSource.close();
+};
+
+// Send request to start streaming
+fetch('https://api.run-agent.ai/v1/agents/agent-123/stream', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    query: 'Tell me a story about space'
+  })
+});
+```
+
+### Python
+
+```python
+import requests
+import json
+
+def stream_agent_response(agent_id, query):
+    url = f"https://api.run-agent.ai/v1/agents/{agent_id}/stream"
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+    }
+    
+    response = requests.post(
+        url,
+        headers=headers,
+        json={"query": query},
+        stream=True
+    )
+    
+    for line in response.iter_lines():
+        if line:
+            line = line.decode('utf-8')
+            if line.startswith('data: '):
+                data = json.loads(line[6:])
+                if 'content' in data:
+                    print(data['content'], end='', flush=True)
+
+# Usage
+stream_agent_response("agent-123", "Explain quantum computing")
+```
+
+### Node.js
+
+```javascript
+const EventSource = require('eventsource');
+
+const eventSource = new EventSource(
+  'https://api.run-agent.ai/v1/agents/agent-123/stream',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY'
+    }
+  }
+);
+
+let fullResponse = '';
+
+eventSource.addEventListener('chunk', (event) => {
+  const data = JSON.parse(event.data);
+  fullResponse += data.content;
+  process.stdout.write(data.content);
+});
+
+eventSource.addEventListener('done', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('\n\nStream complete:', data);
+  eventSource.close();
+});
+
+eventSource.addEventListener('error', (event) => {
+  console.error('Stream error:', event);
+  eventSource.close();
+});
+```
+
+## Handling Stream Interruptions
+
+### Client-Side Reconnection
+
+```javascript
+let reconnectAttempts = 0;
+const maxReconnects = 3;
+
+function connectStream() {
+  const eventSource = new EventSource(url, options);
+  
+  eventSource.onerror = (error) => {
+    eventSource.close();
+    
+    if (reconnectAttempts < maxReconnects) {
+      reconnectAttempts++;
+      setTimeout(() => {
+        console.log(`Reconnecting... (${reconnectAttempts}/${maxReconnects})`);
+        connectStream();
+      }, Math.pow(2, reconnectAttempts) * 1000);
+    }
+  };
+  
+  eventSource.addEventListener('done', () => {
+    reconnectAttempts = 0;  // Reset on success
+  });
+}
+```
+
+### Resume from Position
+
+```json
+{
+  "query": "Continue the story",
+  "parameters": {
+    "resume_from_index": 150
+  },
+  "session_id": "abc123"
+}
+```
+
+## Stream Control
+
+### Abort Stream
+
+Close the connection to stop streaming:
+
+```javascript
+// JavaScript
+eventSource.close();
+
+// Python
+response.close()
+
+// cURL
+# Ctrl+C to interrupt
+```
+
+### Rate Control
+
+Control streaming speed with parameters:
+
+```json
+{
+  "query": "Explain slowly",
+  "parameters": {
+    "stream_delay_ms": 100,
+    "chunk_size": 10
+  }
+}
+```
+
+## Error Handling
+
+### Network Errors
+
+```javascript
+eventSource.onerror = (event) => {
+  if (event.readyState === EventSource.CLOSED) {
+    console.log('Connection closed');
+  } else {
+    console.error('Connection error:', event);
+    // Implement retry logic
+  }
+};
+```
+
+### Stream Errors
+
+```
+event: error
+data: {"error": "Model overloaded", "code": "CAPACITY_ERROR", "retry_after": 30}
+```
+
+## Best Practices
+
+1. **Implement Reconnection Logic** for network interruptions
+2. **Handle Partial Responses** gracefully
+3. **Set Appropriate Timeouts** for long-running streams
+4. **Monitor Memory Usage** when buffering responses
+5. **Provide User Feedback** during streaming
+
+## Performance Tips
+
+- Use compression when available
+- Process chunks as they arrive
+- Implement backpressure handling
+- Consider chunking large responses
+
+## See Also
+
+- [Invoke Endpoint](/api-reference/endpoints/invoke) - Synchronous invocation
+- [WebSockets](/api-reference/webhooks) - Alternative streaming method
+- [Error Handling](/api-reference/errors) - Stream error codes

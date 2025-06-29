@@ -1,0 +1,64 @@
+---
+title: 'runagent upload'
+description: 'Upload agent to remote server'
+---
+
+## Synopsis
+
+```bash
+runagent upload [PATH] [OPTIONS]
+```
+
+## Description
+
+Upload your agent code to RunAgent servers without starting it. Useful for preparing deployments or updating code.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--name`, `-n` | Agent name | From config |
+| `--skip-validation` | Skip validation checks | false |
+| `--compress` | Compress before upload | true |
+
+## Examples
+
+```bash
+# Upload current directory
+runagent upload .
+
+# Upload with custom name
+runagent upload . --name staging-agent
+
+# Upload without validation
+runagent upload . --skip-validation
+```
+
+## Upload Process
+
+1. Validates configuration
+2. Packages agent files
+3. Compresses (if enabled)
+4. Uploads to server
+5. Returns upload ID
+
+## Output
+
+```
+Validating agent... ✓
+Packaging files... ✓
+Compressing... ✓
+Uploading... ✓
+
+Upload successful!
+Upload ID: upload_abc123
+Size: 2.3 MB
+
+Next steps:
+  runagent start upload_abc123
+```
+
+## See Also
+
+- [`runagent start`](/cli/commands/start) - Start uploaded agent
+- [`runagent deploy`](/cli/commands/deploy) - Upload and start in one command

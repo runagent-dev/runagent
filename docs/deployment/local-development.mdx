@@ -1,0 +1,376 @@
+---
+title: 'Local Development'
+description: 'Running and testing agents locally'
+icon: 'local'
+---
+
+## Overview
+
+Local development with RunAgent provides a fast feedback loop for building and testing your agents before deployment. This guide covers local setup, testing, and debugging.
+
+## Getting Started
+
+### Basic Local Server
+
+```bash
+# Start local server
+runagent serve .
+
+# With custom port
+runagent serve . --port 8080
+
+# With hot reload disabled
+runagent serve . --no-reload
+```
+
+### Server Output
+
+```
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+## Testing Your Agent
+
+### Using cURL
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Invoke agent
+curl -X POST http://localhost:8000/invoke \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Hello, agent!"}'
+
+# Stream response
+curl -X POST http://localhost:8000/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Tell me a story"}' \
+  --no-buffer
+```
+
+### Using Python
+
+```python
+import requests
+
+# Test invocation
+response = requests.post(
+    "http://localhost:8000/invoke",
+    json={"query": "What's the weather?"}
+)
+print(response.json())
+
+# Test streaming
+response = requests.post(
+    "http://localhost:8000/stream",
+    json={"query": "Explain quantum physics"},
+    stream=True
+)
+
+for line in response.iter_lines():
+    if line:
+        print(line.decode('utf-8'))
+```
+
+### Interactive Testing
+
+```python
+# test_client.py
+import requests
+import json
+
+BASE_URL = "http://localhost:8000"
+
+def test_agent():
+    while True:
+        query = input("\nEnter query (or 'quit'): ")
+        if query.lower() == 'quit':
+            break
+        
+        response = requests.post(
+            f"{BASE_URL}/invoke",
+            json={"query": query}
+        )
+        
+        print("\nResponse:")
+        print(json.dumps(response.json(), indent=2))
+
+if __name__ == "__main__":
+    test_agent()
+```
+
+## Development Features
+
+### Hot Reload
+
+Changes to your agent code automatically restart the server:
+
+```python
+# agent.py
+def invoke(input_data):
+    # Make changes here - server auto-reloads
+    return {"response": "Updated response!"}
+```
+
+### Debug Mode
+
+```bash
+# Enable debug logging
+runagent serve . --log-level debug
+
+# Or set environment variable
+DEBUG=true runagent serve .
+```
+
+### Custom Configuration
+
+```python
+# dev_config.py
+DEV_CONFIG = {
+    "host": "0.0.0.0",  # Expose to network
+    "port": 8080,
+    "reload": True,
+    "log_level": "debug",
+    "access_log": True
+}
+
+# Use in development
+# runagent serve . --config dev_config.py
+```
+
+## Local API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Welcome page with API info |
+| `/health` | GET | Health check endpoint |
+| `/invoke` | POST | Synchronous agent invocation |
+| `/stream` | POST | Streaming agent responses |
+| `/docs` | GET | Interactive API documentation |
+| `/openapi.json` | GET | OpenAPI schema |
+
+## Debugging Techniques
+
+### Logging
+
+```python
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+
+def invoke(input_data):
+    logger.debug(f"Received input: {input_data}")
+    
+    try:
+        result = process(input_data)
+        logger.info(f"Processing successful: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error processing: {e}", exc_info=True)
+        raise
+```
+
+### Breakpoint Debugging
+
+```python
+def invoke(input_data):
+    # Using built-in debugger
+    breakpoint()  # or import pdb; pdb.set_trace()
+    
+    # Your agent logic
+    result = process(input_data)
+    return result
+```
+
+### Performance Profiling
+
+```python
+import time
+import cProfile
+import pstats
+
+def profile_agent():
+    profiler = cProfile.Profile()
+    
+    # Profile agent execution
+    profiler.enable()
+    result = invoke({"query": "test"})
+    profiler.disable()
+    
+    # Print stats
+    stats = pstats.Stats(profiler)
+    stats.sort_stats('cumulative')
+    stats.print_stats(10)  # Top 10 functions
+```
+
+## Development Tools
+
+### Makefile
+
+```makefile
+# Makefile for common tasks
+.PHONY: run test lint format
+
+run:
+	runagent serve . --reload
+
+test:
+	pytest tests/ -v
+
+lint:
+	flake8 . --max-line-length=100
+	mypy . --ignore-missing-imports
+
+format:
+	black .
+	isort .
+
+watch:
+	watchmedo auto-restart \
+		--directory=. \
+		--pattern="*.py" \
+		--recursive \
+		-- runagent serve .
+```
+
+### Docker Development
+
+```dockerfile
+# Dockerfile.dev
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+CMD ["runagent", "serve", ".", "--host", "0.0.0.0"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: runagent serve . --host 0.0.0.0 --reload
+```
+
+## Testing Strategies
+
+### Unit Tests
+
+```python
+# tests/test_agent.py
+import pytest
+from agent import invoke
+
+def test_invoke_success():
+    result = invoke({"query": "test"})
+    assert "response" in result
+
+def test_invoke_error():
+    with pytest.raises(ValueError):
+        invoke({})  # Missing required field
+
+@pytest.mark.parametrize("query,expected", [
+    ("Hello", "greeting"),
+    ("Calculate", "math"),
+    ("Search", "web")
+])
+def test_query_routing(query, expected):
+    result = invoke({"query": query})
+    assert result["type"] == expected
+```
+
+### Integration Tests
+
+```python
+# tests/test_integration.py
+import requests
+import subprocess
+import time
+
+def test_full_workflow():
+    # Start server
+    proc = subprocess.Popen(["runagent", "serve", "."])
+    time.sleep(2)  # Wait for startup
+    
+    try:
+        # Test endpoints
+        response = requests.get("http://localhost:8000/health")
+        assert response.status_code == 200
+        
+        response = requests.post(
+            "http://localhost:8000/invoke",
+            json={"query": "test"}
+        )
+        assert response.status_code == 200
+    finally:
+        proc.terminate()
+```
+
+## Common Issues
+
+### Port Already in Use
+
+```bash
+# Find process using port
+lsof -i :8000
+
+# Kill process
+kill -9 <PID>
+
+# Or use different port
+runagent serve . --port 8001
+```
+
+### Module Import Errors
+
+```bash
+# Check Python path
+python -c "import sys; print(sys.path)"
+
+# Add current directory
+export PYTHONPATH="${PYTHONPATH}:."
+```
+
+### Environment Variables Not Loading
+
+```bash
+# Check if .env exists
+ls -la .env
+
+# Load manually
+set -a
+source .env
+set +a
+runagent serve .
+```
+
+## See Also
+
+- [Cloud Deployment](/deployment/cloud-deployment) - Deploy to production
+- [CLI Reference](/cli/overview) - Complete CLI documentation
+- [Troubleshooting](/resources/troubleshooting) - Common issues

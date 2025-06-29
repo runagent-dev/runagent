@@ -1,0 +1,124 @@
+---
+title: 'runagent init'
+description: 'Initialize a new RunAgent project'
+---
+
+## Synopsis
+
+```bash
+runagent init [PROJECT_NAME] [OPTIONS]
+```
+
+## Description
+
+The `init` command creates a new RunAgent project with a pre-configured structure and optional template.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--framework`, `-f` | AI framework to use | `langgraph` |
+| `--template`, `-t` | Project template | Based on framework |
+| `--path`, `-p` | Directory to create project in | Current directory |
+| `--no-git` | Skip git initialization | `false` |
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Create a new project
+runagent init my-agent
+
+# Create with specific framework
+runagent init my-agent --framework crewai
+
+# Use a specific template
+runagent init my-agent --template chatbot
+```
+
+### Advanced Usage
+
+```bash
+# Create in specific directory
+runagent init my-agent --path ~/projects
+
+# Skip git initialization
+runagent init my-agent --no-git
+
+# Interactive mode
+runagent init
+```
+
+## Project Structure
+
+The command creates:
+
+```
+my-agent/
+├── agent.py              # Main agent code
+├── runagent.config.json  # Configuration
+├── requirements.txt      # Dependencies
+├── .env.example         # Environment template
+├── .gitignore          # Git ignore rules
+└── README.md           # Project documentation
+```
+
+## Templates
+
+Available templates by framework:
+
+<Tabs>
+  <Tab title="LangGraph">
+    - `problem-solver` - Multi-step reasoning
+    - `chatbot` - Conversational agent
+    - `researcher` - Web research agent
+  </Tab>
+  <Tab title="CrewAI">
+    - `crew-basic` - Simple crew setup
+    - `research-crew` - Research team
+    - `dev-crew` - Development team
+  </Tab>
+  <Tab title="Custom">
+    - `minimal` - Bare minimum setup
+    - `api-agent` - REST API integration
+    - `tool-agent` - Multi-tool agent
+  </Tab>
+</Tabs>
+
+## Interactive Mode
+
+When run without arguments, enters interactive mode:
+
+```bash
+$ runagent init
+? Project name: my-awesome-agent
+? Select framework: 
+  ❯ langgraph
+    crewai
+    agno
+    letta
+    custom
+? Choose a template:
+  ❯ problem-solver
+    chatbot
+    minimal
+? Initialize git repository? (Y/n)
+```
+
+## Post-Initialization
+
+After creating a project:
+
+```bash
+cd my-agent
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your API keys
+runagent serve .
+```
+
+## See Also
+
+- [`runagent template`](/cli/commands/template) - Manage templates
+- [`runagent serve`](/cli/commands/serve) - Test locally

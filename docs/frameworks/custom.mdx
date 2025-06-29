@@ -1,0 +1,304 @@
+---
+title: 'Custom Frameworks'
+description: 'Deploy agents built with any Python framework'
+---
+
+## Overview
+
+RunAgent supports any Python-based AI agent framework or custom implementation. This guide shows how to adapt your existing code or build custom agents for deployment.
+
+## Quick Start
+
+```bash
+# Create a custom framework project
+runagent init my-custom-agent --framework custom
+
+# Navigate to project
+cd my-custom-agent
+
+# Customize your implementation
+# Test locally
+runagent serve .
+```
+
+## Basic Structure
+
+Any Python code can be deployed as long as it provides the required entrypoints:
+
+```python
+# agent.py
+
+# Your custom agent implementation
+class MyCustomAgent:
+    def __init__(self):
+        # Initialize your agent
+        self.model = load_model()
+        self.tools = setup_tools()
+    
+    def process(self, input_data):
+        # Your processing logic
+        return result
+
+# Create instance
+agent = MyCustomAgent()
+
+# Required: Define entrypoints
+def invoke(input_data: dict) -> dict:
+    """
+    Standard entrypoint for request/response
+    """
+    result = agent.process(input_data)
+    return {"response": result}
+
+def stream(input_data: dict):
+    """
+    Optional: Streaming entrypoint
+    """
+    for chunk in agent.process_stream(input_data):
+        yield chunk
+
+## Configuration
+
+```json
+{
+  "agent_name": "my_custom_agent",
+  "description": "Custom agent implementation",
+  "framework": "custom",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agent.py",
+        "module": "stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "API_KEY": "${API_KEY}",
+    "MODEL_PATH": "./models"
+  }
+}
+```
+
+## Integration Examples
+
+### Hugging Face Transformers
+
+```python
+from transformers import pipeline
+
+# Initialize model
+classifier = pipeline("sentiment-analysis")
+
+def invoke(input_data):
+    text = input_data.get("text", "")
+    result = classifier(text)
+    return {"sentiment": result[0]}
+```
+
+### Custom LangChain Implementation
+
+```python
+from langchain import LLMChain, PromptTemplate
+from langchain.llms import OpenAI
+
+# Custom chain
+prompt = PromptTemplate(
+    input_variables=["query"],
+    template="Answer this: {query}"
+)
+
+chain = LLMChain(llm=OpenAI(), prompt=prompt)
+
+def invoke(input_data):
+    response = chain.run(query=input_data.get("query"))
+    return {"response": response}
+```
+
+### FastAPI Integration
+
+```python
+# If you have existing FastAPI code
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.post("/process")
+async def process_endpoint(data: dict):
+    # Your existing logic
+    return result
+
+# Adapt for RunAgent
+def invoke(input_data):
+    # Reuse your FastAPI logic
+    import asyncio
+    return asyncio.run(process_endpoint(input_data))
+```
+
+## Best Practices
+
+1. **Keep Entrypoints Simple**
+   - Entrypoints should be thin wrappers
+   - Put complex logic in separate modules
+   - Handle errors gracefully
+
+2. **State Management**
+   - Avoid global state when possible
+   - Use class instances for stateful agents
+   - Consider thread safety
+
+3. **Dependencies**
+   - List all requirements in requirements.txt
+   - Pin versions for reproducibility
+   - Test with exact versions
+
+## Advanced Patterns
+
+### Multi-Model Agent
+
+```python
+class MultiModelAgent:
+    def __init__(self):
+        self.classifier = load_classifier()
+        self.generator = load_generator()
+        self.embedder = load_embedder()
+    
+    def process(self, input_data):
+        # Route to appropriate model
+        task = input_data.get("task")
+        
+        if task == "classify":
+            return self.classifier.predict(input_data["text"])
+        elif task == "generate":
+            return self.generator.generate(input_data["prompt"])
+        elif task == "embed":
+            return self.embedder.encode(input_data["text"])
+
+agent = MultiModelAgent()
+
+def invoke(input_data):
+    result = agent.process(input_data)
+    return {"result": result}
+```
+
+### Async Custom Agent
+
+```python
+import asyncio
+
+class AsyncAgent:
+    async def process_async(self, data):
+        # Async processing
+        results = await asyncio.gather(
+            self.fetch_data(data),
+            self.analyze(data),
+            self.generate_response(data)
+        )
+        return combine_results(results)
+
+agent = AsyncAgent()
+
+def invoke(input_data):
+    # Bridge sync/async
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(agent.process_async(input_data))
+    return {"response": result}
+```
+
+### Plugin System
+
+```python
+class PluginAgent:
+    def __init__(self):
+        self.plugins = {}
+        self.load_plugins()
+    
+    def load_plugins(self):
+        # Dynamic plugin loading
+        import importlib
+        import os
+        
+        for file in os.listdir("plugins"):
+            if file.endswith("_plugin.py"):
+                module = importlib.import_module(f"plugins.{file[:-3]}")
+                plugin = module.Plugin()
+                self.plugins[plugin.name] = plugin
+    
+    def process(self, input_data):
+        plugin_name = input_data.get("plugin")
+        if plugin_name in self.plugins:
+            return self.plugins[plugin_name].execute(input_data)
+        return {"error": "Plugin not found"}
+```
+
+## Testing Your Custom Agent
+
+```python
+# test_agent.py
+import pytest
+from agent import invoke, stream
+
+def test_invoke():
+    result = invoke({"query": "test"})
+    assert "response" in result
+
+def test_stream():
+    chunks = list(stream({"query": "test"}))
+    assert len(chunks) > 0
+
+def test_error_handling():
+    result = invoke({})  # Missing required field
+    assert "error" in result or "response" in result
+```
+
+## Migration Guide
+
+### From Existing API
+
+```python
+# Your existing API
+def existing_api_handler(request):
+    data = request.json()
+    # Process
+    return response
+
+# Adapt for RunAgent
+def invoke(input_data):
+    # Create mock request if needed
+    class MockRequest:
+        def json(self):
+            return input_data
+    
+    response = existing_api_handler(MockRequest())
+    return response
+```
+
+### From CLI Tool
+
+```python
+# Your existing CLI tool
+def cli_main(args):
+    # Process arguments
+    return result
+
+# Adapt for RunAgent
+def invoke(input_data):
+    # Convert input_data to args
+    import argparse
+    args = argparse.Namespace(**input_data)
+    result = cli_main(args)
+    return {"result": result}
+```
+
+## See Also
+
+- [First Agent Guide](/get-started/first-agent) - Build from scratch
+- [Framework Overview](/frameworks/overview) - Compare frameworks
+- [Configuration](/configuration/config-file) - Configuration details

@@ -1,0 +1,234 @@
+---
+title: 'LangGraph Framework'
+description: 'Deploy LangGraph agents with RunAgent'
+---
+
+## Overview
+
+LangGraph is a library for building stateful, multi-step applications with LLMs. It provides a graph-based approach to agent development, making it easy to create complex workflows with cycles and conditional logic.
+
+## Quick Start
+
+```bash
+# Create a LangGraph project
+runagent init my-langgraph-agent --framework langgraph
+
+# Navigate to project
+cd my-langgraph-agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test locally
+runagent serve .
+```
+
+## Project Structure
+
+```
+my-langgraph-agent/
+├── agents.py           # LangGraph agent definition
+├── nodes.py           # Graph nodes/functions
+├── edges.py           # Edge logic and conditions
+├── state.py           # State schema definition
+├── tools.py           # Tool definitions
+├── runagent.config.json
+├── requirements.txt
+└── .env.example
+```
+
+## Basic LangGraph Agent
+
+```python
+# agents.py
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, List
+
+# Define state
+class AgentState(TypedDict):
+    messages: List[str]
+    current_step: str
+    result: str
+
+# Create graph
+workflow = StateGraph(AgentState)
+
+# Define nodes
+def process_input(state):
+    # Process initial input
+    return {"current_step": "analyzing"}
+
+def analyze(state):
+    # Perform analysis
+    return {"current_step": "generating", "result": "Analysis complete"}
+
+def generate_response(state):
+    # Generate final response
+    return {"result": f"Processed: {state['messages'][0]}"}
+
+# Add nodes
+workflow.add_node("process", process_input)
+workflow.add_node("analyze", analyze)
+workflow.add_node("respond", generate_response)
+
+# Add edges
+workflow.add_edge("process", "analyze")
+workflow.add_edge("analyze", "respond")
+workflow.add_edge("respond", END)
+
+# Set entrypoint
+workflow.set_entry_point("process")
+
+# Compile
+app = workflow.compile()
+
+# RunAgent entrypoints
+def invoke(input_data):
+    result = app.invoke({"messages": [input_data.get("query", "")]})
+    return {"response": result["result"]}
+
+def stream(input_data):
+    for event in app.stream({"messages": [input_data.get("query", "")]}):
+        yield str(event)
+```
+
+## Configuration
+
+```json
+{
+  "agent_name": "langgraph_agent",
+  "description": "LangGraph-based agent with stateful processing",
+  "framework": "langgraph",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+  }
+}
+```
+
+## Advanced Features
+
+### Conditional Edges
+
+```python
+def should_continue(state):
+    if state.get("needs_clarification"):
+        return "clarify"
+    return "proceed"
+
+workflow.add_conditional_edges(
+    "analyze",
+    should_continue,
+    {
+        "clarify": "clarification_node",
+        "proceed": "respond"
+    }
+)
+```
+
+### Cycles and Loops
+
+```python
+# Add cycle for iterative improvement
+workflow.add_edge("improve", "analyze")
+workflow.add_conditional_edges(
+    "analyze",
+    lambda state: "improve" if state["quality"] < 0.8 else "finalize"
+)
+```
+
+### Tool Integration
+
+```python
+from langchain.tools import Tool
+from langgraph.prebuilt import ToolExecutor
+
+tools = [
+    Tool(name="search", func=search_func, description="Search the web"),
+    Tool(name="calculate", func=calc_func, description="Perform calculations")
+]
+
+tool_executor = ToolExecutor(tools)
+workflow.add_node("tools", tool_executor)
+```
+
+## Best Practices
+
+1. **State Management**
+   - Keep state minimal and serializable
+   - Use TypedDict for type safety
+   - Document state schema clearly
+
+2. **Graph Design**
+   - Start simple, add complexity gradually
+   - Use meaningful node names
+   - Keep edges logic simple
+
+3. **Error Handling**
+   - Add error nodes for graceful failures
+   - Use try-except in node functions
+   - Return meaningful error states
+
+## Common Patterns
+
+### Multi-Step Reasoning
+
+```python
+workflow = StateGraph(ReasoningState)
+
+# Chain of reasoning nodes
+workflow.add_node("understand", understand_query)
+workflow.add_node("decompose", break_into_steps)
+workflow.add_node("solve", solve_step)
+workflow.add_node("combine", combine_results)
+
+# Add edges with logic
+workflow.add_edge("understand", "decompose")
+workflow.add_conditional_edges(
+    "solve",
+    lambda s: "solve" if s["remaining_steps"] else "combine"
+)
+```
+
+### Human-in-the-Loop
+
+```python
+def needs_human_input(state):
+    return state.get("confidence", 1.0) < 0.7
+
+workflow.add_conditional_edges(
+    "analyze",
+    needs_human_input,
+    {
+        True: "human_review",
+        False: "auto_proceed"
+    }
+)
+```
+
+## Deployment Tips
+
+- Test graph logic thoroughly before deployment
+- Monitor state size to avoid memory issues
+- Use streaming for long-running workflows
+- Implement proper timeout handling
+
+## See Also
+
+- [LangGraph Documentation](https://python.langchain.com/docs/langgraph)
+- [Framework Overview](/frameworks/overview)
+- [Examples](/resources/examples)

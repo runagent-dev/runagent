@@ -1,0 +1,248 @@
+---
+title: 'SDK Overview'
+description: 'Overview of RunAgent SDKs'
+---
+
+Client libraries for interacting with RunAgent
+
+## Introduction
+
+RunAgent provides native SDKs for multiple programming languages, making it easy to integrate deployed agents into your applications. All SDKs follow consistent patterns while respecting language-specific conventions.
+
+## Available SDKs
+
+### Python
+Full-featured SDK with sync/async support
+```bash
+pip install runagent
+```
+
+### JavaScript
+Coming Soon - Node.js and browser support
+```bash
+npm install @runagent/sdk
+```
+
+### Rust
+Coming Soon - High-performance native SDK
+```bash
+cargo add runagent
+```
+
+### Go
+Coming Soon - Idiomatic Go client
+```bash
+go get github.com/runagent-dev/runagent-go
+```
+
+## Common Features
+
+All SDKs provide:
+
+- **Authentication**: API key and token management
+- **Synchronous Calls**: Request/response pattern
+- **Asynchronous Support**: Non-blocking operations
+- **Streaming**: Real-time response streaming
+- **Error Handling**: Consistent error types
+- **Retry Logic**: Automatic retry with backoff
+- **Type Safety**: Language-appropriate typing
+
+## Quick Comparison
+
+| Feature | Python | JavaScript | Rust | Go |
+|---------|---------|------------|------|-----|
+| Sync Support | ✅ | ✅ | ✅ | ✅ |
+| Async Support | ✅ | ✅ | ✅ | ✅ |
+| Streaming | ✅ | 🚧 | 🚧 | 🚧 |
+| Type Hints | ✅ | ✅ (TS) | ✅ | ✅ |
+| Published | ✅ | 🚧 | 🚧 | 🚧 |
+
+## Basic Usage Pattern
+
+All SDKs follow a similar pattern:
+
+### Python
+```python
+from runagent import RunAgentClient
+
+client = RunAgentClient(agent_id="agent-123")
+result = client.run_generic({"query": "Hello"})
+```
+
+### JavaScript
+```javascript
+import { RunAgentClient } from '@runagent/sdk';
+
+const client = new RunAgentClient({ agentId: 'agent-123' });
+const result = await client.runGeneric({ query: 'Hello' });
+```
+
+### Rust
+```rust
+use runagent::Client;
+
+let client = Client::new("agent-123");
+let result = client.run_generic(json!({ "query": "Hello" })).await?;
+```
+
+### Go
+```go
+import "github.com/runagent-dev/runagent-go"
+
+client := runagent.NewClient("agent-123")
+result, err := client.RunGeneric(map[string]interface{}{
+    "query": "Hello",
+})
+```
+
+## Authentication
+
+SDKs support multiple authentication methods:
+
+### Environment Variable
+
+Set `RUNAGENT_API_KEY` and SDKs will use it automatically:
+
+```bash
+export RUNAGENT_API_KEY="your-api-key"
+```
+
+### Direct Configuration
+
+Pass API key during initialization:
+
+```python
+client = RunAgentClient(
+    agent_id="agent-123",
+    api_key="your-api-key"
+)
+```
+
+### Configuration File
+
+SDKs can read from `~/.runagent/config.json`:
+
+```json
+{
+  "api_key": "your-api-key",
+  "api_url": "https://api.run-agent.ai"
+}
+```
+
+## Error Handling
+
+All SDKs provide consistent error types:
+
+| Error Type | Description |
+|------------|-------------|
+| `AuthenticationError` | Invalid or missing credentials |
+| `AgentNotFoundError` | Agent doesn't exist |
+| `ValidationError` | Invalid input data |
+| `RateLimitError` | Too many requests |
+| `TimeoutError` | Request timed out |
+| `NetworkError` | Connection issues |
+
+## Advanced Features
+
+### Streaming Responses
+
+For real-time applications:
+
+```python
+for chunk in client.run_generic_stream({"query": "Tell a story"}):
+    print(chunk, end="")
+```
+
+### Batch Processing
+
+Process multiple requests efficiently:
+
+```python
+results = client.batch_run([
+    {"query": "Question 1"},
+    {"query": "Question 2"},
+    {"query": "Question 3"}
+])
+```
+
+### Custom Headers
+
+Add custom headers for tracking:
+
+```python
+client = RunAgentClient(
+    agent_id="agent-123",
+    headers={
+        "X-Request-ID": "unique-id",
+        "X-User-ID": "user-123"
+    }
+)
+```
+
+## SDK Selection Guide
+
+Choose your SDK based on:
+
+### Python SDK
+Best for:
+- Data science and ML applications
+- Backend services
+- Scripts and automation
+- Jupyter notebooks
+
+### JavaScript SDK
+Best for:
+- Web applications
+- Node.js backends
+- React/Vue/Angular apps
+- Serverless functions
+
+### Rust SDK
+Best for:
+- High-performance applications
+- Systems programming
+- WebAssembly targets
+- Embedded systems
+
+### Go SDK
+Best for:
+- Microservices
+- Cloud-native applications
+- CLI tools
+- Concurrent processing
+
+## Performance Considerations
+
+| SDK | Startup Time | Memory Usage | Throughput |
+|-----|--------------|--------------|------------|
+| Python | Medium | Medium | Good |
+| JavaScript | Fast | Low | Good |
+| Rust | Fast | Very Low | Excellent |
+| Go | Fast | Low | Excellent |
+
+## Migration Guide
+
+Moving between SDKs? The concepts remain the same:
+
+1. **Client initialization** - Same parameters
+2. **Method names** - Consistent across languages
+3. **Response format** - JSON-compatible structures
+4. **Error handling** - Similar error types
+
+## Getting Help
+
+- **Documentation**: Language-specific guides
+- **Examples**: GitHub repositories with samples
+- **Community**: Discord channels for each SDK
+- **Support**: support@run-agent.ai
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Python SDK" icon="python" href="/sdk/python/getting-started">
+    Start with our most mature SDK
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    Understand the underlying API
+  </Card>
+</CardGroup>

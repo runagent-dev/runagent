@@ -1,0 +1,208 @@
+---
+title: 'Health Check'
+description: 'Check agent health status'
+---
+
+## GET /v1/agents/\{agent_id\}/health
+
+Check the health status of a deployed agent.
+
+### Request
+
+```bash
+GET https://api.run-agent.ai/v1/agents/{agent_id}/health
+Authorization: Bearer YOUR_API_KEY
+```
+
+### Path Parameters
+
+<ParamField path="agent_id" type="string" required>
+  The unique identifier of the agent
+</ParamField>
+
+### Response
+
+<ResponseField name="status" type="string" required>
+  Overall health status: `healthy`, `degraded`, or `unhealthy`
+</ResponseField>
+
+<ResponseField name="checks" type="object" required>
+  Individual health check results
+  
+  <Expandable title="properties">
+    <ResponseField name="agent" type="object">
+      Agent process health
+    </ResponseField>
+    
+    <ResponseField name="dependencies" type="object">
+      External dependency status
+    </ResponseField>
+    
+    <ResponseField name="resources" type="object">
+      Resource utilization
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Current agent version
+</ResponseField>
+
+<ResponseField name="uptime" type="number">
+  Uptime in seconds
+</ResponseField>
+
+## Examples
+
+### Basic Health Check
+
+<CodeGroup>
+  ```bash cURL
+  curl https://api.run-agent.ai/v1/agents/agent-123/health \
+    -H "Authorization: Bearer YOUR_API_KEY"
+  ```
+  
+  ```python Python
+  import requests
+  
+  response = requests.get(
+      "https://api.run-agent.ai/v1/agents/agent-123/health",
+      headers={"Authorization": "Bearer YOUR_API_KEY"}
+  )
+  
+  health = response.json()
+  print(f"Status: {health['status']}")
+  ```
+  
+  ```javascript JavaScript
+  const response = await fetch(
+    'https://api.run-agent.ai/v1/agents/agent-123/health',
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+  
+  const health = await response.json();
+  console.log(`Status: ${health.status}`);
+  ```
+</CodeGroup>
+
+### Response Examples
+
+#### Healthy Agent
+
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "agent": {
+      "status": "healthy",
+      "response_time_ms": 45
+    },
+    "dependencies": {
+      "openai_api": "healthy",
+      "database": "healthy"
+    },
+    "resources": {
+      "memory_usage_percent": 65,
+      "cpu_usage_percent": 20
+    }
+  },
+  "version": "1.2.3",
+  "uptime": 3600,
+  "last_request": "2024-01-01T12:00:00Z"
+}
+```
+
+#### Degraded Agent
+
+```json
+{
+  "status": "degraded",
+  "checks": {
+    "agent": {
+      "status": "healthy",
+      "response_time_ms": 150
+    },
+    "dependencies": {
+      "openai_api": "healthy",
+      "database": "slow"
+    },
+    "resources": {
+      "memory_usage_percent": 85,
+      "cpu_usage_percent": 75
+    }
+  },
+  "version": "1.2.3",
+  "uptime": 7200,
+  "warnings": ["High memory usage", "Database latency detected"]
+}
+```
+
+## Health Check Logic
+
+Status is determined by:
+
+1. **Healthy**: All checks pass
+2. **Degraded**: Some checks show warnings but agent is functional
+3. **Unhealthy**: Critical checks fail
+
+## Monitoring Integration
+
+### Automated Monitoring
+
+```python
+import time
+
+def monitor_agent(agent_id, interval=60):
+    while True:
+        try:
+            response = requests.get(
+                f"https://api.run-agent.ai/v1/agents/{agent_id}/health",
+                headers={"Authorization": "Bearer YOUR_API_KEY"}
+            )
+            
+            health = response.json()
+            
+            if health['status'] != 'healthy':
+                send_alert(f"Agent {agent_id} is {health['status']}")
+                
+        except Exception as e:
+            send_alert(f"Health check failed: {e}")
+            
+        time.sleep(interval)
+```
+
+### Prometheus Integration
+
+```python
+# Expose metrics for Prometheus
+from prometheus_client import Gauge
+
+agent_health = Gauge('agent_health_status', 'Agent health status', ['agent_id'])
+memory_usage = Gauge('agent_memory_usage', 'Memory usage percentage', ['agent_id'])
+
+def update_metrics(agent_id):
+    health = get_agent_health(agent_id)
+    
+    status_value = {'healthy': 1, 'degraded': 0.5, 'unhealthy': 0}
+    agent_health.labels(agent_id=agent_id).set(status_value[health['status']])
+    
+    memory = health['checks']['resources']['memory_usage_percent']
+    memory_usage.labels(agent_id=agent_id).set(memory)
+```
+
+## Best Practices
+
+1. **Regular Monitoring**: Check health every 30-60 seconds
+2. **Set Alerts**: Alert on status changes
+3. **Track Trends**: Monitor resource usage over time
+4. **Implement Retries**: Handle temporary network issues
+
+## See Also
+
+- [Monitoring Guide](/deployment/cloud-deployment#monitoring) - Full monitoring setup
+- [Status Endpoint](/api-reference/endpoints/get-agent) - Detailed agent info
+- [Metrics API](/api-reference/webhooks) - Metrics collection

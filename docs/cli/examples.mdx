@@ -1,0 +1,311 @@
+---
+title: 'CLI Examples'
+description: 'Common RunAgent CLI usage patterns and workflows'
+icon: 'code'
+---
+
+## Common Workflows
+
+### Complete Development Workflow
+
+```bash
+# 1. Create new project
+runagent init chatbot-agent --framework langgraph
+
+# 2. Navigate to project
+cd chatbot-agent
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Set up environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 5. Test locally
+runagent serve .
+
+# 6. In another terminal, test the agent
+curl -X POST http://localhost:8000/invoke \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Hello!"}'
+
+# 7. Deploy when ready
+runagent deploy . --local
+```
+
+### Template Management
+
+```bash
+# List all available templates
+runagent template list
+
+# Get details about a template
+runagent template info problem-solver
+
+# Create project from specific template
+runagent init my-solver --template problem-solver
+
+# Update template to latest version
+runagent template update problem-solver
+```
+
+### Debugging and Development
+
+```bash
+# Run with debug logging
+runagent serve . --log-level debug
+
+# Test specific entrypoint
+runagent serve . --entrypoint app.process_query
+
+# Run with environment overrides
+OPENAI_API_KEY=sk-test-key runagent serve .
+
+# Check configuration validity
+runagent validate .
+```
+
+### Deployment Management
+
+```bash
+# Deploy with specific name
+runagent deploy . --name production-chatbot
+
+# List all deployments
+runagent list
+
+# Get deployment details
+runagent status 055b73d7-6239-4a94
+
+# Stream logs from deployment
+runagent logs 055b73d7-6239-4a94 --follow
+
+# Delete deployment
+runagent delete 055b73d7-6239-4a94
+```
+
+## Use Case Examples
+
+### Building a Customer Support Bot
+
+```bash
+# Initialize project
+runagent init support-bot --framework langgraph
+
+# Add custom dependencies
+cd support-bot
+echo "pandas>=2.0.0" >> requirements.txt
+echo "sqlalchemy>=2.0.0" >> requirements.txt
+
+# Test with sample data
+cat > test_input.json << EOF
+{
+  "query": "I need help with my order #12345",
+  "user_id": "user_789",
+  "context": "customer_support"
+}
+EOF
+
+runagent serve .
+curl -X POST http://localhost:8000/invoke \
+  -H "Content-Type: application/json" \
+  -d @test_input.json
+```
+
+### Creating a Multi-Agent System
+
+```bash
+# Initialize CrewAI project
+runagent init research-crew --framework crewai
+
+# Deploy the crew
+runagent deploy research-crew/ --local
+
+# Run the crew with complex input
+runagent run <deployment-id> --input '{
+  "task": "Research AI trends in 2024",
+  "agents": ["researcher", "analyst", "writer"],
+  "output_format": "report"
+}'
+```
+
+### Batch Processing Pipeline
+
+```bash
+# Create batch processor
+runagent init batch-processor --template data-processor
+
+# Process multiple files
+for file in data/*.json; do
+  runagent run <deployment-id> \
+    --input-file "$file" \
+    --output "results/$(basename $file)"
+done
+
+# Or use parallel processing
+ls data/*.json | parallel -j 4 \
+  'runagent run <deployment-id> --input-file {} --output results/{/}'
+```
+
+## Advanced Patterns
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy Agent
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install RunAgent
+        run: pip install runagent
+      
+      - name: Deploy
+        env:
+          RUNAGENT_API_KEY: ${{ secrets.RUNAGENT_API_KEY }}
+        run: |
+          runagent deploy . --env production
+```
+
+### Environment Management
+
+```bash
+# Development environment
+runagent serve . --env development
+
+# Staging deployment
+runagent deploy . --env staging --name staging-agent
+
+# Production deployment with specific config
+RUNAGENT_ENV=production runagent deploy .
+```
+
+### Monitoring and Alerting
+
+```bash
+# Watch logs with filtering
+runagent logs <id> --follow --filter "ERROR"
+
+# Export logs for analysis
+runagent logs <id> --format json > agent.log
+
+# Check health status
+watch -n 5 'runagent status <id> --format json | jq .health'
+
+# Simple alerting script
+#!/bin/bash
+while true; do
+  STATUS=$(runagent status <id> --format json | jq -r .status)
+  if [ "$STATUS" != "running" ]; then
+    echo "Agent down! Status: $STATUS" | mail -s "Agent Alert" ops@company.com
+  fi
+  sleep 60
+done
+```
+
+## Troubleshooting Commands
+
+### Diagnostic Commands
+
+```bash
+# Check RunAgent installation
+runagent doctor
+
+# Validate project structure
+runagent validate . --verbose
+
+# Test agent imports
+runagent test-import .
+
+# Check API connectivity
+runagent ping
+```
+
+### Recovery Commands
+
+```bash
+# Force stop local agent
+runagent stop <id> --force
+
+# Clean up orphaned processes
+runagent cleanup
+
+# Reset local configuration
+runagent teardown && runagent setup
+
+# Rebuild deployment
+runagent rebuild <id>
+```
+
+## Tips and Tricks
+
+### Shell Aliases
+
+Add to your `.bashrc` or `.zshrc`:
+
+```bash
+# Quick shortcuts
+alias ra='runagent'
+alias ras='runagent serve .'
+alias rad='runagent deploy .'
+alias ral='runagent logs'
+alias rat='runagent template'
+
+# Project creation function
+new-agent() {
+  runagent init "$1" ${@:2} && cd "$1" && code .
+}
+
+# Quick test function
+test-agent() {
+  curl -X POST http://localhost:8000/invoke \
+    -H "Content-Type: application/json" \
+    -d "$1"
+}
+```
+
+### JSON Output Processing
+
+```bash
+# Pretty print JSON output
+runagent list --json | jq .
+
+# Extract specific fields
+runagent status <id> --json | jq '.deployment.created_at'
+
+# Filter deployments
+runagent list --json | jq '.deployments[] | select(.status=="running")'
+```
+
+### Batch Operations
+
+```bash
+# Stop all local deployments
+runagent list --local --json | \
+  jq -r '.deployments[].id' | \
+  xargs -I {} runagent stop {}
+
+# Export all configurations
+for id in $(runagent list --json | jq -r '.deployments[].id'); do
+  runagent export $id > "backup/$id.json"
+done
+```
+
+## See Also
+
+- [CLI Overview](/cli/overview) - Complete command reference
+- [Configuration Guide](/configuration/config-file) - Project configuration
+- [Deployment Guide](/deployment/local-development) - Deployment strategies

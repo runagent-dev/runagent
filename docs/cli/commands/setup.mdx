@@ -1,0 +1,72 @@
+---
+title: 'runagent setup'
+description: 'Setup RunAgent authentication'
+---
+
+## Synopsis
+
+```bash
+runagent setup [OPTIONS]
+```
+
+## Description
+
+Configure RunAgent authentication and global settings. Creates a configuration file for persistent authentication.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--api-key` | API key (prompt if not provided) | - |
+| `--api-url` | Custom API endpoint | https://api.run-agent.ai |
+| `--config-path` | Config file location | ~/.runagent/config.json |
+
+## Examples
+
+```bash
+# Interactive setup
+runagent setup
+
+# Non-interactive with API key
+runagent setup --api-key your-api-key-here
+
+# Custom API endpoint
+runagent setup --api-url https://custom.run-agent.ai
+```
+
+## Interactive Setup
+
+```
+$ runagent setup
+Welcome to RunAgent setup!
+
+Enter your API key: ********
+API endpoint [https://api.run-agent.ai]: 
+Save configuration? [Y/n]: Y
+
+Configuration saved to ~/.runagent/config.json
+Setup complete! You can now use RunAgent.
+```
+
+## Configuration File
+
+Creates `~/.runagent/config.json`:
+
+```json
+{
+  "api_key": "your-api-key",
+  "api_url": "https://api.run-agent.ai",
+  "user_id": "user_123",
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
+## Security
+
+- API keys are stored locally
+- File permissions set to 600 (user read/write only)
+- Never commit config files to version control
+
+## See Also
+
+- [`runagent teardown`](/cli/commands/teardown) - Remove configuration

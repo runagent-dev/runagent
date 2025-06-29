@@ -1,0 +1,336 @@
+---
+title: 'Error Handling'
+description: 'Understanding and handling API errors'
+---
+
+## Overview
+
+The RunAgent API uses standard HTTP status codes and returns detailed error information in a consistent format. This guide covers common errors and how to handle them.
+
+## Error Response Format
+
+All errors follow this structure:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "details": {
+      "field": "Additional context"
+    },
+    "request_id": "req_abc123",
+    "documentation_url": "https://docs.run-agent.ai/errors/ERROR_CODE"
+  }
+}
+```
+
+## HTTP Status Codes
+
+| Status | Meaning | Common Causes |
+|--------|---------|---------------|
+| 200 | Success | Request completed successfully |
+| 201 | Created | Resource created successfully |
+| 400 | Bad Request | Invalid parameters or malformed request |
+| 401 | Unauthorized | Missing or invalid API key |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource doesn't exist |
+| 409 | Conflict | Resource already exists |
+| 422 | Unprocessable | Valid syntax but semantic errors |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Error | Server-side error |
+| 503 | Service Unavailable | Temporary maintenance |
+
+## Common Error Codes
+
+### Authentication Errors
+
+#### INVALID_API_KEY
+```json
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "The provided API key is invalid",
+    "status": 401
+  }
+}
+```
+
+**Solution:** Check your API key format and ensure it's correct.
+
+#### EXPIRED_API_KEY
+```json
+{
+  "error": {
+    "code": "EXPIRED_API_KEY",
+    "message": "The API key has expired",
+    "status": 401
+  }
+}
+```
+
+**Solution:** Generate a new API key from the dashboard.
+
+### Validation Errors
+
+#### MISSING_REQUIRED_FIELD
+```json
+{
+  "error": {
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Required field 'query' is missing",
+    "details": {
+      "field": "query",
+      "requirement": "string, min length 1"
+    },
+    "status": 400
+  }
+}
+```
+
+#### INVALID_FIELD_TYPE
+```json
+{
+  "error": {
+    "code": "INVALID_FIELD_TYPE",
+    "message": "Field 'temperature' must be a number",
+    "details": {
+      "field": "temperature",
+      "provided": "string",
+      "expected": "number"
+    },
+    "status": 400
+  }
+}
+```
+
+### Resource Errors
+
+#### AGENT_NOT_FOUND
+```json
+{
+  "error": {
+    "code": "AGENT_NOT_FOUND",
+    "message": "Agent with ID 'agent-123' not found",
+    "details": {
+      "agent_id": "agent-123"
+    },
+    "status": 404
+  }
+}
+```
+
+#### DEPLOYMENT_FAILED
+```json
+{
+  "error": {
+    "code": "DEPLOYMENT_FAILED",
+    "message": "Failed to deploy agent",
+    "details": {
+      "reason": "Invalid configuration",
+      "validation_errors": ["Missing entrypoint"]
+    },
+    "status": 422
+  }
+}
+```
+
+### Rate Limiting
+
+#### RATE_LIMIT_EXCEEDED
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "details": {
+      "limit": 100,
+      "remaining": 0,
+      "reset_at": "2024-01-01T00:00:00Z"
+    },
+    "status": 429
+  }
+}
+```
+
+### Server Errors
+
+#### INTERNAL_ERROR
+```json
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "An internal error occurred",
+    "request_id": "req_xyz789",
+    "status": 500
+  }
+}
+```
+
+## Error Handling Best Practices
+
+### Python Example
+
+```python
+import requests
+from time import sleep
+
+def call_api_with_retry(url, data, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=data)
+            response.raise_for_status()
+            return response.json()
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                # Rate limited - wait and retry
+                retry_after = int(e.response.headers.get('Retry-After', 60))
+                sleep(retry_after)
+                continue
+                
+            elif e.response.status_code >= 500:
+                # Server error - retry with backoff
+                if attempt < max_retries - 1:
+                    sleep(2 ** attempt)
+                    continue
+                    
+            # Don't retry client errors (4xx)
+            error_data = e.response.json()
+            raise Exception(f"API Error: {error_data['error']['message']}")
+            
+        except requests.exceptions.RequestException as e:
+            # Network error - retry
+            if attempt < max_retries - 1:
+                sleep(2 ** attempt)
+                continue
+            raise
+    
+    raise Exception("Max retries exceeded")
+```
+
+### JavaScript Example
+
+```javascript
+async function callAPIWithRetry(url, data, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${API_KEY}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        
+        if (response.status === 429) {
+          // Rate limited
+          const retryAfter = response.headers.get('Retry-After') || 60;
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          continue;
+        }
+        
+        if (response.status >= 500 && attempt < maxRetries - 1) {
+          // Server error - retry with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        
+        throw new Error(error.error.message);
+      }
+
+      return await response.json();
+      
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      // Network error - retry
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+}
+```
+
+## Debugging Errors
+
+### Request ID
+
+Every error includes a `request_id` for debugging:
+
+```bash
+# Contact support with request ID
+"request_id": "req_abc123xyz"
+```
+
+### Detailed Logging
+
+Enable detailed logging in SDKs:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+# Now SDK will log all requests/responses
+client = RunAgentClient(agent_id="...", debug=True)
+```
+
+### Common Solutions
+
+1. **400 Bad Request**
+   - Validate JSON syntax
+   - Check required fields
+   - Verify data types
+
+2. **401 Unauthorized**
+   - Check API key format
+   - Verify key hasn't expired
+   - Ensure proper header format
+
+3. **429 Rate Limited**
+   - Implement exponential backoff
+   - Check rate limit headers
+   - Consider upgrading plan
+
+4. **500 Internal Error**
+   - Retry with backoff
+   - Check status page
+   - Contact support if persistent
+
+## Webhook Error Handling
+
+For webhook endpoints, implement proper error handling:
+
+```python
+@app.post("/webhook")
+async def handle_webhook(request):
+    try:
+        # Process webhook
+        data = await request.json()
+        process_webhook(data)
+        return {"status": "success"}
+        
+    except ValidationError:
+        # Return 400 for validation errors
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid webhook data"}
+        )
+        
+    except Exception as e:
+        # Return 500 for server errors
+        # RunAgent will retry 500 errors
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal error"}
+        )
+```
+
+## See Also
+
+- [API Introduction](/api-reference/introduction) - API overview
+- [Authentication](/api-reference/authentication) - Auth errors
+- [Rate Limits](/api-reference/rate-limits) - Rate limiting details

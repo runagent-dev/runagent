@@ -1,0 +1,211 @@
+---
+title: 'Coming Soon: Additional SDKs'
+description: 'JavaScript, Rust, and Go SDKs are under development'
+---
+
+## SDKs in Development
+
+We're actively working on native SDKs for additional programming languages. Each SDK will provide the same powerful features as our Python SDK while following language-specific best practices.
+
+## JavaScript/TypeScript SDK
+
+<Card title="JavaScript SDK" icon="js">
+  **Expected Release**: Q2 2024
+  
+  The JavaScript SDK will support both Node.js and browser environments with full TypeScript support.
+  
+  ### Planned Features
+  - Promise-based and async/await APIs
+  - Real-time streaming with EventSource
+  - TypeScript type definitions
+  - React hooks for easy integration
+  - Automatic retries with exponential backoff
+  
+  ### Preview
+  ```typescript
+  import { RunAgentClient } from '@runagent/sdk';
+  
+  const client = new RunAgentClient({
+    agentId: 'your-agent-id',
+    apiKey: process.env.RUNAGENT_API_KEY
+  });
+  
+  // Async/await
+  const result = await client.runGeneric({
+    query: 'Hello, agent!'
+  });
+  
+  // Streaming
+  const stream = client.streamGeneric({ query: 'Tell me a story' });
+  for await (const chunk of stream) {
+    console.log(chunk);
+  }
+  ```
+</Card>
+
+## Rust SDK
+
+<Card title="Rust SDK" icon="rust">
+  **Expected Release**: Q2 2024
+  
+  High-performance SDK with zero-cost abstractions and memory safety.
+  
+  ### Planned Features
+  - Async runtime support (Tokio)
+  - Zero-copy deserialization
+  - Connection pooling
+  - WASM compilation support
+  - Strong type safety with serde
+  
+  ### Preview
+  ```rust
+  use runagent::{Client, RunRequest};
+  
+  #[tokio::main]
+  async fn main() -> Result<(), Box<dyn std::error::Error>> {
+      let client = Client::new("your-agent-id")
+          .with_api_key("your-api-key");
+      
+      let request = RunRequest::new("Hello, agent!");
+      let response = client.run_generic(request).await?;
+      
+      println!("Response: {:?}", response);
+      Ok(())
+  }
+  ```
+</Card>
+
+## Go SDK
+
+<Card title="Go SDK" icon="golang">
+  **Expected Release**: Q3 2024
+  
+  Idiomatic Go client with excellent concurrency support.
+  
+  ### Planned Features
+  - Context-based cancellation
+  - Concurrent request handling
+  - Efficient connection reuse
+  - Structured logging support
+  - Middleware for customization
+  
+  ### Preview
+  ```go
+  package main
+  
+  import (
+      "context"
+      "fmt"
+      "github.com/runagent-dev/runagent-go"
+  )
+  
+  func main() {
+      client := runagent.NewClient("your-agent-id").
+          WithAPIKey("your-api-key")
+      
+      ctx := context.Background()
+      resp, err := client.RunGeneric(ctx, runagent.Input{
+          Query: "Hello, agent!",
+      })
+      
+      if err != nil {
+          panic(err)
+      }
+      
+      fmt.Printf("Response: %v\n", resp)
+  }
+  ```
+</Card>
+
+## Early Access Program
+
+Want to try these SDKs before official release?
+
+<Steps>
+  <Step title="Join Beta">
+    Sign up for our beta program at [run-agent.ai/beta](https://run-agent.ai/beta)
+  </Step>
+  <Step title="Get Access">
+    Receive early access to SDK releases and documentation
+  </Step>
+  <Step title="Provide Feedback">
+    Help us improve the SDKs with your feedback
+  </Step>
+</Steps>
+
+## Language Support Roadmap
+
+### Phase 1 (Current)
+- ✅ Python SDK (Available now)
+
+### Phase 2 (Q2 2024)
+- 🚧 JavaScript/TypeScript SDK
+- 🚧 Rust SDK
+
+### Phase 3 (Q3 2024)
+- 📋 Go SDK
+- 📋 Java SDK
+
+### Phase 4 (Future)
+- 📋 Ruby SDK
+- 📋 PHP SDK
+- 📋 C# SDK
+- 📋 Swift SDK
+
+## Community SDKs
+
+Building an SDK for another language? We'd love to support you!
+
+### Guidelines for Community SDKs
+
+1. **Follow API conventions** - Use consistent method names
+2. **Implement core features** - Auth, sync/async, streaming
+3. **Add tests** - Comprehensive test coverage
+4. **Document thoroughly** - Examples and API reference
+5. **Open source** - Share with the community
+
+### Get Featured
+
+High-quality community SDKs can become official:
+- Code review by our team
+- Integration into our CI/CD
+- Official documentation
+- Ongoing maintenance support
+
+## Stay Updated
+
+<CardGroup cols={2}>
+  <Card title="Newsletter" icon="envelope">
+    Subscribe for SDK release announcements
+    
+    [Subscribe →](https://run-agent.ai/newsletter)
+  </Card>
+  <Card title="Discord" icon="discord">
+    Join #sdk-development channel
+    
+    [Join Discord →](https://discord.gg/runagent)
+  </Card>
+</CardGroup>
+
+## Request a Language
+
+Don't see your language listed? Let us know!
+
+<Card title="Request SDK Support" icon="plus">
+  Vote for your preferred language or suggest a new one:
+  
+  [Request Language →](https://github.com/runagent-dev/runagent/issues/new?template=sdk-request.md)
+</Card>
+
+## Using the API Directly
+
+While waiting for your preferred SDK, you can always use the REST API directly:
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    Complete API documentation
+  </Card>
+  <Card title="API Examples" icon="code" href="/api-reference/endpoints/invoke">
+    Code examples in various languages
+  </Card>
+</CardGroup>

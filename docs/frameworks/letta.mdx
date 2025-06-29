@@ -1,0 +1,255 @@
+---
+title: 'Letta Framework'
+description: 'Deploy Letta agents for conversational AI with long-term memory'
+---
+
+## Overview
+
+Letta (formerly MemGPT) enables you to build conversational agents with long-term memory, personality persistence, and natural dialogue flow. Perfect for chatbots, virtual assistants, and interactive applications.
+
+## Quick Start
+
+```bash
+# Create a Letta project
+runagent init my-letta-agent --framework letta
+
+# Navigate to project
+cd my-letta-agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test locally
+runagent serve .
+```
+
+## Basic Letta Agent
+
+```python
+# agent.py
+from letta import Agent, Memory, Persona
+
+# Define persona
+persona = Persona(
+    name="Assistant",
+    personality="Helpful, friendly, and knowledgeable",
+    core_memories=[
+        "I am a helpful AI assistant",
+        "I maintain context across conversations",
+        "I adapt to user preferences"
+    ]
+)
+
+# Initialize agent
+agent = Agent(
+    persona=persona,
+    memory_config={
+        "type": "hierarchical",
+        "capacity": 10000
+    },
+    model="gpt-4"
+)
+
+# RunAgent entrypoints
+def invoke(input_data):
+    user_id = input_data.get("user_id", "default")
+    message = input_data.get("query")
+    
+    # Load user session
+    agent.load_session(user_id)
+    
+    # Process message
+    response = agent.send_message(message)
+    
+    # Save session
+    agent.save_session(user_id)
+    
+    return {"response": response.text}
+
+def stream(input_data):
+    user_id = input_data.get("user_id", "default")
+    message = input_data.get("query")
+    
+    agent.load_session(user_id)
+    
+    for chunk in agent.stream_message(message):
+        yield chunk.text
+```
+
+## Configuration
+
+```json
+{
+  "agent_name": "letta_assistant",
+  "description": "Conversational agent with long-term memory",
+  "framework": "letta",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agent.py",
+        "module": "stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "LETTA_STORAGE_PATH": "./storage"
+  }
+}
+```
+
+## Key Features
+
+### Memory Management
+
+```python
+# Configure memory system
+from letta import WorkingMemory, ArchivalMemory
+
+agent = Agent(
+    working_memory=WorkingMemory(
+        capacity=20,  # Recent messages
+        summarize_after=15
+    ),
+    archival_memory=ArchivalMemory(
+        storage="vector_db",
+        embedding_model="text-embedding-ada-002"
+    )
+)
+
+# Manual memory operations
+agent.add_memory("User prefers technical explanations")
+relevant_memories = agent.search_memories("user preferences")
+```
+
+### Conversation Management
+
+```python
+# Multi-turn conversations
+conversation = agent.create_conversation(user_id)
+
+# Add context
+conversation.add_context({
+    "topic": "quantum computing",
+    "expertise_level": "beginner"
+})
+
+# Process messages with context
+response = conversation.send_message("Explain superposition")
+```
+
+### Personality Persistence
+
+```python
+# Define rich persona
+persona = Persona(
+    name="Dr. Sarah Chen",
+    role="AI Research Assistant",
+    personality_traits=[
+        "Analytical",
+        "Patient",
+        "Encouraging"
+    ],
+    expertise=["AI", "Machine Learning", "Data Science"],
+    communication_style="Academic but accessible"
+)
+
+# Persona affects all responses
+agent = Agent(persona=persona)
+```
+
+## Best Practices
+
+1. **Session Management**
+   - Always save sessions after interactions
+   - Implement session cleanup for old users
+   - Handle concurrent sessions properly
+
+2. **Memory Optimization**
+   - Summarize old conversations
+   - Index memories for fast retrieval
+   - Set appropriate capacity limits
+
+3. **Personality Consistency**
+   - Define clear persona traits
+   - Test personality across contexts
+   - Allow for growth while maintaining core traits
+
+## Advanced Features
+
+### Emotional State
+
+```python
+from letta import EmotionalState
+
+agent = Agent(
+    emotional_state=EmotionalState(
+        initial_mood="neutral",
+        sensitivity=0.7
+    )
+)
+
+@agent.on_emotion_change
+def handle_emotion(old_state, new_state):
+    # Adjust responses based on emotional state
+    pass
+```
+
+### Tool Integration
+
+```python
+from letta import Tool
+
+# Add tools to agent
+agent.add_tool(
+    Tool(
+        name="calendar",
+        description="Check and manage calendar",
+        function=calendar_api
+    )
+)
+
+# Agent automatically uses tools in conversation
+# User: "What's on my schedule today?"
+# Agent uses calendar tool and responds naturally
+```
+
+## Common Use Cases
+
+### Customer Support Bot
+
+```python
+support_agent = Agent(
+    persona=Persona(
+        name="Support Agent",
+        personality="Patient and solution-oriented",
+        knowledge_base="./support_docs"
+    ),
+    escalation_enabled=True
+)
+```
+
+### Personal Assistant
+
+```python
+assistant = Agent(
+    persona=Persona(
+        name="Personal Assistant",
+        learns_preferences=True
+    ),
+    tools=[calendar, email, reminders]
+)
+```
+
+## See Also
+
+- [Letta Documentation](https://docs.letta.ai)
+- [Framework Overview](/frameworks/overview)
+- [Examples](/resources/examples)

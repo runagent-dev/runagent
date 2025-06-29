@@ -1,0 +1,305 @@
+---
+title: 'Webhooks'
+description: 'Receive real-time notifications for agent events'
+---
+
+## Overview
+
+Webhooks allow you to receive real-time notifications when events occur in your RunAgent deployment. Configure webhook endpoints to integrate with your systems.
+
+## Webhook Events
+
+### Execution Events
+
+| Event | Description | Payload |
+|-------|-------------|---------|
+| `agent.invoked` | Agent invocation started | Request details |
+| `agent.completed` | Agent execution completed | Result and metadata |
+| `agent.failed` | Agent execution failed | Error details |
+| `agent.timeout` | Agent execution timed out | Timeout info |
+
+### Deployment Events
+
+| Event | Description | Payload |
+|-------|-------------|---------|
+| `deployment.created` | New deployment created | Deployment info |
+| `deployment.updated` | Deployment updated | Changes |
+| `deployment.deleted` | Deployment removed | Deletion details |
+| `deployment.health_changed` | Health status changed | Status info |
+
+## Webhook Configuration
+
+### Via API
+
+```bash
+POST https://api.run-agent.ai/v1/webhooks
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "url": "https://your-app.com/webhook",
+  "events": ["agent.completed", "agent.failed"],
+  "agent_id": "agent-123",
+  "secret": "your-webhook-secret"
+}
+```
+
+### Via Configuration
+
+```json
+{
+  "webhooks": {
+    "endpoints": [
+      {
+        "url": "https://your-app.com/webhook",
+        "events": ["agent.*"],
+        "headers": {
+          "X-Custom-Header": "value"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Webhook Payload
+
+### Standard Structure
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "agent.completed",
+  "created": "2024-01-01T12:00:00Z",
+  "data": {
+    // Event-specific data
+  },
+  "agent_id": "agent-123",
+  "deployment_id": "dep-456"
+}
+```
+
+### Event Examples
+
+#### agent.completed
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "agent.completed",
+  "created": "2024-01-01T12:00:00Z",
+  "data": {
+    "request_id": "req_xyz789",
+    "input": {
+      "query": "What's the weather?"
+    },
+    "result": {
+      "response": "The weather is sunny and 72°F"
+    },
+    "execution_time": 1.23,
+    "tokens_used": 150
+  },
+  "agent_id": "agent-123"
+}
+```
+
+#### agent.failed
+
+```json
+{
+  "id": "evt_def456",
+  "type": "agent.failed",
+  "created": "2024-01-01T12:01:00Z",
+  "data": {
+    "request_id": "req_abc789",
+    "error": {
+      "code": "EXECUTION_ERROR",
+      "message": "Agent processing failed",
+      "details": "Model timeout"
+    },
+    "input": {
+      "query": "Complex request"
+    }
+  },
+  "agent_id": "agent-123"
+}
+```
+
+## Webhook Security
+
+### Signature Verification
+
+Verify webhook authenticity using HMAC-SHA256:
+
+```python
+import hmac
+import hashlib
+
+def verify_webhook(payload, signature, secret):
+    expected = hmac.new(
+        secret.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(expected, signature)
+
+# In your webhook handler
+@app.post("/webhook")
+def handle_webhook(request):
+    signature = request.headers.get("X-RunAgent-Signature")
+    
+    if not verify_webhook(request.body, signature, WEBHOOK_SECRET):
+        return {"error": "Invalid signature"}, 401
+    
+    # Process webhook
+    data = request.json()
+    process_event(data)
+```
+
+### IP Whitelisting
+
+Webhook requests come from these IPs:
+- `52.89.214.238`
+- `34.212.75.30`
+- `54.218.53.128`
+
+## Webhook Implementation
+
+### Express.js Example
+
+```javascript
+const express = require('express');
+const crypto = require('crypto');
+
+app.post('/webhook', express.raw({type: 'application/json'}), (req, res) => {
+  const signature = req.headers['x-runagent-signature'];
+  
+  // Verify signature
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.WEBHOOK_SECRET)
+    .update(req.body)
+    .digest('hex');
+  
+  if (signature !== expectedSignature) {
+    return res.status(401).send('Unauthorized');
+  }
+  
+  // Process event
+  const event = JSON.parse(req.body);
+  
+  switch(event.type) {
+    case 'agent.completed':
+      handleCompletion(event.data);
+      break;
+    case 'agent.failed':
+      handleFailure(event.data);
+      break;
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+### Django Example
+
+```python
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, HttpResponseBadRequest
+import json
+import hmac
+import hashlib
+
+@csrf_exempt
+def webhook_handler(request):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('Method not allowed')
+    
+    # Verify signature
+    signature = request.headers.get('X-RunAgent-Signature')
+    expected = hmac.new(
+        settings.WEBHOOK_SECRET.encode(),
+        request.body,
+        hashlib.sha256
+    ).hexdigest()
+    
+    if not hmac.compare_digest(signature, expected):
+        return HttpResponse('Unauthorized', status=401)
+    
+    # Process event
+    event = json.loads(request.body)
+    
+    if event['type'] == 'agent.completed':
+        process_completion.delay(event['data'])  # Celery task
+    
+    return HttpResponse('OK')
+```
+
+## Retry Policy
+
+Failed webhook deliveries are retried with exponential backoff:
+
+1. Immediate retry
+2. After 1 minute
+3. After 5 minutes
+4. After 30 minutes
+5. After 2 hours
+
+After 5 failed attempts, the webhook is marked as failed.
+
+## Testing Webhooks
+
+### Webhook Testing Tool
+
+```bash
+# Send test webhook
+runagent webhooks test <webhook-id> --event agent.completed
+```
+
+### Local Testing with ngrok
+
+```bash
+# Start local server
+python webhook_server.py
+
+# In another terminal
+ngrok http 8000
+
+# Use ngrok URL for webhook
+https://abc123.ngrok.io/webhook
+```
+
+## Monitoring Webhooks
+
+### List Webhook Deliveries
+
+```bash
+GET https://api.run-agent.ai/v1/webhooks/<webhook-id>/deliveries
+```
+
+### Webhook Metrics
+
+```json
+{
+  "webhook_id": "wh_123",
+  "total_deliveries": 1000,
+  "successful": 950,
+  "failed": 50,
+  "average_response_time": 200,
+  "last_delivery": "2024-01-01T12:00:00Z"
+}
+```
+
+## Best Practices
+
+1. **Respond Quickly**: Return 2xx status within 3 seconds
+2. **Process Asynchronously**: Queue events for processing
+3. **Implement Idempotency**: Handle duplicate events
+4. **Verify Signatures**: Always verify webhook authenticity
+5. **Monitor Failures**: Track and alert on webhook failures
+
+## See Also
+
+- [Event Types](/api-reference/errors) - Complete event reference
+- [Security](/api-reference/authentication) - Security best practices
+- [Rate Limits](/api-reference/rate-limits) - Webhook rate limits

@@ -1,0 +1,443 @@
+---
+title: 'Troubleshooting Guide'
+description: 'Common issues and solutions for RunAgent'
+---
+
+## Installation Issues
+
+<AccordionGroup>
+  <Accordion title="pip install fails with permission error">
+    **Solution**: Install with user flag or use virtual environment
+    
+    ```bash
+    # User installation
+    pip install --user runagent
+    
+    # Or use virtual environment (recommended)
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    pip install runagent
+    ```
+  </Accordion>
+  
+  <Accordion title="runagent command not found after installation">
+    **Solution**: Add Python scripts to PATH or use python -m
+    
+    ```bash
+    # Check where it's installed
+    pip show runagent
+    
+    # Use python module directly
+    python -m runagent --help
+    
+    # Add to PATH (Linux/Mac)
+    export PATH="$PATH:$HOME/.local/bin"
+    
+    # Add to PATH (Windows)
+    set PATH=%PATH%;%APPDATA%\Python\Scripts
+    ```
+  </Accordion>
+  
+  <Accordion title="SSL certificate verification failed">
+    **Solution**: Update certificates or use trusted host
+    
+    ```bash
+    # Update certificates
+    pip install --upgrade certifi
+    
+    # Or temporarily bypass (not recommended for production)
+    pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org runagent
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Issues
+
+<AccordionGroup>
+  <Accordion title="Invalid runagent.config.json">
+    **Common causes and solutions**:
+    
+    1. **JSON syntax error**
+       ```bash
+       # Validate JSON
+       python -m json.tool runagent.config.json
+       ```
+    
+    2. **Missing required fields**
+       ```json
+       {
+         "agent_name": "required",
+         "framework": "required",
+         "version": "required",
+         "agent_architecture": {
+           "entrypoints": [...]  // required
+         }
+       }
+       ```
+    
+    3. **Invalid entrypoint path**
+       ```bash
+       # Test import manually
+       python -c "from agents import app; print(app.invoke)"
+       ```
+  </Accordion>
+  
+  <Accordion title="Environment variables not loading">
+    **Solution**: Check .env file and loading mechanism
+    
+    ```bash
+    # Ensure .env exists
+    ls -la .env
+    
+    # Check format (no spaces around =)
+    OPENAI_API_KEY=sk-...
+    NOT: OPENAI_API_KEY = sk-...
+    
+    # Load manually in Python
+    from dotenv import load_dotenv
+    load_dotenv()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Local Development Issues
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    **Solution**: Find and kill process or use different port
+    
+    ```bash
+    # Find process (Linux/Mac)
+    lsof -i :8000
+    kill -9 <PID>
+    
+    # Find process (Windows)
+    netstat -ano | findstr :8000
+    taskkill /PID <PID> /F
+    
+    # Or use different port
+    runagent serve . --port 8080
+    ```
+  </Accordion>
+  
+  <Accordion title="Module import errors">
+    **Solution**: Check dependencies and Python path
+    
+    ```bash
+    # Install all dependencies
+    pip install -r requirements.txt
+    
+    # Check Python path
+    python -c "import sys; print(sys.path)"
+    
+    # Add current directory to PYTHONPATH
+    export PYTHONPATH="${PYTHONPATH}:."
+    ```
+  </Accordion>
+  
+  <Accordion title="Hot reload not working">
+    **Solution**: Check file watchers and restart manually
+    
+    ```bash
+    # Check if reload is enabled
+    runagent serve . --reload
+    
+    # Touch file to trigger reload
+    touch agent.py
+    
+    # Check system file watchers limit (Linux)
+    cat /proc/sys/fs/inotify/max_user_watches
+    # Increase if needed
+    echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Runtime Errors
+
+<AccordionGroup>
+  <Accordion title="Agent timeout errors">
+    **Solution**: Increase timeout or optimize agent code
+    
+    ```python
+    # In runagent.config.json
+    {
+      "deployment": {
+        "timeout": 60  // Increase from default 30s
+      }
+    }
+    
+    # Optimize agent code
+    # - Cache expensive operations
+    # - Use async where possible
+    # - Reduce external API calls
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory limit exceeded">
+    **Solution**: Increase memory limit or reduce usage
+    
+    ```json
+    {
+      "deployment": {
+        "memory": "1GB"  // Increase from default 512MB
+      }
+    }
+    ```
+    
+    Tips for reducing memory:
+    - Load models once, not per request
+    - Use generators for large datasets
+    - Clear unused variables
+    - Profile memory usage
+  </Accordion>
+  
+  <Accordion title="API key errors">
+    **Common issues**:
+    
+    1. **Key not found**
+       ```bash
+       # Check environment
+       echo $OPENAI_API_KEY
+       
+       # Set in .env file
+       OPENAI_API_KEY=sk-...
+       ```
+    
+    2. **Invalid key format**
+       - OpenAI keys start with `sk-`
+       - No extra spaces or quotes
+       - Check expiration
+    
+    3. **Rate limits**
+       - Implement retry logic
+       - Use different keys for dev/prod
+       - Monitor usage
+  </Accordion>
+</AccordionGroup>
+
+## Deployment Issues
+
+<AccordionGroup>
+  <Accordion title="Deployment fails validation">
+    **Solution**: Run validation locally first
+    
+    ```bash
+    # Validate configuration
+    runagent validate .
+    
+    # Test imports
+    runagent test-import .
+    
+    # Check file sizes
+    find . -size +10M -type f
+    ```
+  </Accordion>
+  
+  <Accordion title="Agent not responding after deployment">
+    **Debugging steps**:
+    
+    ```bash
+    # Check status
+    runagent status <deployment-id>
+    
+    # View logs
+    runagent logs <deployment-id> --tail 100
+    
+    # Test health endpoint
+    curl https://api.run-agent.ai/v1/agents/<id>/health
+    
+    # Restart if needed
+    runagent restart <deployment-id>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## SDK Issues
+
+<AccordionGroup>
+  <Accordion title="Authentication errors with SDK">
+    **Solution**: Check API key configuration
+    
+    ```python
+    # Debug authentication
+    import os
+    print(f"API Key present: {'RUNAGENT_API_KEY' in os.environ}")
+    
+    # Explicit configuration
+    from runagent import RunAgentClient
+    client = RunAgentClient(
+        agent_id="...",
+        api_key="your-key-here",
+        debug=True  # Enable debug logging
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Streaming not working">
+    **Common causes**:
+    
+    1. **Buffering issues**
+       ```python
+       # Force unbuffered output
+       for chunk in client.run_generic_stream(input_data):
+           print(chunk, end="", flush=True)
+       ```
+    
+    2. **Proxy interference**
+       - Check if behind corporate proxy
+       - Test with direct connection
+       - Use appropriate proxy settings
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+  <Accordion title="Slow agent response times">
+    **Optimization strategies**:
+    
+    1. **Profile your code**
+       ```python
+       import time
+       
+       start = time.time()
+       # Your operation
+       print(f"Operation took: {time.time() - start}s")
+       ```
+    
+    2. **Cache expensive operations**
+       ```python
+       from functools import lru_cache
+       
+       @lru_cache(maxsize=100)
+       def expensive_operation(input):
+           # Cache results
+           return result
+       ```
+    
+    3. **Use connection pooling**
+       ```python
+       # Reuse HTTP sessions
+       import requests
+       session = requests.Session()
+       ```
+  </Accordion>
+  
+  <Accordion title="High memory usage">
+    **Memory optimization**:
+    
+    ```python
+    # Use generators instead of lists
+    def process_large_data():
+        for item in data:
+            yield process(item)  # Not return all at once
+    
+    # Clear unused objects
+    del large_object
+    import gc
+    gc.collect()
+    
+    # Monitor memory
+    import psutil
+    print(f"Memory: {psutil.Process().memory_info().rss / 1024 / 1024} MB")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tools
+
+### Enable Debug Logging
+
+```python
+# In your agent
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# For RunAgent CLI
+runagent serve . --log-level debug
+
+# For SDK
+client = RunAgentClient(agent_id="...", debug=True)
+```
+
+### Health Checks
+
+```python
+# Add health check endpoint
+def health_check():
+    checks = {
+        "status": "healthy",
+        "database": check_database(),
+        "api_keys": check_api_keys(),
+        "memory": check_memory()
+    }
+    return checks
+```
+
+### Performance Monitoring
+
+```python
+# Simple performance decorator
+import time
+from functools import wraps
+
+def measure_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        print(f"{func.__name__} took {time.time() - start:.2f}s")
+        return result
+    return wrapper
+
+@measure_time
+def slow_operation():
+    # Your code
+    pass
+```
+
+## Getting Help
+
+If you're still experiencing issues:
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord">
+    Get help from the community
+    
+    [Join Discord →](https://discord.gg/runagent)
+  </Card>
+  <Card title="GitHub Issues" icon="github">
+    Report bugs or request features
+    
+    [Open Issue →](https://github.com/runagent-dev/runagent/issues)
+  </Card>
+  <Card title="Email Support" icon="envelope">
+    For critical issues
+    
+    [support@run-agent.ai](mailto:support@run-agent.ai)
+  </Card>
+  <Card title="Status Page" icon="signal">
+    Check system status
+    
+    [View Status →](https://status.run-agent.ai)
+  </Card>
+</CardGroup>
+
+## Diagnostic Commands
+
+Quick commands for diagnosing issues:
+
+```bash
+# System check
+runagent doctor
+
+# Validate project
+runagent validate . --verbose
+
+# Test connectivity
+runagent ping
+
+# Export debug info
+runagent debug-info > debug.txt
+```
