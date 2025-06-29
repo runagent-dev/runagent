@@ -1,0 +1,371 @@
+---
+title: 'Cloud Deployment'
+description: 'Deploy agents to RunAgent cloud infrastructure'
+---
+
+<Info>
+  Cloud deployment is coming soon. This guide covers the planned features and deployment process.
+</Info>
+
+## Overview
+
+RunAgent's cloud deployment provides a serverless, scalable infrastructure for running your agents in production. With automatic scaling, monitoring, and global distribution, you can focus on building agents while we handle the operations.
+
+## Deployment Process
+
+### Quick Deploy
+
+```bash
+# Deploy to cloud
+runagent deploy .
+
+# Deploy with custom name
+runagent deploy . --name production-agent
+
+# Deploy to specific environment
+runagent deploy . --env staging
+```
+
+### Deployment Steps
+
+<Steps>
+  <Step title="Validation">
+    RunAgent validates your configuration and code
+  </Step>
+  <Step title="Build">
+    Creates optimized container with dependencies
+  </Step>
+  <Step title="Upload">
+    Securely uploads to RunAgent infrastructure
+  </Step>
+  <Step title="Deploy">
+    Starts agent with auto-scaling enabled
+  </Step>
+  <Step title="Health Check">
+    Verifies agent is responding correctly
+  </Step>
+</Steps>
+
+## Environments
+
+### Development
+```bash
+runagent deploy . --env development
+```
+- Lower cost tier
+- Detailed logging
+- Relaxed rate limits
+
+### Staging
+```bash
+runagent deploy . --env staging
+```
+- Production-like environment
+- Full monitoring
+- Same limits as production
+
+### Production
+```bash
+runagent deploy . --env production
+```
+- High availability
+- Auto-scaling
+- Full monitoring and alerting
+
+## Configuration
+
+### Deployment Settings
+
+```json
+{
+  "deployment": {
+    "memory": "1GB",
+    "timeout": 60,
+    "min_instances": 1,
+    "max_instances": 10,
+    "regions": ["us-east-1", "eu-west-1"],
+    "environment_variables": {
+      "LOG_LEVEL": "INFO"
+    }
+  }
+}
+```
+
+### Scaling Configuration
+
+```json
+{
+  "scaling": {
+    "metric": "concurrent_requests",
+    "target": 10,
+    "scale_up_cooldown": 60,
+    "scale_down_cooldown": 300
+  }
+}
+```
+
+## Monitoring
+
+### Metrics Available
+
+- Request count and latency
+- Error rates and types
+- Token usage
+- Memory and CPU utilization
+- Concurrent executions
+
+### Accessing Metrics
+
+```bash
+# View real-time metrics
+runagent metrics <deployment-id>
+
+# Get specific metric
+runagent metrics <deployment-id> --metric latency
+
+# Export metrics
+runagent metrics <deployment-id> --export csv
+```
+
+## Security
+
+### Data Encryption
+- TLS 1.3 for all API traffic
+- Encryption at rest for stored data
+- Encrypted environment variables
+
+### Network Security
+- Private VPC per deployment
+- No direct internet access
+- API Gateway with rate limiting
+
+### Compliance
+- SOC 2 Type II (coming soon)
+- GDPR compliant
+- HIPAA ready (Enterprise)
+
+## Cost Management
+
+### Pricing Model
+- Pay per request
+- No charge for idle time
+- Volume discounts available
+
+### Cost Optimization
+
+```json
+{
+  "optimization": {
+    "cache_responses": true,
+    "compress_payloads": true,
+    "batch_requests": true
+  }
+}
+```
+
+### Monitoring Costs
+
+```bash
+# View current usage
+runagent usage <deployment-id>
+
+# Set spending alerts
+runagent alerts create --threshold 100 --type cost
+```
+
+## Advanced Features
+
+### Multi-Region Deployment
+
+```json
+{
+  "deployment": {
+    "regions": ["us-east-1", "eu-west-1", "ap-southeast-1"],
+    "routing": "latency"  // or "geolocation"
+  }
+}
+```
+
+### Custom Domains
+
+```bash
+# Add custom domain
+runagent domain add api.mycompany.com --deployment <id>
+
+# Configure SSL
+runagent domain ssl api.mycompany.com --cert-arn <arn>
+```
+
+### Webhook Integration
+
+```json
+{
+  "webhooks": {
+    "on_success": "https://api.mycompany.com/success",
+    "on_error": "https://api.mycompany.com/error",
+    "on_timeout": "https://api.mycompany.com/timeout"
+  }
+}
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Deploy to RunAgent
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install RunAgent
+        run: pip install runagent
+      
+      - name: Deploy
+        env:
+          RUNAGENT_API_KEY: ${{ secrets.RUNAGENT_API_KEY }}
+        run: |
+          runagent deploy . --env production --name my-agent
+```
+
+### GitLab CI
+
+```yaml
+deploy:
+  stage: deploy
+  script:
+    - pip install runagent
+    - runagent deploy . --env $CI_COMMIT_BRANCH
+  only:
+    - main
+    - staging
+```
+
+## Rollback and Versioning
+
+### Version Management
+
+```bash
+# List versions
+runagent versions <deployment-id>
+
+# Deploy specific version
+runagent deploy . --version 1.2.3
+
+# Rollback to previous
+runagent rollback <deployment-id>
+
+# Rollback to specific version
+runagent rollback <deployment-id> --version 1.2.0
+```
+
+### Blue-Green Deployment
+
+```bash
+# Deploy new version without switching
+runagent deploy . --strategy blue-green --no-switch
+
+# Test new version
+runagent test <deployment-id> --version new
+
+# Switch traffic
+runagent switch <deployment-id> --to new
+```
+
+## Troubleshooting Deployments
+
+### Deployment Failures
+
+```bash
+# Check deployment status
+runagent status <deployment-id>
+
+# View deployment logs
+runagent logs <deployment-id> --deployment
+
+# Get detailed error
+runagent describe <deployment-id>
+```
+
+### Performance Issues
+
+```bash
+# View performance metrics
+runagent performance <deployment-id>
+
+# Enable profiling
+runagent config <deployment-id> --set profiling=true
+
+# Download profile
+runagent profile <deployment-id> --download
+```
+
+## Best Practices
+
+1. **Test Thoroughly**
+   - Use staging environment
+   - Run integration tests
+   - Monitor initial deployment
+
+2. **Resource Optimization**
+   - Right-size memory allocation
+   - Set appropriate timeouts
+   - Use caching where possible
+
+3. **Security**
+   - Rotate API keys regularly
+   - Use least privilege principle
+   - Enable audit logging
+
+4. **Monitoring**
+   - Set up alerts
+   - Track key metrics
+   - Regular performance reviews
+
+## Migration Guide
+
+### From Local to Cloud
+
+1. Test in staging first
+2. Update environment variables
+3. Verify all dependencies
+4. Deploy with same configuration
+5. Monitor closely after deployment
+
+### From Other Platforms
+
+```bash
+# Import from existing service
+runagent import --from heroku --app my-app
+
+# Validate imported configuration
+runagent validate .
+
+# Deploy
+runagent deploy .
+```
+
+## Coming Soon
+
+- Auto-scaling based on custom metrics
+- A/B testing support
+- Edge deployment options
+- Advanced caching strategies
+- WebSocket support
+
+## See Also
+
+- [Local Development](/deployment/local-development) - Test locally first
+- [Monitoring Guide](/api-reference/webhooks) - Set up monitoring
+- [Security Best Practices](/resources/troubleshooting) - Secure your deployment

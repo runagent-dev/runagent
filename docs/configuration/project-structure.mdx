@@ -1,0 +1,291 @@
+---
+title: 'Project Structure'
+description: 'Understanding RunAgent project organization'
+---
+
+## Overview
+
+A well-organized project structure is key to maintainable and deployable AI agents. This guide covers the standard RunAgent project layout and best practices.
+
+## Basic Structure
+
+```
+my-agent/
+├── agent.py              # Main agent implementation
+├── runagent.config.json  # RunAgent configuration
+├── requirements.txt      # Python dependencies
+├── .env                  # Environment variables (local only)
+├── .env.example          # Example environment template
+├── .gitignore            # Git ignore rules
+├── README.md             # Project documentation
+└── tests/                # Unit tests (optional)
+```
+
+## Core Files
+
+### agent.py
+
+Your main agent implementation:
+
+```python
+# agent.py
+def invoke(input_data: dict) -> dict:
+    """Main entrypoint for request/response"""
+    # Your agent logic
+    return {"response": processed_result}
+
+def stream(input_data: dict):
+    """Optional streaming entrypoint"""
+    for chunk in process_streaming(input_data):
+        yield chunk
+```
+
+### runagent.config.json
+
+Configuration file that tells RunAgent how to run your agent:
+
+```json
+{
+  "agent_name": "my-agent",
+  "framework": "langgraph",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "invoke",
+        "type": "generic"
+      }
+    ]
+  }
+}
+```
+
+### requirements.txt
+
+All Python dependencies:
+
+```txt
+openai>=1.0.0
+langchain>=0.1.0
+python-dotenv>=1.0.0
+# Your other dependencies
+```
+
+## Advanced Structure
+
+For larger projects:
+
+```
+my-agent/
+├── src/
+│   ├── __init__.py
+│   ├── agent.py          # Main agent
+│   ├── models.py         # Data models
+│   ├── tools.py          # Agent tools
+│   └── utils.py          # Utilities
+├── prompts/
+│   ├── system.txt        # System prompts
+│   └── templates.py      # Prompt templates
+├── config/
+│   ├── development.json  # Dev config
+│   └── production.json   # Prod config
+├── tests/
+│   ├── test_agent.py
+│   └── test_tools.py
+├── docs/
+│   └── API.md
+├── runagent.config.json
+├── requirements.txt
+├── requirements-dev.txt   # Dev dependencies
+├── Makefile              # Common commands
+└── README.md
+```
+
+## Framework-Specific Structures
+
+### LangGraph Projects
+
+```
+langgraph-agent/
+├── agents.py             # Graph definition
+├── nodes/                # Graph nodes
+│   ├── __init__.py
+│   ├── process.py
+│   └── analyze.py
+├── edges.py              # Edge logic
+├── state.py              # State schema
+├── tools.py              # Custom tools
+└── runagent.config.json
+```
+
+### CrewAI Projects
+
+```
+crewai-project/
+├── crew.py               # Crew definition
+├── agents/               # Individual agents
+│   ├── researcher.py
+│   ├── writer.py
+│   └── reviewer.py
+├── tasks/                # Task definitions
+│   └── tasks.py
+├── tools/                # Shared tools
+└── runagent.config.json
+```
+
+## File Organization Best Practices
+
+### 1. Separate Concerns
+
+```python
+# Good: Separated modules
+# models.py
+class InputModel:
+    pass
+
+# tools.py  
+def search_tool():
+    pass
+
+# agent.py
+from models import InputModel
+from tools import search_tool
+```
+
+### 2. Configuration Management
+
+```python
+# config.py
+import os
+from typing import Dict
+
+def get_config() -> Dict:
+    env = os.getenv("ENVIRONMENT", "development")
+    
+    configs = {
+        "development": {
+            "debug": True,
+            "timeout": 60
+        },
+        "production": {
+            "debug": False,
+            "timeout": 30
+        }
+    }
+    
+    return configs[env]
+```
+
+### 3. Modular Entrypoints
+
+```python
+# entrypoints.py
+from src.agent import Agent
+
+agent = Agent()
+
+def invoke(input_data: dict) -> dict:
+    return agent.process(input_data)
+
+def stream(input_data: dict):
+    yield from agent.stream(input_data)
+```
+
+## Environment Management
+
+### Development
+
+`.env` file (never commit):
+```
+OPENAI_API_KEY=sk-...
+DATABASE_URL=postgresql://...
+DEBUG=true
+```
+
+### Production
+
+Use RunAgent's environment variable management:
+```json
+{
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "DATABASE_URL": "${DATABASE_URL}",
+    "DEBUG": "false"
+  }
+}
+```
+
+## Testing Structure
+
+```
+tests/
+├── conftest.py          # Pytest configuration
+├── fixtures/            # Test data
+│   └── sample_input.json
+├── unit/                # Unit tests
+│   ├── test_agent.py
+│   └── test_tools.py
+└── integration/         # Integration tests
+    └── test_api.py
+```
+
+## Deployment Files
+
+### .gitignore
+
+```gitignore
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# RunAgent
+.runagent/
+logs/
+```
+
+### Makefile
+
+```makefile
+.PHONY: install test run deploy
+
+install:
+	pip install -r requirements.txt
+
+test:
+	pytest tests/
+
+run:
+	runagent serve .
+
+deploy:
+	runagent deploy .
+
+clean:
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+```
+
+## See Also
+
+- [Configuration File](/configuration/config-file) - Config details
+- [Environment Variables](/configuration/environment) - Environment setup
+- [First Agent](/get-started/first-agent) - Build your first project

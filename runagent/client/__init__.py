@@ -1,31 +1,5 @@
-"""
-RunAgent SDK - Standalone Python SDK for deploying and managing AI agents.
+# Import the main SDK components
+from .client import RunAgentClient, AsyncRunAgentClient
 
-This module provides a comprehensive SDK that can work independently of the CLI.
-"""
-
-from .sdk import RunAgentSDK
-from .exceptions import (
-    RunAgentError,
-    AuthenticationError,
-    ValidationError,
-    ConnectionError,
-    ServerError
-)
-
-# Main SDK class for easy import
-RunAgent = RunAgentSDK
-
-# Version info
-__version__ = "0.1.0"
-
-# Expose main components
-__all__ = [
-    "RunAgentSDK",
-    "RunAgent",
-    "RunAgentError", 
-    "AuthenticationError",
-    "ValidationError",
-    "ConnectionError",
-    "ServerError"
-]
+# Expose the main components for easy import
+__all__ = ["RunAgentClient", "AsyncRunAgentClient"]

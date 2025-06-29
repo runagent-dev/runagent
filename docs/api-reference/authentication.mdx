@@ -1,0 +1,276 @@
+---
+title: 'Authentication'
+description: 'API authentication and security'
+---
+
+## Overview
+
+All RunAgent API requests require authentication using API keys. This guide covers how to obtain, use, and manage API keys securely.
+
+## Obtaining API Keys
+
+### Via CLI
+
+```bash
+# Setup authentication
+runagent setup
+
+# View current API key
+runagent config show --key api_key
+```
+
+### Via Dashboard
+
+1. Log in to [dashboard.run-agent.ai](https://dashboard.run-agent.ai)
+2. Navigate to API Keys section
+3. Click "Create New Key"
+4. Copy and save securely
+
+## Using API Keys
+
+### Header Authentication
+
+Include your API key in the Authorization header:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.run-agent.ai/v1/agents
+```
+
+### SDK Authentication
+
+```python
+# Python SDK
+from runagent import RunAgentClient
+
+client = RunAgentClient(
+    agent_id="agent-123",
+    api_key="YOUR_API_KEY"
+)
+```
+
+### Environment Variable
+
+Set the API key as an environment variable:
+
+```bash
+export RUNAGENT_API_KEY="YOUR_API_KEY"
+```
+
+## API Key Types
+
+### Personal Keys
+- Tied to your user account
+- Full access to your resources
+- Should not be shared
+
+### Service Keys
+- For production applications
+- Limited scope and permissions
+- Can be revoked independently
+
+### Temporary Keys
+- Short-lived tokens
+- For testing or demos
+- Auto-expire after set time
+
+## Security Best Practices
+
+### Key Storage
+
+<Warning>
+  Never commit API keys to version control or expose them in client-side code.
+</Warning>
+
+**DO:**
+```python
+# Use environment variables
+api_key = os.environ["RUNAGENT_API_KEY"]
+
+# Or configuration files (gitignored)
+with open(".secrets/api_key") as f:
+    api_key = f.read().strip()
+```
+
+**DON'T:**
+```python
+# Never hardcode keys
+api_key = "sk-abc123..."  # WRONG!
+```
+
+### Key Rotation
+
+Regularly rotate your API keys:
+
+```bash
+# Generate new key
+runagent keys create --name "production-2024"
+
+# Update your application
+export RUNAGENT_API_KEY="new-key"
+
+# Revoke old key
+runagent keys revoke "old-key-id"
+```
+
+### Scope Limitation
+
+Create keys with minimal required permissions:
+
+```bash
+# Read-only key
+runagent keys create --scope read --name "monitoring"
+
+# Agent-specific key
+runagent keys create --agent-id agent-123 --name "agent-specific"
+```
+
+## Request Signing
+
+For additional security, enable request signing:
+
+```python
+import hmac
+import hashlib
+import time
+
+def sign_request(method, path, body, secret):
+    timestamp = str(int(time.time()))
+    message = f"{method}\n{path}\n{timestamp}\n{body}"
+    
+    signature = hmac.new(
+        secret.encode(),
+        message.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return {
+        "X-Signature": signature,
+        "X-Timestamp": timestamp
+    }
+```
+
+## OAuth 2.0 (Coming Soon)
+
+Future support for OAuth 2.0 flow:
+
+```python
+# Authorization URL
+auth_url = "https://auth.run-agent.ai/oauth/authorize"
+params = {
+    "client_id": "your-client-id",
+    "redirect_uri": "https://yourapp.com/callback",
+    "response_type": "code",
+    "scope": "agents:read agents:write"
+}
+```
+
+## Rate Limiting
+
+API keys have associated rate limits:
+
+| Tier | Requests/Hour | Burst |
+|------|---------------|-------|
+| Free | 100 | 10 |
+| Pro | 1,000 | 100 |
+| Enterprise | Custom | Custom |
+
+Rate limit headers:
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1640995200
+```
+
+## IP Whitelisting
+
+Restrict API key usage to specific IPs:
+
+```bash
+# Add IP to whitelist
+runagent keys update <key-id> --add-ip 192.168.1.1
+
+# List whitelisted IPs
+runagent keys show <key-id>
+```
+
+## Monitoring Key Usage
+
+### Via CLI
+
+```bash
+# View key usage
+runagent keys usage <key-id>
+
+# Set usage alerts
+runagent keys alert <key-id> --threshold 80
+```
+
+### Via API
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.run-agent.ai/v1/keys/usage
+```
+
+## Error Responses
+
+### Invalid Key
+
+```json
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "The provided API key is invalid",
+    "status": 401
+  }
+}
+```
+
+### Expired Key
+
+```json
+{
+  "error": {
+    "code": "EXPIRED_API_KEY",
+    "message": "The API key has expired",
+    "status": 401
+  }
+}
+```
+
+### Rate Limited
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Too many requests",
+    "status": 429,
+    "retry_after": 3600
+  }
+}
+```
+
+## Troubleshooting
+
+### Key Not Working
+
+1. Check key format (should start with `ra_`)
+2. Verify key hasn't expired
+3. Ensure proper Authorization header format
+4. Check IP whitelist settings
+5. Verify rate limits haven't been exceeded
+
+### Permission Denied
+
+1. Check key scope and permissions
+2. Verify resource ownership
+3. Ensure key is active
+4. Check organization settings
+
+## See Also
+
+- [API Introduction](/api-reference/introduction) - API overview
+- [Error Handling](/api-reference/errors) - Error responses
+- [Rate Limits](/api-reference/rate-limits) - Rate limiting details

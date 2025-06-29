@@ -1,0 +1,213 @@
+---
+title: 'Synchronous Client'
+description: 'Using the RunAgent Python SDK synchronously'
+---
+
+## Overview
+
+The synchronous client provides blocking operations for interacting with RunAgent. Perfect for scripts, simple applications, and when you don't need concurrent operations.
+
+## Initialization
+
+```python
+from runagent import RunAgentClient
+
+# Basic initialization
+client = RunAgentClient(agent_id="your-agent-id")
+
+# With all options
+client = RunAgentClient(
+    agent_id="your-agent-id",
+    api_key="your-api-key",
+    base_url="https://api.run-agent.ai",
+    timeout=30,
+    max_retries=3
+)
+```
+
+## Basic Usage
+
+### Simple Request
+
+```python
+result = client.run_generic({
+    "query": "What's the weather like?",
+    "location": "San Francisco"
+})
+
+print(result)
+# {'weather': 'sunny', 'temperature': 72, 'unit': 'fahrenheit'}
+```
+
+### With Error Handling
+
+```python
+try:
+    result = client.run_generic({"query": "Hello"})
+    print(f"Success: {result}")
+except RunAgentError as e:
+    print(f"Error: {e.message}")
+    print(f"Code: {e.code}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Request Options
+
+### Timeout Control
+
+```python
+# Short timeout for quick operations
+result = client.run_generic(
+    {"query": "Quick question"},
+    timeout=5  # 5 seconds
+)
+
+# Longer timeout for complex operations
+result = client.run_generic(
+    {"query": "Analyze this dataset", "data": large_data},
+    timeout=120  # 2 minutes
+)
+```
+
+### Custom Headers
+
+```python
+result = client.run_generic(
+    {"query": "Test"},
+    headers={
+        "X-Request-ID": "unique-123",
+        "X-User-ID": "user-456"
+    }
+)
+```
+
+## Response Handling
+
+### Accessing Response Metadata
+
+```python
+response = client.run_generic_with_metadata({"query": "Test"})
+
+# Access result and metadata
+print(response.result)  # Actual agent response
+print(response.execution_time)  # Time taken
+print(response.tokens_used)  # Token usage
+print(response.agent_version)  # Agent version
+```
+
+### Parsing Complex Responses
+
+```python
+result = client.run_generic({
+    "action": "analyze",
+    "data": {"sales": [100, 200, 300]}
+})
+
+# Handle structured response
+if result.get("status") == "success":
+    analysis = result["analysis"]
+    print(f"Total: {analysis['total']}")
+    print(f"Average: {analysis['average']}")
+```
+
+## Advanced Features
+
+### Batch Processing
+
+```python
+# Process multiple requests
+requests = [
+    {"query": "Question 1"},
+    {"query": "Question 2"},
+    {"query": "Question 3"}
+]
+
+results = []
+for request in requests:
+    try:
+        result = client.run_generic(request)
+        results.append({"input": request, "output": result})
+    except Exception as e:
+        results.append({"input": request, "error": str(e)})
+```
+
+### Session Management
+
+```python
+# Maintain conversation context
+session_id = "conv-123"
+
+# First message
+response1 = client.run_generic({
+    "query": "My name is Alice",
+    "session_id": session_id
+})
+
+# Follow-up message
+response2 = client.run_generic({
+    "query": "What's my name?",
+    "session_id": session_id
+})
+# Should remember "Alice"
+```
+
+### Retry Configuration
+
+```python
+# Custom retry logic
+client = RunAgentClient(
+    agent_id="your-agent-id",
+    max_retries=5,
+    retry_delay=1.0,  # Start with 1 second
+    retry_backoff=2.0  # Double each retry
+)
+```
+
+## Best Practices
+
+1. **Reuse Client Instances**
+   ```python
+   # Good - create once
+   client = RunAgentClient(agent_id="...")
+   for item in items:
+       client.run_generic(item)
+   
+   # Bad - create every time
+   for item in items:
+       client = RunAgentClient(agent_id="...")
+       client.run_generic(item)
+   ```
+
+2. **Handle Timeouts**
+   ```python
+   try:
+       result = client.run_generic(data, timeout=10)
+   except TimeoutError:
+       # Handle timeout appropriately
+       result = {"error": "Request timed out"}
+   ```
+
+3. **Log Requests**
+   ```python
+   import logging
+   
+   logging.basicConfig(level=logging.INFO)
+   logger = logging.getLogger(__name__)
+   
+   def run_with_logging(client, data):
+       logger.info(f"Request: {data}")
+       try:
+           result = client.run_generic(data)
+           logger.info(f"Response: {result}")
+           return result
+       except Exception as e:
+           logger.error(f"Error: {e}")
+           raise
+   ```
+
+## See Also
+
+- [Async Client](/sdk/python/async-client) - For concurrent operations
+- [Streaming](/sdk/python/streaming) - For real-time responses
+- [API Reference](/sdk/python/api-reference) - Complete method documentation

@@ -1,0 +1,63 @@
+---
+title: 'runagent teardown'
+description: 'Remove RunAgent configuration'
+---
+
+## Synopsis
+
+```bash
+runagent teardown [OPTIONS]
+```
+
+## Description
+
+Remove RunAgent configuration and authentication data from your system.
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--force`, `-f` | Skip confirmation | false |
+| `--all` | Remove all RunAgent data | false |
+
+## Examples
+
+```bash
+# Remove configuration (with confirmation)
+runagent teardown
+
+# Force removal without confirmation
+runagent teardown --force
+
+# Remove all RunAgent data
+runagent teardown --all
+```
+
+## What Gets Removed
+
+Standard teardown removes:
+- `~/.runagent/config.json`
+- Authentication tokens
+- Cached credentials
+
+With `--all` flag, also removes:
+- Local deployment data
+- Log files
+- Temporary files
+
+## Interactive Confirmation
+
+```
+$ runagent teardown
+This will remove RunAgent configuration from your system.
+Are you sure? [y/N]: y
+
+Removing configuration... ✓
+Clearing credentials... ✓
+
+RunAgent configuration removed.
+```
+
+## See Also
+
+- [`runagent setup`](/cli/commands/setup) - Set up configuration again

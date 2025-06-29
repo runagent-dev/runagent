@@ -1,0 +1,461 @@
+---
+title: 'Building Your First Agent'
+description: 'Learn how to build a custom AI agent from scratch'
+icon: 'hammer'
+---
+
+<Info>
+  This guide walks through building an agent from scratch. For a quicker start using templates, see the [Quick Start](/quickstart) guide.
+</Info>
+
+## Overview
+
+In this tutorial, you'll build a custom AI agent that can:
+- Process user queries
+- Use tools and external APIs
+- Stream responses in real-time
+- Handle errors gracefully
+
+By the end, you'll understand how RunAgent works under the hood and how to create agents tailored to your specific needs.
+
+## Prerequisites
+
+- Python 3.8 or higher
+- RunAgent CLI installed (`pip install runagent`)
+- An OpenAI API key (or other LLM provider)
+
+## Project Setup
+
+<Steps>
+  <Step title="Create Project Directory">
+    ```bash
+    mkdir weather-assistant
+    cd weather-assistant
+    ```
+  </Step>
+  
+  <Step title="Initialize RunAgent Configuration">
+    Create `runagent.config.json`:
+    
+    ```json
+    {
+      "agent_name": "weather_assistant",
+      "description": "An AI assistant that provides weather information",
+      "framework": "custom",
+      "version": "1.0.0",
+      "agent_architecture": {
+        "entrypoints": [
+          {
+            "file": "agent.py",
+            "module": "weather_agent.process_query",
+            "type": "generic"
+          },
+          {
+            "file": "agent.py",
+            "module": "weather_agent.stream_response",
+            "type": "generic_stream"
+          }
+        ]
+      },
+      "env_vars": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "WEATHER_API_KEY": "${WEATHER_API_KEY}"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Create Requirements File">
+    Create `requirements.txt`:
+    
+    ```txt
+    openai>=1.0.0
+    requests>=2.31.0
+    python-dotenv>=1.0.0
+    ```
+  </Step>
+  
+  <Step title="Set Up Environment">
+    Create `.env`:
+    
+    ```bash
+    OPENAI_API_KEY=your-openai-key
+    WEATHER_API_KEY=your-weather-api-key
+    ```
+  </Step>
+</Steps>
+
+## Building the Agent
+
+### Basic Agent Structure
+
+Create `agent.py`:
+
+```python
+import os
+import json
+import requests
+from typing import Dict, Any, Generator
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+class WeatherAgent:
+    def __init__(self):
+        self.weather_api_key = os.getenv("WEATHER_API_KEY")
+        self.base_url = "https://api.openweathermap.org/data/2.5"
+    
+    def get_weather(self, city: str) -> Dict[str, Any]:
+        """Fetch weather data for a city"""
+        url = f"{self.base_url}/weather"
+        params = {
+            "q": city,
+            "appid": self.weather_api_key,
+            "units": "metric"
+        }
+        
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def process_query(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a weather query and return response"""
+        query = input_data.get("query", "")
+        
+        # Use GPT to understand the query
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Extract the city name from the weather query. Return only the city name."
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ],
+            temperature=0
+        )
+        
+        city = completion.choices[0].message.content.strip()
+        
+        # Get weather data
+        weather_data = self.get_weather(city)
+        
+        if "error" in weather_data:
+            return {
+                "status": "error",
+                "message": f"Could not fetch weather for {city}",
+                "error": weather_data["error"]
+            }
+        
+        # Format response
+        temp = weather_data["main"]["temp"]
+        description = weather_data["weather"][0]["description"]
+        
+        return {
+            "status": "success",
+            "city": city,
+            "temperature": temp,
+            "description": description,
+            "message": f"The weather in {city} is {temp}°C with {description}."
+        }
+    
+    def stream_response(self, input_data: Dict[str, Any]) -> Generator[str, None, None]:
+        """Stream a detailed weather report"""
+        # First get the weather data
+        result = self.process_query(input_data)
+        
+        if result["status"] == "error":
+            yield f"Error: {result['message']}\n"
+            return
+        
+        # Create a detailed report using GPT with streaming
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful weather assistant. Provide detailed, friendly weather reports."
+            },
+            {
+                "role": "user",
+                "content": f"Give me a detailed weather report for {result['city']}. "
+                          f"Current temperature: {result['temperature']}°C. "
+                          f"Conditions: {result['description']}. "
+                          "Include what to wear and activity suggestions."
+            }
+        ]
+        
+        stream = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            stream=True,
+            temperature=0.7
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+# Create agent instance
+weather_agent = WeatherAgent()
+
+# Export entrypoints
+process_query = weather_agent.process_query
+stream_response = weather_agent.stream_response
+```
+
+## Understanding Entrypoints
+
+RunAgent uses entrypoints to interact with your agent:
+
+<Tabs>
+  <Tab title="Generic Entrypoint">
+    The `generic` type expects a function that:
+    - Takes a dictionary as input
+    - Returns a dictionary as output
+    - Handles errors internally
+    
+    ```python
+    def process_query(input_data: Dict[str, Any]) -> Dict[str, Any]:
+        # Process input
+        # Return results
+        return {"result": "..."}
+    ```
+  </Tab>
+  
+  <Tab title="Streaming Entrypoint">
+    The `generic_stream` type expects a generator that:
+    - Takes a dictionary as input
+    - Yields strings or chunks
+    - Streams data progressively
+    
+    ```python
+    def stream_response(input_data: Dict[str, Any]) -> Generator[str, None, None]:
+        # Process input
+        # Yield chunks
+        yield "chunk1"
+        yield "chunk2"
+    ```
+  </Tab>
+</Tabs>
+
+## Testing Your Agent
+
+### Local Testing
+
+<Steps>
+  <Step title="Start the Server">
+    ```bash
+    runagent serve .
+    ```
+    
+    You should see:
+    ```
+    INFO:     Started server process
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000
+    ```
+  </Step>
+  
+  <Step title="Test Basic Query">
+    ```bash
+    curl -X POST http://localhost:8000/invoke \
+      -H "Content-Type: application/json" \
+      -d '{"query": "What is the weather in London?"}'
+    ```
+    
+    Response:
+    ```json
+    {
+      "status": "success",
+      "city": "London",
+      "temperature": 15.5,
+      "description": "cloudy",
+      "message": "The weather in London is 15.5°C with cloudy."
+    }
+    ```
+  </Step>
+  
+  <Step title="Test Streaming">
+    ```bash
+    curl -X POST http://localhost:8000/stream \
+      -H "Content-Type: application/json" \
+      -d '{"query": "Tell me about the weather in Paris"}' \
+      --no-buffer
+    ```
+    
+    You'll see the response stream in real-time.
+  </Step>
+</Steps>
+
+### Unit Testing
+
+Create `test_agent.py`:
+
+```python
+import pytest
+from agent import WeatherAgent
+
+def test_weather_agent():
+    agent = WeatherAgent()
+    
+    # Test basic query
+    result = agent.process_query({
+        "query": "Weather in New York"
+    })
+    
+    assert result["status"] in ["success", "error"]
+    if result["status"] == "success":
+        assert "city" in result
+        assert "temperature" in result
+
+def test_streaming():
+    agent = WeatherAgent()
+    
+    # Test streaming
+    chunks = list(agent.stream_response({
+        "query": "Weather in Tokyo"
+    }))
+    
+    assert len(chunks) > 0
+    assert isinstance(chunks[0], str)
+```
+
+## Adding Advanced Features
+
+### Error Handling
+
+Enhance your agent with robust error handling:
+
+```python
+def process_query(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        # Validate input
+        if not input_data.get("query"):
+            return {
+                "status": "error",
+                "message": "Query is required",
+                "code": "MISSING_QUERY"
+            }
+        
+        # Process query...
+        
+    except OpenAI.APIError as e:
+        return {
+            "status": "error",
+            "message": "AI service error",
+            "code": "AI_ERROR",
+            "details": str(e)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": "Unexpected error",
+            "code": "INTERNAL_ERROR",
+            "details": str(e)
+        }
+```
+
+### Adding Tools
+
+Extend functionality with additional tools:
+
+```python
+def get_forecast(self, city: str, days: int = 5) -> Dict[str, Any]:
+    """Get weather forecast"""
+    url = f"{self.base_url}/forecast"
+    params = {
+        "q": city,
+        "appid": self.weather_api_key,
+        "units": "metric",
+        "cnt": days * 8  # 8 forecasts per day (3-hour intervals)
+    }
+    # ... fetch and process forecast data
+```
+
+### State Management
+
+Add conversation context:
+
+```python
+class WeatherAgent:
+    def __init__(self):
+        self.conversation_history = {}
+    
+    def process_query(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        conversation_id = input_data.get("conversation_id", "default")
+        
+        # Retrieve conversation history
+        history = self.conversation_history.get(conversation_id, [])
+        
+        # Process with context...
+        
+        # Update history
+        history.append({"query": query, "response": response})
+        self.conversation_history[conversation_id] = history[-10:]  # Keep last 10
+```
+
+## Deployment Preparation
+
+### Production Checklist
+
+<Checklist>
+  - Environment variables are properly configured
+  - Error handling covers all edge cases
+  - Logging is implemented for debugging
+  - Rate limiting is considered
+  - Input validation is comprehensive
+  - Secrets are not hardcoded
+  - Requirements are pinned to specific versions
+</Checklist>
+
+### Performance Optimization
+
+```python
+# Add caching for repeated queries
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+def get_cached_weather(self, city: str) -> Dict[str, Any]:
+    return self.get_weather(city)
+```
+
+## Next Steps
+
+Now that you've built your first agent:
+
+<CardGroup cols={2}>
+  <Card title="Deploy Your Agent" icon="rocket" href="/deployment/local-development">
+    Learn how to deploy your agent
+  </Card>
+  <Card title="Explore Frameworks" icon="layer-group" href="/frameworks/overview">
+    Try building with LangGraph or CrewAI
+  </Card>
+  <Card title="Advanced Features" icon="sparkles" href="/configuration/config-file">
+    Explore advanced configuration options
+  </Card>
+  <Card title="SDK Integration" icon="code" href="/sdk/python/getting-started">
+    Integrate your agent into applications
+  </Card>
+</CardGroup>
+
+## Summary
+
+You've learned how to:
+- Structure a RunAgent project
+- Create entrypoints for different interaction patterns
+- Handle errors and edge cases
+- Test your agent locally
+- Prepare for production deployment
+
+Your agent is now ready to be deployed and used in real applications!

@@ -1,0 +1,194 @@
+---
+title: 'Agno Framework'
+description: 'Deploy Agno agents with built-in memory and reasoning'
+---
+
+## Overview
+
+Agno is a framework for building agents with advanced reasoning capabilities and persistent memory. It excels at tasks requiring planning, goal-setting, and adaptive behavior.
+
+## Quick Start
+
+```bash
+# Create an Agno project
+runagent init my-agno-agent --framework agno
+
+# Navigate to project
+cd my-agno-agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Test locally
+runagent serve .
+```
+
+## Basic Agno Agent
+
+```python
+# agent.py
+from agno import Agent, Memory, Planner
+from agno.tools import WebSearch, Calculator
+
+# Initialize agent with memory
+agent = Agent(
+    name="Assistant",
+    memory=Memory(type="long_term"),
+    planner=Planner(strategy="adaptive")
+)
+
+# Add tools
+agent.add_tool(WebSearch())
+agent.add_tool(Calculator())
+
+# Define agent behavior
+@agent.on_query
+def process_query(query, context):
+    # Agent automatically uses memory and planning
+    plan = agent.create_plan(query)
+    results = agent.execute_plan(plan)
+    agent.update_memory(query, results)
+    return results
+
+# RunAgent entrypoints
+def invoke(input_data):
+    query = input_data.get("query")
+    context = input_data.get("context", {})
+    result = agent.process(query, context)
+    return {"response": result}
+
+def stream(input_data):
+    query = input_data.get("query")
+    for event in agent.process_stream(query):
+        yield f"{event.type}: {event.content}\n"
+```
+
+## Configuration
+
+```json
+{
+  "agent_name": "agno_agent",
+  "description": "Agno agent with memory and reasoning",
+  "framework": "agno",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agent.py",
+        "module": "stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "AGNO_MEMORY_PATH": "./memory"
+  }
+}
+```
+
+## Key Features
+
+### Memory Management
+
+```python
+# Configure different memory types
+from agno import ShortTermMemory, LongTermMemory, EpisodicMemory
+
+agent = Agent(
+    name="MemoryAgent",
+    memories={
+        "short": ShortTermMemory(capacity=100),
+        "long": LongTermMemory(vector_db="chroma"),
+        "episodic": EpisodicMemory(max_episodes=50)
+    }
+)
+
+# Access memories
+agent.remember("Important fact")
+relevant = agent.recall("What did we discuss?")
+```
+
+### Planning and Reasoning
+
+```python
+# Custom planner
+class CustomPlanner(Planner):
+    def create_plan(self, goal, context):
+        steps = self.decompose_goal(goal)
+        return self.optimize_steps(steps, context)
+
+agent = Agent(
+    planner=CustomPlanner(),
+    reasoning_depth=3  # Multi-step reasoning
+)
+```
+
+### Tool Integration
+
+```python
+# Create custom tools
+from agno import Tool
+
+class DatabaseTool(Tool):
+    name = "database"
+    description = "Query internal database"
+    
+    def execute(self, query):
+        # Your implementation
+        return results
+
+agent.add_tool(DatabaseTool())
+```
+
+## Best Practices
+
+1. **Memory Usage**
+   - Clean up old memories periodically
+   - Use appropriate memory types
+   - Index memories for fast retrieval
+
+2. **Planning**
+   - Keep plans simple and executable
+   - Add checkpoints for long plans
+   - Handle plan failures gracefully
+
+3. **Performance**
+   - Cache frequent queries
+   - Limit reasoning depth
+   - Use async operations
+
+## Common Patterns
+
+### Goal-Oriented Agent
+
+```python
+agent = Agent(
+    goals=["Assist users", "Learn from interactions"],
+    reward_function=custom_reward
+)
+
+@agent.on_goal_complete
+def handle_completion(goal, result):
+    agent.set_new_goal(generate_next_goal(result))
+```
+
+### Adaptive Learning
+
+```python
+@agent.on_feedback
+def learn_from_feedback(feedback):
+    agent.update_behavior(feedback)
+    agent.store_lesson(feedback)
+```
+
+## See Also
+
+- [Agno Documentation](https://docs.agno.ai)
+- [Framework Overview](/frameworks/overview)
+- [Examples](/resources/examples)

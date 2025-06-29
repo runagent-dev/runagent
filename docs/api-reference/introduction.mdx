@@ -1,33 +1,270 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: 'API Introduction'
+description: 'RESTful API for interacting with RunAgent'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Overview
 
-## Welcome
+The RunAgent API is a RESTful interface that allows you to deploy, manage, and interact with AI agents programmatically. All API access is over HTTPS, and data is sent and received as JSON.
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Base URL
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+https://api.run-agent.ai/v1
+```
+
+For local development:
+```
+http://localhost:8000
+```
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API requests require authentication using an API key:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.run-agent.ai/v1/agents
+```
+
+<Warning>
+  Never expose your API key in client-side code or public repositories.
+</Warning>
+
+## Request Format
+
+### Headers
+
+Required headers for all requests:
+
+```http
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+Accept: application/json
+```
+
+### Request Body
+
+POST and PUT requests accept JSON:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
+{
+  "query": "Your input here",
+  "parameters": {
+    "temperature": 0.7,
+    "max_tokens": 150
   }
-]
+}
 ```
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "status": "success",
+  "data": {
+    "result": "Agent response here",
+    "metadata": {
+      "execution_time": 1.23,
+      "tokens_used": 150
+    }
+  }
+}
+```
+
+### Error Response
+
+```json
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_INPUT",
+    "message": "Query parameter is required",
+    "details": {
+      "field": "query",
+      "reason": "missing"
+    }
+  }
+}
+```
+
+## Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 404 | Not Found |
+| 429 | Rate Limited |
+| 500 | Internal Error |
+
+## Rate Limiting
+
+API requests are rate limited:
+
+- **Free tier**: 100 requests per hour
+- **Pro tier**: 1,000 requests per hour
+- **Enterprise**: Custom limits
+
+Rate limit headers:
+
+```http
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1640995200
+```
+
+## Pagination
+
+List endpoints support pagination:
+
+```bash
+GET /v1/agents?page=2&limit=20
+```
+
+Response includes pagination metadata:
+
+```json
+{
+  "data": [...],
+  "pagination": {
+    "page": 2,
+    "limit": 20,
+    "total": 100,
+    "pages": 5
+  }
+}
+```
+
+## Versioning
+
+The API is versioned via the URL path:
+
+- Current version: `v1`
+- Legacy support: 12 months
+- Deprecation notices: 6 months in advance
+
+## Common Patterns
+
+### Async Operations
+
+Long-running operations return immediately:
+
+```json
+{
+  "operation_id": "op_123abc",
+  "status": "pending",
+  "check_url": "/v1/operations/op_123abc"
+}
+```
+
+### Streaming Responses
+
+For streaming endpoints, use Server-Sent Events:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Accept: text/event-stream" \
+  https://api.run-agent.ai/v1/agents/123/stream
+```
+
+### Batch Operations
+
+Submit multiple requests in one call:
+
+```json
+{
+  "batch": [
+    {"query": "Question 1"},
+    {"query": "Question 2"},
+    {"query": "Question 3"}
+  ]
+}
+```
+
+## SDK vs Direct API
+
+| Feature | SDK | Direct API |
+|---------|-----|------------|
+| Ease of use | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| Type safety | ✅ | ❌ |
+| Auto-retry | ✅ | ❌ |
+| Streaming support | ✅ | Manual |
+| Language support | Multiple | Any |
+
+## Quick Start
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    # List agents
+    curl -H "Authorization: Bearer YOUR_API_KEY" \
+      https://api.run-agent.ai/v1/agents
+    
+    # Invoke agent
+    curl -X POST \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"query": "Hello"}' \
+      https://api.run-agent.ai/v1/agents/AGENT_ID/invoke
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import requests
+    
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json"
+    }
+    
+    # List agents
+    response = requests.get(
+        "https://api.run-agent.ai/v1/agents",
+        headers=headers
+    )
+    
+    # Invoke agent
+    response = requests.post(
+        "https://api.run-agent.ai/v1/agents/AGENT_ID/invoke",
+        headers=headers,
+        json={"query": "Hello"}
+    )
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    // List agents
+    const response = await fetch('https://api.run-agent.ai/v1/agents', {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    });
+    
+    // Invoke agent
+    const result = await fetch('https://api.run-agent.ai/v1/agents/AGENT_ID/invoke', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query: 'Hello' })
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    Set up API authentication
+  </Card>
+  <Card title="Endpoints" icon="route" href="/api-reference/endpoints/invoke">
+    Explore available endpoints
+  </Card>
+</CardGroup>

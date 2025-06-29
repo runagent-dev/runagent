@@ -1,0 +1,211 @@
+---
+title: 'runagent deploy'
+description: 'Deploy agent to production or local environment'
+---
+
+## Synopsis
+
+```bash
+runagent deploy [PATH] [OPTIONS]
+```
+
+## Description
+
+The `deploy` command packages and deploys your agent either locally with persistence or to RunAgent's cloud infrastructure (coming soon).
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--local`, `-l` | Deploy locally | `false` |
+| `--name`, `-n` | Deployment name | From config |
+| `--env`, `-e` | Environment | `production` |
+| `--no-validate` | Skip validation | `false` |
+| `--dry-run` | Show what would be deployed | `false` |
+
+## Examples
+
+### Local Deployment
+
+```bash
+# Deploy locally
+runagent deploy . --local
+
+# Deploy with custom name
+runagent deploy . --local --name my-test-agent
+
+# Dry run to see what would happen
+runagent deploy . --dry-run
+```
+
+### Cloud Deployment (Coming Soon)
+
+```bash
+# Deploy to cloud
+runagent deploy .
+
+# Deploy to staging environment
+runagent deploy . --env staging
+
+# Skip validation checks
+runagent deploy . --no-validate
+```
+
+## Deployment Process
+
+<Steps>
+  <Step title="Validation">
+    - Checks `runagent.config.json`
+    - Validates entrypoints
+    - Verifies dependencies
+  </Step>
+  <Step title="Packaging">
+    - Bundles agent code
+    - Includes dependencies
+    - Excludes unnecessary files
+  </Step>
+  <Step title="Upload">
+    - Uploads to RunAgent servers
+    - Or creates local deployment
+  </Step>
+  <Step title="Initialization">
+    - Starts agent container
+    - Configures environment
+    - Runs health checks
+  </Step>
+</Steps>
+
+## Output
+
+Successful deployment shows:
+
+```
+Validating agent configuration... ✓
+Packaging agent files... ✓
+Uploading to RunAgent... ✓
+Initializing deployment... ✓
+
+Deployment successful!
+Agent ID: 055b73d7-6239-4a94-a156-1193fcf33ff0
+Status: Running
+Endpoint: https://api.run-agent.ai/agents/055b73d7
+
+To test your agent:
+  runagent run 055b73d7 --input '{"query": "test"}'
+```
+
+## Local Deployment Details
+
+Local deployments:
+- Run in Docker containers
+- Persist between restarts
+- Support multiple versions
+- Include local monitoring
+
+```bash
+# List local deployments
+runagent list --local
+
+# View deployment details
+runagent status <deployment-id>
+```
+
+## Configuration
+
+### Deployment Settings
+
+In `runagent.config.json`:
+
+```json
+{
+  "deployment": {
+    "memory": "512MB",
+    "timeout": 30,
+    "min_instances": 1,
+    "max_instances": 10,
+    "environment_variables": {
+      "LOG_LEVEL": "INFO"
+    }
+  }
+}
+```
+
+### Excluded Files
+
+By default, these are excluded:
+- `.git/`
+- `__pycache__/`
+- `*.pyc`
+- `.env`
+- `tests/`
+- `docs/`
+
+Create `.deployignore` to customize:
+
+```
+# Custom exclusions
+*.log
+temp/
+scratch.py
+```
+
+## Validation Checks
+
+Before deployment, RunAgent validates:
+
+<Checklist>
+  - Configuration file is valid JSON
+  - Required fields are present
+  - Entrypoints can be imported
+  - Dependencies can be resolved
+  - No syntax errors in Python files
+  - Environment variables are defined
+</Checklist>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Validation Failures">
+    ```bash
+    # Run validation separately
+    runagent validate .
+    
+    # See detailed errors
+    runagent deploy . --log-level debug
+    ```
+  </Accordion>
+  
+  <Accordion title="Upload Failures">
+    Check:
+    - Internet connection
+    - API key is valid
+    - File sizes (limit: 50MB)
+    - Disk space available
+  </Accordion>
+  
+  <Accordion title="Deployment Stuck">
+    ```bash
+    # Check deployment status
+    runagent status <deployment-id>
+    
+    # View logs
+    runagent logs <deployment-id>
+    
+    # Force restart
+    runagent restart <deployment-id>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+1. **Test Locally First**: Always use `runagent serve` before deploying
+2. **Use Environments**: Deploy to staging before production
+3. **Version Your Agents**: Update version in config for each deployment
+4. **Monitor Deployments**: Check logs and metrics after deploying
+
+## See Also
+
+- [`runagent serve`](/cli/commands/serve) - Test locally first
+- [`runagent status`](/cli/commands/status) - Check deployment status
+- [`runagent logs`](/cli/commands/logs) - View deployment logs

@@ -1,0 +1,30 @@
+{
+  "agent_name": "problem_solver",
+  "description": "A simple agent that responds to basic queries",
+  "framework": "langgraph",
+  "template": "problem_solver",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/langgraph/problem_solver",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "app.invoke",
+        "type": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "app.stream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "sk-proj-1234567890"
+  }
+}
