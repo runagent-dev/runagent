@@ -44,7 +44,7 @@ class TemplateDownloader:
         Raises:
             TemplateDownloadError: If download fails
         """
-        template_path = f"{prepath}/{framework}/{template}"
+        template_path = f"{prepath}/{framework}/{template}" if framework else f"{prepath}/{template}"
 
         # Create target directory
         target_dir = Path(target_folder)
@@ -197,7 +197,7 @@ class TemplateDownloader:
         Returns:
             Template metadata if available, None otherwise
         """
-        template_path = f"{prepath}/{framework}/{template}"
+        template_path = f"{prepath}/{framework}/{template}" if framework else f"{prepath}/{template}"
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

@@ -117,4 +117,4 @@ class SocketClient:
                     raise Exception(f"Agent error: {safe_msg.data}")
                 else:
                     # Yield the actual chunk data
-                    yield safe_msg.data.get("content", safe_msg.data)
+                    yield safe_msg.data
