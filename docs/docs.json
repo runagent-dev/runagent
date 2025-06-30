@@ -11,128 +11,44 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Guides",
         "groups": [
           {
             "group": "Get Started",
             "pages": [
               "introduction",
               "quickstart",
-              "get-started/installation",
-              "get-started/first-agent",
-              "get-started/core-concepts"
+              "development"
             ]
           },
           {
-            "group": "CLI Reference",
+            "group": "Essentials",
             "pages": [
-              "cli/overview",
-              {
-                "group": "Commands",
-                "icon": "list",
-                "pages": [
-                  "cli/commands/init",
-                  "cli/commands/serve",
-                  "cli/commands/deploy",
-                  "cli/commands/run",
-                  "cli/commands/upload",
-                  "cli/commands/start",
-                  "cli/commands/setup",
-                  "cli/commands/teardown",
-                  "cli/commands/template"
-                ]
-              },
-              "cli/examples"
-            ]
-          },
-          {
-            "group": "Configuration",
-            "pages": [
-              "configuration/project-structure",
-              "configuration/config-file",
-              "configuration/environment"
-            ]
-          },
-          {
-            "group": "Frameworks",
-            "pages": [
-              "frameworks/overview",
-              "frameworks/langgraph",
-              "frameworks/crewai",
-              "frameworks/agno",
-              "frameworks/letta",
-              "frameworks/custom"
-            ]
-          },
-          {
-            "group": "Deployment",
-            "pages": [
-              "deployment/local-development",
-              "deployment/cloud-deployment"
-            ]
-          },
-          {
-            "group": "Resources",
-            "pages": [
-              "resources/examples",
-              "resources/troubleshooting",
-              "resources/faq"
-            ]
-          }
-
-        ]
-      },
-      {
-        "tab": "SDK",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "sdk/overview"
-            ]
-          },
-          {
-            "group": "Python SDK",
-            "pages": [
-              "sdk/python/getting-started",
-              "sdk/python/sync-client",
-              "sdk/python/async-client",
-              "sdk/python/streaming",
-              "sdk/python/api-reference"
-            ]
-          },
-          {
-            "group": "Coming Soon",
-            "pages": [
-              "sdk/coming-soon"
+              "essentials/markdown",
+              "essentials/code",
+              "essentials/images",
+              "essentials/settings",
+              "essentials/navigation",
+              "essentials/reusable-snippets"
             ]
           }
         ]
       },
       {
         "tab": "API Reference",
-        "groups": [               
-        {
-          "group": "Getting Started",
-          "pages": [
-            "api-reference/introduction",       
-            "api-reference/authentication",
-            "api-reference/errors"
-          ]
-        },    
-        {
-          "group": "Agent Endpoints",
-          "pages": [
-            "api-reference/endpoints/invoke",
-            "api-reference/endpoints/stream",
-            "api-reference/endpoints/health"
-          ]
-        },
+        "groups": [
           {
-            "group": "Advanced",
+            "group": "API Documentation",
             "pages": [
-              "api-reference/webhooks",
-              "api-reference/rate-limits"
+              "api-reference/introduction"
+            ]
+          },
+          {
+            "group": "Endpoint Examples",
+            "pages": [
+              "api-reference/endpoint/get",
+              "api-reference/endpoint/create",
+              "api-reference/endpoint/delete"
             ]
           }
         ]
