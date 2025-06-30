@@ -101,33 +101,64 @@ def teardown(yes):
 
 
 @click.command()
-@click.option("--folder", help="Project folder name")
-@click.option(
-    "--framework",
-    default=None,
-    help="Framework to use (langchain, langgraph, llamaindex)",
-)
-@click.option("--template", default=None, help="Template variant (basic, advanced)")
-@click.option("--non-interactive", is_flag=True, help="Skip interactive prompts")
+@click.option("--template", default="default", help="Template variant (basic, advanced, default)")
+@click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
-def init(folder, framework, template, non_interactive, overwrite):
+@click.option("--langchain", is_flag=True, help="Use LangChain framework")
+@click.option("--langgraph", is_flag=True, help="Use LangGraph framework")
+@click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
+@click.argument(
+    "path",
+    type=click.Path(
+        file_okay=False,  # Don't allow files
+        dir_okay=True,  # Allow directories only
+        readable=True,  # Must be readable
+        resolve_path=True,  # Convert to absolute path
+        path_type=Path,  # Return as pathlib.Path object
+    ),
+    default=".",
+    required=False,  # Make path optional
+)
+def init(template, interactive, overwrite, langchain, langgraph, llamaindex, path):
     """Initialize a new RunAgent project"""
 
     try:
         sdk = RunAgent()
 
-        # Get folder name
-        if not folder:
-            if non_interactive:
-                folder = "runagent-project"
-            else:
-                folder = click.prompt(
-                    "📁 Project folder name", default="runagent-project"
-                )
+        # Check for mutually exclusive framework flags
+        framework_flags = [langchain, langgraph, llamaindex]
+        flags_set = sum(framework_flags)
+        
+        if flags_set > 1:
+            raise click.UsageError("Only one framework can be specified: --langchain, --langgraph, or --llamaindex")
 
-        # Interactive framework selection
-        if not non_interactive and not framework:
-            templates = sdk.list_templates()
+        # Determine framework from flags
+        framework = ""
+        if langchain:
+            framework = "langchain"
+        elif langgraph:
+            framework = "langgraph"
+        elif llamaindex:
+            framework = "llamaindex"
+        
+        # Handle minimal case: no framework specified and no interactive mode
+        use_minimal_default = not framework and not interactive
+        
+        if use_minimal_default:
+            # For minimal default, we treat "default" as both framework and template
+            # This downloads from templates/default/ (not templates/default/default/)
+            framework = ""         # Empty framework 
+            template = "default"   # Template is "default"
+
+        # Use the path as the project location
+        project_path = Path(path).resolve()
+        
+        # Ensure the path exists (create parent directories if needed)
+        project_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Interactive framework selection (only if interactive mode and no framework flag)
+        if interactive and not framework:
+            templates = sdk.list_available()
             frameworks = list(templates.keys())
 
             console.print("🎯 [bold]Available frameworks:[/bold]")
@@ -139,10 +170,10 @@ def init(folder, framework, template, non_interactive, overwrite):
             )
             framework = frameworks[choice - 1]
 
-        # Interactive template selection
-        if not non_interactive and not template:
-            templates = sdk.list_templates(framework)
-            template_list = templates.get(framework, ["basic"])
+        # Interactive template selection (only if interactive mode)
+        if interactive and framework:  # Only if we have a framework
+            templates = sdk.list_available(framework)
+            template_list = templates.get(framework, ["default"])
 
             console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
             for i, tmpl in enumerate(template_list, 1):
@@ -153,44 +184,55 @@ def init(folder, framework, template, non_interactive, overwrite):
             )
             template = template_list[choice - 1]
 
-        # Use defaults if not specified
-        framework = framework or "langchain"
-        template = template or "basic"
+        # Handle minimal case: no framework specified and no interactive mode
+        use_minimal_default = not framework and not interactive
+        
+        if use_minimal_default:
+            # For minimal default, we use empty framework and "default" template
+            # This will download from templates/default/ (after your downloader change)
+            framework = ""         # Empty framework 
+            template = "default"   # Template is "default"
 
+        # Show configuration
         console.print(f"\n🚀 [bold]Initializing project:[/bold]")
-        console.print(f"   Folder: [cyan]{folder}[/cyan]")
-        console.print(f"   Framework: [magenta]{framework}[/magenta]")
-        console.print(f"   Template: [yellow]{template}[/yellow]")
+        console.print(f"   Path: [cyan]{project_path}[/cyan]")
+        if use_minimal_default:
+            console.print(f"   Mode: [green]Minimal Default[/green]")
+        else:
+            console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
+            console.print(f"   Template: [yellow]{template}[/yellow]")
 
         # Initialize project
         success = sdk.init_project(
-            folder=folder, framework=framework, template=template, overwrite=overwrite
+            folder=str(project_path),
+            framework=framework, 
+            template=template, 
+            overwrite=overwrite
         )
 
         if success:
             console.print(f"\n✅ [green]Project initialized successfully![/green]")
-            console.print(f"📁 Created: [cyan]{folder}[/cyan]")
+            console.print(f"📁 Created: [cyan]{project_path}[/cyan]")
 
             # Show next steps
             console.print("\n📝 [bold]Next steps:[/bold]")
-            console.print(f"  1️⃣ [cyan]cd {folder}[/cyan]")
+            console.print(f"  1️⃣ [cyan]cd {project_path}[/cyan]")
             console.print(f"  2️⃣ Update your API keys in [yellow].env[/yellow] file")
             console.print(f"  3️⃣ Test locally: [cyan]python main.py[/cyan]")
             console.print(
-                f"  4️⃣ Deploy: [cyan]runagent deploy-local --folder {folder}[/cyan]"
+                f"  4️⃣ Deploy: [cyan]runagent deploy-local --folder {project_path}[/cyan]"
             )
 
     except TemplateError as e:
         console.print(f"❌ [red]Template error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
     except FileExistsError as e:
-        console.print(f"❌ [red]Folder exists:[/red] {e}")
+        console.print(f"❌ [red]Path exists:[/red] {e}")
         console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
         raise click.ClickException("Project initialization failed")
     except Exception as e:
         console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
-
 
 @click.command()
 @click.option(
