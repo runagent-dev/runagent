@@ -136,7 +136,7 @@ class SafeMessage(BaseModel):
     id: str
     type: MessageType
     timestamp: str
-    data: Dict[str, Any]
+    data: Any
     metadata: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 

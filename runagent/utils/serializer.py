@@ -57,7 +57,7 @@ class CoreSerializer:
             
             if not reconstruct:
                 # Return the parsed dictionary/JSON version with proper nested structure
-                return self._reconstruct_nested_json(deserialized_data)
+                return self._reconstruct_nested_json(deserialized_data.get("content"))
             
             # Try to reconstruct original object
             return self._reconstruct_object(deserialized_data)
@@ -139,7 +139,6 @@ class CoreSerializer:
             
             if deserialized_data.get('metadata'):
                 deserialized_data['metadata'] = self._reconstruct_nested_json(deserialized_data['metadata'])
-            
             return SafeMessage(**deserialized_data)
             
         except json.JSONDecodeError as e:
@@ -266,16 +265,16 @@ class CoreSerializer:
             return result
         elif isinstance(data, list):
             return [self._reconstruct_nested_json(item) for item in data]
-        elif isinstance(data, str):
-            # Try to parse as JSON if it looks like JSON
-            stripped = data.strip()
-            if stripped.startswith(('{', '[')):
-                try:
-                    parsed = json.loads(data)
-                    return self._reconstruct_nested_json(parsed)
-                except (json.JSONDecodeError, ValueError):
-                    pass
-            return data
+        # elif isinstance(data, str):
+        #     # Try to parse as JSON if it looks like JSON
+        #     stripped = data.strip()
+        #     if stripped.startswith(('{', '[')):
+        #         try:
+        #             parsed = json.loads(data)
+        #             return self._reconstruct_nested_json(parsed)
+        #         except (json.JSONDecodeError, ValueError):
+        #             pass
+        #     return data
         else:
             return data
 
