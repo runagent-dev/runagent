@@ -2,6 +2,7 @@ from runagent.sdk import RunAgentSDK
 from runagent.sdk.rest_client import RestClient
 from runagent.utils.agent import detect_framework, validate_agent
 from runagent.sdk.socket_client import SocketClient
+from runagent.utils.serializer import CoreSerializer
 
 
 class RunAgentClient:
@@ -9,6 +10,7 @@ class RunAgentClient:
         self.sdk = RunAgentSDK()
         self.agent_id = agent_id
         self.local = local
+        self.serializer = CoreSerializer()
 
         if local:
             agent_info = self.sdk.db_service.get_agent(agent_id)
@@ -31,9 +33,16 @@ class RunAgentClient:
             self.socket_client = SocketClient()
 
     def run_generic(self, *input_args, **input_kwargs):
-        return self.rest_client.run_agent_generic(
+        response = self.rest_client.run_agent_generic(
             self.agent_id, input_args=input_args, input_kwargs=input_kwargs
         )
+        print(">>>", response)
+        if response.get("success"):
+            response_data = response.get("output_data")
+            return self.serializer.deserialize_object(response_data)
+
+        else:
+            raise Exception(response.get("error"))
 
     def run_generic_stream(self, *input_args, **input_kwargs):
         return self.socket_client.run_agent_generic_stream(
@@ -44,9 +53,15 @@ class RunAgentClient:
 class AsyncRunAgentClient(RunAgentClient):
 
     async def run_generic(self, *input_args, **input_kwargs):
-        return self.rest_client.run_agent_generic(
+        response = self.rest_client.run_agent_generic(
             self.agent_id, input_args=input_args, input_kwargs=input_kwargs
         )
+        if response.get("success"):
+            response_data = response.get("output_data")
+            return self.serializer.deserialize_object(response_data)
+
+        else:
+            raise Exception(response.get("error"))
 
     async def run_generic_stream(self, *input_args, **input_kwargs):
         async for item in self.socket_client.run_agent_generic_stream_async(
