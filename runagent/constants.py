@@ -6,7 +6,7 @@ from pathlib import Path
 TEMPLATE_REPO_URL = os.getenv(
     "RUNAGENT_TEMPLATE_REPO", "https://github.com/runagent-dev/runagent.git"
 )
-TEMPLATE_BRANCH = os.getenv("RUNAGENT_TEMPLATE_BRANCH", "radeen/cli-update")
+TEMPLATE_BRANCH = os.getenv("RUNAGENT_TEMPLATE_BRANCH", "main")
 TEMPLATE_PREPATH = os.getenv("RUNAGENT_TEMPLATE_PREPATH", "templates")
 
 # Default Template Settings
