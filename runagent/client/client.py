@@ -3,9 +3,12 @@ from runagent.sdk.rest_client import RestClient
 from runagent.utils.agent import detect_framework, validate_agent
 from runagent.sdk.socket_client import SocketClient
 from runagent.utils.serializer import CoreSerializer
+from rich.console import Console
+console = Console()
 
 
 class RunAgentClient:
+
     def __init__(self, agent_id: str, local: bool = True, host: str = None, port: int = None):
         self.sdk = RunAgentSDK()
         self.agent_id = agent_id
@@ -16,14 +19,17 @@ class RunAgentClient:
             if host and port:
                 agent_host = host
                 agent_port = port
+                console.print(f"🔌 [cyan]Using explicit address: {agent_host}:{agent_port}[/cyan]")
             else:
                 agent_info = self.sdk.db_service.get_agent(agent_id)
                 if not agent_info:
                     raise ValueError(f"Agent {agent_id} not found in local DB")
+                
                 self.agent_info = agent_info
-
                 agent_host = self.agent_info["host"]
                 agent_port = self.agent_info["port"]
+                
+                console.print(f"🔍 [cyan]Auto-resolved address for agent {agent_id}: {agent_host}:{agent_port}[/cyan]")
 
             agent_base_url = f"http://{agent_host}:{agent_port}"
             agent_socket_url = f"ws://{agent_host}:{agent_port}"

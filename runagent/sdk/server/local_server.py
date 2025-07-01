@@ -24,6 +24,7 @@ from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponse, 
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
+from runagent.utils.port import PortManager
 
 console = Console()
 
@@ -165,19 +166,18 @@ class LocalServer:
             host=agent["host"],
         )
 
-    # Modified from_path method for LocalServer class
     @staticmethod
     def from_path(
-        path: str, port: int = 8450, host: str = "127.0.0.1"
+        path: str, port: int = None, host: str = "127.0.0.1"
     ) -> "LocalServer":
         """
-        Create LocalServer instance from an agent path.
-        If an agent from the same path already exists, use that agent's configuration.
+        Create LocalServer instance from an agent path with smart port handling.
+        If an agent from the same path already exists, check if its port is available.
 
         Args:
             path: Path to agent directory
-            port: Port to run server on (ignored if existing agent found)
-            host: Host to bind to (ignored if existing agent found)
+            port: Preferred port (auto-allocated if None or unavailable)
+            host: Preferred host (default: 127.0.0.1)
 
         Returns:
             LocalServer instance
@@ -189,12 +189,15 @@ class LocalServer:
         existing_agent = db_service.get_agent_by_path(str(agent_path))
         
         if existing_agent:
-            # Agent already exists - use existing configuration
+            # Agent already exists - check if its port is available
+            existing_host = existing_agent['host']
+            existing_port = existing_agent['port']
+            
             console.print(f"🔍 [yellow]Found existing agent for path: {agent_path}[/yellow]")
             console.print(f"📋 [cyan]Agent Details:[/cyan]")
             console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
-            console.print(f"   • Host: [blue]{existing_agent['host']}[/blue]")
-            console.print(f"   • Port: [blue]{existing_agent['port']}[/blue]")
+            console.print(f"   • Host: [blue]{existing_host}[/blue]")
+            console.print(f"   • Port: [blue]{existing_port}[/blue]")
             console.print(f"   • Framework: [green]{existing_agent['framework']}[/green]")
             console.print(f"   • Status: [yellow]{existing_agent['status']}[/yellow]")
             console.print(f"   • Deployed: [dim]{existing_agent['deployed_at']}[/dim]")
@@ -203,19 +206,53 @@ class LocalServer:
             
             if existing_agent['last_run']:
                 console.print(f"   • Last Run: [dim]{existing_agent['last_run']}[/dim]")
-            
-            console.print(f"\n🔄 [green]Reusing existing agent configuration[/green]")
-            
-            return LocalServer(
-                agent_path=agent_path,
-                agent_id=existing_agent['agent_id'],
-                port=existing_agent['port'],  # Use existing port
-                host=existing_agent['host'],  # Use existing host
-                db_service=db_service,
-            )
+                        
+            # Check if the existing port is available
+            if PortManager.is_port_available(existing_host, existing_port):
+                console.print(f"\n🔄 [green]Port {existing_port} is available - reusing existing agent configuration[/green]")
+                
+                return LocalServer(
+                    agent_path=agent_path,
+                    agent_id=existing_agent['agent_id'],
+                    port=existing_port,
+                    host=existing_host,
+                    db_service=db_service,
+                )
+            else:
+                # Port is in use - need to allocate a new one and update the database
+                console.print(f"\n⚠️ [yellow]Port {existing_port} is already in use - allocating new port[/yellow]")
+                
+                # Get currently used ports to avoid conflicts
+                used_ports = PortManager.get_used_ports_from_db(db_service)
+                
+                # Allocate new address
+                if port and PortManager.is_port_available(host, port):
+                    new_host = host
+                    new_port = port
+                    console.print(f"🎯 Using preferred address: [blue]{new_host}:{new_port}[/blue]")
+                else:
+                    new_host, new_port = PortManager.allocate_unique_address(used_ports)
+                
+                # Update the existing agent's host/port in the database
+                with db_service.db_manager.get_session() as session:
+                    from runagent.sdk.db import Agent
+                    agent_record = session.query(Agent).filter(Agent.agent_id == existing_agent['agent_id']).first()
+                    if agent_record:
+                        agent_record.host = new_host
+                        agent_record.port = new_port
+                        session.commit()
+                        console.print(f"🔄 [green]Updated agent address in database: {new_host}:{new_port}[/green]")
+                
+                return LocalServer(
+                    agent_path=agent_path,
+                    agent_id=existing_agent['agent_id'],
+                    port=new_port,
+                    host=new_host,
+                    db_service=db_service,
+                )
         
         else:
-            # No existing agent - create new one
+            # No existing agent - create new one with auto port allocation
             console.print(f"🆕 [green]Creating new agent for path: {agent_path}[/green]")
             
             capacity_info = db_service.get_database_capacity_info()
@@ -225,27 +262,33 @@ class LocalServer:
                     "https://docs.runagent.ai/local-server for more information."
                 )
 
-            # Add agent entry to database
+            # Generate unique agent ID
             agent_id = str(uuid.uuid4())
-            result = db_service.add_agent(
+            
+            # Add agent with automatic port allocation
+            result = db_service.add_agent_with_auto_port(
                 agent_id=agent_id,
                 agent_path=str(agent_path),
-                host=host,
-                port=port,
                 framework=detect_framework(path),
                 status="ready",
+                preferred_host=host,
+                preferred_port=port,  # Will auto-allocate if None or unavailable
             )
             
             if not result["success"]:
                 raise Exception(f"Failed to add agent to database: {result['error']}")
             
+            allocated_host = result["allocated_host"]
+            allocated_port = result["allocated_port"]
+            
             console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
+            console.print(f"🔌 [green]Allocated address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
             
             return LocalServer(
                 agent_path=agent_path,
                 agent_id=agent_id,
-                port=port,
-                host=host,
+                port=allocated_port,  # Use allocated port
+                host=allocated_host,  # Use allocated host
                 db_service=db_service,
             )
 

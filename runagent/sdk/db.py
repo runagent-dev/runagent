@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from rich.console import Console
 from sqlalchemy import (
@@ -23,6 +23,8 @@ from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.sql import func
 
 from runagent.constants import LOCAL_CACHE_DIRECTORY
+from runagent.utils.port import PortManager
+
 
 console = Console()
 
@@ -362,7 +364,7 @@ class DBService:
         agent_id: str,
         agent_path: str,
         host: str = "localhost",
-        port: int = 8000,
+        port: int = 8450,
         framework: str = None,
         status: str = "deployed",
     ) -> Dict:
@@ -1067,6 +1069,216 @@ class DBService:
             except Exception as e:
                 console.print(f"Error getting database stats: {e}")
                 return {"rest_client_configured": self.rest_client is not None}
+
+    def add_agent_with_auto_port(
+        self,
+        agent_id: str,
+        agent_path: str,
+        framework: str = None,
+        status: str = "deployed",
+        preferred_host: str = "127.0.0.1",
+        preferred_port: int = None,
+    ) -> Dict:
+        """
+        Add a new agent with automatic port allocation
+
+        Args:
+            agent_id: Unique agent identifier
+            agent_path: Path to agent directory
+            framework: Framework type (langchain, langgraph, etc.)
+            status: Initial status
+            preferred_host: Preferred host (default: 127.0.0.1)
+            preferred_port: Preferred port (auto-allocated if None)
+
+        Returns:
+            Dictionary with success status and allocated address details
+        """
+        if not agent_id or not agent_path:
+            return {
+                "success": False,
+                "error": "Missing required fields",
+                "code": "INVALID_INPUT",
+            }
+
+        with self.db_manager.get_session() as session:
+            try:
+                # Check current agent count for capacity management
+                current_count = session.query(Agent).count()
+
+                # Check if agent already exists
+                existing_agent = (
+                    session.query(Agent).filter(Agent.agent_id == agent_id).first()
+                )
+                if existing_agent:
+                    return {
+                        "success": False,
+                        "error": f"Agent {agent_id} already exists",
+                        "code": "AGENT_EXISTS",
+                    }
+
+
+                # Get currently used ports to avoid conflicts
+                used_ports = []
+                existing_agents = session.query(Agent).all()
+                for agent in existing_agents:
+                    if agent.port:
+                        used_ports.append(agent.port)
+
+                # Allocate host and port
+                if preferred_port and PortManager.is_port_available(preferred_host, preferred_port):
+                    # Use preferred port if available
+                    allocated_host = preferred_host
+                    allocated_port = preferred_port
+                    console.print(f"🎯 Using preferred address: [blue]{allocated_host}:{allocated_port}[/blue]")
+                else:
+                    # Auto-allocate available address
+                    allocated_host, allocated_port = PortManager.allocate_unique_address(used_ports)
+
+                # Smart limit checking (existing logic)
+                default_limit = self._get_default_limit()
+
+                # Phase 1: Check if we're within default limits (no API call needed)
+                if current_count < default_limit:
+                    console.print(
+                        f"🟢 Adding agent within default limits ({current_count + 1}/{default_limit})"
+                    )
+                    console.print(f"🔌 Allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
+
+                    # Proceed without API check
+                    new_agent = Agent(
+                        agent_id=agent_id,
+                        agent_path=str(agent_path),
+                        host=allocated_host,
+                        port=allocated_port,
+                        framework=framework,
+                        status=status,
+                    )
+
+                    session.add(new_agent)
+                    session.commit()
+
+                    return {
+                        "success": True,
+                        "message": f"Agent {agent_id} added successfully with auto-allocated address",
+                        "current_count": current_count + 1,
+                        "limit_source": "default",
+                        "api_check_performed": False,
+                        "allocated_host": allocated_host,
+                        "allocated_port": allocated_port,
+                        "address": f"{allocated_host}:{allocated_port}",
+                    }
+
+                # Phase 2: At or above default limit - check API for enhanced limits
+                console.print(
+                    f"🟡 At default limit ({current_count}/{default_limit}) - checking for enhanced limits..."
+                )
+
+                limit_info = self._check_enhanced_limits_with_fallback()
+                max_capacity = limit_info["limit"]
+
+                # Check if we can still add within enhanced limits
+                if current_count >= max_capacity:
+                    oldest_agent = (
+                        session.query(Agent).order_by(Agent.deployed_at).first()
+                    )
+
+                    # Provide helpful error message based on API availability
+                    if not self.rest_client:
+                        error_message = f"Maximum {max_capacity} agents allowed. Configure RestClient with API key for enhanced limits."
+                        suggestion = "Configure RestClient with valid API key to potentially increase limits"
+                    elif not limit_info.get("api_validated", False):
+                        error_message = f"Maximum {max_capacity} agents allowed. API key invalid or not configured."
+                        suggestion = "Verify API key configuration in RestClient"
+                    else:
+                        error_message = f"Maximum {max_capacity} agents allowed. Database is at capacity ({current_count}/{max_capacity} agents)."
+                        suggestion = (
+                            f"Consider replacing the oldest agent: {oldest_agent.agent_id}"
+                            if oldest_agent
+                            else "Database cleanup needed"
+                        )
+
+                    return {
+                        "success": False,
+                        "error": error_message,
+                        "code": "DATABASE_FULL",
+                        "current_count": current_count,
+                        "max_allowed": max_capacity,
+                        "limit_info": limit_info,
+                        "oldest_agent": (
+                            {
+                                "agent_id": oldest_agent.agent_id,
+                                "deployed_at": (
+                                    oldest_agent.deployed_at.isoformat()
+                                    if oldest_agent.deployed_at
+                                    else None
+                                ),
+                            }
+                            if oldest_agent
+                            else None
+                        ),
+                        "suggestion": suggestion,
+                    }
+
+                # Enhanced limits allow the addition
+                console.print(f"🔌 Allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
+                
+                new_agent = Agent(
+                    agent_id=agent_id,
+                    agent_path=str(agent_path),
+                    host=allocated_host,
+                    port=allocated_port,
+                    framework=framework,
+                    status=status,
+                )
+
+                session.add(new_agent)
+                session.commit()
+
+                limit_source = "enhanced" if limit_info.get("enhanced") else "default"
+                console.print(
+                    f"🟢 Agent added with {limit_source} limits ({current_count + 1}/{max_capacity})"
+                )
+
+                return {
+                    "success": True,
+                    "message": f"Agent {agent_id} added successfully with auto-allocated address ({limit_source} limits)",
+                    "current_count": current_count + 1,
+                    "max_allowed": max_capacity,
+                    "remaining_slots": (
+                        max_capacity - (current_count + 1)
+                        if max_capacity != 999
+                        else "unlimited"
+                    ),
+                    "limit_info": limit_info,
+                    "api_check_performed": True,
+                    "allocated_host": allocated_host,
+                    "allocated_port": allocated_port,
+                    "address": f"{allocated_host}:{allocated_port}",
+                }
+
+            except Exception as e:
+                session.rollback()
+                return {
+                    "success": False,
+                    "error": f"Database error: {str(e)}",
+                    "code": "DATABASE_ERROR",
+                }
+
+
+    def get_agent_address(self, agent_id: str) -> Optional[Tuple[str, int]]:
+        """
+        Get host and port for a specific agent
+
+        Args:
+            agent_id: Agent identifier
+
+        Returns:
+            Tuple of (host, port) if found, None otherwise
+        """
+        agent_data = self.get_agent(agent_id)
+        if agent_data:
+            return agent_data.get("host"), agent_data.get("port")
+        return None
 
     def close(self):
         """Close database connections"""
