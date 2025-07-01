@@ -93,7 +93,7 @@ class TemplateDownloader:
                 self._copy_directory_contents(template_source_dir, target_dir)
 
                 # Verify essential files exist
-                essential_files = ["main.py", "agent.py", "requirements.txt"]
+                essential_files = ["runagent.config.json"]
                 missing_files = []
                 for file in essential_files:
                     if not (target_dir / file).exists():

@@ -8,6 +8,7 @@ from pathlib import Path
 from ..constants import TEMPLATE_BRANCH, TEMPLATE_PREPATH, TEMPLATE_REPO_URL
 from .exceptions import ValidationError
 from .template_downloader import TemplateDownloader
+from ..utils.agent import get_agent_config
 
 
 class TemplateManager:
@@ -91,17 +92,18 @@ class TemplateManager:
         """
         # Validate template exists
         available_templates = self.list_available()
-        if framework not in available_templates:
-            raise ValidationError(
-                f"Framework '{framework}' not available. "
-                f"Available: {list(available_templates.keys())}"
-            )
+        if not framework == "":
+            if framework == "" or framework not in available_templates:
+                raise ValidationError(
+                    f"Framework '{framework}' not available. "
+                    f"Available: {list(available_templates.keys())}"
+                )
 
-        if template not in available_templates[framework]:
-            raise ValidationError(
-                f"Template '{template}' not available for {framework}. "
-                f"Available: {available_templates[framework]}"
-            )
+            if template not in available_templates[framework]:
+                raise ValidationError(
+                    f"Template '{template}' not available for {framework}. "
+                    f"Available: {available_templates[framework]}"
+                )
 
         # Check folder existence
         folder_path = Path(folder)
@@ -125,40 +127,31 @@ class TemplateManager:
             )
 
             # Create project configuration
-            self._create_project_config(folder_path, framework, template)
+            self._create_project_config(folder_path)
 
             return True
 
         except Exception as e:
             # Clean up on failure
-            if folder_path.exists():
-                import shutil
+            # if folder_path.exists():
+            #     import shutil
 
-                shutil.rmtree(folder_path)
+            #     shutil.rmtree(folder_path)
             raise ValidationError(f"Project initialization failed: {str(e)}")
 
-    def _create_project_config(self, folder_path: Path, framework: str, template: str):
+    def _create_project_config(self, folder_path: Path):
         """Create project configuration file"""
         import time
 
         from ..utils.config import Config
 
-        config_content = {
-            "agent_name": folder_path.name,
-            "framework": framework,
-            "template": template,
-            "version": "0.1.0",
-            "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "template_source": {
-                "repo_url": TEMPLATE_REPO_URL,
-                "branch": TEMPLATE_BRANCH,
-                "path": f"{TEMPLATE_PREPATH}/{framework}/{template}",
-            },
-            "architecture": {
-                "main_file": "main.py",
-                "agent_file": "agent.py",
-                "entry_point": "run",
-            },
-        }
+        existing_config = get_agent_config(folder_path)
+
+        existing_config.agent_name = folder_path.name
+        existing_config.created_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        config_content = existing_config.model_dump(
+            exclude={"agent_architecture"}
+        )
 
         Config.create_config(str(folder_path), config_content)
