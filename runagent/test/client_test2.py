@@ -1,13 +1,15 @@
 from runagent import RunAgentClient
 
-ra = RunAgentClient(agent_id="055b73d7-6239-4a94-a156-1193fcf33ff0")
+ra = RunAgentClient(
+    agent_id="89883120-8a12-4464-80a7-5a52852bab33",
+    local=True
+    )
 
 
-agent_results = ra.run_generic({
-    "query": "How to I fix my broken phone?",
-    "num_solutions": 4,  # Keep between 1-5
-    "solutions": [],
-    "validated_results": "",
-})
+agent_results = ra.run_generic(
+    sender_name="Alice Johnson",
+    recipient_name="Mr. Daniel Smith",
+    subject="Request for Meeting Next Week"
+)
 
 print(agent_results)
