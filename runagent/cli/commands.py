@@ -17,6 +17,7 @@ from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     TemplateError,
     ValidationError,
 )
+from runagent.client.client import RunAgentClient
 
 console = Console()
 
@@ -152,6 +153,7 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
 
         # Use the path as the project location
         project_path = Path(path).resolve()
+        relative_project_path = project_path.relative_to(Path.cwd())
         
         # Ensure the path exists (create parent directories if needed)
         project_path.parent.mkdir(parents=True, exist_ok=True)
@@ -195,32 +197,30 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
 
         # Show configuration
         console.print(f"\n🚀 [bold]Initializing project:[/bold]")
-        console.print(f"   Path: [cyan]{project_path}[/cyan]")
-        if use_minimal_default:
-            console.print(f"   Mode: [green]Minimal Default[/green]")
-        else:
-            console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
-            console.print(f"   Template: [yellow]{template}[/yellow]")
+
+        console.print(f"   Path: [cyan]{relative_project_path}[/cyan]")
+        console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
+        console.print(f"   Template: [yellow]{template}[/yellow]")
 
         # Initialize project
         success = sdk.init_project(
             folder=str(project_path),
-            framework=framework, 
-            template=template, 
+            framework=framework,
+            template=template,
             overwrite=overwrite
         )
 
         if success:
             console.print(f"\n✅ [green]Project initialized successfully![/green]")
-            console.print(f"📁 Created: [cyan]{project_path}[/cyan]")
+            console.print(f"📁 Created at: [cyan]{relative_project_path}[/cyan]")
 
             # Show next steps
             console.print("\n📝 [bold]Next steps:[/bold]")
-            console.print(f"  1️⃣ [cyan]cd {project_path}[/cyan]")
-            console.print(f"  2️⃣ Update your API keys in [yellow].env[/yellow] file")
-            console.print(f"  3️⃣ Test locally: [cyan]python main.py[/cyan]")
+            console.print(f"  1. [cyan]cd {relative_project_path}[/cyan]")
+            console.print(f"  2. Update your API keys in [yellow].env[/yellow] file")
+            console.print(f"  3. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
             console.print(
-                f"  4️⃣ Deploy: [cyan]runagent deploy-local --folder {project_path}[/cyan]"
+                f"  4. Test: [cyan]Test the agent with any of our SDKs. For more details, refer to: [link]https://docs.run-agent.ai/sdk/overview[/link][/cyan]"
             )
 
     except TemplateError as e:
@@ -613,156 +613,176 @@ def serve(port, host, debug, path):
         raise click.ClickException("Server failed to start")
 
 
-@click.command()
-@click.option("--id", "agent_id", required=True, help="Agent ID to run")
-@click.option("--input", "input_file", help="Path to input JSON file")
-@click.option("--message", "-m", help="Simple message to send to agent")
+
+@click.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ))
+@click.option("--id", "agent_id", help="Agent ID to run")
+@click.option("--host", help="Host to connect to (use with --port)")
+@click.option("--port", type=int, help="Port to connect to (use with --host)")
+@click.option(
+    "--input",
+    "input_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, path_type=Path),
+    help="Path to input JSON file"
+)
 @click.option("--local", is_flag=True, help="Run agent locally")
-@click.option("--direct", is_flag=True, help="Run agent directly (bypass HTTP server)")
-@click.option("--timeout", default=300, help="Maximum wait time in seconds")
-def run(agent_id, input_file, message, local, direct, timeout):
-    """Run a deployed agent"""
-
-    try:
-        sdk = RunAgent()
-
-        # Check authentication for remote runs
-        if not local and not sdk.is_configured():
-            console.print(
-                "❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first"
-            )
-            raise click.ClickException("Authentication required for remote runs")
-
-        # Prepare input
-        if input_file:
-            if not Path(input_file).exists():
-                raise click.ClickException(f"Input file not found: {input_file}")
-
-            with open(input_file, "r") as f:
-                try:
-                    input_data = json.load(f)
-                    messages = input_data.get("messages", [])
-                except json.JSONDecodeError:
-                    raise click.ClickException(
-                        f"Invalid JSON in input file: {input_file}"
-                    )
-
-        elif message:
-            messages = [{"role": "user", "content": message}]
-
-        else:
-            # Interactive mode
-            console.print("Enter your message (press Enter twice to submit):")
-            lines = []
-            while True:
-                try:
-                    line = input()
-                    if line == "" and lines:
-                        break
-                    lines.append(line)
-                except (EOFError, KeyboardInterrupt):
-                    console.print("\n❌ Input cancelled")
-                    return
-
-            message_text = "\n".join(lines)
-            messages = [{"role": "user", "content": message_text}]
-
-        # Determine execution method
-        if local:
-            if direct:
-                console.print(
-                    f"🏃 [bold]Running agent directly (bypass server)...[/bold]"
-                )
-                execution_method = "Direct"
-
-                # Use direct execution method
-                input_data = {"messages": messages}
-                result = sdk.local.run_agent_direct(agent_id, input_data)
-            else:
-                console.print(f"🏃 [bold]Running agent via local server...[/bold]")
-                execution_method = "Local Server"
-
-                # Check if server is running first
-                server_status = sdk.local.check_server_status()
-                if not server_status.get("running"):
-                    console.print(f"❌ [red]Local server not running![/red]")
-                    console.print(f"💡 Start server with: [cyan]runagent serve[/cyan]")
-                    console.print(
-                        f"💡 Or use direct execution: [cyan]runagent run --id {agent_id} --local --direct[/cyan]"
-                    )
-                    raise click.ClickException("Local server not available")
-
-                console.print(
-                    f"✅ [green]Server is running at {server_status['url']}[/green]"
-                )
-
-                # Run via HTTP server
-                result = sdk.run_agent(agent_id=agent_id, messages=messages, local=True)
-        else:
-            console.print(f"🏃 [bold]Running agent remotely...[/bold]")
-            execution_method = "Remote"
-
-            # Run remotely
-            result = sdk.run_agent(agent_id=agent_id, messages=messages, local=False)
-
-        console.print(f"🆔 Agent: [magenta]{agent_id}[/magenta]")
-        console.print(f"📍 Method: [cyan]{execution_method}[/cyan]")
-
-        # Run the agent
-        import time
-
-        start_time = time.time()
-        execution_time = time.time() - start_time
-
-        # Display results
-        if result.get("success"):
-            console.print(f"\n✅ [green]Agent execution completed![/green]")
-
-            agent_result = result.get("result", {})
-            content = agent_result.get("content", "")
-
-            console.print(f"\n📄 [bold]Response:[/bold]")
-            console.print(content)
-
-            # Show metadata
-            metadata = agent_result.get("metadata", {})
-            if metadata:
-                console.print(f"\n📊 [bold]Metadata:[/bold]")
-                for key, value in metadata.items():
-                    if key != "execution_time":  # Skip since we show our own
-                        console.print(f"  • {key}: [cyan]{value}[/cyan]")
-
-            # Show execution time from result or calculate our own
-            if "execution_time" in result:
-                total_time = result["execution_time"]
-            else:
-                total_time = execution_time
-
-            console.print(f"\n⏱️ Total time: [yellow]{total_time:.2f}s[/yellow]")
-        else:
-            error_msg = result.get("error", "Unknown error")
-            console.print(f"\n❌ [red]Agent execution failed:[/red] {error_msg}")
-
-            # Show suggestions based on error type
-            if "Server not reachable" in error_msg or "Connection" in error_msg:
-                console.print(
-                    f"💡 [yellow]Suggestion:[/yellow] Start the server with [cyan]runagent serve[/cyan]"
-                )
-                console.print(
-                    f"💡 [yellow]Alternative:[/yellow] Use direct execution with [cyan]--direct[/cyan] flag"
-                )
-
-            raise click.ClickException("Agent run failed")
-
-    except ConnectionError as e:
-        console.print(f"❌ [red]Connection error:[/red] {e}")
-        console.print(
-            f"💡 [yellow]Suggestion:[/yellow] Start the server with [cyan]runagent serve[/cyan]"
+@click.option("--generic", is_flag=True, help="Use generic mode (default)")
+@click.option("--generic-stream", is_flag=True, help="Use generic streaming mode")
+@click.option("--timeout", type=int, help="Timeout in seconds")
+@click.pass_context
+def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, timeout):
+    """
+    Run an agent with flexible configuration options
+    
+    Examples:
+        # Using agent ID with extra params
+        runagent run --agent-id my-agent --param1=value1 --param2=value2
+        
+        # Using host/port with input file
+        runagent run --host localhost --port 8080 --input config.json
+        
+        # Generic streaming mode with extra params
+        runagent run --agent-id my-agent --generic-stream --debug=true --retries=3
+    """
+    
+    # ============================================
+    # VALIDATION 1: Either agent-id OR host/port
+    # ============================================
+    agent_id_provided = agent_id is not None
+    host_port_provided = host is not None or port is not None
+    
+    if agent_id_provided and host_port_provided:
+        raise click.UsageError(
+            "Cannot specify both --agent-id and --host/--port. "
+            "Choose one approach."
         )
-        raise click.ClickException("Connection failed")
+    
+    if not agent_id_provided and not host_port_provided:
+        raise click.UsageError(
+            "Must specify either --agent-id or both --host and --port."
+        )
+    
+    # If using host/port, both must be provided
+    if host_port_provided and (host is None or port is None):
+        raise click.UsageError(
+            "When using host/port, both --host and --port must be specified."
+        )
+    
+    # ============================================
+    # VALIDATION 2: Generic mode selection
+    # ============================================
+    if generic and generic_stream:
+        raise click.UsageError(
+            "Cannot specify both --generic and --generic-stream. Choose one."
+        )
+    
+    # Default to generic mode if neither specified
+    if not generic and not generic_stream:
+        generic = True
+        console.print("🔧 Defaulting to --generic mode")
+    
+    # ============================================
+    # VALIDATION 3: Input file OR extra params
+    # ============================================
+    
+    # Parse extra parameters from ctx.args
+    extra_params = {}
+    invalid_args = []
+    
+    for arg in ctx.args:
+        if arg.startswith('--') and '=' in arg:
+            # Valid format: --key=value
+            key, value = arg[2:].split('=', 1)
+            extra_params[key] = value
+        else:
+            # Invalid format
+            invalid_args.append(arg)
+    
+    if invalid_args:
+        raise click.UsageError(
+            f"Invalid extra arguments: {invalid_args}. "
+            "Extra parameters must be in --key=value format."
+        )
+    
+    # Check mutual exclusivity of input file and extra params
+    if input_file and extra_params:
+        raise click.UsageError(
+            "Cannot specify both --input file and extra parameters. "
+            "Use either --input config.json OR --param1=value1 --param2=value2"
+        )
+    
+    if not input_file and not extra_params:
+        console.print("⚠️  No input file or extra parameters provided. Running with defaults.")
+    
+    # ============================================
+    # DISPLAY CONFIGURATION
+    # ============================================
+    
+    console.print("🚀 RunAgent Configuration:")
+    
+    # Connection info
+    if agent_id:
+        console.print(f"   Agent ID: [cyan]{agent_id}[/cyan]")
+    else:
+        console.print(f"   Host: [cyan]{host}[/cyan]")
+        console.print(f"   Port: [cyan]{port}[/cyan]")
+    
+    # Mode
+    mode = "Generic Streaming" if generic_stream else "Generic"
+    console.print(f"   Mode: [magenta]{mode}[/magenta]")
+    
+    # Local execution
+    if local:
+        console.print("   Local: [green]Yes[/green]")
+    
+    # Timeout
+    if timeout:
+        console.print(f"   Timeout: [yellow]{timeout}s[/yellow]")
+    
+    # Input configuration
+    if input_file:
+        console.print(f"   Input file: [blue]{input_file}[/blue]")
+        # Load and validate JSON file here
+        try:
+            import json
+            with open(input_file, 'r') as f:
+                input_params = json.load(f)
+            console.print(f"   Config keys: [dim]{list(input_params.keys())}[/dim]")
+        except json.JSONDecodeError:
+            raise click.ClickException(f"Invalid JSON in input file: {input_file}")
+        except Exception as e:
+            raise click.ClickException(f"Error reading input file: {e}")
+    
+    elif extra_params:
+        console.print("   Extra parameters:")
+        for key, value in extra_params.items():
+            # Try to parse value as JSON for complex types
+            # TODO: Will add type inference later
+            console.print(f"     --{key} = [green]{value}[/green]")
+        input_params = extra_params
+    
+    else:
+        input_params = {}
+    
+    # ============================================
+    # EXECUTION LOGIC
+    # ============================================
+    
+    try:
+        ra_client = RunAgentClient(agent_id, local, host, port)
+
+        if generic_stream:
+            for item in ra_client.run_generic_stream(**input_params):
+                console.print(item)
+        else:
+            result = ra_client.run_generic(**input_params)
+            console.print(result)
+            
     except Exception as e:
-        console.print(f"❌ [red]Run error:[/red] {e}")
-        raise click.ClickException("Agent run failed")
+        raise click.ClickException(f"Execution failed: {e}")
 
 
 @click.command()

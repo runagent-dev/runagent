@@ -6,20 +6,25 @@ from runagent.utils.serializer import CoreSerializer
 
 
 class RunAgentClient:
-    def __init__(self, agent_id: str, local: bool = True):
+    def __init__(self, agent_id: str, local: bool = True, host: str = None, port: int = None):
         self.sdk = RunAgentSDK()
         self.agent_id = agent_id
         self.local = local
         self.serializer = CoreSerializer()
 
         if local:
-            agent_info = self.sdk.db_service.get_agent(agent_id)
-            if not agent_info:
-                raise ValueError(f"Agent {agent_id} not found in local DB")
-            self.agent_info = agent_info
+            if host and port:
+                agent_host = host
+                agent_port = port
+            else:
+                agent_info = self.sdk.db_service.get_agent(agent_id)
+                if not agent_info:
+                    raise ValueError(f"Agent {agent_id} not found in local DB")
+                self.agent_info = agent_info
 
-            agent_host = self.agent_info["host"]
-            agent_port = self.agent_info["port"]
+                agent_host = self.agent_info["host"]
+                agent_port = self.agent_info["port"]
+
             agent_base_url = f"http://{agent_host}:{agent_port}"
             agent_socket_url = f"ws://{agent_host}:{agent_port}"
 
@@ -36,7 +41,6 @@ class RunAgentClient:
         response = self.rest_client.run_agent_generic(
             self.agent_id, input_args=input_args, input_kwargs=input_kwargs
         )
-        print(">>>", response)
         if response.get("success"):
             response_data = response.get("output_data")
             return self.serializer.deserialize_object(response_data)
