@@ -1,5 +1,3 @@
-# RunAgent
-
 <p align="center">
   <a href="https://run-agent.ai/#gh-dark-mode-only">
     <img src="./docs/logo/logo_dark.svg" width="318px" alt="RunAgent logo" />
@@ -14,6 +12,15 @@
 </h2>
 
 <p align="center">
+  <a href="https://docs.run-agent.ai">
+    <img
+      src="https://img.shields.io/badge/Click%20here%20for-RunAgent%20Docs-blue?style=for-the-badge&logo=read-the-docs"
+      alt="Read the Docs">
+  </a>
+</p>
+
+
+<p align="center">
   <a href="https://pypi.org/project/runagent/">
     <img src="https://img.shields.io/pypi/v/runagent" alt="PyPI" />
   </a>
@@ -23,14 +30,8 @@
   <a href="https://pypi.org/project/runagent/">
     <img src="https://img.shields.io/pypi/pyversions/runagent.svg" alt="Python Versions" />
   </a>
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
-  </a>
-  <a href="https://docs.run-agent.ai">
-    <img src="https://img.shields.io/badge/docs-latest-brightgreen.svg" alt="Documentation" />
-  </a>
   <a href="https://discord.gg/runagent">
-    <img src="https://img.shields.io/discord/1234567890?color=7289DA&label=Discord&logo=discord&logoColor=white" alt="Discord" />
+    <img src="https://img.shields.io/discord/1389567838825480192?color=7289DA&label=Discord&logo=discord&logoColor=white" alt="Discord" />
   </a>
 </p>
 
@@ -43,8 +44,7 @@
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-cli">CLI</a> •
   <a href="#-sdk">SDK</a> •
-  <a href="#-templates">Templates</a> •
-  <a href="#-docs">Docs</a>
+  <a href="#-templates">Templates</a>
 </p>
 
 ---
