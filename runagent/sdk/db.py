@@ -112,7 +112,8 @@ class DBManager:
 
     def _init_database(self):
         """Initialize the database with SQLAlchemy"""
-        console.print(f"🗃️ Initializing database: [blue]{self.db_path}[/blue]")
+        if not self.db_path.exists():
+            console.print(f"🗃️ Initializing database: [blue]{self.db_path}[/blue]")
 
         try:
             # Create database engine
