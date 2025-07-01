@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: 'Deploy AI agents to production in minutes, not days'
+description: 'Deploy AI agents to production in seconds, not hours'
 icon: 'book-open'
 ---
 
@@ -23,7 +23,7 @@ RunAgent is a unified platform for deploying, managing, and scaling AI agents—
 
 <CardGroup cols={2}>
   <Card
-    title="Deploy in Minutes"
+    title="Deploy in Seconds"
     icon="rocket"
     href="/quickstart"
   >
@@ -34,7 +34,7 @@ RunAgent is a unified platform for deploying, managing, and scaling AI agents—
     icon="layer-group"
     href="/frameworks/overview"
   >
-    Works with LangGraph, CrewAI, Agno, Letta, and more
+    Works with LangChain, LlamaIndex, LangGraph, CrewAI, Agno, Letta, and more
   </Card>
   <Card
     title="Built for Scale"
@@ -58,17 +58,37 @@ RunAgent is a unified platform for deploying, managing, and scaling AI agents—
   <Step title="Initialize Your Project">
     Create a new agent project or adapt your existing code
     ```bash
-    runagent init my-agent --framework langgraph
+    runagent init my-agent --framework langchain
     ```
   </Step>
   <Step title="Configure Your Agent">
     Define entrypoints and settings in `runagent.config.json`
     ```json
-    {
-      "agent_name": "my-agent",
-      "framework": "langgraph",
-      "entrypoints": [...]
-    }
+      {
+        "agent_name": "langchain_basic_test",
+        "description": "Basic LangChain agent for testing",
+        "framework": "langchain",
+        "template": "basic",
+        "version": "1.0.0",
+        "created_at": "2025-06-29 10:00:00",
+        "template_source": {
+          "repo_url": "https://github.com/runagent-dev/runagent.git",
+          "path": "/templates/langchain/chatbot",
+          "author": "test"
+        },
+        "agent_architecture": {
+          "entrypoints": [
+            {
+              "file": "Your main file which you will run (e.g. main.py)",
+              "module": "run (The entrypoint module )",
+              "type": "generic"
+            }
+          ]
+        },
+        "env_vars": {
+          "OPENAI_API_KEY": "Your OPENAI_API_KEY"
+        }
+      }
     ```
   </Step>
   <Step title="Test Locally">

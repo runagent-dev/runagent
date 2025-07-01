@@ -24,6 +24,50 @@
             ]
           },
           {
+            "group": "Frameworks",
+            "pages": [
+              "frameworks/overview",
+              "frameworks/langgraph",
+              "frameworks/crewai",
+              "frameworks/agno",
+              "frameworks/letta",
+              "frameworks/custom"
+            ]
+          },
+          {
+            "group": "Configuration Overview",
+            "pages": [
+              {
+                "group": "Configuration",
+                "pages": [
+                  "configuration/project-structure",
+                  "configuration/config-file",
+                  "configuration/environment"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/local-development",
+              "deployment/cloud-deployment"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/examples",
+              "resources/troubleshooting",
+              "resources/faq"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
             "group": "CLI Reference",
             "pages": [
               "cli/overview",
@@ -44,42 +88,7 @@
               },
               "cli/examples"
             ]
-          },
-          {
-            "group": "Configuration",
-            "pages": [
-              "configuration/project-structure",
-              "configuration/config-file",
-              "configuration/environment"
-            ]
-          },
-          {
-            "group": "Frameworks",
-            "pages": [
-              "frameworks/overview",
-              "frameworks/langgraph",
-              "frameworks/crewai",
-              "frameworks/agno",
-              "frameworks/letta",
-              "frameworks/custom"
-            ]
-          },
-          {
-            "group": "Deployment",
-            "pages": [
-              "deployment/local-development",
-              "deployment/cloud-deployment"
-            ]
-          },
-          {
-            "group": "Resources",
-            "pages": [
-              "resources/examples",
-              "resources/troubleshooting",
-              "resources/faq"
-            ]
           }
-
         ]
       },
       {
@@ -111,23 +120,23 @@
       },
       {
         "tab": "API Reference",
-        "groups": [               
-        {
-          "group": "Getting Started",
-          "pages": [
-            "api-reference/introduction",       
-            "api-reference/authentication",
-            "api-reference/errors"
-          ]
-        },    
-        {
-          "group": "Agent Endpoints",
-          "pages": [
-            "api-reference/endpoints/invoke",
-            "api-reference/endpoints/stream",
-            "api-reference/endpoints/health"
-          ]
-        },
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/errors"
+            ]
+          },
+          {
+            "group": "Agent Endpoints",
+            "pages": [
+              "api-reference/endpoints/invoke",
+              "api-reference/endpoints/stream",
+              "api-reference/endpoints/health"
+            ]
+          },
           {
             "group": "Advanced",
             "pages": [

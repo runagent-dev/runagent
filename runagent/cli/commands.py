@@ -18,7 +18,7 @@ from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     ValidationError,
 )
 from runagent.client.client import RunAgentClient
-
+from runagent.sdk.server.local_server import LocalServer
 console = Console()
 
 
@@ -351,8 +351,10 @@ def template(action_list, action_info, framework, template, filter_framework, fo
 @click.option("--folder", required=True, help="Folder containing agent files")
 @click.option("--framework", help="Framework type (auto-detected if not specified)")
 @click.option("--replace", help="Agent ID to replace (for capacity management)")
-def deploy_local(folder, framework, replace):
-    """Deploy agent locally for testing"""
+@click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
+@click.option("--host", default="127.0.0.1", help="Preferred host")
+def deploy_local(folder, framework, replace, port, host):
+    """Deploy agent locally for testing with automatic port allocation"""
 
     try:
         sdk = RunAgent()
@@ -361,19 +363,41 @@ def deploy_local(folder, framework, replace):
         if not Path(folder).exists():
             raise click.ClickException(f"Folder not found: {folder}")
 
-        console.print(f"🚀 [bold]Deploying agent locally...[/bold]")
+        console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
         console.print(f"📁 Source: [cyan]{folder}[/cyan]")
 
-        # Deploy agent
-        result = sdk.deploy_local(
-            folder=folder, framework=framework, replace_agent_id=replace
-        )
+        if replace:
+            # Replace existing agent
+            result = sdk.db_service.replace_agent(
+                old_agent_id=replace,
+                new_agent_id=str(uuid.uuid4()),  # Generate new ID
+                agent_path=folder,
+                host=host,
+                port=port,
+                framework=framework or detect_framework(folder),
+            )
+        else:
+            # Add new agent with auto port allocation
+            import uuid
+            agent_id = str(uuid.uuid4())
+            result = sdk.db_service.add_agent_with_auto_port(
+                agent_id=agent_id,
+                agent_path=folder,
+                framework=framework or detect_framework(folder),
+                status="deployed",
+                preferred_host=host,
+                preferred_port=port,
+            )
 
         if result.get("success"):
-            agent_id = result["agent_id"]
+            agent_id = result.get("new_agent_id") if replace else result.get("agent_id")
+            allocated_host = result.get("allocated_host", host)
+            allocated_port = result.get("allocated_port", port)
+            
             console.print(f"\n✅ [green]Local deployment successful![/green]")
             console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
-            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
+            console.print(f"🔌 Allocated Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
+            console.print(f"🌐 Endpoint: [link]http://{allocated_host}:{allocated_port}[/link]")
 
             if replace:
                 console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
@@ -385,10 +409,11 @@ def deploy_local(folder, framework, replace):
             )
 
             console.print(f"\n💡 [bold]Next steps:[/bold]")
-            console.print(f"  • Start server: [cyan]runagent serve[/cyan]")
-            console.print(
-                f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]"
-            )
+            console.print(f"  • Start server: [cyan]runagent serve {folder}[/cyan]")
+            console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
+            console.print(f"  • Or use Python SDK:")
+            console.print(f"    [dim]from runagent import RunAgentClient[/dim]")
+            console.print(f"    [dim]client = RunAgentClient(agent_id='{agent_id}', local=True)[/dim]")
         else:
             error_code = result.get("error_code")
             if error_code == "DATABASE_FULL":
@@ -415,7 +440,6 @@ def deploy_local(folder, framework, replace):
     except Exception as e:
         console.print(f"❌ [red]Deployment error:[/red] {e}")
         raise click.ClickException("Deployment failed")
-
 
 @click.command()
 @click.option("--folder", required=True, help="Folder containing agent files")
@@ -578,7 +602,7 @@ def deploy(folder, agent_id, local, framework, config):
 
 
 @click.command()
-@click.option("--port", default=8450, help="Port to run server on")
+@click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
 @click.argument(
@@ -594,17 +618,25 @@ def deploy(folder, agent_id, local, framework, config):
     default=".",
 )
 def serve(port, host, debug, path):
-    """Start local FastAPI server for testing deployed agents"""
+    """Start local FastAPI server for testing deployed agents with automatic port allocation"""
 
     try:
         sdk = RunAgent()
 
-        console.print("⚡ [bold]Starting local server...[/bold]")
-        console.print(f"🌐 URL: [bold blue]http://{host}:{port}[/bold blue]")
-        console.print(f"📖 Docs: [link]http://{host}:{port}/docs[/link]")
+        console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
+        
+        # Create LocalServer with automatic port allocation
+        server = LocalServer.from_path(str(path), port=port, host=host)
+        
+        # The actual allocated address
+        allocated_host = server.host
+        allocated_port = server.port
+        
+        console.print(f"🌐 URL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
+        console.print(f"📖 Docs: [link]http://{allocated_host}:{allocated_port}/docs[/link]")
 
         # Start server (this will block)
-        sdk.serve_local_agent(agent_path=path, port=port, host=host, debug=debug)
+        server.start(debug=debug)
 
     except KeyboardInterrupt:
         console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
