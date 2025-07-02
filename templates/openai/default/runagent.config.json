@@ -1,0 +1,30 @@
+{
+  "agent_name": "Demo Agent",
+  "description": "A simple placeholder agent",
+  "framework": "",
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/default",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "email_agent.py",
+        "module": "generate_email",
+        "type": "generic"
+      },
+      {
+        "file": "email_agent.py",
+        "module": "generate_email_sream",
+        "type": "generic_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "sk-proj-1234567890"
+  }
+}
