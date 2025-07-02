@@ -1,10 +1,9 @@
 services:
   mintlify:
-    image: node:lts-alpine3.21
-    container_name: mintlify-dev
+    image: node:24.3-slim
     working_dir: /app
     volumes:
-      - ./docs:/app  # Mount your local Mintlify project folder
+      - ./:/app  # Mount your local Mintlify project folder
       - node_modules:/app/node_modules  # Named volume for node_modules
     ports:
       - "3000:3000"  # Expose port 3000
