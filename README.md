@@ -51,24 +51,24 @@
 
 ## 🎯 What is RunAgent?
 
-RunAgent is a production-ready platform for deploying AI agents. Whether you're using LangGraph, LangChain, LlamaIndex, or any other framework, RunAgent provides the infrastructure and tools to take your agents from development to production seamlessly.
+RunAgent is a production-ready tool/platform for deploying AI agents. Whether you're using LangGraph, LangChain, LlamaIndex, or any other framework, RunAgent provides the infrastructure and tools to take your agents from development to production seamlessly.
 
 ### Why RunAgent?
 
 - **🚀 Deploy in Minutes**: From local development to production with a single command
 - **🔧 Framework Agnostic**: Works with any AI agent framework
-- **📦 Serverless Architecture**: Scale automatically, pay only for what you use
-- **🛡️ Secure by Default**: Sandboxed execution environments
-- **📊 Built-in Monitoring**: Logs, metrics, and debugging tools included
 - **🌊 Response Streaming**: Real-time agent responses for interactive applications
+- **📦 Serverless Architecture**: Scale automatically, pay only for what you use(Coming Soon)
+- **🛡️ Secure by Default**: Sandboxed execution environments(Coming Soon)
+- **📊 Built-in Monitoring**: Logs, metrics, and debugging tools included(Coming Soon)
 
 ## ✨ Features
 
 ### 🖥️ Powerful CLI
 - Initialize projects from templates
 - Local development server with hot reload
-- One-command deployment to production
-- Real-time log streaming
+- One-command deployment to production(Coming Soon)
+- Real-time response streaming
 - Environment management
 
 ### 📚 Multi-Language SDKs
@@ -77,13 +77,15 @@ RunAgent is a production-ready platform for deploying AI agents. Whether you're 
 - **Rust SDK** - Coming soon
 - **Go SDK** - Coming soon
 
-### 🏗️ Production Ready
+### 🏗️ Production Ready(Coming soon)
 - Firecracker-based sandboxed environments
 - Automatic scaling and load balancing
 - Webhook support for event-driven architectures
 - Built-in security and compliance features
 
 ## 🚀 Quick Start
+
+
 
 ### Installation
 
@@ -95,8 +97,10 @@ pip install runagent
 
 1. **Initialize from a template**:
 ```bash
-runagent init my-agent --framework langgraph
+mkdir my-agent
 cd my-agent
+runagent init .
+
 ```
 
 2. **Configure your agent** (`runagent.config.json`):
