@@ -1,7 +1,7 @@
 """
 Template management for the SDK.
 """
-
+import os
 import typing as t
 from pathlib import Path
 
@@ -51,6 +51,8 @@ class TemplateManager:
 
             return templates
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             raise ValidationError(f"Failed to fetch templates: {str(e)}")
 
     def get_info(self, framework: str, template: str) -> t.Optional[t.Dict[str, t.Any]]:
@@ -72,7 +74,7 @@ class TemplateManager:
             return None
 
     def init_project(
-        self, folder: str, framework: str, template: str, overwrite: bool = False
+        self, folder_path: Path, framework: str, template: str, overwrite: bool = False
     ) -> bool:
         """
         Initialize a new project from template.
@@ -92,25 +94,24 @@ class TemplateManager:
         """
         # Validate template exists
         available_templates = self.list_available()
-        if not framework == "":
-            if framework == "" or framework not in available_templates:
-                raise ValidationError(
-                    f"Framework '{framework}' not available. "
-                    f"Available: {list(available_templates.keys())}"
-                )
 
-            if template not in available_templates[framework]:
-                raise ValidationError(
-                    f"Template '{template}' not available for {framework}. "
-                    f"Available: {available_templates[framework]}"
-                )
+        if framework not in available_templates:
+            raise ValidationError(
+                f"Framework '{framework}' not available. "
+                f"Available: {list(available_templates.keys())}"
+            )
+
+        if template not in available_templates[framework]:
+            raise ValidationError(
+                f"Template '{template}' not available for {framework}. "
+                f"Available: {available_templates[framework]}"
+            )
 
         # Check folder existence
-        folder_path = Path(folder)
         if folder_path.exists() and any(folder_path.iterdir()):
             if not overwrite:
                 raise FileExistsError(
-                    f"Folder '{folder}' already exists and is not empty. "
+                    f"Folder '{folder_path}' already exists and is not empty. "
                     "Use overwrite=True to force initialization."
                 )
 

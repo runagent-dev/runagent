@@ -58,6 +58,8 @@ class RunAgentSDK:
         try:
             self.templates.check_connectivity()
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             # Non-fatal warning for template connectivity
             pass
 
@@ -148,9 +150,9 @@ class RunAgentSDK:
     # Project Initialization Methods
     def init_project(
         self,
-        folder: str,
-        framework: str = "langchain",
-        template: str = "basic",
+        folder_path: Path,
+        framework: str = "default",
+        template: str = "default",
         overwrite: bool = False,
     ) -> bool:
         """
@@ -170,7 +172,7 @@ class RunAgentSDK:
             FileExistsError: If folder exists and overwrite is False
         """
         return self.templates.init_project(
-            folder=folder, framework=framework, template=template, overwrite=overwrite
+            folder_path=folder_path, framework=framework, template=template, overwrite=overwrite
         )
 
     def list_local_agents(self) -> t.List[t.Dict[str, t.Any]]:
