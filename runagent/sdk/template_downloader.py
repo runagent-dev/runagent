@@ -1,5 +1,6 @@
 # runagent/client/template_downloader.py
 
+import os
 import shutil
 import tempfile
 import typing as t
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import git
 from git import Repo
+from runagent.utils.agent import validate_agent
 
 
 class TemplateDownloadError(Exception):
@@ -105,10 +107,16 @@ class TemplateDownloader:
                     )
 
             except git.exc.GitCommandError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise TemplateDownloadError(f"Git error: {e}")
             except FileNotFoundError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise TemplateDownloadError(str(e))
             except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise TemplateDownloadError(f"Unexpected error: {e}")
 
     def _copy_directory_contents(self, source_dir: Path, target_dir: Path) -> None:
@@ -139,7 +147,7 @@ class TemplateDownloader:
         Raises:
             TemplateDownloadError: If listing fails
         """
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temp_dir:
             temp_path = Path(temp_dir)
 
             try:
@@ -147,7 +155,6 @@ class TemplateDownloader:
                 repo = Repo.clone_from(
                     self.repo_url, temp_path, branch=self.branch, depth=1
                 )
-
                 templates = {}
 
                 # Navigate to the prepath directory
@@ -173,14 +180,18 @@ class TemplateDownloader:
                                 and not template_dir.name.startswith(".")
                             ):
                                 # Verify this is a valid template (has main.py)
-                                if (template_dir / "main.py").exists():
+                                if validate_agent(template_dir):
                                     templates[framework_name].append(template_dir.name)
 
                 return templates
 
             except git.exc.GitCommandError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise TemplateDownloadError(f"Git error while listing templates: {e}")
             except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise TemplateDownloadError(f"Error listing templates: {e}")
 
     def get_template_info(

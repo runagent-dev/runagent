@@ -3,6 +3,7 @@ from typing import Dict
 
 from runagent.sdk.server.framework.langgraph import LangGraphExecutor
 from runagent.sdk.server.framework.langchain import LangChainExecutor
+from runagent.sdk.server.framework.generic import GenericExecutor
 from runagent.utils.schema import EntryPoint, EntryPointType
 
 
@@ -20,7 +21,9 @@ def get_executor(
 
     if framework == "langgraph":
         return LangGraphExecutor(agent_dir, agent_entrypoints)
-    if framework == "langchain":
+    elif framework == "langchain":
         return LangChainExecutor(agent_dir, agent_entrypoints)
+    elif framework == "default":
+        return GenericExecutor(agent_dir, agent_entrypoints)
     else:
         raise ValueError(f"Framework {framework} not supported yet.")

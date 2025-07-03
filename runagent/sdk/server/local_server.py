@@ -168,7 +168,7 @@ class LocalServer:
 
     @staticmethod
     def from_path(
-        path: str, port: int = None, host: str = "127.0.0.1"
+        agent_path: Path, port: int = None, host: str = "127.0.0.1"
     ) -> "LocalServer":
         """
         Create LocalServer instance from an agent path with smart port handling.
@@ -183,7 +183,7 @@ class LocalServer:
             LocalServer instance
         """
         db_service = DBService()
-        agent_path = Path(path).resolve()
+        agent_path = agent_path.resolve()
 
         # Check if an agent from this path already exists
         existing_agent = db_service.get_agent_by_path(str(agent_path))
@@ -269,7 +269,7 @@ class LocalServer:
             result = db_service.add_agent_with_auto_port(
                 agent_id=agent_id,
                 agent_path=str(agent_path),
-                framework=detect_framework(path),
+                framework=detect_framework(agent_path),
                 status="ready",
                 preferred_host=host,
                 preferred_port=port,  # Will auto-allocate if None or unavailable

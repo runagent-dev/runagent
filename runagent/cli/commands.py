@@ -1,7 +1,7 @@
 """
 CLI commands that use the restructured SDK internally.
 """
-
+import os
 import json
 
 # import requests
@@ -57,9 +57,13 @@ def setup(api_key, base_url, force):
                 console.print(f"   {key}: [cyan]{value}[/cyan]")
 
     except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Authentication failed:[/red] {e}")
         raise click.ClickException("Setup failed")
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Setup error:[/red] {e}")
         raise click.ClickException("Setup failed")
 
@@ -97,6 +101,8 @@ def teardown(yes):
         )
 
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Teardown error:[/red] {e}")
         raise click.ClickException("Teardown failed")
 
@@ -128,72 +134,55 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
 
         # Check for mutually exclusive framework flags
         framework_flags = [langchain, langgraph, llamaindex]
-        flags_set = sum(framework_flags)
+        framework_str = ["langchain", "langgraph", "llamaindex"]
         
-        if flags_set > 1:
-            raise click.UsageError("Only one framework can be specified: --langchain, --langgraph, or --llamaindex")
+        if sum(framework_flags) > 1:
+            frameworks_str = ", ".join(f"--{fw}" for fw in framework_str)
+            raise click.UsageError(f"Only one framework can be specified: {frameworks_str}")
 
-        # Determine framework from flags
-        framework = ""
-        if langchain:
-            framework = "langchain"
-        elif langgraph:
-            framework = "langgraph"
-        elif llamaindex:
-            framework = "llamaindex"
+        framework = (
+            [name for name, flag in zip(framework_str, framework_flags) if flag] or ["default"]
+        )[0]
         
-        # Handle minimal case: no framework specified and no interactive mode
-        use_minimal_default = not framework and not interactive
-        
-        if use_minimal_default:
-            # For minimal default, we treat "default" as both framework and template
-            # This downloads from templates/default/ (not templates/default/default/)
-            framework = ""         # Empty framework 
-            template = "default"   # Template is "default"
+        if interactive:
+            if framework == "default":
+                console.print("🎯 [bold]Available frameworks:[/bold]")
+                for i, fw in enumerate(framework_str, 1):    # need to start from 1
+                    console.print(f"  {i}. {fw}")
+
+                choice = click.prompt(
+                    "Select framework", type=click.IntRange(1, len(framework_str)), default=1
+                )
+                framework = framework_str[choice - 1]
+
+            if template == "default":
+                templates = sdk.list_templates(framework)
+                template_list = templates.get(framework, ["default"])
+
+                console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
+                for i, tmpl in enumerate(template_list, 1):
+                    console.print(f"  {i}. {tmpl}")
+
+                choice = click.prompt(
+                    "Select template", type=click.IntRange(1, len(template_list)), default=1
+                )
+                template = template_list[choice - 1]
+                
+            if path.resolve() == Path.cwd():
+                project_name = click.prompt(
+                    "Enter project name",
+                    type=str,
+                    default="runagent-project"
+                )
+                # Update path to include project name
+                path = Path.cwd() / project_name
 
         # Use the path as the project location
-        project_path = Path(path).resolve()
+        project_path = path.resolve()
         relative_project_path = project_path.relative_to(Path.cwd())
         
         # Ensure the path exists (create parent directories if needed)
         project_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Interactive framework selection (only if interactive mode and no framework flag)
-        if interactive and not framework:
-            templates = sdk.list_available()
-            frameworks = list(templates.keys())
-
-            console.print("🎯 [bold]Available frameworks:[/bold]")
-            for i, fw in enumerate(frameworks, 1):
-                console.print(f"  {i}. {fw}")
-
-            choice = click.prompt(
-                "Select framework", type=click.IntRange(1, len(frameworks)), default=1
-            )
-            framework = frameworks[choice - 1]
-
-        # Interactive template selection (only if interactive mode)
-        if interactive and framework:  # Only if we have a framework
-            templates = sdk.list_available(framework)
-            template_list = templates.get(framework, ["default"])
-
-            console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
-            for i, tmpl in enumerate(template_list, 1):
-                console.print(f"  {i}. {tmpl}")
-
-            choice = click.prompt(
-                "Select template", type=click.IntRange(1, len(template_list)), default=1
-            )
-            template = template_list[choice - 1]
-
-        # Handle minimal case: no framework specified and no interactive mode
-        use_minimal_default = not framework and not interactive
-        
-        if use_minimal_default:
-            # For minimal default, we use empty framework and "default" template
-            # This will download from templates/default/ (after your downloader change)
-            framework = ""         # Empty framework 
-            template = "default"   # Template is "default"
 
         # Show configuration
         console.print(f"\n🚀 [bold]Initializing project:[/bold]")
@@ -204,7 +193,7 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
 
         # Initialize project
         success = sdk.init_project(
-            folder=str(project_path),
+            folder_path=project_path,
             framework=framework,
             template=template,
             overwrite=overwrite
@@ -224,9 +213,13 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
             )
 
     except TemplateError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Template error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
     except FileExistsError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Path exists:[/red] {e}")
         console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
         raise click.ClickException("Project initialization failed")
@@ -597,6 +590,8 @@ def deploy(folder, agent_id, local, framework, config):
             )
 
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Deployment error:[/red] {e}")
         raise click.ClickException("Deployment failed")
 
@@ -621,12 +616,10 @@ def serve(port, host, debug, path):
     """Start local FastAPI server for testing deployed agents with automatic port allocation"""
 
     try:
-        sdk = RunAgent()
-
         console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
         
         # Create LocalServer with automatic port allocation
-        server = LocalServer.from_path(str(path), port=port, host=host)
+        server = LocalServer.from_path(path, port=port, host=host)
         
         # The actual allocated address
         allocated_host = server.host
@@ -641,6 +634,8 @@ def serve(port, host, debug, path):
     except KeyboardInterrupt:
         console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Server error:[/red] {e}")
         raise click.ClickException("Server failed to start")
 
@@ -814,6 +809,8 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
             console.print(result)
             
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         raise click.ClickException(f"Execution failed: {e}")
 
 
@@ -972,5 +969,7 @@ def db_status(cleanup_days, agent_id, capacity):
                 console.print(f"❌ [red]{cleanup_result.get('error')}[/red]")
 
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Database status error:[/red] {e}")
         raise click.ClickException("Failed to get database status")

@@ -23,31 +23,59 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
     config_path_json = folder_path / AGENT_CONFIG_FILE_NAME
 
     # Try YAML config paths
-    config_path_yaml = folder_path / AGENT_CONFIG_FILE_NAME.replace(".json", ".yaml")
-    config_path_yml = folder_path / AGENT_CONFIG_FILE_NAME.replace(".json", ".yml")
+    config_path_yaml = folder_path / AGENT_CONFIG_FILE_NAME.replace(
+        ".json", ".yaml"
+    )
+    config_path_yml = folder_path / AGENT_CONFIG_FILE_NAME.replace(
+        ".json", ".yml"
+    )
+
+    config_data = None
 
     if config_path_json.exists():
         with config_path_json.open() as f:
             try:
                 config_data = json.load(f)
+                if not config_data:
+                    raise ValueError(
+                        f"Config file {config_path_json} is empty"
+                    )
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Invalid JSON format in {config_path_json}: {str(e)}"
+                )
             except Exception as e:
-                raise ValueError(f"Invalid JSON config file: {str(e)}")
+                raise ValueError(
+                    f"Error reading JSON config file {config_path_json}: "
+                    f"{str(e)}"
+                )
 
     elif config_path_yaml.exists() or config_path_yml.exists():
         try:
             import yaml
 
             yaml_path = (
-                config_path_yaml if config_path_yaml.exists() else config_path_yml
+                config_path_yaml if config_path_yaml.exists() 
+                else config_path_yml
             )
             with yaml_path.open() as f:
                 config_data = yaml.safe_load(f)
-                # return RunAgentConfig(**config_data)
+                if not config_data:
+                    raise ValueError(
+                        f"Config file {yaml_path} is empty"
+                    )
+        except yaml.YAMLError as e:
+            raise ValueError(
+                f"Invalid YAML format in {yaml_path}: {str(e)}"
+            )
         except Exception as e:
-            raise ValueError(f"Invalid YAML config file: {str(e)}")
+            raise ValueError(
+                f"Error reading YAML config file {yaml_path}: {str(e)}"
+            )
     else:
         raise ValueError(
-            f"No config file found. Tried: {config_path_json}, {config_path_yaml}, {config_path_yml}"
+            f"No config file found. Tried: {config_path_json}, "
+            f"{config_path_yaml}, {config_path_yml}"
         )
 
     # Check for .env file and load environment variables
@@ -59,10 +87,11 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
             env_vars = dotenv_values(env_path)
 
             # Update env_vars in config data
+            if "env_vars" not in config_data:
+                config_data["env_vars"] = {}
             config_data["env_vars"].update(env_vars)
         except Exception as e:
             raise ValueError(f"Error loading .env file: {str(e)}")
-
     return RunAgentConfig(**config_data)
 
 
