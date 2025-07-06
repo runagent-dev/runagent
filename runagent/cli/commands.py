@@ -400,7 +400,9 @@ def deploy_local(folder, framework, replace, port, host):
                 console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
 
             # Show capacity info
-            capacity = sdk.get_local_capacity()
+            # capacity = sdk.get_local_capacity()
+            capacity_info = sdk.db_service.get_database_capacity_info()
+
             console.print(
                 f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
             )
@@ -608,6 +610,8 @@ def deploy(folder, agent_id, local, framework, config):
 @click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
+@click.option("--replace", help="Replace existing agent with this agent ID")
+@click.option("--delete", help="Delete existing agent with this agent ID before serving")
 @click.argument(
     "path",
     type=click.Path(
@@ -620,16 +624,97 @@ def deploy(folder, agent_id, local, framework, config):
     ),
     default=".",
 )
-def serve(port, host, debug, path):
-    """Start local FastAPI server for testing deployed agents with automatic port allocation"""
+def serve(port, host, debug, replace, delete, path):
+    """Start local FastAPI server for testing deployed agents with automatic port allocation
+    
+    Options:
+        --replace AGENT_ID: Replace existing agent with new agent from path
+        --delete AGENT_ID: Delete existing agent before serving new one
+    """
 
     try:
-        console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
+        sdk = RunAgent()
         
-        # Create LocalServer with automatic port allocation
-        server = LocalServer.from_path(path, port=port, host=host)
+        # Handle delete operation first
+        if delete:
+            console.print(f"🗑️ [yellow]Deleting agent: {delete}[/yellow]")
+            
+            # Use the new force_delete_agent method
+            result = sdk.db_service.force_delete_agent(delete)
+            
+            if not result["success"]:
+                console.print(f"⚠️ [yellow]{result['error']}[/yellow]")
+                if result.get("code") == "AGENT_NOT_FOUND":
+                    console.print("💡 Available agents:")
+                    agents = sdk.db_service.list_agents()
+                    for agent in agents[:5]:  # Show first 5
+                        console.print(f"   • {agent['agent_id']} ({agent['framework']})")
+            else:
+                console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
         
-        # The actual allocated address
+        # Handle replace operation
+        if replace:
+            console.print(f"🔄 [yellow]Replacing agent: {replace}[/yellow]")
+            
+            # Check if the agent to replace exists
+            existing_agent = sdk.db_service.get_agent(replace)
+            if not existing_agent:
+                console.print(f"⚠️ [yellow]Agent {replace} not found in database[/yellow]")
+                console.print("💡 Available agents:")
+                agents = sdk.db_service.list_agents()
+                for agent in agents[:5]:  # Show first 5
+                    console.print(f"   • {agent['agent_id']} ({agent['framework']})")
+                raise click.ClickException("Agent to replace not found")
+            
+            # Generate new agent ID
+            import uuid
+            new_agent_id = str(uuid.uuid4())
+            
+            # Use the existing replace_agent method
+            result = sdk.db_service.replace_agent(
+                old_agent_id=replace,
+                new_agent_id=new_agent_id,
+                agent_path=str(path),
+                host=host,
+                port=port,
+                framework=detect_framework(path),
+            )
+            
+            if not result["success"]:
+                raise click.ClickException(f"Failed to replace agent: {result['error']}")
+            
+            console.print(f"✅ [green]Agent replaced successfully![/green]")
+            console.print(f"🆔 New Agent ID: [bold magenta]{new_agent_id}[/bold magenta]")
+            
+            # Create server with the new agent ID and specified host/port
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            
+            server = LocalServer(
+                db_service=db_service,
+                agent_id=new_agent_id,
+                agent_path=path,
+                port=port or 8450,  # Use provided port or default
+                host=host,
+            )
+        else:
+            # Normal operation - check capacity if not replacing/deleting
+            capacity_info = sdk.db_service.get_database_capacity_info()
+            if capacity_info["is_full"] and not delete and not replace:
+                console.print("❌ [red]Database is full![/red]")
+                oldest_agent = capacity_info.get("oldest_agent", {})
+                if oldest_agent:
+                    console.print(f"💡 [yellow]Suggested commands:[/yellow]")
+                    console.print(f"   Replace: [cyan]runagent serve {path} --replace {oldest_agent.get('agent_id', '')}[/cyan]")
+                    console.print(f"   Delete:  [cyan]runagent serve {path} --delete {oldest_agent.get('agent_id', '')}[/cyan]")
+                raise click.ClickException("Database at capacity. Use --replace or --delete to free space.")
+            
+            console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
+            
+            # Use the existing LocalServer.from_path method
+            server = LocalServer.from_path(path, port=port, host=host)
+        
+        # Common server startup code
         allocated_host = server.host
         allocated_port = server.port
         
@@ -646,7 +731,6 @@ def serve(port, host, debug, path):
             raise
         console.print(f"❌ [red]Server error:[/red] {e}")
         raise click.ClickException("Server failed to start")
-
 
 
 @click.command(
@@ -838,7 +922,9 @@ def db_status(cleanup_days, agent_id, capacity):
 
         if capacity:
             # Show detailed capacity info
-            capacity_info = sdk.get_local_capacity()
+            # capacity_info = sdk.get_local_capacity()
+            capacity_info = sdk.db_service.get_database_capacity_info()
+
 
             console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
             console.print(
@@ -922,8 +1008,11 @@ def db_status(cleanup_days, agent_id, capacity):
             return
 
         # Show general database stats
-        stats = sdk.get_local_stats()
-        capacity_info = sdk.get_local_capacity()
+        # stats = sdk.get_local_stats()
+        stats=sdk.db_service.get_database_stats()
+        # capacity_info = sdk.get_local_capacity()
+        capacity_info = sdk.db_service.get_database_capacity_info()
+
 
         console.print("\n📊 [bold]Local Database Status[/bold]")
 
@@ -952,7 +1041,9 @@ def db_status(cleanup_days, agent_id, capacity):
                 console.print(f"  [cyan]{status}[/cyan]: {count}")
 
         # List agents
-        agents = sdk.list_local_agents()
+        # agents = sdk.list_local_agents()
+        agents = sdk.db_service.list_agents()
+
         if agents:
             console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
             for agent in agents:
