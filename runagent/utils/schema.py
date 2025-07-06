@@ -52,7 +52,7 @@ class RunAgentConfig(BaseModel):
     agent_architecture: AgentArchitecture = Field(
         ..., description="Agent architecture details"
     )
-    env_vars: Dict[str, str] = Field(
+    env_vars: Optional[Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
     )
 

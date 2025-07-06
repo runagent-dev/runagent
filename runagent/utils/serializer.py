@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 from typing import Any, Dict, Optional, Union
@@ -30,6 +31,8 @@ class CoreSerializer:
             
             return serialized_json
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"Core serialization failed: {e}")
             # Return a safe fallback JSON string
             fallback = {
@@ -63,9 +66,13 @@ class CoreSerializer:
             return self._reconstruct_object(deserialized_data)
             
         except json.JSONDecodeError as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"JSON deserialization failed: {e}")
             raise ValueError(f"Invalid JSON string: {e}")
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"Deserialization failed: {e}")
             raise
 
@@ -101,6 +108,8 @@ class CoreSerializer:
             return json_str
             
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"Message serialization failed: {e}")
             # Return a safe fallback JSON string
             fallback = {
@@ -142,12 +151,18 @@ class CoreSerializer:
             return SafeMessage(**deserialized_data)
             
         except json.JSONDecodeError as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"JSON deserialization failed: {e}")
             raise ValueError(f"Invalid JSON string: {e}")
         except TypeError as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"SafeMessage construction failed: {e}")
             raise ValueError(f"Invalid SafeMessage data: {e}")
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             self.logger.error(f"Message deserialization failed: {e}")
             raise
 
@@ -186,6 +201,8 @@ class CoreSerializer:
             else:
                 return str(obj)
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return f"<Unserializable {type(obj).__name__}>"
 
     def _deep_serialize_value(self, value: Any) -> Any:
@@ -216,12 +233,16 @@ class CoreSerializer:
                 serialized = self._try_serialize_strategies(value)
                 return serialized
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 return str(value)
         else:
             # Convert to string as fallback
             try:
                 return str(value)
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 return f"<Unserializable {type(value).__name__}>"
 
     def _deep_serialize_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -343,6 +364,8 @@ class CoreSerializer:
                 json.dumps(content, default=str)
                 return {"content": content, "strategy": "dataclass"}
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 pass
         
         # Strategy 3: Pydantic models (check before __dict__ as they also have __dict__)
@@ -356,6 +379,8 @@ class CoreSerializer:
                 json.dumps(content, default=str)
                 return {"content": content, "strategy": "pydantic"}
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 pass
         
         # Strategy 4: Dict-like objects
@@ -369,6 +394,8 @@ class CoreSerializer:
                     "module": getattr(obj.__class__, '__module__', 'unknown')
                 }
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 pass
         
         # Strategy 5: Iterables (but not strings)
@@ -379,6 +406,8 @@ class CoreSerializer:
                 json.dumps(content, default=str)
                 return {"content": content, "strategy": "iterable"}
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 pass
         
         # Strategy 6: Convert to string representation
@@ -391,6 +420,8 @@ class CoreSerializer:
                 "length": len(str_repr)
             }
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             pass
         
         # Strategy 7: Last resort - minimal info
@@ -428,6 +459,8 @@ class CoreSerializer:
             obj_str = str(obj)
             obj_size = len(obj_str)
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             obj_str = f"<Cannot convert {type(obj)} to string>"
             obj_size = 0
         

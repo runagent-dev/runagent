@@ -128,6 +128,8 @@ class LocalServer:
                     check=True,
                 )
             except subprocess.CalledProcessError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise Exception(
                     f"Failed to install dependencies from {req_txt_path}: {str(e)}"
                 )
@@ -529,6 +531,8 @@ class LocalServer:
         except KeyboardInterrupt:
             console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"💥 [red]Server error: {str(e)}[/red]")
             raise
 

@@ -108,6 +108,8 @@ class Config:
                 with config_file.open("r") as f:
                     config = json.load(f)
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 config = {}
         else:
             config = {}
@@ -121,6 +123,8 @@ class Config:
                 json.dump(config, f, indent=2)
             return True
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return False
 
     @staticmethod
@@ -248,6 +252,8 @@ class Config:
                 config_file.unlink()
             return True
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return False
 
     @staticmethod
@@ -309,4 +315,6 @@ class Config:
                 json.dump(backup_config, f, indent=2)
             return str(backup_file)
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return None

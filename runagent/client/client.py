@@ -9,7 +9,7 @@ console = Console()
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, entrypoint_tag: str = "default", local: bool = True, host: str = None, port: int = None):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None):
         self.sdk = RunAgentSDK()
         self.serializer = CoreSerializer()
         self.local = local

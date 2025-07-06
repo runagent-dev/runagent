@@ -3,6 +3,7 @@ CLI commands that use the restructured SDK internally.
 """
 import os
 import json
+import uuid
 
 # import requests
 from pathlib import Path
@@ -19,6 +20,7 @@ from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
 )
 from runagent.client.client import RunAgentClient
 from runagent.sdk.server.local_server import LocalServer
+from runagent.utils.agent import detect_framework
 console = Console()
 
 
@@ -224,6 +226,8 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
         console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
         raise click.ClickException("Project initialization failed")
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
 
@@ -499,6 +503,8 @@ def start(agent_id, config):
             try:
                 config_dict = json.loads(config)
             except json.JSONDecodeError:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise click.ClickException("Invalid JSON in config parameter")
 
         console.print(f"🚀 [bold]Starting agent...[/bold]")
@@ -556,6 +562,8 @@ def deploy(folder, agent_id, local, framework, config):
             try:
                 config_dict = json.loads(config)
             except json.JSONDecodeError:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise click.ClickException("Invalid JSON in config parameter")
 
         if folder:
@@ -779,8 +787,12 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
                 input_params = json.load(f)
             console.print(f"   Config keys: [dim]{list(input_params.keys())}[/dim]")
         except json.JSONDecodeError:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             raise click.ClickException(f"Invalid JSON in input file: {input_file}")
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             raise click.ClickException(f"Error reading input file: {e}")
     
     elif extra_params:

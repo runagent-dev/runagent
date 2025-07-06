@@ -98,6 +98,8 @@ class HttpHandler:
                 elif "error" in error_data:
                     error_message = error_data["error"]
         except (json.JSONDecodeError, ValueError):
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             if response.text:
                 error_message = response.text
 
@@ -183,6 +185,8 @@ class HttpHandler:
         except (ClientError, ServerError, ConnectionError, AuthenticationError, ValidationError):
             raise
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             if not handle_errors:
                 raise
             raise ClientError(f"Unexpected error: {str(e)}")

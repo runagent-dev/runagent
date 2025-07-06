@@ -267,6 +267,8 @@ class TemplateDownloader:
                         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                         info["metadata"] = metadata
                     except json.JSONDecodeError:
+                        if os.getenv('DISABLE_TRY_CATCH'):
+                            raise
                         pass
 
                 # Verify this is a valid template
@@ -278,4 +280,6 @@ class TemplateDownloader:
                 return info
 
             except Exception:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 return None

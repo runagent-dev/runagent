@@ -26,6 +26,8 @@ class TemplateManager:
             self.list_available()
             return True
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return False
 
     def list_available(
@@ -71,6 +73,8 @@ class TemplateManager:
                 TEMPLATE_PREPATH, framework, template
             )
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return None
 
     def init_project(
@@ -133,6 +137,8 @@ class TemplateManager:
             return True
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             # Clean up on failure
             # if folder_path.exists():
             #     import shutil
