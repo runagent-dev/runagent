@@ -1,0 +1,27 @@
+{
+  "agent_name": "simple_letta_agent",
+  "description": "Simple Letta agent for conversational AI",
+  "framework": "letta",
+  "template": "basic",
+  "version": "1.0.0",
+  "created_at": "2025-01-07 12:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/letta/basic",
+    "author": "runagent-dev"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_run",
+        "tag": "basic"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_stream",
+        "tag": "basic_stream"
+      }
+    ]
+  }
+}

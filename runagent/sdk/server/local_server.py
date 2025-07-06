@@ -54,11 +54,7 @@ class LocalServer:
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
         self.agent_framework = self.agent_config.framework
-
-        self.agent_architecture = self.agent_config.agent_architecture
-        # self.agent_entrypoints = {}
-        # for entrypoint in agent_architecture.entrypoints:
-        #     self.agent_entrypoints[entrypoint.tag] = entrypoint
+        self.agent_architecture = self.agent_config.agent_architecture  
 
         # Install dependencies if requirements.txt exists
         self._install_dependencies()
@@ -71,25 +67,8 @@ class LocalServer:
             self.agent_path, self.agent_framework, self.agent_architecture.entrypoints
         )
 
-        # (
-        #     self.entrypoint_runners, self.entrypoint_stream_runners
-        # ) = self.agentic_executor.get_runners()
-
-        # Add agent to database if it doesn't exist
-        agent = self.db_service.get_agent(self.agent_id)
-        if not agent:
-            result = self.db_service.add_agent(
-                agent_id=self.agent_id,
-                agent_path=str(self.agent_path),
-                host=self.host,
-                port=self.port,
-                framework=self.agent_framework,
-            )
-            if not result["success"]:
-                console.print(
-                    f"[red]Failed to add agent to database: {result['error']}[/red]"
-                )
-                raise Exception(f"Failed to add agent to database: {result['error']}")
+        # Handle agent setup (simplified - no special Letta handling needed)
+        self._ensure_agent_in_database()
 
         self.websocket_handler = AgentWebSocketHandler(self.db_service)
         self.start_time = time.time()
@@ -97,7 +76,9 @@ class LocalServer:
         self.app = self._setup_fastapi_app()
         self._setup_websocket_routes()
         self._setup_routes()
-    
+
+
+
     def _setup_fastapi_app(self):
         """Setup FastAPI app"""
         app = FastAPI(
@@ -186,18 +167,29 @@ class LocalServer:
     ) -> "LocalServer":
         """
         Create LocalServer instance from an agent path with smart port handling.
-        If an agent from the same path already exists, check if its port is available.
+        Works with all frameworks including Letta (no special handling needed).
 
         Args:
-            path: Path to agent directory
+            agent_path: Path to agent directory
             port: Preferred port (auto-allocated if None or unavailable)
             host: Preferred host (default: 127.0.0.1)
 
         Returns:
             LocalServer instance
         """
+        import uuid
+        from runagent.utils.port import PortManager
+        from runagent.utils.agent import detect_framework, get_agent_config
+
         db_service = DBService()
         agent_path = agent_path.resolve()
+
+        # Get agent config to determine framework
+        try:
+            agent_config = get_agent_config(agent_path)
+            framework = agent_config.framework
+        except Exception as e:
+            framework = detect_framework(agent_path)
 
         # Check if an agent from this path already exists
         existing_agent = db_service.get_agent_by_path(str(agent_path))
@@ -266,9 +258,11 @@ class LocalServer:
                 )
         
         else:
-            # No existing agent - create new one with auto port allocation
+            # No existing agent - create new one
             console.print(f"🆕 [green]Creating new agent for path: {agent_path}[/green]")
+            console.print(f"📋 [cyan]Framework detected: [bold]{framework}[/bold][/cyan]")
             
+            # Check database capacity
             capacity_info = db_service.get_database_capacity_info()
             if capacity_info["is_full"]:
                 raise Exception(
@@ -276,14 +270,14 @@ class LocalServer:
                     "https://docs.runagent.ai/local-server for more information."
                 )
 
-            # Generate unique agent ID
+            # Generate unique agent ID (same for all frameworks including Letta)
             agent_id = str(uuid.uuid4())
             
             # Add agent with automatic port allocation
             result = db_service.add_agent_with_auto_port(
                 agent_id=agent_id,
                 agent_path=str(agent_path),
-                framework=detect_framework(agent_path),
+                framework=framework,
                 status="ready",
                 preferred_host=host,
                 preferred_port=port,  # Will auto-allocate if None or unavailable
@@ -297,6 +291,10 @@ class LocalServer:
             
             console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
             console.print(f"🔌 [green]Allocated address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
+            
+            if framework == "letta":
+                console.print(f"🤖 [yellow]Letta agent will be created when first called[/yellow]")
+                console.print(f"💡 [dim]Make sure Letta server is running: letta server[/dim]")
             
             return LocalServer(
                 agent_path=agent_path,
@@ -547,3 +545,73 @@ class LocalServer:
             "status": "running",
             "server_type": "FastAPI",
         }
+
+
+
+    def _ensure_agent_in_database(self):
+        """Ensure regular agent is in database"""
+        agent = self.db_service.get_agent(self.agent_id)
+        if not agent:
+            result = self.db_service.add_agent(
+                agent_id=self.agent_id,
+                agent_path=str(self.agent_path),
+                host=self.host,
+                port=self.port,
+                framework=self.agent_framework,
+            )
+            if not result["success"]:
+                console.print(f"[red]Failed to add agent to database: {result['error']}[/red]")
+                raise Exception(f"Failed to add agent to database: {result['error']}")
+
+    def _update_letta_agent_id_in_db(self):
+        """Update database with actual Letta agent ID after initialization"""
+        try:
+            # Import the agent module to trigger Letta agent creation
+            from runagent.utils.imports import PackageImporter
+            importer = PackageImporter()
+            
+            # Import the agent module to initialize Letta agent
+            agent_module = importer.resolve_import(
+                self.agent_path / "agent.py", 
+                "_get_letta_agent_id"
+            )
+            
+            # Get the actual Letta agent ID
+            actual_letta_agent_id = agent_module()
+            
+            if actual_letta_agent_id and actual_letta_agent_id != self.agent_id:
+                console.print(f"🔄 Updating database with Letta agent ID: {actual_letta_agent_id}")
+                
+                # Update the agent ID in database
+                with self.db_service.db_manager.get_session() as session:
+                    from runagent.sdk.db import Agent
+                    
+                    # Update existing record
+                    agent_record = session.query(Agent).filter(
+                        Agent.agent_id == self.agent_id
+                    ).first()
+                    
+                    if agent_record:
+                        agent_record.agent_id = actual_letta_agent_id
+                        session.commit()
+                        
+                        # Update our internal agent ID
+                        self.agent_id = actual_letta_agent_id
+                        console.print(f"✅ Database updated with Letta agent ID: {self.agent_id}")
+                    else:
+                        # Create new record with Letta agent ID
+                        new_agent = Agent(
+                            agent_id=actual_letta_agent_id,
+                            agent_path=str(self.agent_path),
+                            host=self.host,
+                            port=self.port,
+                            framework=self.agent_framework,
+                            status="deployed",
+                        )
+                        session.add(new_agent)
+                        session.commit()
+                        self.agent_id = actual_letta_agent_id
+                        console.print(f"✅ Created database record with Letta agent ID: {self.agent_id}")
+            
+        except Exception as e:
+            console.print(f"⚠️ Could not update Letta agent ID in database: {e}")

@@ -14,6 +14,8 @@ def get_executor(
         return LangGraphExecutor(agent_dir)
     elif framework == "langchain":
         return LangChainExecutor(agent_dir)
+    elif framework == "letta":
+        return GenericExecutor(agent_dir)
     elif framework == "default":
         return GenericExecutor(agent_dir)
     else:
