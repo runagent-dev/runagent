@@ -2,11 +2,11 @@ from .email_agent import MockOpenAIClient
 from typing import Iterator
 
 
-def mock_response(email_prompt):
+def mock_response(prompt):
     """Test the mock agent with non-streaming responses"""
     client = MockOpenAIClient()
 
-    response = client.create(model="gpt-4", messages=email_prompt)
+    response = client.create(model="gpt-4", messages=prompt)
 
     print(response.content)
     print(f"\nTokens used: {response.usage_tokens}")

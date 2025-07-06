@@ -342,11 +342,11 @@ class LocalServer:
                 "uptime_seconds": time.time() - self.start_time,
                 "version": "1.0.0",
             }
-        @self.app.get("/api/v1/agents/{agent_id}/architecture")
-        async def get_agent_architecture(agent_id: str):
+        @self.app.get(f"/api/v1/agents/{self.agent_id}/architecture")
+        async def get_agent_architecture():
             """Health check endpoint"""
             return {
-                "agent_id": agent_id,
+                "agent_id": self.agent_id,
                 "entrypoints": self.agent_config.agent_architecture.entrypoints
             }
 
@@ -358,13 +358,14 @@ class LocalServer:
             runner = self.agentic_executor.get_runner(entrypoint)
 
             @self.app.post(
-                "/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}",
+                f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}",
                 response_model=AgentRunResponse
             )
-            async def run_agent(agent_id: str, request: AgentRunRequest):
+            async def run_agent(request: AgentRunRequest):
                 """Run a deployed agent"""
                 start_time = time.time()
-
+                agent_id = self.agent_id
+                
                 try:
                     console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
                     console.print(f"🔍 Entrypoint: [cyan]{entrypoint.tag}[/cyan]")
@@ -373,9 +374,6 @@ class LocalServer:
                     result = runner(
                         *request.input_data.input_args, **request.input_data.input_kwargs
                     )
-                    print("runner", runner)
-                    print("input_data", request.input_data)
-                    print("result", result)
 
                     result_str = self.serializer.serialize_object(result)
                     execution_time = time.time() - start_time
