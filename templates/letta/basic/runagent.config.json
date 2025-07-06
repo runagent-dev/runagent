@@ -1,0 +1,27 @@
+{
+  "agent_name": "astrology_letta_agent",
+  "description": "Expert astrology assistant with RAG knowledge base and keyword extraction tools",
+  "framework": "letta",
+  "template": "astrology",
+  "version": "1.0.0",
+  "created_at": "2025-01-07 12:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/letta/astrology",
+    "author": "runagent-dev"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_run",
+        "tag": "astrology"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_stream",
+        "tag": "astrology_stream"
+      }
+    ]
+  }
+}

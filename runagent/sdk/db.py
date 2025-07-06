@@ -1290,3 +1290,58 @@ class DBService:
     def close(self):
         """Close database connections"""
         self.db_manager.close()
+
+
+    def force_delete_agent(self, agent_id: str) -> Dict:
+        """
+        Force delete agent from database (bypasses the normal deletion restriction)
+        
+        Args:
+            agent_id: Agent identifier
+            
+        Returns:
+            Dictionary with success status and details
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                # Find the agent
+                agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
+                
+                if not agent:
+                    return {
+                        "success": False,
+                        "error": f"Agent {agent_id} not found",
+                        "code": "AGENT_NOT_FOUND",
+                    }
+                
+                # Store agent info for the response
+                agent_info = {
+                    "agent_id": agent.agent_id,
+                    "framework": agent.framework,
+                    "deployed_at": agent.deployed_at.isoformat() if agent.deployed_at else None,
+                }
+                
+                # Delete the agent (CASCADE will handle related AgentRun records)
+                session.delete(agent)
+                session.commit()
+                
+                console.print(f"🗑️ [green]Force deleted agent: {agent_id}[/green]")
+                
+                return {
+                    "success": True,
+                    "message": f"Agent {agent_id} force deleted successfully",
+                    "deleted_agent": agent_info,
+                    "operation": "force_delete",
+                }
+                
+            except Exception as e:
+                session.rollback()
+                console.print(f"❌ [red]Error force deleting agent {agent_id}: {str(e)}[/red]")
+                return {
+                    "success": False,
+                    "error": f"Failed to force delete agent: {str(e)}",
+                    "code": "DELETE_ERROR",
+                }
+
+
+
