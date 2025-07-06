@@ -15,16 +15,13 @@
       {
         "file": "agents.py",
         "module": "app.invoke",
-        "type": "generic"
+        "tag": "basic"
       },
       {
         "file": "agents.py",
         "module": "app.stream",
-        "type": "generic_stream"
+        "tag": "basic_stream"
       }
     ]
-  },
-  "env_vars": {
-    "OPENAI_API_KEY": "sk-proj-1234567890"
   }
 }
