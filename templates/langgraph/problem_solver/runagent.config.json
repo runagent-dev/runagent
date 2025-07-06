@@ -15,12 +15,12 @@
       {
         "file": "agents.py",
         "module": "app.invoke",
-        "type": "generic"
+        "tag": "generic"
       },
       {
         "file": "agents.py",
         "module": "app.stream",
-        "type": "generic_stream"
+        "tag": "generic_stream"
       }
     ]
   },
