@@ -13,7 +13,6 @@ from runagent.utils.agent import validate_agent
 
 class TemplateDownloadError(Exception):
     """Exception raised when template download fails"""
-
     pass
 
 
@@ -21,13 +20,13 @@ class TemplateDownloader:
     """Download templates from git repository with sparse checkout"""
 
     def __init__(self, repo_url: str, branch: str = "main"):
-        """
+        '''
         Initialize template downloader
 
         Args:
             repo_url: Git repository URL
             branch: Branch to download from
-        """
+        '''
         self.repo_url = repo_url
         self.branch = branch
 
@@ -46,7 +45,7 @@ class TemplateDownloader:
         Raises:
             TemplateDownloadError: If download fails
         """
-        template_path = f"{prepath}/{framework}/{template}" if framework else f"{prepath}/{template}"
+        template_path = f"{prepath}/{framework}/{template}"
 
         # Create target directory
         target_dir = Path(target_folder)
