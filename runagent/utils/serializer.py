@@ -22,13 +22,13 @@ class CoreSerializer:
             JSON string representation
         """
         try:
-            serialized_data = self._try_serialize_strategies(obj)
-            json_str = json.dumps(serialized_data, ensure_ascii=False, default=self._json_serializer_fallback)
+            serialized_json = self._try_serialize_strategies(obj)
+            # json_str = json.dumps(serialized_data, ensure_ascii=False, default=self._json_serializer_fallback)
             
-            if not self.check_size_limit(json_str):
-                self.logger.warning(f"Serialized object exceeds size limit: {len(json_str)} bytes")
+            # if not self.check_size_limit(json_str):
+            #     self.logger.warning(f"Serialized object exceeds size limit: {len(json_str)} bytes")
             
-            return json_str
+            return serialized_json
         except Exception as e:
             self.logger.error(f"Core serialization failed: {e}")
             # Return a safe fallback JSON string
@@ -40,7 +40,7 @@ class CoreSerializer:
             }
             return json.dumps(fallback, ensure_ascii=False)
     
-    def deserialize_object(self, json_str: str, reconstruct: bool = False) -> Union[Dict[str, Any], Any]:
+    def deserialize_object(self, json_resp: str, reconstruct: bool = False) -> Union[Dict[str, Any], Any]:
         """
         Parse JSON string to data dict or reconstruct original object
         
@@ -49,11 +49,11 @@ class CoreSerializer:
             reconstruct: If True, attempt to reconstruct original object type
                         If False, return parsed dictionary/JSON version
         """
-        if not isinstance(json_str, str):
-            raise ValueError(f"Expected string input, got {type(json_str)}")
+        # if not isinstance(json_str, str):
+        #     raise ValueError(f"Expected string input, got {type(json_str)}")
         
         try:
-            deserialized_data = json.loads(json_str)
+            deserialized_data = json_resp  # json.loads(json_str)
             
             if not reconstruct:
                 # Return the parsed dictionary/JSON version with proper nested structure
