@@ -1,3 +1,4 @@
+import os
 import socket
 from typing import Tuple
 from rich.console import Console
@@ -21,6 +22,8 @@ class PortManager:
                 result = sock.connect_ex((host, port))
                 return result != 0  # Port is available if connection fails
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return False
     
     @staticmethod
@@ -61,5 +64,7 @@ class PortManager:
             
             return used_ports
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"[yellow]Warning: Could not fetch used ports: {e}[/yellow]")
             return []

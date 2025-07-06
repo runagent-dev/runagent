@@ -2,14 +2,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field
-
-
-
-class EntryPointType(Enum):
-    """Enum for different types of agent entrypoints"""
-    GENERIC = "generic"
-    GENERIC_STREAM = "generic_stream"
+from pydantic import BaseModel, Field, validator
 
 
 class TemplateSource(BaseModel):
@@ -25,13 +18,23 @@ class EntryPoint(BaseModel):
 
     file: str = Field(..., description="Entrypoint file")
     module: str = Field(..., description="Entrypoint module name")
-    type: EntryPointType = Field(..., description="Entrypoint type")
+    tag: str = Field(..., description="Entrypoint tag")
 
 
 class AgentArchitecture(BaseModel):
     """Agent architecture configuration"""
 
-    entrypoints: List[EntryPoint] = Field(..., description="List of entrypoints")
+    entrypoints: List[EntryPoint] = Field(
+        ..., description="List of entrypoints"
+    )
+
+    @validator('entrypoints')
+    def validate_unique_tags(cls, v):
+        """Validate that all entrypoint tags are unique"""
+        tags = [entrypoint.tag for entrypoint in v]
+        if len(tags) != len(set(tags)):
+            raise ValueError("All entrypoint tags must be unique")
+        return v
 
 
 class RunAgentConfig(BaseModel):
@@ -49,7 +52,7 @@ class RunAgentConfig(BaseModel):
     agent_architecture: AgentArchitecture = Field(
         ..., description="Agent architecture details"
     )
-    env_vars: Dict[str, str] = Field(
+    env_vars: Optional[Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
     )
 

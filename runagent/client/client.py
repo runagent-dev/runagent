@@ -9,11 +9,12 @@ console = Console()
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, local: bool = True, host: str = None, port: int = None):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None):
         self.sdk = RunAgentSDK()
-        self.agent_id = agent_id
-        self.local = local
         self.serializer = CoreSerializer()
+        self.local = local
+        self.agent_id = agent_id
+        self.entrypoint_tag = entrypoint_tag
 
         if local:
             if host and port:
@@ -24,11 +25,11 @@ class RunAgentClient:
                 agent_info = self.sdk.db_service.get_agent(agent_id)
                 if not agent_info:
                     raise ValueError(f"Agent {agent_id} not found in local DB")
-                
+
                 self.agent_info = agent_info
                 agent_host = self.agent_info["host"]
                 agent_port = self.agent_info["port"]
-                
+
                 console.print(f"🔍 [cyan]Auto-resolved address for agent {agent_id}: {agent_host}:{agent_port}[/cyan]")
 
             agent_base_url = f"http://{agent_host}:{agent_port}"
@@ -43,9 +44,21 @@ class RunAgentClient:
             self.rest_client = RestClient()
             self.socket_client = SocketClient()
 
-    def run_generic(self, *input_args, **input_kwargs):
-        response = self.rest_client.run_agent_generic(
-            self.agent_id, input_args=input_args, input_kwargs=input_kwargs
+        self.agent_architecture = self.rest_client.get_agent_architecture(agent_id)
+
+        selected_entrypoint = next(
+            (
+                entrypoint for entrypoint in self.agent_architecture['entrypoints']
+                if entrypoint['tag'] == entrypoint_tag
+            ), None)
+
+        if not selected_entrypoint:
+            raise ValueError(f"Entrypoint `{entrypoint_tag}` not found in agent {agent_id}")
+
+    def _run(self, *input_args, **input_kwargs):
+
+        response = self.rest_client.run_agent(
+            self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
         )
         if response.get("success"):
             response_data = response.get("output_data")
@@ -54,27 +67,13 @@ class RunAgentClient:
         else:
             raise Exception(response.get("error"))
 
-    def run_generic_stream(self, *input_args, **input_kwargs):
-        return self.socket_client.run_agent_generic_stream(
-            self.agent_id, input_args=input_args, input_kwargs=input_kwargs
+    def _run_stream(self, *input_args, **input_kwargs):
+        return self.socket_client.run_stream(
+            self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
         )
 
-
-class AsyncRunAgentClient(RunAgentClient):
-
-    async def run_generic(self, *input_args, **input_kwargs):
-        response = self.rest_client.run_agent_generic(
-            self.agent_id, input_args=input_args, input_kwargs=input_kwargs
-        )
-        if response.get("success"):
-            response_data = response.get("output_data")
-            return self.serializer.deserialize_object(response_data)
-
+    def run(self, *input_args, **input_kwargs):
+        if self.entrypoint_tag.endswith("_stream"):
+            return self._run_stream(*input_args, **input_kwargs)
         else:
-            raise Exception(response.get("error"))
-
-    async def run_generic_stream(self, *input_args, **input_kwargs):
-        async for item in self.socket_client.run_agent_generic_stream_async(
-            self.agent_id, *input_args, **input_kwargs
-        ):
-            yield item
+            return self._run(*input_args, **input_kwargs)

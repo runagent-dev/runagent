@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -132,6 +133,8 @@ class DBManager:
             Base.metadata.create_all(bind=self.engine)
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"[red]Error initializing database: {e}[/red]")
             raise
 
@@ -158,6 +161,8 @@ class DBManager:
                 session.execute("SELECT 1 FROM agent_runs LIMIT 1")
             return True
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return False
 
     def close(self):
@@ -313,6 +318,8 @@ class DBService:
                 return result
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             # Exception during API call, fallback to default
             result = {
                 "limit": default_limit,

@@ -26,9 +26,9 @@ class SocketClient:
         self.api_key = api_key or Config.get_api_key()
         self.serializer = CoreSerializer()
         
-    async def run_agent_generic_stream_async(self, agent_id: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
+    async def run_stream_async(self, agent_id: str, entrypoint_tag: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
         """Stream agent execution results (async version)"""
-        uri = f"{self.base_socket_url}/agents/{agent_id}/execute/generic_stream"
+        uri = f"{self.base_socket_url}/agents/{agent_id}/execute/{entrypoint_tag}"
         
         async with websockets.connect(uri) as websocket:
             # Send start stream request
@@ -72,11 +72,11 @@ class SocketClient:
                     # Yield the actual chunk data
                     yield safe_msg.data.get("content", safe_msg.data)
 
-    def run_agent_generic_stream(self, agent_id: str, input_args, input_kwargs) -> Iterator[Any]:
+    def run_stream(self, agent_id: str, entrypoint_tag: str, input_args, input_kwargs) -> Iterator[Any]:
         """Stream agent execution results (sync version)"""
         from websockets.sync.client import connect
         
-        uri = f"{self.base_socket_url}/agents/{agent_id}/execute/generic_stream"
+        uri = f"{self.base_socket_url}/agents/{agent_id}/execute/{entrypoint_tag}"
         
         with connect(uri) as websocket:
 

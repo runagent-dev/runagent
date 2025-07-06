@@ -38,6 +38,8 @@ LOCAL_CACHE_DIRECTORY = str(
 try:
     Path(LOCAL_CACHE_DIRECTORY).mkdir(parents=True, exist_ok=True)
 except OSError as e:
+    if os.getenv('DISABLE_TRY_CATCH'):
+        raise
     raise RuntimeError(
         f"Cache directory {LOCAL_CACHE_DIRECTORY} is not writable please "
         f"provide a path that is writable using {ENV_LOCAL_CACHE_DIRECTORY} "

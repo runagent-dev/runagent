@@ -20,14 +20,14 @@ from enum import Enum
 from runagent.sdk.db import DBService
 from runagent.sdk.server.framework import get_executor
 from runagent.utils.agent import detect_framework, get_agent_config
-from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponse, WebSocketActionType, WebSocketAgentRequest, EntryPointType
+from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponse, WebSocketActionType, WebSocketAgentRequest
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 from runagent.utils.port import PortManager
+from runagent.utils.serializer import CoreSerializer
 
 console = Console()
-
 
 
 class LocalServer:
@@ -47,16 +47,18 @@ class LocalServer:
         self.agent_id = agent_id
         self.agent_path = agent_path
         self.importer = PackageImporter(verbose=True)
+        self.serializer = CoreSerializer(max_size_mb=5.0)
 
         self.agent_config = get_agent_config(agent_path)
+
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
         self.agent_framework = self.agent_config.framework
 
-        agent_architecture = self.agent_config.agent_architecture
-        self.agent_entrypoints = {}
-        for entrypoint in agent_architecture.entrypoints:
-            self.agent_entrypoints[entrypoint.type] = entrypoint
+        self.agent_architecture = self.agent_config.agent_architecture
+        # self.agent_entrypoints = {}
+        # for entrypoint in agent_architecture.entrypoints:
+        #     self.agent_entrypoints[entrypoint.tag] = entrypoint
 
         # Install dependencies if requirements.txt exists
         self._install_dependencies()
@@ -66,8 +68,12 @@ class LocalServer:
             os.environ[key] = str(value)
 
         self.agentic_executor = get_executor(
-            self.agent_path, self.agent_framework, self.agent_entrypoints
+            self.agent_path, self.agent_framework, self.agent_architecture.entrypoints
         )
+
+        # (
+        #     self.entrypoint_runners, self.entrypoint_stream_runners
+        # ) = self.agentic_executor.get_runners()
 
         # Add agent to database if it doesn't exist
         agent = self.db_service.get_agent(self.agent_id)
@@ -85,26 +91,32 @@ class LocalServer:
                 )
                 raise Exception(f"Failed to add agent to database: {result['error']}")
 
-        self.app = FastAPI(
+        self.websocket_handler = AgentWebSocketHandler(self.db_service)
+        self.start_time = time.time()
+
+        self.app = self._setup_fastapi_app()
+        self._setup_websocket_routes()
+        self._setup_routes()
+    
+    def _setup_fastapi_app(self):
+        """Setup FastAPI app"""
+        app = FastAPI(
             title=f"RunAgent API - {self.agent_name}",
             description=f"Agend ID: {self.agent_id}",
             version=self.agent_version,
         )
-        self.start_time = time.time()
 
         # Setup CORS
-        self.app.add_middleware(
+        app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        # Setup routes
-        self.websocket_handler = AgentWebSocketHandler(self.db_service)
-        self._setup_routes()
-        self._setup_websocket_routes()
-    
+
+        return app
+
     def _install_dependencies(self):
         """Install agent dependencies from requirements.txt if it exists"""
         req_txt_path = self.agent_path / "requirements.txt"
@@ -116,6 +128,8 @@ class LocalServer:
                     check=True,
                 )
             except subprocess.CalledProcessError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 raise Exception(
                     f"Failed to install dependencies from {req_txt_path}: {str(e)}"
                 )
@@ -330,84 +344,103 @@ class LocalServer:
                 "uptime_seconds": time.time() - self.start_time,
                 "version": "1.0.0",
             }
+        @self.app.get("/api/v1/agents/{agent_id}/architecture")
+        async def get_agent_architecture(agent_id: str):
+            """Health check endpoint"""
+            return {
+                "agent_id": agent_id,
+                "entrypoints": self.agent_config.agent_architecture.entrypoints
+            }
 
-        @self.app.post(
-            "/api/v1/agents/{agent_id}/execute/generic", response_model=AgentRunResponse
-        )
-        async def run_agent(agent_id: str, request: AgentRunRequest):
-            """Run a deployed agent"""
-            start_time = time.time()
+        for entrypoint in self.agent_architecture.entrypoints:
 
-            try:
+            if entrypoint.tag.endswith("_stream"):
+                continue
 
-                if EntryPointType.GENERIC not in self.agent_entrypoints:
-                    raise ValueError("No `generic` entrypoint found in agent config")
-                
-                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
-                console.print(
-                    f"🔍 Entrypoint: [cyan]{self.agent_entrypoints[EntryPointType.GENERIC].file}[/cyan]"
-                )
-                console.print(f"🔍 Input data: [cyan]{request.input_data}[/cyan]")
+            runner = self.agentic_executor.get_runner(entrypoint)
 
-                result = self.agentic_executor.generic(
-                    *request.input_data.input_args, **request.input_data.input_kwargs
-                )
-                execution_time = time.time() - start_time
+            @self.app.post(
+                "/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}",
+                response_model=AgentRunResponse
+            )
+            async def run_agent(agent_id: str, request: AgentRunRequest):
+                """Run a deployed agent"""
+                start_time = time.time()
 
-                # Record successful run in database
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=result,
-                    success=True,
-                    execution_time=execution_time,
-                )
+                try:
+                    console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
+                    console.print(f"🔍 Entrypoint: [cyan]{entrypoint.tag}[/cyan]")
+                    console.print(f"🔍 Input data: [cyan]{request.input_data}[/cyan]")
 
-                console.print(
-                    f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
-                    f"{execution_time:.2f}s"
-                )
+                    result = runner(
+                        *request.input_data.input_args, **request.input_data.input_kwargs
+                    )
+                    print("runner", runner)
+                    print("input_data", request.input_data)
+                    print("result", result)
 
-                return AgentRunResponse(
-                    success=True,
-                    output_data=result,
-                    error=None,
-                    execution_time=execution_time,
-                    agent_id=agent_id,
-                )
+                    result_str = self.serializer.serialize_object(result)
+                    execution_time = time.time() - start_time
 
-            except Exception as e:
-                error_msg = f"Server error running agent {agent_id}: {str(e)}"
-                execution_time = time.time() - start_time
+                    # Record successful run in database
+                    self.db_service.record_agent_run(
+                        agent_id=agent_id,
+                        input_data=request.input_data,
+                        output_data=result_str,
+                        success=True,
+                        execution_time=execution_time,
+                    )
 
-                # Record failed run in database
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=None,
-                    success=False,
-                    error_message=error_msg,
-                    execution_time=execution_time,
-                )
+                    console.print(
+                        f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
+                        f"{execution_time:.2f}s"
+                    )
 
-                console.print(f"💥 [red]{error_msg}[/red]")
+                    return AgentRunResponse(
+                        success=True,
+                        output_data=result_str,
+                        error=None,
+                        execution_time=execution_time,
+                        agent_id=agent_id,
+                    )
 
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
-                )
+                except Exception as e:
+                    if os.getenv('DISABLE_TRY_CATCH'):
+                        raise
+                    error_msg = f"Server error running agent {agent_id}: {str(e)}"
+                    execution_time = time.time() - start_time
+
+                    # Record failed run in database
+                    self.db_service.record_agent_run(
+                        agent_id=agent_id,
+                        input_data=request.input_data,
+                        output_data=None,
+                        success=False,
+                        error_message=error_msg,
+                        execution_time=execution_time,
+                    )
+
+                    console.print(f"💥 [red]{error_msg}[/red]")
+
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
+                    )
 
     def _setup_websocket_routes(self):
         """Add WebSocket routes to your existing FastAPI app"""
-        print(self.agent_entrypoints)
-        @self.app.websocket("/api/v1/agents/{agent_id}/execute/generic_stream")
-        async def run_agent_stream(websocket: WebSocket, agent_id: str):
-            """WebSocket endpoint for agent streaming"""
-            # Validate agent exists
+        for entrypoint in self.agent_architecture.entrypoints:
 
-            if EntryPointType.GENERIC_STREAM not in self.agent_entrypoints:
-                raise ValueError("No `generic_stream` entrypoint found in agent config")
+            if not entrypoint.tag.endswith("_stream"):
+                continue
 
-            await self.websocket_handler.handle_agent_stream(websocket, agent_id, self.agentic_executor.generic_stream)
+            stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
+
+            @self.app.websocket("/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}")
+            async def run_agent_stream(websocket: WebSocket, agent_id: str):
+                """WebSocket endpoint for agent streaming"""
+                await self.websocket_handler.handle_agent_stream(
+                    websocket, agent_id, stream_runner
+                )
 
     def extract_endpoints(self):
         endpoints = []
@@ -498,6 +531,8 @@ class LocalServer:
         except KeyboardInterrupt:
             console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"💥 [red]Server error: {str(e)}[/red]")
             raise
 
