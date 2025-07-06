@@ -6,28 +6,28 @@ from runagent.utils.schema import EntryPoint
 
 
 class LangGraphExecutor(GenericExecutor):
-    def __init__(self, agent_dir: Path, agent_entrypoints: Dict[str, EntryPoint]):
-        super().__init__(agent_dir, agent_entrypoints)
+    def __init__(self, agent_dir: Path):
+        super().__init__(agent_dir)
 
         self._invoke_entrypoint = None
         self._stream_entrypoint = None
         self._stream_token_entrypoint = None
 
-        if "invoke" in agent_entrypoints:
-            ep = agent_entrypoints["invoke"]
-            self._invoke_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file, ep.module
-            )
-        if "stream" in agent_entrypoints:
-            ep = agent_entrypoints["stream"]
-            self._stream_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file, ep.module
-            )
-        if "stream_token" in agent_entrypoints:
-            ep = agent_entrypoints["stream_token"]
-            self._stream_token_entrypoint = self.importer.resolve_import(
-                self.agent_dir / ep.file, ep.module
-            )
+        # if "invoke" in agent_entrypoints:
+        #     ep = agent_entrypoints["invoke"]
+        #     self._invoke_entrypoint = self.importer.resolve_import(
+        #         self.agent_dir / ep.file, ep.module
+        #     )
+        # if "stream" in agent_entrypoints:
+        #     ep = agent_entrypoints["stream"]
+        #     self._stream_entrypoint = self.importer.resolve_import(
+        #         self.agent_dir / ep.file, ep.module
+        #     )
+        # if "stream_token" in agent_entrypoints:
+        #     ep = agent_entrypoints["stream_token"]
+        #     self._stream_token_entrypoint = self.importer.resolve_import(
+        #         self.agent_dir / ep.file, ep.module
+        #     )
 
     def invoke(self, *input_args, **input_kwargs):
         if self._invoke_entrypoint is None:
