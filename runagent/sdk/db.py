@@ -1290,3 +1290,6 @@ class DBService:
     def close(self):
         """Close database connections"""
         self.db_manager.close()
+
+
+
