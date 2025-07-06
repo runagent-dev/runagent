@@ -606,6 +606,7 @@ def deploy(folder, agent_id, local, framework, config):
         raise click.ClickException("Deployment failed")
 
 
+
 @click.command()
 @click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
@@ -639,18 +640,30 @@ def serve(port, host, debug, replace, delete, path):
         if delete:
             console.print(f"🗑️ [yellow]Deleting agent: {delete}[/yellow]")
             
-            # Use the new force_delete_agent method
-            result = sdk.db_service.force_delete_agent(delete)
-            
-            if not result["success"]:
-                console.print(f"⚠️ [yellow]{result['error']}[/yellow]")
-                if result.get("code") == "AGENT_NOT_FOUND":
-                    console.print("💡 Available agents:")
-                    agents = sdk.db_service.list_agents()
-                    for agent in agents[:5]:  # Show first 5
-                        console.print(f"   • {agent['agent_id']} ({agent['framework']})")
+            # Use the new force_delete_agent method if available, otherwise direct DB access
+            if hasattr(sdk.db_service, 'force_delete_agent'):
+                result = sdk.db_service.force_delete_agent(delete)
+                if not result["success"]:
+                    console.print(f"⚠️ [yellow]{result['error']}[/yellow]")
+                    if result.get("code") == "AGENT_NOT_FOUND":
+                        console.print("💡 Available agents:")
+                        agents = sdk.db_service.list_agents()
+                        for agent in agents[:5]:  # Show first 5
+                            console.print(f"   • {agent['agent_id']} ({agent['framework']})")
+                else:
+                    console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
             else:
-                console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
+                # Fallback to direct database access
+                with sdk.db_service.db_manager.get_session() as session:
+                    from runagent.sdk.db import Agent
+                    agent_to_delete = session.query(Agent).filter(Agent.agent_id == delete).first()
+                    
+                    if agent_to_delete:
+                        session.delete(agent_to_delete)
+                        session.commit()
+                        console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
+                    else:
+                        console.print(f"⚠️ [yellow]Agent {delete} not found in database[/yellow]")
         
         # Handle replace operation
         if replace:
@@ -670,13 +683,30 @@ def serve(port, host, debug, replace, delete, path):
             import uuid
             new_agent_id = str(uuid.uuid4())
             
-            # Use the existing replace_agent method
+            # Get currently used ports to avoid conflicts
+            used_ports = []
+            all_agents = sdk.db_service.list_agents()
+            for agent in all_agents:
+                if agent.get('port') and agent['agent_id'] != replace:  # Exclude the agent being replaced
+                    used_ports.append(agent['port'])
+            
+            # Allocate host and port
+            from runagent.utils.port import PortManager
+            if port and PortManager.is_port_available(host, port):
+                allocated_host = host
+                allocated_port = port
+                console.print(f"🎯 Using specified address: [blue]{allocated_host}:{allocated_port}[/blue]")
+            else:
+                allocated_host, allocated_port = PortManager.allocate_unique_address(used_ports)
+                console.print(f"🔌 Auto-allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
+            
+            # Use the existing replace_agent method with proper port allocation
             result = sdk.db_service.replace_agent(
                 old_agent_id=replace,
                 new_agent_id=new_agent_id,
                 agent_path=str(path),
-                host=host,
-                port=port,
+                host=allocated_host,
+                port=allocated_port,  # Ensure port is not None
                 framework=detect_framework(path),
             )
             
@@ -685,8 +715,9 @@ def serve(port, host, debug, replace, delete, path):
             
             console.print(f"✅ [green]Agent replaced successfully![/green]")
             console.print(f"🆔 New Agent ID: [bold magenta]{new_agent_id}[/bold magenta]")
+            console.print(f"🔌 Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
             
-            # Create server with the new agent ID and specified host/port
+            # Create server with the new agent ID and allocated host/port
             from runagent.sdk.db import DBService
             db_service = DBService()
             
@@ -694,8 +725,8 @@ def serve(port, host, debug, replace, delete, path):
                 db_service=db_service,
                 agent_id=new_agent_id,
                 agent_path=path,
-                port=port or 8450,  # Use provided port or default
-                host=host,
+                port=allocated_port,
+                host=allocated_host,
             )
         else:
             # Normal operation - check capacity if not replacing/deleting
@@ -961,7 +992,7 @@ def db_status(cleanup_days, agent_id, capacity):
                     f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]"
                 )
                 console.print(
-                    f"   [cyan]runagent deploy-local --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]"
+                    f"   [cyan]runagent serve --folder <path> --replace {oldest.get('agent_id', '')}[/cyan] or "
                 )
 
             return
