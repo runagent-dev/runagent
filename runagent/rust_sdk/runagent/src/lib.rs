@@ -18,7 +18,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create a client for a local agent
-//!     let client = RunAgentClient::new("my-agent-id", "generic", true)?;
+//!     let client = RunAgentClient::new("my-agent-id", "generic", true).await?;
 //!     
 //!     // Run the agent
 //!     let response = client.run(&[

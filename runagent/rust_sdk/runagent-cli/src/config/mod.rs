@@ -5,5 +5,5 @@
 
 pub mod cli_config;
 
-// Re-export the main config type
-pub use cli_config::CliConfig;
+// Re-export the main config type if needed
+// pub use cli_config::CliConfig;

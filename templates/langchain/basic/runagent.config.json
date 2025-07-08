@@ -1,0 +1,32 @@
+{
+  "agent_name": "test-langchain-agent",
+  "description": "Simple LangChain test agent for RunAgent development and testing",
+  "framework": "langchain",
+  "template": "basic",
+  "version": "1.0.0",
+  "created_at": "2024-01-15T10:00:00Z",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "/home/riamdriad5/runagent/runagent/templates/langchain/chatbot",
+    "author": "test"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "run",
+        "tag": "generic"
+      },
+      {
+        "file": "main.py", 
+        "module": "run_stream",
+        "tag": "generic_stream"
+      },
+      {
+        "file": "main.py",
+        "module": "health_check", 
+        "tag": "health"
+      }
+    ]
+  }
+}

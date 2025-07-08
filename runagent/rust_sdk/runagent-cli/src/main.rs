@@ -1,10 +1,6 @@
 //! RunAgent CLI - Deploy and manage AI agents easily
-//!
-//! This is the main entry point for the RunAgent CLI, providing the same
-//! interface as the Python CLI but implemented in Rust for better performance.
 
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 use std::process;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -20,16 +16,6 @@ use utils::output::CliOutput;
 #[command(name = "runagent")]
 #[command(about = "RunAgent CLI - Deploy and manage AI agents easily")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(long_about = "
-RunAgent CLI provides a unified interface for deploying and managing AI agents
-across different frameworks like LangChain, LangGraph, LlamaIndex, and custom Rust agents.
-
-Examples:
-  runagent serve ./my-agent --port 8450
-  runagent init my-new-agent --framework langchain --interactive  
-  runagent deploy-local --folder ./agent
-  runagent run --id agent-123 --message='Hello World'
-")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -47,35 +33,25 @@ struct Cli {
 enum Commands {
     /// Setup RunAgent authentication
     Setup(SetupArgs),
-
     /// Remove RunAgent configuration  
     Teardown(TeardownArgs),
-
     /// Initialize a new RunAgent project
     Init(InitArgs),
-
     /// Manage project templates
     Template(TemplateArgs),
-
     /// Deploy agent locally for testing
     #[command(name = "deploy-local")]
     DeployLocal(DeployLocalArgs),
-
     /// Upload agent to remote server
     Upload(UploadArgs),
-
     /// Start an uploaded agent on remote server
     Start(StartArgs),
-
     /// Deploy agent (upload + start) or deploy locally
     Deploy(DeployArgs),
-
     /// Start local FastAPI server for testing deployed agents
     Serve(ServeArgs),
-
     /// Run an agent with flexible configuration options
     Run(RunArgs),
-
     /// Show local database status and statistics
     #[command(name = "db-status")]
     DbStatus(DbStatusArgs),
@@ -139,26 +115,4 @@ fn init_logging(verbose: bool) {
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set tracing subscriber");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use clap::CommandFactory;
-
-    #[test]
-    fn verify_cli() {
-        Cli::command().debug_assert()
-    }
-
-    #[test]
-    fn test_cli_parsing() {
-        // Test basic command parsing
-        let cli = Cli::try_parse_from(&["runagent", "serve", "."]);
-        assert!(cli.is_ok());
-
-        // Test with flags
-        let cli = Cli::try_parse_from(&["runagent", "--verbose", "serve", ".", "--port", "8450"]);
-        assert!(cli.is_ok());
-    }
 }

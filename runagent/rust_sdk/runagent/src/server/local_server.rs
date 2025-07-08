@@ -1,10 +1,8 @@
 //! Local FastAPI-like server for testing deployed agents
 
-use crate::db::DatabaseService;
 use crate::server::handlers;
 use crate::types::{RunAgentError, RunAgentResult};
 use axum::{
-    // Remove unused State import
     routing::{get, post},
     Router,
 };
@@ -18,12 +16,16 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+#[cfg(feature = "db")]
+use crate::db::DatabaseService;
+
 /// Shared server state
 #[derive(Clone)]
 pub struct ServerState {
     pub agent_id: String,
     pub agent_path: PathBuf,
-    pub db_service: Arc<DatabaseService>,
+    #[cfg(feature = "db")]
+    pub db_service: Option<Arc<DatabaseService>>,
 }
 
 /// Local server for testing deployed agents
@@ -45,16 +47,24 @@ impl LocalServer {
             .parse()
             .map_err(|e| RunAgentError::config(format!("Invalid address: {}", e)))?;
 
-        // Initialize database service
-        let db_service = Arc::new(DatabaseService::new(None).await?);
+        // Initialize database service if feature is enabled
+        #[cfg(feature = "db")]
+        let db_service = match DatabaseService::new(None).await {
+            Ok(service) => Some(Arc::new(service)),
+            Err(e) => {
+                tracing::warn!("Failed to initialize database service: {}", e);
+                None
+            }
+        };
 
         let state = ServerState {
-            agent_id,
+            agent_id: agent_id.clone(),
             agent_path,
+            #[cfg(feature = "db")]
             db_service,
         };
 
-        let app = Self::create_router(state.clone());
+        let app = Self::create_router(state.clone(), &agent_id);
 
         Ok(Self { app, addr, state })
     }
@@ -75,26 +85,33 @@ impl LocalServer {
     }
 
     /// Create the Axum router with all routes
-    fn create_router(state: ServerState) -> Router {
+    fn create_router(state: ServerState, agent_id: &str) -> Router {
         Router::new()
+            // Root and health
+            .route("/", get(handlers::root))
+            .route("/health", get(handlers::health_check))
+            
             // API routes
             .route("/api/v1", get(handlers::root))
             .route("/api/v1/health", get(handlers::health_check))
             .route(
-                &format!("/api/v1/agents/{}/architecture", state.agent_id),
+                &format!("/api/v1/agents/{}/architecture", agent_id),
                 get(handlers::get_agent_architecture),
             )
             .route(
-                &format!("/api/v1/agents/{}/execute/:entrypoint", state.agent_id),
+                "/api/v1/agents/:agent_id/execute/:entrypoint",
                 post(handlers::run_agent),
             )
-            // WebSocket routes
+            
+            // WebSocket routes for streaming
             .route(
-                &format!("/api/v1/agents/{}/execute/:entrypoint/ws", state.agent_id),
+                "/api/v1/agents/:agent_id/execute/:entrypoint/ws",
                 get(handlers::websocket_handler),
             )
+            
             // State
             .with_state(state)
+            
             // Middleware
             .layer(
                 ServiceBuilder::new()
@@ -114,6 +131,10 @@ impl LocalServer {
             .await
             .map_err(|e| RunAgentError::connection(format!("Failed to bind to {}: {}", self.addr, e)))?;
 
+        tracing::info!("🚀 Server ready at http://{}", self.addr);
+        tracing::info!("🆔 Agent ID: {}", self.state.agent_id);
+        tracing::info!("📁 Agent Path: {}", self.state.agent_path.display());
+
         axum::serve(listener, self.app)
             .await
             .map_err(|e| RunAgentError::server(format!("Server error: {}", e)))?;
@@ -132,6 +153,16 @@ impl LocalServer {
             docs_url: format!("http://{}/docs", self.addr),
             status: "running".to_string(),
         }
+    }
+
+    /// Get the agent ID
+    pub fn agent_id(&self) -> &str {
+        &self.state.agent_id
+    }
+
+    /// Get the server address
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 }
 
@@ -176,5 +207,9 @@ mod tests {
 
         let server = LocalServer::from_path(agent_path, None, None).await;
         assert!(server.is_ok());
+        
+        if let Ok(server) = server {
+            assert!(!server.agent_id().is_empty());
+        }
     }
 }

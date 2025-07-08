@@ -2067,6 +2067,7 @@ dependencies = [
  "config",
  "console",
  "dirs",
+ "futures-util",
  "indicatif",
  "runagent",
  "serde",
@@ -2078,6 +2079,7 @@ dependencies = [
  "tokio-test",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
  "which",
 ]

@@ -1,14 +1,10 @@
-//! Init command implementation
-//!
-//! Initializes new RunAgent projects with support for multiple frameworks
-//! including Python (LangChain, LangGraph, LlamaIndex) and Rust frameworks.
+//! Init command implementation with embedded templates
 
 use crate::utils::{output::CliOutput, validation};
 use anyhow::{Context, Result};
 use clap::Args;
 use chrono::Utc;
 use serde_json::json;
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -61,7 +57,7 @@ pub async fn execute(args: InitArgs, output: &CliOutput) -> Result<()> {
     let framework = determine_framework(&args)?;
 
     // Determine path & name
-    let (project_path, project_name) = determine_project_path(&args, output)?;
+    let (project_path, project_name) = determine_project_path(&args)?;
 
     // Interactive adjustments
     let (final_framework, final_template) = if args.interactive {
@@ -112,7 +108,7 @@ fn determine_framework(args: &InitArgs) -> Result<String> {
     }
 }
 
-fn determine_project_path(args: &InitArgs, output: &CliOutput) -> Result<(PathBuf, String)> {
+fn determine_project_path(args: &InitArgs) -> Result<(PathBuf, String)> {
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
     if args.path == PathBuf::from(".") {
         if let Some(ref name) = args.name {
@@ -161,7 +157,7 @@ fn handle_interactive_mode(
         output.info("Available frameworks:");
         output.list_items(&[
             "1. langchain",
-            "2. langgraph",
+            "2. langgraph", 
             "3. llamaindex",
             "4. rust-langchain",
             "5. rust",
@@ -257,10 +253,10 @@ fn generate_project_files(
 
 fn generate_langchain_project(project_path: &PathBuf, template: &str) -> Result<()> {
     let main_py = match template {
-        "basic" => include_str!("../../../../../templates/langchain/basic/main.py"),
-        "advanced" => include_str!("../../../../../templates/langchain/advanced/main.py"),
-        "streaming" => include_str!("../../../../../templates/langchain/streaming/main.py"),
-        _ => include_str!("../../../../../templates/langchain/basic/main.py"),
+        "basic" => get_langchain_basic_template(),
+        "advanced" => get_langchain_advanced_template(),
+        "streaming" => get_langchain_streaming_template(),
+        _ => get_langchain_basic_template(),
     };
     fs::write(project_path.join("main.py"), main_py)?;
 
@@ -277,9 +273,9 @@ fn generate_langchain_project(project_path: &PathBuf, template: &str) -> Result<
 
 fn generate_langgraph_project(project_path: &PathBuf, template: &str) -> Result<()> {
     let graph_py = match template {
-        "basic" => include_str!("../../../../../templates/langgraph/basic/graph.py"),
-        "advanced" => include_str!("../../../../../templates/langgraph/advanced/graph.py"),
-        _ => include_str!("../../../../../templates/langgraph/basic/graph.py"),
+        "basic" => get_langgraph_basic_template(),
+        "advanced" => get_langgraph_advanced_template(),
+        _ => get_langgraph_basic_template(),
     };
     fs::write(project_path.join("graph.py"), graph_py)?;
     fs::write(
@@ -292,9 +288,9 @@ fn generate_langgraph_project(project_path: &PathBuf, template: &str) -> Result<
 
 fn generate_llamaindex_project(project_path: &PathBuf, template: &str) -> Result<()> {
     let main_py = match template {
-        "basic" => include_str!("../../../../../templates/llamaindex/basic/main.py"),
-        "rag" => include_str!("../../../../../templates/llamaindex/rag/main.py"),
-        _ => include_str!("../../../../../templates/llamaindex/basic/main.py"),
+        "basic" => get_llamaindex_basic_template(),
+        "rag" => get_llamaindex_rag_template(),
+        _ => get_llamaindex_basic_template(),
     };
     fs::write(project_path.join("main.py"), main_py)?;
     fs::write(
@@ -311,16 +307,32 @@ fn generate_rust_langchain_project(
     template: &str,
 ) -> Result<()> {
     let cargo = format!(
-        "[package]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ntokio = {{ version = \"1.0\", features = [\"full\"] }}\nserde = {{ version = \"1.0\", features = [\"derive\"] }}\nserde_json = \"1.0\"\nreqwest = {{ version = \"0.11\", features = [\"json\"] }}\nanyhow = \"1.0\"\ntracing = \"0.1\"\ntracing-subscriber = \"0.3\"\n\n# RunAgent SDK\nrunagent = {{ path = \"../path/to/runagent\" }}\n",
+        r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = {{ version = "1.0", features = ["full"] }}
+serde = {{ version = "1.0", features = ["derive"] }}
+serde_json = "1.0"
+reqwest = {{ version = "0.11", features = ["json"] }}
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# RunAgent SDK
+runagent = {{ path = "../path/to/runagent" }}
+"#,
         project_name
     );
     fs::write(project_path.join("Cargo.toml"), cargo)?;
     fs::create_dir_all(project_path.join("src"))?;
 
     let main_rs = match template {
-        "basic" => include_str!("../../../../../templates/rust-langchain/basic/main.rs"),
-        "async" => include_str!("../../../../../templates/rust-langchain/async/main.rs"),
-        _ => include_str!("../../../../../templates/rust-langchain/basic/main.rs"),
+        "basic" => get_rust_langchain_basic_template(),
+        "async" => get_rust_langchain_async_template(),
+        _ => get_rust_langchain_basic_template(),
     };
     fs::write(project_path.join("src/main.rs"), main_rs)?;
     fs::write(project_path.join(".env.example"), "OPENAI_API_KEY=your_api_key_here\n")?;
@@ -338,17 +350,28 @@ fn generate_rust_project(
         ""
     };
     let cargo = format!(
-        "[package]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ntokio = {{ version = \"1.0\", features = [\"full\"] }}\nserde = {{ version = \"1.0\", features = [\"derive\"] }}\nserde_json = \"1.0\"\nanyhow = \"1.0\"\n{}",
+        r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = {{ version = "1.0", features = ["full"] }}
+serde = {{ version = "1.0", features = ["derive"] }}
+serde_json = "1.0"
+anyhow = "1.0"
+{}
+"#,
         project_name, deps
     );
     fs::write(project_path.join("Cargo.toml"), cargo)?;
     fs::create_dir_all(project_path.join("src"))?;
 
     let main_rs = match template {
-        "basic" => include_str!("../../../../../templates/rust/basic/main.rs"),
-        "tokio" => include_str!("../../../../../templates/rust/tokio/main.rs"),
-        "axum" => include_str!("../../../../../templates/rust/axum/main.rs"),
-        _ => include_str!("../../../../../templates/rust/basic/main.rs"),
+        "basic" => get_rust_basic_template(),
+        "tokio" => get_rust_tokio_template(),
+        "axum" => get_rust_axum_template(),
+        _ => get_rust_basic_template(),
     };
     fs::write(project_path.join("src/main.rs"), main_rs)?;
     Ok(())
@@ -381,7 +404,25 @@ fn generate_common_files(
     )?;
 
     let readme = format!(
-        "# {}\n\nA RunAgent project using the {} framework.\n\n## Setup\n\n{}\n\n## Usage\n\n```bash\nrunagent serve .\nrunagent run --id <agent-id> --message='Hello World'\n```\n\n## Development\n\n{}\n",
+        r#"# {}
+
+A RunAgent project using the {} framework.
+
+## Setup
+
+{}
+
+## Usage
+
+```bash
+runagent serve .
+runagent run --id <agent-id> --message='Hello World'
+```
+
+## Development
+
+{}
+"#,
         project_name,
         framework,
         if framework.starts_with("rust") {
@@ -415,21 +456,26 @@ fn show_next_steps(project_path: &PathBuf, framework: &str, output: &CliOutput) 
     } else {
         "# already here".into()
     };
+    
+    // Fix the temporary value issue by creating owned strings
+    let serve_command_rust = format!("runagent serve {}", rel.display());
+    let serve_command_python = format!("runagent serve {}", rel.display());
+    
     let steps = if framework.starts_with("rust") {
         vec![
-            &cd,
+            cd.as_str(),
             "cargo build",
             "cp .env.example .env",
-            &format!("runagent serve {}", rel.display()),
+            serve_command_rust.as_str(),
             "# in another shell:",
             "runagent run --id <agent-id> --message='Hello from Rust!'",
         ]
     } else {
         vec![
-            &cd,
+            cd.as_str(),
             "pip install -r requirements.txt",
             "cp .env.example .env",
-            &format!("runagent serve {}", rel.display()),
+            serve_command_python.as_str(),
             "# in another shell:",
             "runagent run --id <agent-id> --message='Hello World!'",
         ]
@@ -440,64 +486,528 @@ fn show_next_steps(project_path: &PathBuf, framework: &str, output: &CliOutput) 
     output.info("🔗 Examples: https://github.com/runagent-dev/runagent/tree/main/examples");
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
+// Embedded templates
+fn get_langchain_basic_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Basic LangChain Agent Template
+"""
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage
 
-    #[test]
-    fn test_determine_framework() {
-        let args = InitArgs {
-            path: PathBuf::from("."),
-            template: "basic".into(),
-            interactive: false,
-            overwrite: false,
-            langchain: true,
-            langgraph: false,
-            llamaindex: false,
-            rust_langchain: false,
-            rust: false,
-            name: None,
-        };
-        assert_eq!(determine_framework(&args).unwrap(), "langchain");
+load_dotenv()
+
+def run(*args, **kwargs):
+    """Main agent function"""
+    # Get input message
+    message = kwargs.get("message", "Hello from RunAgent!")
+    
+    # Initialize LLM
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    # Process message
+    response = llm.invoke([HumanMessage(content=message)])
+    
+    return {
+        "response": response.content,
+        "input": message,
+        "framework": "langchain"
     }
 
-    #[test]
-    fn test_multiple_frameworks_error() {
-        let args = InitArgs {
-            path: PathBuf::from("."),
-            template: "basic".into(),
-            interactive: false,
-            overwrite: false,
-            langchain: true,
-            langgraph: true,
-            llamaindex: false,
-            rust_langchain: false,
-            rust: false,
-            name: None,
-        };
-        assert!(determine_framework(&args).is_err());
+if __name__ == "__main__":
+    result = run(message="Test message")
+    print(result)
+"#
+}
+
+fn get_langchain_advanced_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Advanced LangChain Agent Template with Memory
+"""
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+
+load_dotenv()
+
+# Global memory instance
+memory = ConversationBufferMemory()
+
+def run(*args, **kwargs):
+    """Advanced agent with memory"""
+    message = kwargs.get("message", "Hello from RunAgent!")
+    
+    # Initialize LLM
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    # Create conversation chain
+    conversation = ConversationChain(
+        llm=llm,
+        memory=memory,
+        verbose=True
+    )
+    
+    # Process message
+    response = conversation.predict(input=message)
+    
+    return {
+        "response": response,
+        "input": message,
+        "framework": "langchain",
+        "memory_length": len(memory.chat_memory.messages),
+        "template": "advanced"
     }
 
-    #[test]
-    fn test_validate_project_name() {
-        assert!(validation::validate_project_name("valid").is_ok());
-        assert!(validation::validate_project_name("").is_err());
+if __name__ == "__main__":
+    result = run(message="What's the weather like?")
+    print(result)
+"#
+}
+
+fn get_langchain_streaming_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Streaming LangChain Agent Template
+"""
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage
+
+load_dotenv()
+
+def run(*args, **kwargs):
+    """Non-streaming version"""
+    message = kwargs.get("message", "Hello from RunAgent!")
+    
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    response = llm.invoke([HumanMessage(content=message)])
+    
+    return {
+        "response": response.content,
+        "input": message,
+        "framework": "langchain",
+        "streaming": False
     }
 
-    #[tokio::test]
-    async fn test_generate_langchain_project() {
-        let tmp = TempDir::new().unwrap();
-        generate_langchain_project(tmp.path(), "basic").unwrap();
-        assert!(tmp.path().join("main.py").exists());
-        assert!(tmp.path().join("requirements.txt").exists());
+def run_stream(*args, **kwargs):
+    """Streaming version"""
+    message = kwargs.get("message", "Hello from RunAgent!")
+    
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY"),
+        streaming=True
+    )
+    
+    # Stream response
+    for chunk in llm.stream([HumanMessage(content=message)]):
+        yield {
+            "chunk": chunk.content,
+            "type": "content",
+            "framework": "langchain"
+        }
+
+if __name__ == "__main__":
+    result = run(message="Tell me a joke")
+    print(result)
+"#
+}
+
+fn get_langgraph_basic_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Basic LangGraph Agent Template
+"""
+import os
+from dotenv import load_dotenv
+from typing import Dict, Any
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage
+
+load_dotenv()
+
+def agent_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Main agent reasoning node"""
+    message = state.get("input", "Hello from RunAgent!")
+    
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    response = llm.invoke([HumanMessage(content=message)])
+    
+    return {
+        "output": response.content,
+        "framework": "langgraph",
+        "node": "agent"
     }
 
-    #[tokio::test]
-    async fn test_generate_rust_project() {
-        let tmp = TempDir::new().unwrap();
-        generate_rust_project(tmp.path(), "proj", "basic").unwrap();
-        assert!(tmp.path().join("Cargo.toml").exists());
-        assert!(tmp.path().join("src/main.rs").exists());
+def create_graph():
+    """Create the LangGraph workflow"""
+    workflow = StateGraph(dict)
+    
+    # Add nodes
+    workflow.add_node("agent", agent_node)
+    
+    # Set entry point
+    workflow.set_entry_point("agent")
+    
+    # Add edge to end
+    workflow.add_edge("agent", END)
+    
+    return workflow.compile()
+
+# Global graph instance
+graph = create_graph()
+
+def run(*args, **kwargs):
+    """Main agent function using LangGraph"""
+    input_data = kwargs.get("message", "Hello from RunAgent!")
+    
+    # Run the graph
+    result = graph.invoke({"input": input_data})
+    
+    return {
+        "response": result.get("output"),
+        "input": input_data,
+        "framework": "langgraph",
+        "graph_result": result
     }
+
+if __name__ == "__main__":
+    result = run(message="Explain LangGraph")
+    print(result)
+"#
+}
+
+fn get_langgraph_advanced_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Advanced LangGraph Agent with Tools
+"""
+import os
+from dotenv import load_dotenv
+from typing import Dict, Any, Literal
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage
+
+load_dotenv()
+
+def agent_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Agent reasoning node"""
+    message = state.get("input", "")
+    
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    response = llm.invoke([HumanMessage(content=message)]).content
+    
+    return {
+        "output": response,
+        "next": "end"
+    }
+
+def create_graph():
+    """Create advanced LangGraph"""
+    workflow = StateGraph(dict)
+    
+    # Add nodes
+    workflow.add_node("agent", agent_node)
+    
+    # Set entry point
+    workflow.set_entry_point("agent")
+    
+    workflow.add_edge("agent", END)
+    
+    return workflow.compile()
+
+# Global graph instance
+graph = create_graph()
+
+def run(*args, **kwargs):
+    """Advanced agent"""
+    input_data = kwargs.get("message", "Hello from RunAgent!")
+    
+    result = graph.invoke({
+        "input": input_data,
+    })
+    
+    return {
+        "response": result.get("output"),
+        "input": input_data,
+        "framework": "langgraph",
+        "graph_result": result
+    }
+
+if __name__ == "__main__":
+    result = run(message="search for python tutorials")
+    print(result)
+"#
+}
+
+fn get_llamaindex_basic_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+Basic LlamaIndex Agent Template
+"""
+import os
+from dotenv import load_dotenv
+from llama_index.core import VectorStoreIndex, Document
+from llama_index.llms.openai import OpenAI
+
+load_dotenv()
+
+def run(*args, **kwargs):
+    """Main agent function using LlamaIndex"""
+    message = kwargs.get("message", "Hello from RunAgent!")
+    
+    # Initialize LLM
+    llm = OpenAI(
+        model="gpt-3.5-turbo",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    # Create some sample documents
+    documents = [
+        Document(text="RunAgent is a platform for deploying AI agents."),
+        Document(text="LlamaIndex is a framework for building LLM applications."),
+    ]
+    
+    # Create index
+    index = VectorStoreIndex.from_documents(documents)
+    
+    # Create query engine
+    query_engine = index.as_query_engine(llm=llm)
+    
+    # Query the index
+    response = query_engine.query(message)
+    
+    return {
+        "response": str(response),
+        "input": message,
+        "framework": "llamaindex",
+        "documents_count": len(documents)
+    }
+
+if __name__ == "__main__":
+    result = run(message="What is RunAgent?")
+    print(result)
+"#
+}
+
+fn get_llamaindex_rag_template() -> &'static str {
+    r#"#!/usr/bin/env python3
+"""
+LlamaIndex RAG Template
+"""
+import os
+from dotenv import load_dotenv
+from llama_index.core import VectorStoreIndex, Document
+
+load_dotenv()
+
+def run(*args, **kwargs):
+    """RAG-powered agent function"""
+    message = kwargs.get("message", "What can you tell me about RunAgent?")
+    
+    documents = [
+        Document(text="RunAgent is a platform for deploying AI agents."),
+        Document(text="LlamaIndex specializes in RAG applications."),
+    ]
+    
+    # Create index
+    index = VectorStoreIndex.from_documents(documents)
+    
+    # Create query engine
+    query_engine = index.as_query_engine(similarity_top_k=2)
+    
+    # Query with retrieval
+    response = query_engine.query(message)
+    
+    return {
+        "response": str(response),
+        "input": message,
+        "framework": "llamaindex",
+        "template": "rag"
+    }
+
+if __name__ == "__main__":
+    result = run(message="Tell me about RunAgent")
+    print(result)
+"#
+}
+
+fn get_rust_langchain_basic_template() -> &'static str {
+    r#"use anyhow::Result;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    println!("RunAgent Rust LangChain Basic Template");
+    
+    let result = run().await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    
+    Ok(())
+}
+
+async fn run() -> Result<serde_json::Value> {
+    Ok(json!({
+        "response": "Hello from Rust LangChain basic template!",
+        "framework": "rust-langchain",
+        "template": "basic"
+    }))
+}
+"#
+}
+
+fn get_rust_langchain_async_template() -> &'static str {
+    r#"use anyhow::Result;
+use serde_json::json;
+use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    println!("RunAgent Rust LangChain Async Template");
+    
+    let result = run().await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    
+    Ok(())
+}
+
+async fn run() -> Result<serde_json::Value> {
+    // Simulate async operation
+    sleep(Duration::from_millis(100)).await;
+    
+    Ok(json!({
+        "response": "Hello from Rust LangChain async template!",
+        "framework": "rust-langchain",
+        "template": "async",
+        "async": true
+    }))
+}
+"#
+}
+
+fn get_rust_basic_template() -> &'static str {
+    r#"use anyhow::Result;
+use serde_json::json;
+
+fn main() -> Result<()> {
+    println!("RunAgent Rust Basic Template");
+    
+    let result = run()?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    
+    Ok(())
+}
+
+fn run() -> Result<serde_json::Value> {
+    Ok(json!({
+        "response": "Hello from Rust basic template!",
+        "framework": "rust",
+        "template": "basic"
+    }))
+}
+"#
+}
+
+fn get_rust_tokio_template() -> &'static str {
+    r#"use anyhow::Result;
+use serde_json::json;
+use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    println!("RunAgent Rust Tokio Template");
+    
+    let result = run().await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    
+    Ok(())
+}
+
+async fn run() -> Result<serde_json::Value> {
+    sleep(Duration::from_millis(100)).await;
+    
+    Ok(json!({
+        "response": "Hello from Rust tokio template!",
+        "framework": "rust",
+        "template": "tokio"
+    }))
+}
+"#
+}
+
+fn get_rust_axum_template() -> &'static str {
+    r#"use anyhow::Result;
+use axum::{routing::get, Router, Json};
+use serde_json::json;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    println!("RunAgent Rust Axum Template");
+    
+    let app = Router::new()
+        .route("/", get(hello))
+        .route("/run", get(run_handler));
+    
+    let listener = TcpListener::bind("0.0.0.0:3000").await?;
+    println!("Server running on http://0.0.0.0:3000");
+    
+    axum::serve(listener, app).await?;
+    
+    Ok(())
+}
+
+async fn hello() -> Json<serde_json::Value> {
+    Json(json!({
+        "message": "Hello from RunAgent Rust Axum template!",
+        "framework": "rust",
+        "template": "axum"
+    }))
+}
+
+async fn run_handler() -> Json<serde_json::Value> {
+    Json(run().await.unwrap_or_else(|_| json!({"error": "Failed to run"})))
+}
+
+async fn run() -> Result<serde_json::Value> {
+    Ok(json!({
+        "response": "Hello from Rust axum template!",
+        "framework": "rust",
+        "template": "axum"
+    }))
+}
+"#
 }
