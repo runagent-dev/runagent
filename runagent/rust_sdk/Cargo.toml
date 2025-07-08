@@ -1,7 +1,7 @@
+# runagent/rust_sdk/Cargo.toml - FIXED (Remove pyo3 from workspace)
 [workspace]
 members = [
-    "runagent",
-    "runagent-cli"
+    "runagent"
 ]
 resolver = "2"
 
@@ -12,7 +12,7 @@ tokio-tungstenite = "0.21"
 
 # HTTP and web
 reqwest = { version = "0.11", features = ["json", "stream"] }
-axum = { version = "0.7", features = ["ws", "headers"] }
+axum = { version = "0.7.6", features = ["ws"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
 hyper = { version = "1.0", features = ["full"] }
@@ -38,6 +38,9 @@ chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
 once_cell = "1.19"
 directories = "5.0"
+
+# Async streaming
+async-stream = "0.3"
 
 # Logging
 tracing = "0.1"

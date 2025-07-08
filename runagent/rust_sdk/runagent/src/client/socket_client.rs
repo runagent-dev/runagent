@@ -215,8 +215,3 @@ mod tests {
         assert!(client.is_ok());
     }
 }
-
-// Helper macro for creating async streams
-mod async_stream {
-    pub use async_stream::stream;
-}

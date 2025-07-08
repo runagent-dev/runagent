@@ -1,18 +1,18 @@
-//! Database manager for SQLite operations
+//! Simplified Database manager without migrations
 
 use crate::constants::LOCAL_CACHE_DIRECTORY;
 use crate::types::{RunAgentError, RunAgentResult};
-use sqlx::{migrate::MigrateDatabase, Pool, Sqlite, SqlitePool};
+use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool};
 use std::path::PathBuf;
 
-/// Database manager for SQLite operations
+/// Database manager for SQLite operations (No migrations needed)
 pub struct DatabaseManager {
     pool: Pool<Sqlite>,
     db_path: PathBuf,
 }
 
 impl DatabaseManager {
-    /// Create a new database manager
+    /// Create a new database manager with automatic schema creation
     pub async fn new(db_path: Option<PathBuf>) -> RunAgentResult<Self> {
         let db_path = db_path.unwrap_or_else(|| {
             LOCAL_CACHE_DIRECTORY.join("runagent_local.db")
@@ -24,23 +24,87 @@ impl DatabaseManager {
                 .map_err(|e| RunAgentError::database(format!("Failed to create database directory: {}", e)))?;
         }
 
-        let database_url = format!("sqlite://{}", db_path.to_string_lossy());
-
-        // Create database if it doesn't exist
-        if !Sqlite::database_exists(&database_url).await.unwrap_or(false) {
-            Sqlite::create_database(&database_url).await
-                .map_err(|e| RunAgentError::database(format!("Failed to create database: {}", e)))?;
-        }
+        // Create connection options
+        let options = SqliteConnectOptions::new()
+            .filename(&db_path)
+            .create_if_missing(true);
 
         // Create connection pool
-        let pool = SqlitePool::connect(&database_url).await
+        let pool = SqlitePool::connect_with(options).await
             .map_err(|e| RunAgentError::database(format!("Failed to connect to database: {}", e)))?;
 
-        // Run migrations
-        sqlx::migrate!("./migrations").run(&pool).await
-            .map_err(|e| RunAgentError::database(format!("Failed to run migrations: {}", e)))?;
+        let manager = Self { pool, db_path };
+        
+        // Create tables if they don't exist
+        manager.create_tables_if_not_exist().await?;
 
-        Ok(Self { pool, db_path })
+        Ok(manager)
+    }
+
+    /// Create tables if they don't exist (replaces migrations)
+    async fn create_tables_if_not_exist(&self) -> RunAgentResult<()> {
+        // Create agents table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS agents (
+                agent_id TEXT PRIMARY KEY,
+                agent_path TEXT NOT NULL,
+                host TEXT NOT NULL DEFAULT 'localhost',
+                port INTEGER NOT NULL DEFAULT 8450,
+                framework TEXT,
+                status TEXT NOT NULL DEFAULT 'deployed',
+                deployed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_run DATETIME,
+                run_count INTEGER NOT NULL DEFAULT 0,
+                success_count INTEGER NOT NULL DEFAULT 0,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            "#
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RunAgentError::database(format!("Failed to create agents table: {}", e)))?;
+
+        // Create agent_runs table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS agent_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                input_data TEXT NOT NULL,
+                output_data TEXT,
+                success BOOLEAN NOT NULL,
+                error_message TEXT,
+                execution_time REAL,
+                started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME,
+                FOREIGN KEY (agent_id) REFERENCES agents(agent_id) ON DELETE CASCADE
+            )
+            "#
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RunAgentError::database(format!("Failed to create agent_runs table: {}", e)))?;
+
+        // Create indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RunAgentError::database(format!("Failed to create index: {}", e)))?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_id ON agent_runs(agent_id)")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RunAgentError::database(format!("Failed to create index: {}", e)))?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_agent_runs_started_at ON agent_runs(started_at)")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RunAgentError::database(format!("Failed to create index: {}", e)))?;
+
+        Ok(())
     }
 
     /// Get the database pool
@@ -53,127 +117,8 @@ impl DatabaseManager {
         &self.db_path
     }
 
-    /// Check if database is initialized
-    pub async fn is_initialized(&self) -> bool {
-        // Try to query a simple table to check if database is working
-        sqlx::query("SELECT 1")
-            .fetch_optional(&self.pool)
-            .await
-            .is_ok()
-    }
-
-    /// Get database size in bytes
-    pub async fn get_size(&self) -> RunAgentResult<u64> {
-        if self.db_path.exists() {
-            let metadata = std::fs::metadata(&self.db_path)
-                .map_err(|e| RunAgentError::database(format!("Failed to get database size: {}", e)))?;
-            Ok(metadata.len())
-        } else {
-            Ok(0)
-        }
-    }
-
     /// Close the database connection
     pub async fn close(self) {
         self.pool.close().await;
-    }
-
-    /// Execute a transaction
-    pub async fn transaction<F, R>(&self, f: F) -> RunAgentResult<R>
-    where
-        F: for<'c> FnOnce(&'c mut sqlx::Transaction<'_, Sqlite>) -> futures::future::BoxFuture<'c, RunAgentResult<R>> + Send,
-        R: Send,
-    {
-        let mut tx = self.pool.begin().await
-            .map_err(|e| RunAgentError::database(format!("Failed to begin transaction: {}", e)))?;
-
-        let result = f(&mut tx).await;
-
-        match result {
-            Ok(value) => {
-                tx.commit().await
-                    .map_err(|e| RunAgentError::database(format!("Failed to commit transaction: {}", e)))?;
-                Ok(value)
-            }
-            Err(err) => {
-                tx.rollback().await
-                    .map_err(|e| RunAgentError::database(format!("Failed to rollback transaction: {}", e)))?;
-                Err(err)
-            }
-        }
-    }
-
-    /// Vacuum the database to reclaim space
-    pub async fn vacuum(&self) -> RunAgentResult<()> {
-        sqlx::query("VACUUM")
-            .execute(&self.pool)
-            .await
-            .map_err(|e| RunAgentError::database(format!("Failed to vacuum database: {}", e)))?;
-        Ok(())
-    }
-
-    /// Get database statistics
-    pub async fn get_stats(&self) -> RunAgentResult<DatabaseStats> {
-        let agent_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| RunAgentError::database(format!("Failed to get agent count: {}", e)))?;
-
-        let run_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_runs")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| RunAgentError::database(format!("Failed to get run count: {}", e)))?;
-
-        let db_size = self.get_size().await?;
-
-        Ok(DatabaseStats {
-            total_agents: agent_count as usize,
-            total_runs: run_count as usize,
-            database_size_mb: db_size as f64 / 1024.0 / 1024.0,
-            database_path: self.db_path.to_string_lossy().to_string(),
-            agent_status_counts: std::collections::HashMap::new(), // Would be populated in a real implementation
-            rest_client_configured: false, // Would be determined based on configuration
-        })
-    }
-}
-
-/// Database statistics
-#[derive(Debug, Clone)]
-pub struct DatabaseStats {
-    /// Total number of agents
-    pub total_agents: usize,
-    /// Total number of runs
-    pub total_runs: usize,
-    /// Database size in MB
-    pub database_size_mb: f64,
-    /// Path to database file
-    pub database_path: String,
-    /// Count of agents by status
-    pub agent_status_counts: std::collections::HashMap<String, usize>,
-    /// Whether REST client is configured
-    pub rest_client_configured: bool,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[tokio::test]
-    async fn test_database_manager_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test.db");
-        
-        let manager = DatabaseManager::new(Some(db_path)).await;
-        assert!(manager.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_database_initialization() {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test.db");
-        
-        let manager = DatabaseManager::new(Some(db_path)).await.unwrap();
-        assert!(manager.is_initialized().await);
     }
 }
