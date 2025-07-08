@@ -6,7 +6,7 @@ use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
     response::{IntoResponse, Json},
-    websocket::{Message, WebSocket},
+    extract::ws::{Message, WebSocket},
 };
 use chrono::Utc;
 use futures::{sink::SinkExt, stream::StreamExt};

@@ -1,4 +1,3 @@
-# runagent/rust_sdk/runagent/Cargo.toml - SIMPLIFIED (No complex features)
 [package]
 name = "runagent"
 version = "0.1.0"
@@ -16,7 +15,7 @@ tokio-tungstenite = { workspace = true }
 reqwest = { workspace = true }
 axum = { workspace = true }
 tower = { workspace = true }
-tower-http = { workspace = true }
+tower-http = { workspace = true, features = ["trace"] }
 hyper = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -42,10 +41,13 @@ url = "2.5"
 bytes = "1.5"
 mime = "0.3"
 percent-encoding = "2.3"
+dirs = "5.0"  # Add this line
 
 [dev-dependencies]
 tokio-test = "0.4"
 
-# Simple features without complex dependencies
+# Add the features section
 [features]
-default = []
+default = ["db", "server"]
+server = []
+db = []

@@ -156,7 +156,7 @@ impl CoreSerializer {
         metadata.insert("is_array".to_string(), Value::Bool(obj.is_array()));
         metadata.insert("is_object".to_string(), Value::Bool(obj.is_object()));
 
-        Value::Object(metadata.into())
+        Value::Object(metadata.into_iter().collect())
     }
 
     /// Deep serialize any value, handling nested structures

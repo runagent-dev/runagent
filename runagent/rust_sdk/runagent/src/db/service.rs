@@ -5,8 +5,10 @@ use crate::db::{manager::DatabaseManager, models::*};
 use crate::types::{RunAgentError, RunAgentResult};
 use chrono::{DateTime, Duration, Utc};
 use sqlx::Row;
+use sqlx::FromRow;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
 
 /// High-level database service with business logic
 pub struct DatabaseService {
@@ -51,6 +53,8 @@ impl DatabaseService {
 
         // Phase 1: Check if we're within default limits
         if current_count < default_limit {
+            let agent_id = agent.agent_id.clone();
+
             self.insert_agent(agent).await?;
             
             return Ok(AddAgentResult::success(

@@ -47,31 +47,31 @@ impl RunAgentClient {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(
+    pub async fn new(
         agent_id: &str,
         entrypoint_tag: &str,
         local: bool,
     ) -> RunAgentResult<Self> {
-        Self::with_address(agent_id, entrypoint_tag, local, None, None)
+        Self::with_address(agent_id, entrypoint_tag, local, None, None).await
     }
 
     /// Create a new RunAgent client with specific host and port
-    pub fn with_address(
+    pub async fn with_address(
         agent_id: &str,
         entrypoint_tag: &str,
         local: bool,
         host: Option<&str>,
         port: Option<u16>,
     ) -> RunAgentResult<Self> {
-        let serializer = CoreSerializer::new(10.0)?; // 10MB max size
+        let serializer = CoreSerializer::new(10.0)?;
 
         #[cfg(feature = "db")]
         let db_service = if local {
-            Some(DatabaseService::new()?)
+            Some(DatabaseService::new(None).await?)
         } else {
             None
         };
-
+        
         let (rest_client, socket_client) = if local {
             let (agent_host, agent_port) = if let (Some(h), Some(p)) = (host, port) {
                 tracing::info!("Using explicit address: {}:{}", h, p);
