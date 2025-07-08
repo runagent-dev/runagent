@@ -1,0 +1,53 @@
+[package]
+name = "runagent-cli"
+version = "0.1.0"
+edition = "2021"
+description = "RunAgent CLI - Deploy and manage AI agents easily"
+license = "MIT"
+repository = "https://github.com/runagent-dev/runagent"
+keywords = ["ai", "agents", "llm", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "runagent"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+runagent = { path = "../runagent", features = ["db", "server"] }
+
+# CLI dependencies
+clap = { version = "4.4", features = ["derive", "color", "suggestions"] }
+console = "0.15"
+indicatif = "0.17"
+colored = "2.0"
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Utility
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# System
+which = { workspace = true }
+dirs = "5.0"
+tempfile = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Config
+config = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = "0.4"

@@ -1,7 +1,8 @@
-# runagent/rust_sdk/Cargo.toml - FIXED (Remove pyo3 from workspace)
+# runagent/rust_sdk/Cargo.toml - Updated workspace with CLI
 [workspace]
 members = [
-    "runagent"
+    "runagent",
+    "runagent-cli"
 ]
 resolver = "2"
 
@@ -26,10 +27,11 @@ serde_yaml = "0.9"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
-# CLI
-clap = { version = "4.4", features = ["derive", "color"] }
+# CLI dependencies
+clap = { version = "4.4", features = ["derive", "color", "suggestions"] }
 console = "0.15"
 indicatif = "0.17"
+colored = "2.0"
 
 # Utility
 anyhow = "1.0"
@@ -53,6 +55,10 @@ dotenv = "0.15"
 # Process and system
 which = "6.0"
 tempfile = "3.8"
+dirs = "5.0"
+
+# URL parsing
+url = "2.5"
 
 [profile.release]
 opt-level = 3
