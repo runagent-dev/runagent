@@ -1,9 +1,6 @@
 # runagent/rust_sdk/Cargo.toml - Updated workspace with CLI
 [workspace]
-members = [
-    "runagent",
-    "runagent-cli"
-]
+members = ["runagent"]
 resolver = "2"
 
 [workspace.dependencies]
