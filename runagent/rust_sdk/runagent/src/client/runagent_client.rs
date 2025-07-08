@@ -42,7 +42,7 @@ impl RunAgentClient {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = RunAgentClient::new("my-agent", "generic", true)?;
+    ///     let client = RunAgentClient::new("my-agent", "generic", true).await?;
     ///     // Use the client...
     ///     Ok(())
     /// }
@@ -80,11 +80,11 @@ impl RunAgentClient {
                 #[cfg(feature = "db")]
                 {
                     if let Some(ref db) = db_service {
-                        let agent_info = db.get_agent(agent_id)?
+                        let agent_info = db.get_agent(agent_id).await?
                             .ok_or_else(|| RunAgentError::validation(format!("Agent {} not found in local DB", agent_id)))?;
                         
                         tracing::info!("Auto-resolved address for agent {}: {}:{}", agent_id, agent_info.host, agent_info.port);
-                        (agent_info.host, agent_info.port)
+                        (agent_info.host, agent_info.port as u16)
                     } else {
                         return Err(RunAgentError::config("Database feature not enabled but required for local agent lookup"));
                     }
@@ -174,7 +174,7 @@ impl RunAgentClient {
     /// # use runagent::client::RunAgentClient;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = RunAgentClient::new("my-agent", "generic", true)?;
+    /// # let client = RunAgentClient::new("my-agent", "generic", true).await?;
     /// let response = client.run_with_args(
     ///     &[serde_json::json!("Hello")],
     ///     &[("temperature", serde_json::json!(0.7))]
@@ -231,7 +231,7 @@ impl RunAgentClient {
     /// # use runagent::client::RunAgentClient;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = RunAgentClient::new("my-agent", "generic", true)?;
+    /// # let client = RunAgentClient::new("my-agent", "generic", true).await?;
     /// let response = client.run(&[
     ///     ("message", serde_json::json!("Hello, world!")),
     ///     ("temperature", serde_json::json!(0.7))
@@ -251,7 +251,7 @@ impl RunAgentClient {
     /// # use futures::StreamExt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = RunAgentClient::new("my-agent", "generic_stream", true)?;
+    /// # let client = RunAgentClient::new("my-agent", "generic_stream", true).await?;
     /// let mut stream = client.run_stream(&[
     ///     ("message", serde_json::json!("Hello, world!"))
     /// ]).await?;

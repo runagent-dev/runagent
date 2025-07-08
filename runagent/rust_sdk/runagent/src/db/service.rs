@@ -4,11 +4,9 @@ use crate::client::RestClient;
 use crate::db::{manager::DatabaseManager, models::*};
 use crate::types::{RunAgentError, RunAgentResult};
 use chrono::{DateTime, Duration, Utc};
-use sqlx::Row;
-use sqlx::FromRow;
-use std::collections::HashMap;
+use sqlx::{Row, FromRow};
+// use std::collections::HashMap;
 use std::path::PathBuf;
-
 
 /// High-level database service with business logic
 pub struct DatabaseService {
@@ -55,10 +53,10 @@ impl DatabaseService {
         if current_count < default_limit {
             let agent_id = agent.agent_id.clone();
 
-            self.insert_agent(agent).await?;
+            self.insert_agent(agent.clone()).await?;
             
             return Ok(AddAgentResult::success(
-                format!("Agent {} added successfully", agent.agent_id),
+                format!("Agent {} added successfully", agent_id),
                 current_count + 1,
                 "default".to_string(),
                 false,
@@ -68,7 +66,7 @@ impl DatabaseService {
         // Phase 2: Check enhanced limits via API
         if let Some(limit_info) = self.check_enhanced_limits().await? {
             if current_count >= limit_info.limit {
-                let oldest_agent = self.get_oldest_agent().await?;
+                let _oldest_agent = self.get_oldest_agent().await?;
                 
                 return Ok(AddAgentResult::error(
                     format!("Maximum {} agents allowed", limit_info.limit),
@@ -76,7 +74,7 @@ impl DatabaseService {
                 ).with_capacity_info(limit_info.limit, limit_info.limit.saturating_sub(current_count)));
             }
 
-            self.insert_agent(agent).await?;
+            self.insert_agent(agent.clone()).await?;
             
             return Ok(AddAgentResult::success(
                 format!("Agent added with enhanced limits"),
@@ -94,7 +92,7 @@ impl DatabaseService {
             ));
         }
 
-        self.insert_agent(agent).await?;
+        self.insert_agent(agent.clone()).await?;
         Ok(AddAgentResult::success(
             "Agent added successfully".to_string(),
             current_count + 1,
@@ -153,36 +151,39 @@ impl DatabaseService {
         new_agent: Agent,
     ) -> RunAgentResult<bool> {
         // Use a transaction to ensure atomicity
-        self.manager.transaction(|tx| {
-            Box::pin(async move {
-                // Delete old agent
-                sqlx::query("DELETE FROM agents WHERE agent_id = ?")
-                    .bind(old_agent_id)
-                    .execute(&mut **tx)
-                    .await
-                    .map_err(|e| RunAgentError::database(format!("Failed to delete old agent: {}", e)))?;
+        let mut tx = self.manager.pool().begin().await
+            .map_err(|e| RunAgentError::database(format!("Failed to begin transaction: {}", e)))?;
+        
+        // Delete old agent
+        sqlx::query("DELETE FROM agents WHERE agent_id = ?")
+            .bind(old_agent_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| RunAgentError::database(format!("Failed to delete old agent: {}", e)))?;
 
-                // Insert new agent
-                sqlx::query(
-                    "INSERT INTO agents (agent_id, agent_path, host, port, framework, status, deployed_at, created_at, updated_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                )
-                .bind(&new_agent.agent_id)
-                .bind(&new_agent.agent_path)
-                .bind(&new_agent.host)
-                .bind(new_agent.port)
-                .bind(&new_agent.framework)
-                .bind(&new_agent.status)
-                .bind(new_agent.deployed_at)
-                .bind(new_agent.created_at)
-                .bind(new_agent.updated_at)
-                .execute(&mut **tx)
-                .await
-                .map_err(|e| RunAgentError::database(format!("Failed to insert new agent: {}", e)))?;
+        // Insert new agent
+        sqlx::query(
+            "INSERT INTO agents (agent_id, agent_path, host, port, framework, status, deployed_at, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&new_agent.agent_id)
+        .bind(&new_agent.agent_path)
+        .bind(&new_agent.host)
+        .bind(new_agent.port)
+        .bind(&new_agent.framework)
+        .bind(&new_agent.status)
+        .bind(new_agent.deployed_at)
+        .bind(new_agent.created_at)
+        .bind(new_agent.updated_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| RunAgentError::database(format!("Failed to insert new agent: {}", e)))?;
 
-                Ok(true)
-            })
-        }).await
+        // Commit transaction
+        tx.commit().await
+            .map_err(|e| RunAgentError::database(format!("Failed to commit transaction: {}", e)))?;
+
+        Ok(true)
     }
 
     /// Record an agent run
@@ -313,21 +314,19 @@ impl DatabaseService {
         &self,
         agent_id: &str,
         success: bool,
-        execution_time: Option<f64>,
+        _execution_time: Option<f64>,
     ) -> RunAgentResult<()> {
-        let mut query = sqlx::QueryBuilder::new(
-            "UPDATE agents SET run_count = run_count + 1, last_run = ?, updated_at = ?"
-        );
+        let mut query_str = "UPDATE agents SET run_count = run_count + 1, last_run = ?, updated_at = ?".to_string();
 
         if success {
-            query.push(", success_count = success_count + 1");
+            query_str.push_str(", success_count = success_count + 1");
         } else {
-            query.push(", error_count = error_count + 1");
+            query_str.push_str(", error_count = error_count + 1");
         }
 
-        query.push(" WHERE agent_id = ?");
+        query_str.push_str(" WHERE agent_id = ?");
 
-        query.build()
+        sqlx::query(&query_str)
             .bind(Utc::now())
             .bind(Utc::now())
             .bind(agent_id)

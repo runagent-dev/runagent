@@ -187,39 +187,39 @@ impl RestClient {
     /// Validate API connection
     pub async fn validate_api_connection(&self) -> RunAgentResult<Value> {
         match self.health_check().await {
-            Ok(response) => {
-                let mut result = serde_json::json!({
-                    "success": true,
-                    "api_connected": true,
-                    "base_url": self.base_url
-                });
+                    Ok(_response) => {
+                        let mut result = serde_json::json!({
+                            "success": true,
+                            "api_connected": true,
+                            "base_url": self.base_url
+                        });
 
-                if self.api_key.is_some() {
-                    // Test authentication if API key is provided
-                    match self.get_local_db_limits().await {
-                        Ok(limits_result) => {
-                            result["api_authenticated"] = limits_result.get("api_validated").unwrap_or(&Value::Bool(false)).clone();
-                            result["enhanced_limits"] = limits_result.get("enhanced_limits").unwrap_or(&Value::Bool(false)).clone();
-                        }
-                        Err(_) => {
+                        if self.api_key.is_some() {
+                            // Test authentication if API key is provided
+                            match self.get_local_db_limits().await {
+                                Ok(limits_result) => {
+                                    result["api_authenticated"] = limits_result.get("api_validated").unwrap_or(&Value::Bool(false)).clone();
+                                    result["enhanced_limits"] = limits_result.get("enhanced_limits").unwrap_or(&Value::Bool(false)).clone();
+                                }
+                                Err(_) => {
+                                    result["api_authenticated"] = Value::Bool(false);
+                                    result["enhanced_limits"] = Value::Bool(false);
+                                }
+                            }
+                        } else {
                             result["api_authenticated"] = Value::Bool(false);
                             result["enhanced_limits"] = Value::Bool(false);
+                            result["message"] = Value::String("No API key provided".to_string());
                         }
-                    }
-                } else {
-                    result["api_authenticated"] = Value::Bool(false);
-                    result["enhanced_limits"] = Value::Bool(false);
-                    result["message"] = Value::String("No API key provided".to_string());
-                }
 
-                Ok(result)
-            }
-            Err(e) => Ok(serde_json::json!({
-                "success": false,
-                "api_connected": false,
-                "error": format!("API health check failed: {}", e)
-            })),
-        }
+                        Ok(result)
+                    }
+                    Err(e) => Ok(serde_json::json!({
+                        "success": false,
+                        "api_connected": false,
+                        "error": format!("API health check failed: {}", e)
+                    })),
+                }
     }
 
     /// Get local database limits from backend API

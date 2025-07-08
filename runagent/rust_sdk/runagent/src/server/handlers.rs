@@ -132,17 +132,20 @@ async fn handle_websocket(socket: WebSocket, state: ServerState, entrypoint: Str
         match msg {
             Ok(Message::Text(text)) => {
                 // Parse the incoming message
-                if let Ok(request) = serde_json::from_str::<Value>(&text) {
+                if let Ok(_request) = serde_json::from_str::<Value>(&text) {
                     // Mock streaming response
+                    let agent_id_formatted = format!(" {} ", state.agent_id);
+                    let entrypoint_formatted = format!(" {}", entrypoint);
+                    
                     let chunks = vec![
                         "Hello",
                         " from",
                         " streaming",
                         " agent",
-                        &format!(" {} ", state.agent_id),
+                        &agent_id_formatted,
                         "using",
                         " entrypoint",
-                        &format!(" {}", entrypoint),
+                        &entrypoint_formatted,
                     ];
 
                     for chunk in chunks {

@@ -3,7 +3,7 @@
 use crate::constants::LOCAL_CACHE_DIRECTORY;
 use crate::types::{RunAgentError, RunAgentResult};
 use crate::db::models::DatabaseStats;
-use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
+use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction, Row};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
