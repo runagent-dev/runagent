@@ -15,11 +15,8 @@
       {
         "file": "main.py",
         "module": "run",
-        "type": "generic"
+        "tag": "generic"
       }
     ]
-  },
-  "env_vars": {
-    "OPENAI_API_KEY": "Your OPENAI_API_KEY"
   }
 }
