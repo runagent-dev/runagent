@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing LangChain Agent with Rust SDK");
     
     // Replace with the actual agent ID from `runagent serve`
-    let agent_id = "e547af1e-25cf-43fc-a345-e2027dae06db";
+    let agent_id = "a507dcf4-2266-41d9-b78c-483c90645981";
     
     // Test: Non-streaming execution
     println!("\n🚀 Testing Non-Streaming Execution");
@@ -37,6 +37,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", serde_json::to_string_pretty(&response)?);
     
     println!("\n✅ Test completed successfully!");
+    
+    Ok(())
+}
+
+// ******************************Streaming Part with LangChain****************************************
+
+
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let agent_id = "10c727df-c682-400d-98e0-e4e1984a2d4b";
+    
+    println!("🌊 LangChain Streaming Test");
+    let client = RunAgentClient::new(agent_id, "generic_stream", true).await?;
+    
+    let mut stream = client.run_stream(&[
+        ("message", json!("Tell me a paragraph about journey by boat")),
+        ("temperature", json!(0.8)),
+        ("model", json!("gpt-4o-mini"))
+    ]).await?;
+    
+    while let Some(chunk_result) = stream.next().await {
+        match chunk_result {
+            Ok(chunk) => println!("{}", chunk),
+            Err(e) => {
+                println!("Error: {}", e);
+                break;
+            }
+        }
+    }
     
     Ok(())
 }

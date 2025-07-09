@@ -16,6 +16,12 @@
         "file": "main.py",
         "module": "run",
         "tag": "generic"
+      },
+      {
+        "file": "main.py",
+        "module": "run_stream",
+        "tag": "generic_stream"
+
       }
     ]
   }

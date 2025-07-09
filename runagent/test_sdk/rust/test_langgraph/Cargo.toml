@@ -1,7 +1,7 @@
 [package]
 name = "temp_rust_test"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 # Assuming you're using the runagent Rust SDK
@@ -11,3 +11,4 @@ runagent = { path = "/home/riamdriad5/runagent/runagent/runagent/rust_sdk/runage
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 anyhow = "1.0"
+futures = "0.3"  

@@ -52,20 +52,18 @@ pub const DATABASE_FILE_NAME: &str = "runagent_local.db";
 /// Maximum number of local agents
 pub const MAX_LOCAL_AGENTS: usize = 5;
 
-/// Local cache directory (computed at runtime)
+/// Local cache directory (computed at runtime) - FIXED to match Python exactly
 pub static LOCAL_CACHE_DIRECTORY: Lazy<PathBuf> = Lazy::new(|| {
-    std::env::var(ENV_LOCAL_CACHE_DIRECTORY)
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            directories::ProjectDirs::from("com", "runagent", "runagent")
-                .map(|proj_dirs| proj_dirs.config_dir().to_path_buf())
-                .unwrap_or_else(|| {
-                    // Fallback to home directory
-                    dirs::home_dir()
-                        .unwrap_or_else(|| PathBuf::from("."))
-                        .join(".runagent")
-                })
-        })
+    // Check environment variable first
+    if let Ok(env_path) = std::env::var(ENV_LOCAL_CACHE_DIRECTORY) {
+        return PathBuf::from(env_path);
+    }
+    
+    // Use the same logic as Python: always ~/.runagent
+    // Python: os.path.expanduser("~/.runagent")
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".runagent")
 });
 
 /// Supported frameworks
@@ -147,8 +145,24 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_directory() {
-        let dir = &*LOCAL_CACHE_DIRECTORY;
-        assert!(dir.to_str().is_some());
+    fn test_cache_directory_matches_python() {
+        // Test that our path matches what Python would generate
+        let expected = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".runagent");
+        
+        let actual = &*LOCAL_CACHE_DIRECTORY;
+        assert_eq!(*actual, expected);
+    }
+
+    #[test]
+    fn test_database_path() {
+        let db_path = LOCAL_CACHE_DIRECTORY.join(DATABASE_FILE_NAME);
+        let expected = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".runagent")
+            .join("runagent_local.db");
+        
+        assert_eq!(db_path, expected);
     }
 }
