@@ -74,7 +74,7 @@ RunAgent is a production-ready tool/platform for deploying AI agents. Whether yo
 ### 📚 Multi-Language SDKs
 - **Python SDK** - Available now with sync/async support
 - **JavaScript SDK** - Coming soon
-- **Rust SDK** - Coming soon
+- **Rust SDK** - Available now with streaming support
 - **Go SDK** - Coming soon
 
 ### 🏗️ Production Ready(Coming soon)
