@@ -74,7 +74,7 @@ RunAgent is a production-ready tool/platform for deploying AI agents. Whether yo
 ### 📚 Multi-Language SDKs
 - **Python SDK** - Available now with sync/async support
 - **JavaScript SDK** - Coming soon
-- **Rust SDK** - Coming soon
+- **Rust SDK** - Available now with streaming support
 - **Go SDK** - Coming soon
 
 ### 🏗️ Production Ready(Coming soon)
@@ -228,6 +228,54 @@ async def main():
 asyncio.run(main())
 ```
 
+
+### Rust SDK 
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Connect to agent
+    let client = RunAgentClient::new("your-agent-id", "generic", true).await?;
+    
+    // Simple invocation
+    let result = client.run(&[
+        ("query", json!("Help me plan a trip to Japan")),
+        ("duration", json!("7 days"))
+    ]).await?;
+    
+    println!("Result: {}", result);
+    Ok(())
+}
+```
+#### Streaming
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Stream responses for real-time interaction
+    let client = RunAgentClient::new("agent-id", "generic_stream", true).await?;
+    let mut stream = client.run_stream(&[
+        ("query", json!("Explain quantum computing")),
+        ("detail_level", json!("beginner"))
+    ]).await?;
+    
+    while let Some(chunk) = stream.next().await {
+        print!("{}", chunk?);
+    }
+    
+    Ok(())
+}
+```
+
+
+
+
+
 ### JavaScript SDK (Coming Soon)
 
 ```javascript
@@ -246,6 +294,8 @@ for await (const chunk of client.runGenericStream({ query: 'Tell me a joke' })) 
   process.stdout.write(chunk);
 }
 ```
+
+
 
 ## 📋 Templates
 

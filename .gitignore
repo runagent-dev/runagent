@@ -145,3 +145,5 @@ deployments/
 .deployments/
 
 
+*.lock
+target

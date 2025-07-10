@@ -1,10 +1,10 @@
 {
-  "agent_name": "langchain_basic_test",
-  "description": "Basic LangChain agent for testing",
+  "agent_name": "test-langchain-agent",
+  "description": "Simple LangChain test agent for RunAgent development and testing",
   "framework": "langchain",
   "template": "basic",
   "version": "1.0.0",
-  "created_at": "2025-06-29 10:00:00",
+  "created_at": "2024-01-15T10:00:00Z",
   "template_source": {
     "repo_url": "https://github.com/runagent-dev/runagent.git",
     "path": "/home/riamdriad5/runagent/runagent/templates/langchain/chatbot",
@@ -16,6 +16,12 @@
         "file": "main.py",
         "module": "run",
         "tag": "generic"
+      },
+      {
+        "file": "main.py",
+        "module": "run_stream",
+        "tag": "generic_stream"
+
       }
     ]
   }
