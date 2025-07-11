@@ -51,7 +51,17 @@
 
 ## 🎯 What is RunAgent?
 
-RunAgent is a production-ready tool/platform for deploying AI agents. Whether you're using LangGraph, LangChain, LlamaIndex, or any other framework, RunAgent provides the infrastructure and tools to take your agents from development to production seamlessly.
+RunAgent is a production-ready tool/platform for deploying AI agents and accessing those agents with from a wide variety of languages(provided SDKs). With out-of-the-box support for invoking & streaming and outputs, and any pythonic agentic framework, RunAgent gives you the infrastructure and tools to seamlessly deploy your agents, and build applications on top of them.
+
+
+<p align="center">
+  <a href="https://run-agent.ai/#gh-dark-mode-only">
+    <img src="./docs/images/runagent_dia_dark.jpg" width="318px" alt="RunAgent Diagram" />
+  </a>
+  <a href="https://run-agent.ai/#gh-light-mode-only">
+    <img src="./docs/images/runagent_dia_light.jpg" width="318px" alt="RunAgent Diagram" />
+  </a>
+</p>
 
 ### Why RunAgent?
 
@@ -65,179 +75,267 @@ RunAgent is a production-ready tool/platform for deploying AI agents. Whether yo
 ## ✨ Features
 
 ### 🖥️ Powerful CLI
-- Initialize projects from templates
-- Local development server with hot reload
-- One-command deployment to production(Coming Soon)
-- Real-time response streaming
-- Environment management
+
+- Initialize projects from framework-specific(or blank) templates.
+- Local development server with FastAPI(both REST and WebSocket support)
+- One-command deployment for configured projects.
+- Separate Environment management for project.
+- Real-time agent invocation & streaming.
 
 ### 📚 Multi-Language SDKs
-- **Python SDK** - Available now with sync/async support
-- **JavaScript SDK** - Coming soon
-- **Rust SDK** - Available now with streaming support
-- **Go SDK** - Coming soon
 
-### 🏗️ Production Ready(Coming soon)
-- Firecracker-based sandboxed environments
-- Automatic scaling and load balancing
-- Webhook support for event-driven architectures
-- Built-in security and compliance features
+- **Python SDK** - `pip install runagent`
+- **JavaScript SDK** - `npm install runagent`
+- **Rust SDK**
+- **Go SDK**
 
-## 🚀 Quick Start
+### 🏗️ Serverless Deployment
+
+- Sandboxed environment for each deployed agent.
+- Automatic scaling and load balancing.
+- Webhook support for event-driven architectures.
+- Built-in security and compliance features.
+- (More features of Feedback)
 
 
+## 🚀 QuickStart(Deploying an Agent)
 
-### Installation
+RunAgent toolset gives you the power to both: 1. Deploy an agent from any Agentic framework(Using runagent CLI) and 2. Use a CLI-deployed agent in yout application(Any of our language specific SDKs). The SDKs gives you kind of a native experience of using the cutting-edge agentic features, but in your own development environment.
+
+> The python SDK is binded with the RunAgent CLI. For other language SDKs, you need to install from respective package repositories.
+
+### 1. Installation
 
 ```bash
 pip install runagent
 ```
 
-### Create Your First Agent
+### 2. Initialize from a template:
 
-1. **Initialize from a template**:
+We have created a bunch of predefined [templates](./templates) covering most of our supported frameworks. These will work as examples and starting point for users, and you can initiate those with `runagent init` command.
+
 ```bash
-mkdir my-agent
-cd my-agent
-runagent init .
+# for a framework specific template, use framework tags:
+runagent init <project_name> --langgraph
 
+# We will create a minimal project `my_agent`:
+runagent init my_agent
 ```
 
-2. **Configure your agent** (`runagent.config.json`):
+
+If we look at the directory structure:
+
+```bash
+my-agent/
+├── __init__.py
+├── email_agent.py
+├── main.py
+└── runagent.config.json
+```
+In any runagent project most important file is `runagent.config.json` file, it keeps metadata relevent to that project, as well as the list of `entrypoints`, which are the functions/methods from codebase, that will be exposed through runagent server.
+
+> `entrypoints` can be referred as single most important concept in runagent ecosystem. See more details in [Core Concepts](https://docs.run-agent.ai/get-started/core-concepts).
+
+
+### 2. Configure your agent (`runagent.config.json`):
+
+If we look at the `main.py` content(partial):
+
+```python
+from .email_agent import MockOpenAIClient
+from typing import Iterator
+
+
+def mock_response(message, role="user"):
+    """Test the mock agent with non-streaming responses"""
+    client = MockOpenAIClient()
+
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
+    response = client.create(model="gpt-4", messages=prompt)
+
+    print(response.content)
+    print(f"\nTokens used: {response.usage_tokens}")
+    print(f"Response time: {response.response_time:.2f}s")
+
+    return response.content
+
+
+def mock_response_stream(message, role="user") -> Iterator[str]:
+    """Test the mock agent with streaming responses"""
+    client = MockOpenAIClient()
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
+    for chunk in client.create(
+        model="gpt-4",
+        messages=prompt,
+        stream=True
+    ):
+        if not chunk.finished:
+            yield chunk.delta
+        else:
+            yield "\n[STREAM COMPLETE]"
+```
+
+There are `mock_response` and `mock_response_stream` functions, that will be used as agent entrypoints. So we will mention those in `runagent.config.json` file, which is central file for any agent in runagent ecosystem.
+
+Lets take a look at the `runagent.config.json` file:
+
 ```json
 {
   "agent_name": "my-agent",
-  "description": "My intelligent agent",
-  "framework": "langgraph",
+  "description": "A simple placeholder agent",
+  "framework": "default",
+  "template": "default",
   "version": "1.0.0",
+  "created_at": "2025-07-11 15:08:18",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "sawradip",
+    "path": "templates/default"
+  },
   "agent_architecture": {
     "entrypoints": [
       {
-        "file": "agents.py",
-        "module": "app.invoke",
-        "type": "generic"
+        "file": "main.py",
+        "module": "mock_response",
+        "tag": "minimal"
       },
       {
-        "file": "agents.py",
-        "module": "app.stream",
-        "type": "generic_stream"
+        "file": "main.py",
+        "module": "mock_response_stream",
+        "tag": "minimal_stream"
       }
     ]
-  }
+  },
+  "env_vars": {}
 }
 ```
 
-3. **Test locally**:
-```bash
-runagent serve .
-```
+You can see, in the `entrypoints` list, each record has a relative(or may be absolute) path of the file containing the entrypoint function. As well as a tag, (unique for each project) must be specified. 
 
-4. **Deploy to production** (coming soon):
-```bash
-runagent deploy .
-```
+In case of streaming entrypoints, (i.e. `mock_response_stream`), the tag must be prefixed with a `_stream` suffix.
 
-## 🔧 CLI
-
-The RunAgent CLI is your command center for agent operations:
-
-| Command | Description |
-|---------|-------------|
-| `runagent init` | Create a new agent project from templates |
-| `runagent serve` | Run agent locally for development |
-| `runagent deploy` | Deploy agent to production (coming soon) |
-| `runagent logs` | Stream logs from running agents |
-| `runagent status` | Check agent deployment status |
-| `runagent list` | List all deployed agents |
-| `runagent delete` | Remove a deployed agent |
-
-### Example: Creating a Problem-Solving Agent
+### 3. Serve your agent (built-in runagent server):
 
 ```bash
-# Initialize from template
-runagent init problem-solver --framework langgraph
+# project_dir - Project root directory
+runagent serve <project_dir>
 
-# Navigate to project
-cd problem-solver
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run locally
+# If you are inside teh project directory
 runagent serve .
 
-# Your agent is now running at http://localhost:8000
+# In our case, <project_name> also works.
+runagent serve my_agent
 ```
 
-## 📦 SDK
+You will get an `agent_id`, as well as an url `host:port`, you can use either of them with `RunAgentClient` form any RunAgent SDK.
+
+### 4. Deploy agent on RunAgent Cloud - Serverless (coming soon):
+
+```bash
+# Same argument used with `serve`
+runagent deploy <project_dir>
+```
+
+
+
+## 🚀 QuickStart(use a deployed agent)
+
+We provide RunAgent SDK for multiple languages, and are adding new language supports as fast as we can. If you have a preferred language to use, or want to contribute for a specific language, reach out to Discord, or raise an issue.
+
+Remember the `agent_id` and url(`host:port`) we got during deploying, now we will use those, as well as the `tag` specified in `runagent.config.json`. As you have installed the CLI, the `python-sdk` is already installed in your environment. For otehr language installation, follow the previous section in readme, or docs for details.
+
+With our SDKs, you can access the `entrypoints` (the ones we mentioned in `runagent.config.json`) like native functions(yeah! even for streaming). We take care all the complex communication in background.
 
 ### Python SDK
 
-The Python SDK provides intuitive interfaces for interacting with deployed agents:
-
-#### Synchronous Usage
+We can initiate the client with the `agent_id` and the entrypoint `tag`. First we will try with `minimal` tag, which corresponds to the function `def mock_response(message, role="user"):`. S
 
 ```python
 from runagent import RunAgentClient
 
-# Initialize client
-client = RunAgentClient(agent_id="your-agent-id")
-
-# Simple invocation
-result = client.run_generic({
-    "query": "How do I fix my broken phone?",
-    "num_solutions": 3
-})
-print(result)
+ra = RunAgentClient(
+    agent_id=<agent_id>,
+    entrypoint_tag=<tag>,
+    local=True  # You are running local server
+    )
 ```
 
-#### Streaming Responses
+Now, if you remember, the function signature of the `mock_response` function is `def mock_response(message, role="user"):`. And the magic teh runagent-sdk provides is, you can invoke the `RunAgentClient.run` method, as teh target entry point method. So you can use:
 
-```python
-# Stream responses for real-time interaction
-for chunk in client.run_generic_stream({
-    "query": "Explain quantum computing",
-    "detail_level": "beginner"
-}):
-    print(chunk, end="", flush=True)
+```
+agent_results = ra.run(
+    role="user",
+    message="Analyze the benefits of remote work for software teams"
+)
 ```
 
-#### Asynchronous Support
+So, to see the total codeblock,
+```
+from runagent import RunAgentClient
 
-```python
-import asyncio
-from runagent import AsyncRunAgentClient
+ra = RunAgentClient(
+    agent_id=<agent_id>>,
+    entrypoint_tag=<tag>,
+    local=True
+    )
 
-async def main():
-    client = AsyncRunAgentClient(agent_id="your-agent-id")
-    
-    # Async invocation
-    result = await client.run_generic({
-        "query": "What's the weather like?",
-        "location": "San Francisco"
-    })
-    print(result)
-    
-    # Async streaming
-    async for chunk in client.run_generic_stream({
-        "query": "Write a story about AI",
-        "length": "short"
-    }):
-        print(chunk, end="", flush=True)
 
-asyncio.run(main())
+agent_results = ra.run(
+    role="user",
+    message="Analyze the benefits of remote work for software teams"
+)
+
+print(agent_results)
 ```
 
+Just replace, `agent_id` and `tag` from the deployment, and you have access to the target funtion (almost)natively. if you want to access with `host:port`, that is all supported.
+```
+ra = RunAgentClient(host=<host>, port=<port>, entrypoint_tag=<tag>, local=True)
+```
 
-### Rust SDK 
-```rust
+You must be thinking, that is fine, but what about the streaming?? 
+You can use the streaming function's returned interable as a native iterable object. So, 
+```
+from runagent import RunAgentClient
+
+ra = RunAgentClient(
+    agent_id=<agent_id>,
+    entrypoint_tag=<tag>,
+    local=True
+    )
+
+for chunk in ra.run([
+        {"role": "user", "content": "Analyze the benefits of remote work "
+         "for software teams"}
+]):
+    print(chunk)
+```
+
+No need for the complicated implementation of rest api, web socket, grpc and what not. RunAgent is here to run your agent.
+
+
+### Rust SDK
+
+Non-streaming Example:
+
+```rust 
 use runagent::client::RunAgentClient;
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to agent
-    let client = RunAgentClient::new("your-agent-id", "generic", true).await?;
+    let client = RunAgentClient::new(<agent_id>, <tag>, true).await?;
     
     // Simple invocation
     let result = client.run(&[
@@ -249,7 +347,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
-#### Streaming
+
+Streaming Example:
+
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
@@ -258,7 +358,7 @@ use futures::StreamExt;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Stream responses for real-time interaction
-    let client = RunAgentClient::new("agent-id", "generic_stream", true).await?;
+    let client = RunAgentClient::new(<agent_id>, <tag>, true).await?;
     let mut stream = client.run_stream(&[
         ("query", json!("Explain quantum computing")),
         ("detail_level", json!("beginner"))
@@ -272,48 +372,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### JavaScript/ TypeScript SDK
 
+Create an `.mjs` file or ad `type: "module"` to your `package.json`.
 
+Non-streaming Example:
 
-
-### JavaScript SDK (Coming Soon)
-
-```javascript
+```mjs
 import { RunAgentClient } from 'runagent';
 
-const client = new RunAgentClient({ agentId: 'your-agent-id' });
-
-// Simple invocation
-const result = await client.runGeneric({
-  query: 'Help me plan a trip to Japan',
-  duration: '7 days'
+const ra = new RunAgentClient({
+  agentId: <agent_id>,
+  host: <host>,
+  port: <port>,
+  entrypointTag: "minimal",
+  local: true
 });
 
-// Streaming
-for await (const chunk of client.runGenericStream({ query: 'Tell me a joke' })) {
-  process.stdout.write(chunk);
+await ra.initialize();
+
+const solutionResult = await ra.run({
+  role: 'user',
+  message: 'Analyze the benefits of remote work for software teams',
+});
+
+console.log(solutionResult);
+```
+
+Streaming Example:
+
+```mjs
+import { RunAgentClient } from 'runagent';
+
+const ra = new RunAgentClient({
+  agentId: <agent_id>,
+  host: <host>,
+  port: <port>,
+  entrypointTag: "minimal_stream",
+  local: true
+});
+
+// Initialize
+await ra.initialize();
+
+const stream = await ra.run({
+  role: 'user',
+  message: 'Analyze the benefits of remote work for software teams',
+});
+
+for await (const out of stream) {
+  console.log('=====??');
+  console.log(out);
+  console.log('??====');
 }
 ```
 
+## 🔧 CLI
 
+The RunAgent CLI is your command center for agent operations:
 
-## 📋 Templates
+| Command | Description |
+|---------|-------------|
+| `runagent init` | Create a new agent project from templates |
+| `runagent serve` | Run agent locally for development |
 
-Get started quickly with our pre-built templates:
-
-- **problem-solver** - Multi-step problem-solving agent
-- **chatbot** - Conversational AI assistant
-- **data-analyst** - Data processing and analysis agent
-- **web-researcher** - Internet research and summarization
-- **code-assistant** - Programming help and code generation
-
-```bash
-# List available templates
-runagent templates list
-
-# Initialize from a specific template
-runagent init my-chatbot --template chatbot
-```
 
 ## 🏢 Enterprise Features (Coming Soon)
 
@@ -336,6 +458,7 @@ For detailed documentation, visit [docs.run-agent.ai](https://docs.run-agent.ai)
 ## 🗺️ Roadmap
 
 ### ✅ Available Now
+
 - CLI with local deployment
 - Python SDK with sync/async support
 - Pre-built templates
@@ -343,8 +466,8 @@ For detailed documentation, visit [docs.run-agent.ai](https://docs.run-agent.ai)
 - Basic monitoring and logging
 
 ### 🚧 Coming Soon
+
 - Serverless cloud deployment
-- JavaScript, Rust, and Go SDKs
 - Web dashboard for agent management
 - Advanced monitoring and analytics
 - Multi-region deployment
@@ -352,6 +475,7 @@ For detailed documentation, visit [docs.run-agent.ai](https://docs.run-agent.ai)
 - Team collaboration features
 
 ### 🔮 Future
+
 - Private cloud deployment options
 - Advanced security features
 - Custom runtime environments
