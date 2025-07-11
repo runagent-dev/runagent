@@ -1,6 +1,3 @@
-Here is your full `README.md` file in **proper markdown format**, cleaned up and properly structured so you can copy and paste directly:
-
-````markdown
 # RunAgent Rust SDK
 
 [![Crates.io](https://img.shields.io/crates/v/runagent.svg)](https://crates.io/crates/runagent)
