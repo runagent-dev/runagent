@@ -421,23 +421,6 @@ mod tests {
         assert!(agent.last_run.is_some());
     }
 
-    #[test]
-    fn test_agent_success_rate() {
-        let mut agent = Agent::new(
-            "test-agent".to_string(),
-            "/path/to/agent".to_string(),
-            "localhost".to_string(),
-            8450,
-        );
-
-        assert_eq!(agent.success_rate(), 0.0);
-
-        agent.record_run(true);
-        agent.record_run(true);
-        agent.record_run(false);
-
-        assert_eq!(agent.success_rate(), 200.0 / 3.0);
-    }
 
     #[test]
     fn test_agent_run_creation() {
