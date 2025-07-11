@@ -15,12 +15,12 @@
       {
         "file": "main.py",
         "module": "mock_response_stream",
-        "tag": "demo2_stream"
+        "tag": "minimal_stream"
       },
       {
         "file": "main.py",
         "module": "mock_response",
-        "tag": "demo"
+        "tag": "minimal"
       }
     ]
   } 

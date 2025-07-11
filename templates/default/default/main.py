@@ -2,10 +2,16 @@ from .email_agent import MockOpenAIClient
 from typing import Iterator
 
 
-def mock_response(prompt):
+def mock_response(message, role="user"):
     """Test the mock agent with non-streaming responses"""
     client = MockOpenAIClient()
 
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
     response = client.create(model="gpt-4", messages=prompt)
 
     print(response.content)
@@ -15,10 +21,15 @@ def mock_response(prompt):
     return response.content
 
 
-def mock_response_stream(prompt) -> Iterator[str]:
+def mock_response_stream(message, role="user") -> Iterator[str]:
     """Test the mock agent with streaming responses"""
     client = MockOpenAIClient()
-    
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
     for chunk in client.create(
         model="gpt-4",
         messages=prompt,
