@@ -1,12 +1,17 @@
 [package]
 name = "runagent"
-version = "0.1.0"
-edition = "202"
+version = "0.1.1"
+edition = "2021"
 description = "RunAgent SDK for Rust - Deploy and manage AI agents easily"
 license = "MIT"
 repository = "https://github.com/runagent-dev/runagent"
-keywords = ["ai", "agents", "llm", "sdk"]
-categories = ["api-bindings", "development-tools"]
+homepage = "https://runagent.ai"
+documentation = "https://docs.rs/runagent"
+readme = "README.md"
+keywords = ["ai", "agents", "llm", "sdk", "deployment"]
+categories = ["api-bindings", "development-tools", "web-programming"]
+authors = ["RunAgent <runagent.live@gmail.com?>"]
+
 
 [dependencies]
 # Workspace dependencies

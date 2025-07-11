@@ -1,11 +1,11 @@
 [package]
 name = "temp_rust_test"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
 # Assuming you're using the runagent Rust SDK
-runagent = { path = "/home/riamdriad5/runagent/runagent/runagent/rust_sdk/runagent" }
+runagent = { path = "/home/riamdriad5/runagent/runagent/runagent-rust/runagent" }
 
 # Required dependencies
 tokio = { version = "1.0", features = ["full"] }
