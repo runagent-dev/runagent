@@ -41,14 +41,45 @@
 
 <p align="center">
   <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-quickstart-deploying-an-agent">Quick Start</a> •
   <a href="#-cli">CLI</a> •
-  <a href="#-sdk">SDK</a> •
-  <a href="#-templates">Templates</a>
+  <a href="#-documentation">Documentation</a> •
+  <a href="#-contributing">Contributing</a>
 </p>
 
 ---
+## 📖 Table of Contents
 
+- [📖 Table of Contents](#-table-of-contents)
+- [🎯 What is RunAgent?](#-what-is-runagent)
+  - [Why RunAgent?](#why-runagent)
+- [✨ Features](#-features)
+  - [🖥️ Powerful CLI](#️-powerful-cli)
+  - [📚 Multi-Language SDKs](#-multi-language-sdks)
+  - [🏗️ Serverless Deployment(Coming Soon)](#️-serverless-deploymentcoming-soon)
+- [🚀 QuickStart(Deploying an Agent)](#-quickstartdeploying-an-agent)
+  - [1. Installation](#1-installation)
+  - [2. Initialize from a template:](#2-initialize-from-a-template)
+  - [2. Configure your agent (`runagent.config.json`):](#2-configure-your-agent-runagentconfigjson)
+  - [3. Serve your agent (built-in runagent server):](#3-serve-your-agent-built-in-runagent-server)
+  - [4. Deploy agent on RunAgent Cloud - Serverless (coming soon):](#4-deploy-agent-on-runagent-cloud---serverless-coming-soon)
+- [🚀 QuickStart(use a deployed agent)](#-quickstartuse-a-deployed-agent)
+  - [Python SDK](#python-sdk)
+  - [Rust SDK](#rust-sdk)
+  - [JavaScript/ TypeScript SDK](#javascript-typescript-sdk)
+- [🔧 CLI](#-cli)
+- [🏢 Enterprise Features (Coming Soon)](#-enterprise-features-coming-soon)
+- [📚 Documentation](#-documentation)
+- [🗺️ Roadmap](#️-roadmap)
+  - [✅ Available Now](#-available-now)
+  - [🚧 Coming Soon](#-coming-soon)
+  - [🔮 Future](#-future)
+- [🤝 Contributing](#-contributing)
+- [💬 Community \& Support](#-community--support)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
+---
 ## 🎯 What is RunAgent?
 
 RunAgent is a production-ready tool/platform for deploying AI agents and accessing those agents with from a wide variety of languages(provided SDKs). With out-of-the-box support for invoking & streaming and outputs, and any pythonic agentic framework, RunAgent gives you the infrastructure and tools to seamlessly deploy your agents, and build applications on top of them.
@@ -89,7 +120,7 @@ RunAgent is a production-ready tool/platform for deploying AI agents and accessi
 - **Rust SDK**
 - **Go SDK**
 
-### 🏗️ Serverless Deployment
+### 🏗️ Serverless Deployment(Coming Soon)
 
 - Sandboxed environment for each deployed agent.
 - Automatic scaling and load balancing.
@@ -97,6 +128,7 @@ RunAgent is a production-ready tool/platform for deploying AI agents and accessi
 - Built-in security and compliance features.
 - (More features of Feedback)
 
+---
 
 ## 🚀 QuickStart(Deploying an Agent)
 
@@ -427,6 +459,8 @@ for await (const out of stream) {
 }
 ```
 
+---
+
 ## 🔧 CLI
 
 The RunAgent CLI is your command center for agent operations:
@@ -444,6 +478,8 @@ The RunAgent CLI is your command center for agent operations:
 - **Team Collaboration**: Shared agents, role-based access control
 - **Custom Domains**: Deploy agents to your own domains
 - **SLA Support**: 99.9% uptime guarantee
+
+---
 
 ## 📚 Documentation
 
@@ -481,6 +517,7 @@ For detailed documentation, visit [docs.run-agent.ai](https://docs.run-agent.ai)
 - Custom runtime environments
 - Agent marketplace
 
+---
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
