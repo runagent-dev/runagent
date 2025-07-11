@@ -54,14 +54,14 @@
 RunAgent is a production-ready tool/platform for deploying AI agents and accessing those agents with from a wide variety of languages(provided SDKs). With out-of-the-box support for invoking & streaming and outputs, and any pythonic agentic framework, RunAgent gives you the infrastructure and tools to seamlessly deploy your agents, and build applications on top of them.
 
 
-<p align="center">
-  <a href="https://run-agent.ai/#gh-dark-mode-only">
-    <img src="./docs/images/runagent_dia_dark.jpg" width="318px" alt="RunAgent Diagram" />
+<div style="width:100%;display:flex;justify-content:center;align-items:center;">
+  <a href="https://run-agent.ai/#gh-dark-mode-only" style="flex:1;">
+    <img src="./docs/images/runagent_dia_dark.jpg" style="width:100%;max-width:900px;" alt="RunAgent Diagram" />
   </a>
-  <a href="https://run-agent.ai/#gh-light-mode-only">
-    <img src="./docs/images/runagent_dia_light.jpg" width="318px" alt="RunAgent Diagram" />
+  <a href="https://run-agent.ai/#gh-light-mode-only" style="flex:1;">
+    <img src="./docs/images/runagent_dia_light.jpg" style="width:100%;max-width:900px;" alt="RunAgent Diagram" />
   </a>
-</p>
+</div>
 
 ### Why RunAgent?
 
