@@ -6,22 +6,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing LangChain Agent with Rust SDK");
     
     // Replace with the actual agent ID from `runagent serve`
-    let agent_id = "a507dcf4-2266-41d9-b78c-483c90645981";
+    let agent_id = "578b088a-0476-40e9-8ebc-1068284fd824";
     
     // Test: Non-streaming execution
     println!("\n🚀 Testing Non-Streaming Execution");
     println!("==================================");
     
     // Connect directly with host and port since we know where the server is running
-    let client = RunAgentClient::with_address(
+    let client = RunAgentClient::new(
         agent_id, 
         "generic", 
         true,  // local = true
-        Some("127.0.0.1"), 
-        Some(8452)  // Use the port from your server output
+        // Some("127.0.0.1"), 
+        // Some(8452)  // Use the port from your server output
     ).await?;
     
-    println!("🔗 Connected to agent at 127.0.0.1:8452");
+    // println!("🔗 Connected to agent at 127.0.0.1:8452");
     
     // Test with proper arguments that match the `run` function signature
     let response = client.run_with_args(
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             ("message", json!("Hello from Rust SDK! Can you tell me about RunAgent?")),
             ("temperature", json!(0.7)),
-            ("model", json!("gpt-3.5-turbo"))
+            ("model", json!("gpt-4o-mini"))
         ]
     ).await?;
     
