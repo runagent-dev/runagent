@@ -3,203 +3,229 @@ title: 'Installation'
 description: 'Install RunAgent CLI and SDK on your system'
 icon: 'download'
 ---
+RunAgent provides Python, JavaScript, Rust, and Go SDKs along with a powerful CLI for deploying and managing AI agents across multiple frameworks.
 
-## System Requirements
-
-Before installing RunAgent, ensure your system meets these requirements:
-
-- **Python**: 3.8 or higher
-- **pip**: Latest version recommended
-- **Operating System**: Windows, macOS, or Linux
-- **Memory**: At least 4GB RAM recommended
-- **Storage**: 500MB free space
-
-## Installation Methods
+## Install RunAgent CLI
 
 <Tabs>
-  <Tab title="pip (Recommended)">
-    Install the latest stable version:
-    
-    ```bash
+  <Tab title="Python">
+  Before installing RunAgent, ensure you have Python 3.8+.
+  <Steps>
+  <Step title="Install RunAgent CLI & Python SDK">
+  <CodeGroup>
+    ```pip pip
     pip install runagent
     ```
-    
-    Or install with all optional dependencies:
-    
-    ```bash
-    pip install "runagent[all]"
+    ```uv uv
+    uv add runagent
     ```
-  </Tab>
-  
-  <Tab title="pipx">
-    For isolated installation:
-    
+  </CodeGroup>
+  The CLI comes bundled with the Python SDK for seamless local development.
+  </Step>
+  <Step title="Verify Installation">
+    Check that RunAgent is installed correctly:
     ```bash
-    pipx install runagent
+    runagent --version
     ```
-    
-    This keeps RunAgent separate from your other Python packages.
-  </Tab>
-  
-  <Tab title="From Source">
-    Install the development version:
-    
+  </Step>
+  <Step title="Login (Optional)">
+    For cloud deployment features (coming soon), login to get your API key:
     ```bash
-    git clone https://github.com/runagent-dev/runagent.git
-    cd runagent
-    pip install -e .
+    runagent login
     ```
-  </Tab>
-  
-  <Tab title="Docker">
-    Using Docker (coming soon):
-    
-    ```bash
-    docker pull runagent/cli:latest
-    docker run -it runagent/cli --help
-    ```
+    </Step>
+    </Steps>
   </Tab>
 </Tabs>
 
-## Verify Installation
+## Install RunAgent SDK
 
-After installation, verify RunAgent is properly installed:
-
-```bash
-runagent --version
-```
-
-You should see output like:
-```
-RunAgent CLI version 1.0.0
-```
-
-## Platform-Specific Notes
-
-<AccordionGroup>
-  <Accordion title="Windows">
-    On Windows, you may need to:
-    
-    1. Run as Administrator for first-time setup
-    2. Add Python Scripts to PATH:
-       ```powershell
-       $env:Path += ";$env:APPDATA\Python\Python38\Scripts"
-       ```
-    3. Use `python -m runagent` if `runagent` command isn't found
-  </Accordion>
-  
-  <Accordion title="macOS">
-    On macOS:
-    
-    1. You might need to use `pip3` instead of `pip`
-    2. If using Homebrew Python:
-       ```bash
-       brew install python@3.8
-       pip3 install runagent
-       ```
-  </Accordion>
-  
-  <Accordion title="Linux">
-    On Linux:
-    
-    1. You may need to install Python dev packages:
-       ```bash
-       # Ubuntu/Debian
-       sudo apt-get install python3-dev python3-pip
-       
-       # Fedora/RHEL
-       sudo dnf install python3-devel
-       ```
-    2. Use `--user` flag to install locally:
-       ```bash
-       pip install --user runagent
-       ```
-  </Accordion>
-</AccordionGroup>
-
-## Virtual Environment (Recommended)
-
-We recommend using a virtual environment:
-
-```bash
-# Create virtual environment
-python -m venv runagent-env
-
-# Activate it
-# On Windows:
-runagent-env\Scripts\activate
-# On Unix or MacOS:
-source runagent-env/bin/activate
-
-# Install RunAgent
-pip install runagent
-```
-
-## Upgrading
-
-To upgrade to the latest version:
-
-```bash
-pip install --upgrade runagent
-```
-
-Check for updates:
-```bash
-pip list --outdated | grep runagent
-```
-
-## Uninstalling
-
-To remove RunAgent:
-
-```bash
-pip uninstall runagent
-
-# Also remove configuration (optional)
-runagent teardown
-```
-
-## Troubleshooting Installation
-
-<AccordionGroup>
-  <Accordion title="Permission Denied">
-    If you get permission errors:
-    ```bash
-    pip install --user runagent
+<Tabs>
+  <Tab title="Python">
+  When RunAgent CLI is installed, the Python SDK is installed as a dependency. You can install it manually as well.
+  <Steps>
+  <Step title="Install RunAgent Python SDK">
+  <CodeGroup>
+    ```pip pip
+    pip install runagent
     ```
-  </Accordion>
-  
-  <Accordion title="Command Not Found">
-    If `runagent` command isn't found after installation:
-    
-    1. Check if it's in your PATH:
-       ```bash
-       which runagent
-       # or
-       where runagent  # Windows
-       ```
-    
-    2. Try using the module directly:
-       ```bash
-       python -m runagent
-       ```
-  </Accordion>
-  
-  <Accordion title="SSL Certificate Errors">
-    For SSL/TLS errors:
-    ```bash
-    pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org runagent
+    ```uv uv
+    uv add runagent
     ```
-  </Accordion>
-</AccordionGroup>
+  </CodeGroup>
+  The CLI comes bundled with the Python SDK for seamless local development.
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="JavaScript">
+Before installing the SDK, ensure you have Node.js 16+.
+  <Steps>
+  <Step title="Install RunAgent SDK">
+  <CodeGroup>
+    ```npm npm
+    npm install runagent
+    ```
+    ```pnpm pnpm
+    pnpm add runagent
+    ```
+    ```bun bun
+    bun add runagent
+    ```
+    ```yarn yarn
+    yarn add runagent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="TypeScript Support">
+  The JavaScript SDK comes with full TypeScript support out of the box:
+  - Native async/await and Promise support
+  - Streaming response handling
+  - Type-safe agent invocation
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Rust">
+Before installing the SDK, ensure you have Rust 1.70+.
+  <Steps>
+  <Step title="Add RunAgent to Cargo.toml">
+  <CodeGroup>
+    ```toml Cargo.toml
+    [dependencies]
+    runagent = "0.1.0"
+    tokio = { version = "1.0", features = ["full"] }
+    serde_json = "1.0"
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Install via Cargo">
+  <CodeGroup>
+    ```bash cargo
+    cargo add runagent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Features">
+  The Rust SDK provides:
+  - High-performance async operations
+  - Streaming support with futures
+  - Memory-safe agent interactions
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Go">
+Before installing the SDK, ensure you have Go 1.19+.
+  <Steps>
+  <Step title="Install RunAgent SDK">
+  <CodeGroup>
+    ```bash go
+    go get github.com/runagent-dev/runagent-go
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Import in your project">
+  <CodeGroup>
+    ```go main.go
+    import "github.com/runagent-dev/runagent-go"
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Features (Coming Soon)">
+  The Go SDK will provide:
+  - Idiomatic Go interfaces
+  - Goroutine-based streaming
+  - Context-aware operations
+  </Step>
+  </Steps>
+  </Tab>
+</Tabs>
+
+## Framework Templates
+
+RunAgent provides pre-built templates for popular AI frameworks to get you started quickly:
+
+<Tabs>
+  <Tab title="LangGraph">
+  <Steps>
+  <Step title="Initialize LangGraph Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_langgraph_agent --langgraph
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Pre-configured LangGraph agent setup
+  - Streaming and non-streaming entrypoints
+  - Sample state management examples
+  - Ready-to-deploy configuration
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="LangChain">
+  <Steps>
+  <Step title="Initialize LangChain Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_langchain_agent --langchain
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - LangChain agent with tool support
+  - Memory and conversation handling
+  - Streaming response capabilities
+  - Production-ready configuration
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="CrewAI">
+  <Steps>
+  <Step title="Initialize CrewAI Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_crew_agent --crewai
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Multi-agent crew setup
+  - Task coordination examples
+  - Role-based agent configuration
+  - Collaborative workflow templates
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Custom">
+  <Steps>
+  <Step title="Initialize Blank Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_custom_agent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Minimal agent template
+  - Basic entrypoint examples
+  - Configuration file template
+  - Development server setup
+  </Step>
+  </Steps>
+  </Tab>
+</Tabs>
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Quick Start" icon="rocket" href="/quickstart">
-    Deploy your first agent
-  </Card>
-  <Card title="Core Concepts" icon="book" href="/get-started/core-concepts">
-    Understand RunAgent architecture
-  </Card>
-</CardGroup>
+After installation, you can:
+
+1. **Initialize your first agent**: `runagent init my_agent`
+2. **Start the development server**: `runagent serve my_agent`
+3. **Connect from your application** using any of our SDKs
+4. **Deploy to production** (coming soon): `runagent deploy my_agent`
+
+<Card title="Need Help?" icon="question-mark">
+If you encounter any issues during installation:
+- Check our [troubleshooting guide](/troubleshooting)
+- Join our [Discord community](https://discord.gg/runagent)
+- Report issues on [GitHub](https://github.com/runagent-dev/runagent/issues)
+</Card>
