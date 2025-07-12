@@ -461,6 +461,126 @@ for await (const out of stream) {
 
 ---
 
+
+### GO SDK
+
+Non-streaming Example:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent/runagent-go/runagent"
+)
+
+func main() {
+	fmt.Println("=== Example 1: Non-Streaming ===")
+
+	config := runagent.Config{
+		AgentID:       "<agent_id>",
+		EntrypointTag: "minimal",
+		Host:          "<host>",
+		Port:          <port>,
+		Local:         true,
+	}
+
+	client := runagent.NewRunAgentClient(config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	if err := client.Initialize(ctx); err != nil {
+		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	solutionResult, err := client.Run(ctx, map[string]interface{}{
+		"role":    "user",
+		"message": "Analyze the benefits of remote work for software teams",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", solutionResult)
+}
+
+
+```
+
+Streaming Example:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent/runagent-go/runagent"
+)
+
+func main() {
+	fmt.Println("=== Streaming Agent Example ===")
+
+	// Create client
+	client := runagent.NewRunAgentClient(runagent.Config{
+		AgentID:       "<agend_id>",
+		EntrypointTag: "minimal_stream",
+		Host:          "<host>",
+		Port:          <port>,
+		Local:         true,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Initialize
+	if err := client.Initialize(ctx); err != nil {
+		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Start streaming
+	result, err := client.Run(ctx, map[string]interface{}{
+		"role":    "user",
+		"message": "Write a detailed analysis of remote work benefits for software development teams",
+	})
+	if err != nil {
+		log.Fatalf("Failed to start streaming: %v", err)
+	}
+
+	stream := result.(*runagent.StreamIterator)
+	defer stream.Close()
+
+	fmt.Println("📡 Streaming response:")
+	fmt.Println("----------------------------------------")
+
+	// Process stream
+	for {
+		chunk, hasMore, err := stream.Next(ctx)
+		if err != nil {
+			log.Printf("Stream error: %v", err)
+			break
+		}
+		if !hasMore {
+			break
+		}
+		if chunk != nil {
+			fmt.Print(chunk)
+		}
+	}
+
+	fmt.Println("\n✅ Stream completed!")
+}
+
+```
+---
 ## 🔧 CLI
 
 The RunAgent CLI is your command center for agent operations:
