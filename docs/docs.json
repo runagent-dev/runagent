@@ -8,18 +8,36 @@
     "dark": "#006AD4"
   },
   "favicon": "/favicon.ico",
-  "navigation": {
+
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity"
+    ]
+  },
+  "navigation": {    
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Github",
+          "href": "https://github.com/runagent-dev/runagent",
+          "icon": "github"
+        }
+      ]
+    },
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Guides",
         "groups": [
           {
             "group": "Get Started",
             "pages": [
-              "introduction",
-              "quickstart",
+              "get-started/introduction",
               "get-started/installation",
-              "get-started/first-agent",
+              "get-started/quickstart",
               "get-started/core-concepts"
             ]
           },
@@ -65,7 +83,7 @@
         ]
       },
       {
-        "tab": "CLI",
+        "tab": "CLI Reference",
         "groups": [
           {
             "group": "CLI Reference",
@@ -92,7 +110,7 @@
         ]
       },
       {
-        "tab": "SDK",
+        "tab": "SDK Reference",
         "groups": [
           {
             "group": "Overview",
@@ -146,29 +164,10 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Github",
-          "href": "https://github.com/runagent-dev/runagent",
-          "icon": "github"
-        },
-        {
-          "anchor": "Community",
-          "href": "https://run-agent.ai/community",
-          "icon": "discord"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://run-agent.ai/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    ]
   },
   "logo": {
-    "light": "/logo/logo_dark.svg",
+    "light": "/logo/logo_light.svg",
     "dark": "/logo/logo_dark.svg"
   },
   "navbar": {

@@ -779,11 +779,11 @@ def serve(port, host, debug, replace, delete, path):
     help="Path to input JSON file"
 )
 @click.option("--local", is_flag=True, help="Run agent locally")
-@click.option("--generic", is_flag=True, help="Use generic mode (default)")
-@click.option("--generic-stream", is_flag=True, help="Use generic streaming mode")
+@click.option("--tag", required=True, help="Entrypoint tag to be used")
+# @click.option("--generic-stream", is_flag=True, help="Use generic streaming mode")
 @click.option("--timeout", type=int, help="Timeout in seconds")
 @click.pass_context
-def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, timeout):
+def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
     """
     Run an agent with flexible configuration options
     
@@ -822,17 +822,17 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
         )
     
     # ============================================
-    # VALIDATION 2: Generic mode selection
-    # ============================================
-    if generic and generic_stream:
-        raise click.UsageError(
-            "Cannot specify both --generic and --generic-stream. Choose one."
-        )
+    # # VALIDATION 2: Generic mode selection
+    # # ============================================
+    # if generic and generic_stream:
+    #     raise click.UsageError(
+    #         "Cannot specify both --generic and --generic-stream. Choose one."
+    #     )
     
-    # Default to generic mode if neither specified
-    if not generic and not generic_stream:
-        generic = True
-        console.print("🔧 Defaulting to --generic mode")
+    # # Default to generic mode if neither specified
+    # if not generic and not generic_stream:
+    #     generic = True
+    #     console.print("🔧 Defaulting to --generic mode")
     
     # ============================================
     # VALIDATION 3: Input file OR extra params
@@ -841,7 +841,7 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
     # Parse extra parameters from ctx.args
     extra_params = {}
     invalid_args = []
-    
+
     for arg in ctx.args:
         if arg.startswith('--') and '=' in arg:
             # Valid format: --key=value
@@ -880,9 +880,9 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
         console.print(f"   Host: [cyan]{host}[/cyan]")
         console.print(f"   Port: [cyan]{port}[/cyan]")
     
-    # Mode
-    mode = "Generic Streaming" if generic_stream else "Generic"
-    console.print(f"   Mode: [magenta]{mode}[/magenta]")
+    # Tag
+    # mode = "Generic Streaming" if generic_stream else "Generic"
+    console.print(f"   Tag: [magenta]{tag}[/magenta]")
     
     # Local execution
     if local:
@@ -926,13 +926,19 @@ def run(ctx, agent_id, host, port, input_file, local, generic, generic_stream, t
     # ============================================
     
     try:
-        ra_client = RunAgentClient(agent_id, local, host, port)
+        ra_client = RunAgentClient(
+            agent_id=agent_id,
+            local=local,
+            host=host,
+            port=port,
+            entrypoint_tag=tag
+        )
 
-        if generic_stream:
-            for item in ra_client.run_generic_stream(**input_params):
+        if tag.endswith("_stream"):
+            for item in ra_client.run(**input_params):
                 console.print(item)
         else:
-            result = ra_client.run_generic(**input_params)
+            result = ra_client.run(**input_params)
             console.print(result)
             
     except Exception as e:

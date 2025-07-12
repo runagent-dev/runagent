@@ -1,0 +1,202 @@
+---
+title: Introduction
+description: 'Deploy AI agents to production in seconds, not hours'
+icon: 'book-open'
+---
+<Card 
+    title='🚀 The Future of AI Development is Here' 
+    icon='sparkles' 
+    href='https://run-agent.ai'
+>
+Write your AI agents once in Python. Use them everywhere, from any programming language, with zero infrastructure complexity.
+</Card>
+
+## The Problem Every AI Developer Faces
+
+You've built an incredible AI agent in Python. It uses LangGraph for complex reasoning, leverages powerful tools, and produces amazing results. Your team loves it.
+
+**Then reality hits:**
+
+Your **frontend team** needs it in JavaScript, your **mobile team** wants it in Kotlin, your **Unity team** wants it in good old C#, your **systems team** requires it in Rust. The traditional approach? Build separate implementations, REST APIs, WebSocket handlers...
+
+**Sound exhausting?** That's because it is.
+
+## What RunAgent Actually Does
+
+RunAgent fundamentally changes how AI agents work. Here's the magic:
+
+<img
+  className="block dark:hidden"
+  src="/images/runagent_dia_light.jpg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/runagent_dia_dark.jpg"
+  alt="Hero Dark"
+/>
+
+
+Your Python function signatures automatically become API contracts for every supported language:
+
+<CodeGroup>
+```python Your Python Agent
+def analyze_market(company: str, timeframe: str = "1year") -> dict:
+    return langgraph_agent.invoke({"company": company, "timeframe": timeframe})
+```
+
+```javascript Becomes JavaScript
+const analysis = await client.run({
+    company: "Tesla",
+    timeframe: "6months"
+});
+```
+
+```rust Becomes Rust  
+let analysis = client.run(&[
+    ("company", json!("Tesla")),
+    ("timeframe", json!("6months"))
+]).await?;
+```
+</CodeGroup>
+
+**The Revolutionary Insight**: Change your Python function signature, and all language SDKs automatically adapt. No API versioning, no breaking changes.
+
+## Getting started
+
+The fastest way to experience the magic is with RunAgent:
+
+1. **Install the CLI** (includes Python SDK):
+   ```bash
+   pip install runagent
+   ```
+
+2. **Create your first agent**:
+   ```bash
+   runagent init my_agent
+   ```
+
+3. **Deploy locally**:
+   ```bash
+   runagent serve my_agent
+   ```
+
+...and you're ready to access your Python agent from any supported language.
+
+- Head to the [quickstart](/quickstart) guide to see the full magic
+- Browse our [framework templates](/templates) for LangGraph, CrewAI, and more
+- Check out [core concepts](/concepts) to understand how it works
+
+## Multi-Language SDK Support
+
+RunAgent provides native-like access to your deployed agents across multiple languages:
+
+<CardGroup cols={2}>
+  <Card
+    title="Python SDK"
+    icon="python"
+    href="/sdks/python"
+  >
+    Native async/sync support with streaming capabilities. Access your agents like local functions.
+  </Card>
+  <Card 
+    title="JavaScript SDK" 
+    icon="js" 
+    href="/sdks/javascript"
+  >
+    Full TypeScript support with streaming and Promise-based APIs for modern web applications.
+  </Card>
+  <Card 
+    title="Rust SDK" 
+    icon="rust" 
+    href="/sdks/rust"
+  >
+    High-performance async SDK with futures and streaming support for systems programming.
+  </Card>
+  <Card 
+    title="Go SDK" 
+    icon="go" 
+    href="/sdks/go"
+  >
+    Idiomatic Go client with goroutines and channel-based streaming (coming soon).
+  </Card>
+</CardGroup>
+
+## Framework Support
+
+RunAgent works with any Python-based AI agent framework:
+
+<CardGroup cols={2}>
+  <Card
+    title="LangGraph"
+    icon="link"
+    href="/frameworks/langgraph"
+  >
+    Deploy your LangGraph agents with built-in state management and workflow execution.
+  </Card>
+  <Card 
+    title="LangChain" 
+    icon="chain" 
+    href="/frameworks/langchain"
+  >
+    Turn your LangChain agents into production-ready APIs with automatic scaling.
+  </Card>
+  <Card 
+    title="CrewAI" 
+    icon="users" 
+    href="/frameworks/crewai"
+  >
+    Deploy multi-agent CrewAI systems with coordinated execution and monitoring.
+  </Card>
+  <Card 
+    title="Custom Framework" 
+    icon="code" 
+    href="/frameworks/custom"
+  >
+    Use any Python-based framework by defining simple entrypoint functions.
+  </Card>
+</CardGroup>
+
+## Real-Time Streaming Across Languages
+
+When your Python agent streams responses, RunAgent makes it feel native in every target language:
+
+<Tabs>
+  <Tab title="Python Generator">
+    ```python
+    def generate_report(topic: str) -> Iterator[str]:
+        yield f"# {topic} Analysis Report\n\n"
+        yield "## Executive Summary\n"
+        for section in analyze_topic(topic):
+            yield f"### {section.title}\n{section.content}\n\n"
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript Async Iterator">
+    ```javascript
+    const stream = await client.runStream({topic: "AI Market Trends"});
+    for await (const chunk of stream) {
+        document.getElementById('report').innerHTML += chunk;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Rust Futures Stream">
+    ```rust
+    let mut stream = client.run_stream(&[("topic", json!("AI Market"))]).await?;
+    while let Some(chunk) = stream.next().await {
+        println!("{}", chunk?);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+**What's happening**: WebSocket connections, real-time data flow, and native iteration patterns—all handled automatically by RunAgent.
+
+<Card 
+    title='View All Features' 
+    icon='sparkles' 
+    href='/features'
+>
+Explore streaming, monitoring, security, and enterprise features.
+</Card>
