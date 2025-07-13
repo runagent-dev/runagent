@@ -1,10 +1,13 @@
 import asyncio
 from pathlib import Path
 from typing import Dict, List
-
+from rich.console import Console
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import EntryPoint, RunAgentConfig
 from runagent.utils.serializer import CoreSerializer
+from runagent.utils.response import extract_jsonpath, to_dict
+
+console = Console()
 
 
 class GenericExecutor:
@@ -24,8 +27,13 @@ class GenericExecutor:
         )
         
         def generic_runner(*input_args, **input_kwargs):
+            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
             print("resolved non stream", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
             result = resolved_entrypoint(*input_args, **input_kwargs)
+            if entrypoint.extractor:
+                result = extract_jsonpath(result, entrypoint.extractor)
+
             return result
         return generic_runner
 
@@ -37,10 +45,14 @@ class GenericExecutor:
         )
 
         async def generic_stream_runner(*input_args, **input_kwargs):
+            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
             for chunk in resolved_entrypoint(
                 *input_args,
                 **input_kwargs
             ):
+                if entrypoint.extractor:
+                    chunk = extract_jsonpath(chunk, entrypoint.extractor)
                 yield chunk
                 await asyncio.sleep(0)
 

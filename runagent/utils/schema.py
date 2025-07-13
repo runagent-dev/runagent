@@ -1,6 +1,6 @@
 # Pydantic schema for runagent.config.json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field, validator
 
@@ -19,6 +19,10 @@ class EntryPoint(BaseModel):
     file: str = Field(..., description="Entrypoint file")
     module: str = Field(..., description="Entrypoint module name")
     tag: str = Field(..., description="Entrypoint tag")
+    extractor: Optional[Dict[str, str]] = Field(
+        default={},
+        description="JSONPath expression to extract data from the response"
+    )
 
 
 class AgentArchitecture(BaseModel):
