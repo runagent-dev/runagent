@@ -13,17 +13,17 @@ console = Console()
 
 class AgentWebSocketHandler:
     """WebSocket handler for agent streaming"""
-    
+
     def __init__(self, db_service):
         self.db_service = db_service
         self.serializer = CoreSerializer(max_size_mb=10.0)
         self.active_streams = {}
-    
+
     async def handle_agent_stream(self, websocket: WebSocket, agent_id: str, agent_execution_streamer: Callable):
         """Handle WebSocket connection for agent streaming"""
         await websocket.accept()
         connection_id = f"{agent_id}_{int(time.time())}"
-        
+
         try:
             console.print(f"🔌 WebSocket connected for agent: [cyan]{agent_id}[/cyan]")
             
@@ -33,7 +33,7 @@ class AgentWebSocketHandler:
             if request_msg.error:
                 await self._send_error(websocket, f"Invalid request: {request_msg.error}")
                 return
-            
+
             # Parse WebSocket request
             try:
                 ws_request = WebSocketAgentRequest(**request_msg.data)
