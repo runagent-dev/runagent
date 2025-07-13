@@ -12,7 +12,7 @@
 </h2>
 
 <h3 align="center">
-  Build in Python, Deploy Anywhere, Access from Any Language
+  Write agent once, use everywhere
 </h3>
 
 <p align="center">
