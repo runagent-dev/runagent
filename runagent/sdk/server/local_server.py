@@ -370,7 +370,7 @@ class LocalServer:
             try:
                 console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
 
-                result = runner(
+                result = await runner(
                     *request.input_data.input_args, **request.input_data.input_kwargs
                 )
 
