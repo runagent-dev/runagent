@@ -1,0 +1,31 @@
+{
+  "agent_name": "Demo Agent",
+  "description": "A simple placeholder agent",
+  "framework": "crewai",
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/default",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "reseasrch_crew.py",
+        "module": "run_stream",
+        "tag": "research_crew"
+      },
+      {
+        "file": "reseasrch_crew.py",
+        "module": "run_stream",
+        "tag": "extracted_research_crew",
+        "extractor": {
+          "content": "$.raw"
+        }
+      }
+    ]
+  }
+}
+

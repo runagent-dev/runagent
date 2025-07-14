@@ -8,6 +8,7 @@ from runagent.sdk.server.framework.generic import GenericExecutor
 from runagent.sdk.server.framework.agno import AgnoExecutor
 from runagent.sdk.server.framework.llamaindex import LlamaIndexExecutor
 from runagent.sdk.server.framework.autogen import AutogenExecutor
+from runagent.sdk.server.framework.crewai import CrewAIExecutor
 from runagent.sdk.server.framework.ag2 import AG2Executor
 from runagent.utils.schema import EntryPoint
 
@@ -18,9 +19,10 @@ def get_executor(
     executor_dict = {
         "default": GenericExecutor,
         "openai": OpenAIExecutor,
+        "ag2": AG2Executor,
         "agno": AgnoExecutor,
         "autogen": AutogenExecutor,
-        "ag2": AG2Executor,
+        "crewai": CrewAIExecutor,
         "langgraph": LangGraphExecutor,
         "langchain": GenericExecutor,
         "letta": GenericExecutor,
