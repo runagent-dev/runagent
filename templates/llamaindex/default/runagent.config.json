@@ -20,11 +20,7 @@
       {
         "file": "math_genius.py",
         "module": "stream_multiply",
-        "tag": "math_stream",
-        "extractor": {
-          "tool_calls": "$.tool_calls[0]",
-          "delta_content": "$.delta"
-        }
+        "tag": "math_stream"
       }
     ]
   },

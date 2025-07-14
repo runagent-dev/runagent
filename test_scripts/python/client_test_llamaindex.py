@@ -25,5 +25,9 @@ ra = RunAgentClient(
 for chunk in ra.run(
     "What is 2 * 3?"
 ):
-    print(chunk)
-    # print(chunk['content'], end="")
+    if chunk["tool_calls"]:
+        tool_call = chunk['tool_calls']
+        print(f"[TOOL CALL] {tool_call['tool_name']} - {tool_call['tool_kwargs']} ")
+    elif chunk["delta_content"]:
+        print(chunk["delta_content"], end="")
+        
