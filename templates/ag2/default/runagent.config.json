@@ -1,0 +1,28 @@
+{
+  "agent_name": "Demo Agent",
+  "description": "A simple placeholder agent",
+  "framework": "ag2",
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/default",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "conversation.py",
+        "module": "invoke",
+        "tag": "ag2_invoke"
+      },
+      {
+        "file": "conversation.py",
+        "module": "stream",
+        "tag": "ag2_stream"
+      }
+    ]
+  }
+}
+
