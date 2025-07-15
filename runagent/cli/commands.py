@@ -113,9 +113,15 @@ def teardown(yes):
 @click.option("--template", default="default", help="Template variant (basic, advanced, default)")
 @click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
+@click.option("--ag2", is_flag=True, help="Use AG2 framework")
+@click.option("--agno", is_flag=True, help="Use AGNO framework")
+@click.option("--autogen", is_flag=True, help="Use Autogen framework")
+@click.option("--crewai", is_flag=True, help="Use CrewAI framework")
 @click.option("--langchain", is_flag=True, help="Use LangChain framework")
 @click.option("--langgraph", is_flag=True, help="Use LangGraph framework")
+@click.option("--letta", is_flag=True, help="Use Letta framework")
 @click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
+@click.option("--openai", is_flag=True, help="Use OpenAI framework")
 @click.argument(
     "path",
     type=click.Path(
@@ -128,34 +134,60 @@ def teardown(yes):
     default=".",
     required=False,  # Make path optional
 )
-def init(template, interactive, overwrite, langchain, langgraph, llamaindex, path):
+def init(
+    template,
+    interactive,
+    overwrite,
+    ag2,
+    agno,
+    autogen,
+    crewai,
+    langchain,
+    langgraph,
+    letta,
+    llamaindex,
+    openai,
+    path
+):
     """Initialize a new RunAgent project"""
 
     try:
         sdk = RunAgent()
 
         # Check for mutually exclusive framework flags
-        framework_flags = [langchain, langgraph, llamaindex]
-        framework_str = ["langchain", "langgraph", "llamaindex"]
-        
-        if sum(framework_flags) > 1:
-            frameworks_str = ", ".join(f"--{fw}" for fw in framework_str)
+        framework_dict = {
+            "ag2": ag2,
+            "agno": agno,
+            "autogen": autogen,
+            "crewai": crewai,
+            "langchain": langchain,
+            "langgraph": langgraph,
+            "letta": letta,
+            "llamaindex": llamaindex,
+            "openai": openai,
+        }
+        total_flags = sum(flag for flag in framework_dict.values())
+        if total_flags > 1:
+            frameworks_str = ", ".join(f"--{fw}" for fw in framework_dict)
             raise click.UsageError(f"Only one framework can be specified: {frameworks_str}")
 
         framework = (
-            [name for name, flag in zip(framework_str, framework_flags) if flag] or ["default"]
+            [name for name, flag in framework_dict.items() if flag] or ["default"]
         )[0]
         
         if interactive:
             if framework == "default":
                 console.print("🎯 [bold]Available frameworks:[/bold]")
-                for i, fw in enumerate(framework_str, 1):    # need to start from 1
+                for i, fw in enumerate(framework_dict.keys(), 1):    # need to start from 1
                     console.print(f"  {i}. {fw}")
 
                 choice = click.prompt(
-                    "Select framework", type=click.IntRange(1, len(framework_str)), default=1
+                    "Select framework", type=click.IntRange(1, len(framework_dict)), default=1
                 )
-                framework = framework_str[choice - 1]
+                # framework = framework_dict[choice - 1]
+                framework = [
+                    fw_name for i, fw_name in enumerate(framework_dict) if i == (choice-1)
+                ][0]
 
             if template == "default":
                 templates = sdk.list_templates(framework)
@@ -182,7 +214,7 @@ def init(template, interactive, overwrite, langchain, langgraph, llamaindex, pat
         # Use the path as the project location
         project_path = path.resolve()
         relative_project_path = project_path.relative_to(Path.cwd())
-        
+
         # Ensure the path exists (create parent directories if needed)
         project_path.parent.mkdir(parents=True, exist_ok=True)
 
