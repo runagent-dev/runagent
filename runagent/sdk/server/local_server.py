@@ -350,93 +350,131 @@ class LocalServer:
                 "entrypoints": self.agent_config.agent_architecture.entrypoints
             }
 
+        # Then in your loop:
         for entrypoint in self.agent_architecture.entrypoints:
-
             if entrypoint.tag.endswith("_stream"):
                 continue
 
             runner = self.agentic_executor.get_runner(entrypoint)
-
-            @self.app.post(
+            
+            self.app.post(
                 f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}",
                 response_model=AgentRunResponse
-            )
-            async def run_agent(request: AgentRunRequest):
-                """Run a deployed agent"""
-                start_time = time.time()
-                agent_id = self.agent_id
-                
-                try:
-                    console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
-                    console.print(f"🔍 Entrypoint: [cyan]{entrypoint.tag}[/cyan]")
-                    console.print(f"🔍 Input data: [cyan]{request.input_data}[/cyan]")
+            )(self.create_endpoint_handler(runner, self.agent_id))
 
-                    result = runner(
-                        *request.input_data.input_args, **request.input_data.input_kwargs
-                    )
+    def create_endpoint_handler(self, runner, agent_id):
+        async def run_agent(request: AgentRunRequest):
+            """Run a deployed agent"""
+            start_time = time.time()
 
-                    result_str = self.serializer.serialize_object(result)
-                    execution_time = time.time() - start_time
+            try:
+                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
 
-                    # Record successful run in database
-                    self.db_service.record_agent_run(
-                        agent_id=agent_id,
-                        input_data=request.input_data,
-                        output_data=result_str,
-                        success=True,
-                        execution_time=execution_time,
-                    )
+                result = await runner(
+                    *request.input_data.input_args, **request.input_data.input_kwargs
+                )
 
-                    console.print(
-                        f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
-                        f"{execution_time:.2f}s"
-                    )
+                result_str = self.serializer.serialize_object(result)
+                execution_time = time.time() - start_time
 
-                    return AgentRunResponse(
-                        success=True,
-                        output_data=result_str,
-                        error=None,
-                        execution_time=execution_time,
-                        agent_id=agent_id,
-                    )
+                # Record successful run in database
+                self.db_service.record_agent_run(
+                    agent_id=agent_id,
+                    input_data=request.input_data,
+                    output_data=result_str,
+                    success=True,
+                    execution_time=execution_time,
+                )
 
-                except Exception as e:
-                    if os.getenv('DISABLE_TRY_CATCH'):
-                        raise
-                    error_msg = f"Server error running agent {agent_id}: {str(e)}"
-                    execution_time = time.time() - start_time
+                console.print(
+                    f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
+                    f"{execution_time:.2f}s"
+                )
 
-                    # Record failed run in database
-                    self.db_service.record_agent_run(
-                        agent_id=agent_id,
-                        input_data=request.input_data,
-                        output_data=None,
-                        success=False,
-                        error_message=error_msg,
-                        execution_time=execution_time,
-                    )
+                return AgentRunResponse(
+                    success=True,
+                    output_data=result_str,
+                    error=None,
+                    execution_time=execution_time,
+                    agent_id=agent_id,
+                )
 
-                    console.print(f"💥 [red]{error_msg}[/red]")
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                error_msg = f"Server error running agent {agent_id}: {str(e)}"
+                execution_time = time.time() - start_time
 
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
-                    )
+                # Record failed run in database
+                self.db_service.record_agent_run(
+                    agent_id=agent_id,
+                    input_data=request.input_data,
+                    output_data=None,
+                    success=False,
+                    error_message=error_msg,
+                    execution_time=execution_time,
+                )
 
+                console.print(f"💥 [red]{error_msg}[/red]")
+
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
+                )
+        
+        return run_agent
+
+    # def _setup_websocket_routes(self):
+    #     """Add WebSocket routes to your existing FastAPI app"""
+    #     for entrypoint in self.agent_architecture.entrypoints:
+
+    #         if not entrypoint.tag.endswith("_stream"):
+    #             continue
+
+    #         stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
+
+    #         @self.app.websocket("/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}")
+    #         async def run_agent_stream(websocket: WebSocket, agent_id: str):
+    #             """WebSocket endpoint for agent streaming"""
+    #             await self.websocket_handler.handle_agent_stream(
+    #                 websocket, agent_id, stream_runner
+    #             )
+
+    # def create_websocket_handler(self, stream_runner, entrypoint_tag):
+    #     async def run_agent_stream(websocket: WebSocket, agent_id: str):
+    #         """WebSocket endpoint for agent streaming"""
+    #         await self.websocket_handler.handle_agent_stream(
+    #             websocket, agent_id, stream_runner
+    #         )
+    #     return run_agent_stream
+
+    # def _setup_websocket_routes(self):
+    #     """Add WebSocket routes to your existing FastAPI app"""
+
+    #     for entrypoint in self.agent_architecture.entrypoints:
+    #         if not entrypoint.tag.endswith("_stream"):
+    #             continue
+
+    #         stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
+            
+    #         self.app.websocket(
+    #             f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}"
+    #         )(self.create_websocket_handler(stream_runner, entrypoint.tag))
+            
     def _setup_websocket_routes(self):
-        """Add WebSocket routes to your existing FastAPI app"""
         for entrypoint in self.agent_architecture.entrypoints:
-
             if not entrypoint.tag.endswith("_stream"):
                 continue
 
             stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
 
-            @self.app.websocket("/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}")
-            async def run_agent_stream(websocket: WebSocket, agent_id: str):
-                """WebSocket endpoint for agent streaming"""
-                await self.websocket_handler.handle_agent_stream(
-                    websocket, agent_id, stream_runner
-                )
+            # Create a separate function for each entrypoint
+            def make_websocket_handler(runner):  # ← Factory function
+                @self.app.websocket(f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}")
+                async def websocket_endpoint(websocket: WebSocket, agent_id: str = self.agent_id):
+                    await self.websocket_handler.handle_agent_stream(websocket, agent_id, runner)
+                return websocket_endpoint
+            
+            make_websocket_handler(stream_runner)
 
     def extract_endpoints(self):
         endpoints = []

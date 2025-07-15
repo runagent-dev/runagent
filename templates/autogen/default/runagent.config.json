@@ -1,0 +1,42 @@
+{
+  "agent_name": "Demo Agent",
+  "description": "A simple placeholder agent",
+  "framework": "autogen",
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/default",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "simple_assistant.py",
+        "module": "agent.run",
+        "tag": "autogen_invoke"
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "agent.run_stream",
+        "tag": "autogen_step_stream",
+        "extractor": {
+          "type": "$.type",
+          "source": "$.source",
+          "message": "$.content"
+        }
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "agent_token_streamable.run_stream",
+        "tag": "autogen_token_stream",
+        "extractor": {
+          "type": "$.type",
+          "delta": "$.content"
+        }
+      }
+    ]
+  }
+}
+

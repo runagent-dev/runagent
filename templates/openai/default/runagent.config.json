@@ -1,7 +1,7 @@
 {
   "agent_name": "Demo Agent",
   "description": "A simple placeholder agent",
-  "framework": "",
+  "framework": "openai",
   "template": "default",
   "version": "1.0.0",
   "created_at": "2025-06-25 13:42:03",
@@ -13,14 +13,31 @@
   "agent_architecture": {
     "entrypoints": [
       {
-        "file": "email_agent.py",
-        "module": "generate_email",
-        "type": "generic"
+        "file": "simple_assistant.py",
+        "module": "get_response",
+        "tag": "simple_assistant"
       },
       {
-        "file": "email_agent.py",
-        "module": "generate_email_sream",
-        "type": "generic_stream"
+        "file": "simple_assistant.py",
+        "module": "get_response",
+        "tag": "simple_assistant_extracted",
+        "extractor": {
+          "extracted_content": "$.choices[0].message.content",
+          "extracted_usage": "$.usage.completion_tokens_details"
+        }
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "get_response_stream",
+        "tag": "simple_assistant_stream"
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "get_response_stream",
+        "tag": "simple_assistant_extracted_stream",
+        "extractor": {
+          "delta_content": "$.choices[0].delta.content"
+        }
       }
     ]
   },

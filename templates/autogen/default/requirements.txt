@@ -1,0 +1,2 @@
+autogen-agentchat==0.6.4
+autogen-ext==0.6.4

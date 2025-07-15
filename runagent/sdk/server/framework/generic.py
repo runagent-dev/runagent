@@ -1,10 +1,14 @@
 import asyncio
+import inspect
 from pathlib import Path
 from typing import Dict, List
-
+from rich.console import Console
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import EntryPoint, RunAgentConfig
 from runagent.utils.serializer import CoreSerializer
+from runagent.utils.response import extract_jsonpath, to_dict
+
+console = Console()
 
 
 class GenericExecutor:
@@ -13,38 +17,97 @@ class GenericExecutor:
 
     def __init__(self, agent_dir: Path):
         self.agent_dir = agent_dir
-
         self.importer = PackageImporter(verbose=False)
 
     def get_runner(self, entrypoint: EntryPoint):
-        
+        """
+        Always returns an async function, regardless of whether the 
+        underlying entrypoint is sync or async.
+        """
         resolved_entrypoint = self._entrypoint_resolver(
             entrypoint_filepath=self.agent_dir / entrypoint.file,
             entrypoint_module=entrypoint.module,
         )
         
-        def generic_runner(*input_args, **input_kwargs):
-            print("resolved non stream", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-            result = resolved_entrypoint(*input_args, **input_kwargs)
+        async def normalized_runner(*input_args, **input_kwargs):
+            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
+            
+            if inspect.iscoroutinefunction(resolved_entrypoint):
+                print("resolved async", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                result = await resolved_entrypoint(*input_args, **input_kwargs)
+            else:
+                print("resolved sync (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                # Run sync function in executor to avoid blocking
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
+                )
+            
+            if entrypoint.extractor:
+                result = extract_jsonpath(result, entrypoint.extractor)
+            
             return result
-        return generic_runner
+        
+        return normalized_runner
 
     def get_stream_runner(self, entrypoint: EntryPoint):
-        
+        """
+        Always returns an async generator, regardless of whether the 
+        underlying entrypoint is sync or async.
+        """
         resolved_entrypoint = self._entrypoint_resolver(
             entrypoint_filepath=self.agent_dir / entrypoint.file,
             entrypoint_module=entrypoint.module,
         )
 
-        async def generic_stream_runner(*input_args, **input_kwargs):
-            for chunk in resolved_entrypoint(
-                *input_args,
-                **input_kwargs
-            ):
-                yield chunk
-                await asyncio.sleep(0)
+        async def normalized_stream_runner(*input_args, **input_kwargs):
+            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
+            
+            if inspect.isasyncgenfunction(resolved_entrypoint):
+                # Native async generator
+                print("resolved async generator", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                async for chunk in resolved_entrypoint(*input_args, **input_kwargs):
+                    if entrypoint.extractor:
+                        chunk = extract_jsonpath(chunk, entrypoint.extractor)
+                    yield chunk
+                    await asyncio.sleep(0)
+            
+            elif inspect.iscoroutinefunction(resolved_entrypoint):
+                # Async function that returns iterable
+                print("resolved async function (returns iterable)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                result = await resolved_entrypoint(*input_args, **input_kwargs)
+                for chunk in result:
+                    if entrypoint.extractor:
+                        chunk = extract_jsonpath(chunk, entrypoint.extractor)
+                    yield chunk
+                    await asyncio.sleep(0)
+            
+            elif inspect.isgeneratorfunction(resolved_entrypoint):
+                # Sync generator - consume in executor
+                print("resolved sync generator (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                generator = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
+                )
+                for chunk in generator:
+                    if entrypoint.extractor:
+                        chunk = extract_jsonpath(chunk, entrypoint.extractor)
+                    yield chunk
+                    await asyncio.sleep(0)
+            
+            else:
+                # Sync function that returns iterable
+                print("resolved sync function (returns iterable, wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
+                )
+                for chunk in result:
+                    if entrypoint.extractor:
+                        chunk = extract_jsonpath(chunk, entrypoint.extractor)
+                    yield chunk
+                    await asyncio.sleep(0)
 
-        return generic_stream_runner
+        return normalized_stream_runner
 
     def _entrypoint_resolver(self, entrypoint_filepath: Path, entrypoint_module: str):
         print(f"DEBUG: Resolving entrypoint - filepath: {entrypoint_filepath}, module: {entrypoint_module}")
@@ -69,24 +132,16 @@ class GenericExecutor:
         print("Resolving", (entrypoint_module, resolved_module))
         return resolved_module
 
-
-    # def run(self, *input_args, **input_kwargs):
-    #     if self._generic_entrypoint is None:
-    #         raise ValueError("No `generic` entrypoint found in agent config")
-    #     result_obj = self._generic_entrypoint(*input_args, **input_kwargs)
-    #     result_json = self.serializer.serialize_object(result_obj)
-    #     return result_json
-
-    # async def run_stream(self, *input_args, **input_kwargs):
-    #     if self._generic_stream_entrypoint is None:
-    #         raise ValueError("No `generic_stream` entrypoint found in agent config")
-
-    #     for chunk in self._generic_stream_entrypoint(
-    #         *input_args,
-    #         **input_kwargs
-    #     ):
-    #         yield chunk
-    #         await asyncio.sleep(0)
-
-
-    
+    def _get_function_type(self, func):
+        """
+        Determine the type of function for debugging purposes.
+        Returns: str describing the function type
+        """
+        if inspect.isasyncgenfunction(func):
+            return "async_generator"
+        elif inspect.iscoroutinefunction(func):
+            return "async_function"
+        elif inspect.isgeneratorfunction(func):
+            return "sync_generator"
+        else:
+            return "sync_function"
