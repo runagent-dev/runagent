@@ -110,6 +110,80 @@ def teardown(yes):
 
 
 @click.command()
+@click.option("--id", "agent_id", required=True, help="Agent ID to delete")
+@click.option("--yes", is_flag=True, help="Skip confirmation")
+def delete(agent_id, yes):
+    """Delete an agent from the local database"""
+    try:
+        sdk = RunAgent()
+        
+        # Get agent info first
+        agent = sdk.db_service.get_agent(agent_id)
+        if not agent:
+            console.print(f"❌ [red]Agent {agent_id} not found in database[/red]")
+            
+            # Show available agents
+            console.print("\n💡 Available agents:")
+            agents = sdk.db_service.list_agents()
+            if agents:
+                table = Table(title="Available Agents")
+                table.add_column("Agent ID", style="magenta")
+                table.add_column("Framework", style="green")
+                table.add_column("Status", style="yellow")
+                table.add_column("Deployed At", style="dim")
+                
+                for agent in agents[:10]:  # Show first 10
+                    table.add_row(
+                        agent['agent_id'][:8] + "...",
+                        agent['framework'],
+                        agent['status'],
+                        agent['deployed_at'] or "Unknown"
+                    )
+                console.print(table)
+            else:
+                console.print("   No agents found in database")
+            
+            raise click.ClickException("Agent not found")
+        
+        # Show agent details
+        console.print(f"\n🔍 [yellow]Agent to be deleted:[/yellow]")
+        console.print(f"   Agent ID: [bold magenta]{agent['agent_id']}[/bold magenta]")
+        console.print(f"   Framework: [green]{agent['framework']}[/green]")
+        console.print(f"   Path: [blue]{agent['agent_path']}[/blue]")
+        console.print(f"   Status: [yellow]{agent['status']}[/yellow]")
+        console.print(f"   Deployed: [dim]{agent['deployed_at']}[/dim]")
+        console.print(f"   Total Runs: [cyan]{agent['run_count']}[/cyan]")
+        
+        # Confirmation
+        if not yes:
+            if not click.confirm("\n⚠️ This will permanently delete the agent from the database. Continue?"):
+                console.print("Deletion cancelled.")
+                return
+        
+        # Delete the agent
+        result = sdk.db_service.force_delete_agent(agent_id)
+        
+        if result["success"]:
+            console.print(f"\n✅ [green]Agent {agent_id} deleted successfully![/green]")
+            
+            # Show updated capacity
+            capacity_info = sdk.db_service.get_database_capacity_info()
+            console.print(f"📊 Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
+        else:
+            console.print(f"❌ [red]Failed to delete agent: {result.get('error')}[/red]")
+            raise click.ClickException("Deletion failed")
+    
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Delete error:[/red] {e}")
+        raise click.ClickException("Delete failed")
+
+
+
+
+
+@click.command()
 @click.option("--template", default="default", help="Template variant (basic, advanced, default)")
 @click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
@@ -607,12 +681,13 @@ def deploy(folder, agent_id, local, framework, config):
 
 
 
+# MODIFY: Replace the existing serve command with this updated version
+
 @click.command()
 @click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
 @click.option("--replace", help="Replace existing agent with this agent ID")
-@click.option("--delete", help="Delete existing agent with this agent ID before serving")
 @click.argument(
     "path",
     type=click.Path(
@@ -625,45 +700,15 @@ def deploy(folder, agent_id, local, framework, config):
     ),
     default=".",
 )
-def serve(port, host, debug, replace, delete, path):
+def serve(port, host, debug, replace, path):
     """Start local FastAPI server for testing deployed agents with automatic port allocation
     
     Options:
         --replace AGENT_ID: Replace existing agent with new agent from path
-        --delete AGENT_ID: Delete existing agent before serving new one
     """
 
     try:
         sdk = RunAgent()
-        
-        # Handle delete operation first
-        if delete:
-            console.print(f"🗑️ [yellow]Deleting agent: {delete}[/yellow]")
-            
-            # Use the new force_delete_agent method if available, otherwise direct DB access
-            if hasattr(sdk.db_service, 'force_delete_agent'):
-                result = sdk.db_service.force_delete_agent(delete)
-                if not result["success"]:
-                    console.print(f"⚠️ [yellow]{result['error']}[/yellow]")
-                    if result.get("code") == "AGENT_NOT_FOUND":
-                        console.print("💡 Available agents:")
-                        agents = sdk.db_service.list_agents()
-                        for agent in agents[:5]:  # Show first 5
-                            console.print(f"   • {agent['agent_id']} ({agent['framework']})")
-                else:
-                    console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
-            else:
-                # Fallback to direct database access
-                with sdk.db_service.db_manager.get_session() as session:
-                    from runagent.sdk.db import Agent
-                    agent_to_delete = session.query(Agent).filter(Agent.agent_id == delete).first()
-                    
-                    if agent_to_delete:
-                        session.delete(agent_to_delete)
-                        session.commit()
-                        console.print(f"✅ [green]Agent {delete} deleted successfully[/green]")
-                    else:
-                        console.print(f"⚠️ [yellow]Agent {delete} not found in database[/yellow]")
         
         # Handle replace operation
         if replace:
@@ -729,16 +774,16 @@ def serve(port, host, debug, replace, delete, path):
                 host=allocated_host,
             )
         else:
-            # Normal operation - check capacity if not replacing/deleting
+            # Normal operation - check capacity if not replacing
             capacity_info = sdk.db_service.get_database_capacity_info()
-            if capacity_info["is_full"] and not delete and not replace:
+            if capacity_info["is_full"] and not replace:
                 console.print("❌ [red]Database is full![/red]")
                 oldest_agent = capacity_info.get("oldest_agent", {})
                 if oldest_agent:
                     console.print(f"💡 [yellow]Suggested commands:[/yellow]")
                     console.print(f"   Replace: [cyan]runagent serve {path} --replace {oldest_agent.get('agent_id', '')}[/cyan]")
-                    console.print(f"   Delete:  [cyan]runagent serve {path} --delete {oldest_agent.get('agent_id', '')}[/cyan]")
-                raise click.ClickException("Database at capacity. Use --replace or --delete to free space.")
+                    console.print(f"   Delete:  [cyan]runagent delete --id {oldest_agent.get('agent_id', '')}[/cyan]")
+                raise click.ClickException("Database at capacity. Use --replace or use 'runagent delete' to free space.")
             
             console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
             
