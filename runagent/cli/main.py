@@ -23,6 +23,7 @@ runagent.add_command(commands.deploy)
 runagent.add_command(commands.serve)
 runagent.add_command(commands.run)
 runagent.add_command(commands.db_status)
+runagent.add_command(commands.delete)  
 
 if __name__ == "__main__":
     runagent()
