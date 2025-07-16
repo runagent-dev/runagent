@@ -35,7 +35,12 @@ const result = await client.run({ query: "Hello!" });
 // Your Rust team gets the same experience
 let result = client.run(&[("query", json!("Hello!"))]).await?;
 ```
-
+```go 
+// Run the Go agent
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"query": "Hello!",
+	})
+```
 That's the magic ✨
 
 ## Understanding Agents in RunAgent
@@ -100,6 +105,13 @@ let result = client.run(&[
     ("question", json!("How do quantum computers work?")),
     ("difficulty", json!("beginner"))
 ]).await?;
+```
+
+```go Another one Go
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"question": "How do quantum computers work?",
+  "difficulty": "beginner",
+	})
 ```
 </CodeGroup>
 
@@ -306,6 +318,36 @@ Each SDK provides idiomatic experiences:
     while let Some(chunk) = stream.next().await {
         print!("{}", chunk?);
     }
+    ```
+  </Tab>
+
+  <Tab title="Go: Iterator ">
+    ```go
+    c, err := client.NewWithAddress("841debad-7433-46ae-a0ec-0540d0df7314", "minimal_stream", true, "localhost", 8450)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	s, err := c.RunStream(ctx, map[string]interface{}{"role": "user", "message": "Analyze the benefits of remote work for software teams"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+
+	for {
+		data, hasMore, err := s.Next(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !hasMore {
+			break
+		}
+		fmt.Printf("Received: %v\n", data)
+	}
     ```
   </Tab>
 </Tabs>

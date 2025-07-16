@@ -356,6 +356,48 @@ Watch your Python agent stream responses in real-time to any language:
     
     **Performance revelation**: Rust developers get zero-copy streaming from your Python agent with full type safety!
   </Tab>
+
+  <Tab title="🦀 Go - Streaming">
+    ```go
+    package main
+
+    import (
+      "context"
+      "fmt"
+      "log"
+      "time"
+      "github.com/runagent-dev/runagent/runagent-go/runagent/pkg/client"
+    )
+
+    func main() {
+      c, err := client.NewWithAddress("841debad-7433-46ae-a0ec-0540d0df7314", "minimal_stream", true, "localhost", 8450)
+      if err != nil {
+        log.Fatal(err)
+      }
+      defer c.Close()
+
+      ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+      defer cancel()
+
+      s, err := c.RunStream(ctx, map[string]interface{}{"role": "user", "message": "Analyze the benefits of remote work for software teams"})
+      if err != nil {
+        log.Fatal(err)
+      }
+      defer s.Close()
+
+      for {
+        data, hasMore, err := s.Next(ctx)
+        if err != nil {
+          log.Fatal(err)
+        }
+        if !hasMore {
+          break
+        }
+        fmt.Printf("Received: %v\n", data)
+      }
+    }
+    ```
+    </Tab>
 </Tabs>
 
 ## Level Up: Real AI Frameworks

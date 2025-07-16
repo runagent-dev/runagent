@@ -189,6 +189,28 @@ When your Python agent streams responses, RunAgent makes it feel native in every
     }
     ```
   </Tab>
+
+  <Tab title="Go Stream">
+    ```go
+    s, err := c.RunStream(ctx, map[string]interface{}{"role": "user", "message": "Analyze the benefits of remote work for software teams"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+
+	for {
+		data, hasMore, err := s.Next(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !hasMore {
+			break
+		}
+		fmt.Printf("Received: %v\n", data)
+	}
+    ```
+  </Tab>
+
 </Tabs>
 
 **What's happening**: WebSocket connections, real-time data flow, and native iteration patterns—all handled automatically by RunAgent.
