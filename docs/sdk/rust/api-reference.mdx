@@ -1,0 +1,485 @@
+### RunAgentClient
+
+Main client for interacting with RunAgent deployments.
+
+### Constructors
+
+#### new
+
+```rust
+pub async fn new(
+    agent_id: &str,
+    entrypoint_tag: &str,
+    local: bool,
+) -> RunAgentResult<Self>
+```
+
+Create a new RunAgent client with database lookup.
+
+**Parameters:**
+- `agent_id`: The ID of your deployed agent
+- `entrypoint_tag`: The entrypoint to use for execution
+- `local`: Whether this is a local agent deployment
+
+**Returns:** `RunAgentResult<RunAgentClient>`
+
+#### with_address
+
+```rust
+pub async fn with_address(
+    agent_id: &str,
+    entrypoint_tag: &str,
+    local: bool,
+    host: Option<&str>,
+    port: Option<u16>,
+) -> RunAgentResult<Self>
+```
+
+Create a new RunAgent client with specific host and port.
+
+**Parameters:**
+- `agent_id`: The ID of your deployed agent
+- `entrypoint_tag`: The entrypoint to use for execution
+- `local`: Whether this is a local agent deployment
+- `host`: Optional host address
+- `port`: Optional port number
+
+**Returns:** `RunAgentResult<RunAgentClient>`
+
+### Methods
+
+#### run
+
+```rust
+pub async fn run(&self, input_kwargs: &[(&str, Value)]) -> RunAgentResult<Value>
+```
+
+Run the agent with keyword arguments.
+
+**Parameters:**
+- `input_kwargs`: Array of key-value pairs for agent input
+
+**Returns:** `RunAgentResult<Value>` - Agent
+
+**Returns:** `RunAgentResult<Value>` - Agent response as JSON
+
+#### run_with_args
+
+```rust
+pub async fn run_with_args(
+    &self,
+    input_args: &[Value],
+    input_kwargs: &[(&str, Value)],
+) -> RunAgentResult<Value>
+```
+
+Run the agent with both positional and keyword arguments.
+
+**Parameters:**
+- `input_args`: Array of positional arguments
+- `input_kwargs`: Array of key-value pairs for agent input
+
+**Returns:** `RunAgentResult<Value>` - Agent response as JSON
+
+#### run_stream
+
+```rust
+pub async fn run_stream(
+    &self,
+    input_kwargs: &[(&str, Value)],
+) -> RunAgentResult<Pin<Box<dyn Stream<Item = RunAgentResult<Value>> + Send>>>
+```
+
+Run the agent and return a stream of responses.
+
+**Parameters:**
+- `input_kwargs`: Array of key-value pairs for agent input
+
+**Returns:** `RunAgentResult<Stream>` - Stream of response chunks
+
+#### run_stream_with_args
+
+```rust
+pub async fn run_stream_with_args(
+    &self,
+    input_args: &[Value],
+    input_kwargs: &[(&str, Value)],
+) -> RunAgentResult<Pin<Box<dyn Stream<Item = RunAgentResult<Value>> + Send>>>
+```
+
+Run the agent with streaming and both positional and keyword arguments.
+
+#### get_agent_architecture
+
+```rust
+pub async fn get_agent_architecture(&self) -> RunAgentResult<Value>
+```
+
+Get the agent's architecture information.
+
+**Returns:** `RunAgentResult<Value>` - Architecture details
+
+#### health_check
+
+```rust
+pub async fn health_check(&self) -> RunAgentResult<bool>
+```
+
+Check if the agent is available.
+
+**Returns:** `RunAgentResult<bool>` - Health status
+
+#### agent_id
+
+```rust
+pub fn agent_id(&self) -> &str
+```
+
+Get the agent ID.
+
+#### entrypoint_tag
+
+```rust
+pub fn entrypoint_tag(&self) -> &str
+```
+
+Get the entrypoint tag.
+
+#### is_local
+
+```rust
+pub fn is_local(&self) -> bool
+```
+
+Check if using local deployment.
+
+## LocalServer
+
+Local server for testing deployed agents.
+
+### Constructors
+
+#### new
+
+```rust
+pub async fn new(
+    agent_id: String,
+    agent_path: PathBuf,
+    host: &str,
+    port: u16,
+) -> RunAgentResult<Self>
+```
+
+Create a new local server.
+
+**Parameters:**
+- `agent_id`: Unique identifier for the agent
+- `agent_path`: Path to the agent directory
+- `host`: Host address to bind to
+- `port`: Port number to bind to
+
+#### from_path
+
+```rust
+pub async fn from_path(
+    agent_path: PathBuf,
+    host: Option<&str>,
+    port: Option<u16>,
+) -> RunAgentResult<Self>
+```
+
+Create a new local server from agent path with auto-discovery.
+
+**Parameters:**
+- `agent_path`: Path to the agent directory
+- `host`: Optional host (defaults to "127.0.0.1")
+- `port`: Optional port (defaults to 8450)
+
+### Methods
+
+#### start
+
+```rust
+pub async fn start(self) -> RunAgentResult<()>
+```
+
+Start the server (blocking operation).
+
+#### get_info
+
+```rust
+pub fn get_info(&self) -> ServerInfo
+```
+
+Get server information.
+
+**Returns:** `ServerInfo` struct with server details
+
+#### agent_id
+
+```rust
+pub fn agent_id(&self) -> &str
+```
+
+Get the agent ID.
+
+#### addr
+
+```rust
+pub fn addr(&self) -> SocketAddr
+```
+
+Get the server address.
+
+## DatabaseService
+
+High-level database service for agent management (when `db` feature is enabled).
+
+### Constructors
+
+#### new
+
+```rust
+pub async fn new(db_path: Option<PathBuf>) -> RunAgentResult<Self>
+```
+
+Create a new database service.
+
+#### with_rest_client
+
+```rust
+pub async fn with_rest_client(
+    db_path: Option<PathBuf>,
+    rest_client: RestClient,
+) -> RunAgentResult<Self>
+```
+
+Create database service with REST client for enhanced limits.
+
+### Methods
+
+#### add_agent
+
+```rust
+pub async fn add_agent(&self, agent: Agent) -> RunAgentResult<AddAgentResult>
+```
+
+Add a new agent to the database.
+
+#### get_agent
+
+```rust
+pub async fn get_agent(&self, agent_id: &str) -> RunAgentResult<Option<Agent>>
+```
+
+Get an agent by ID.
+
+#### list_agents
+
+```rust
+pub async fn list_agents(&self) -> RunAgentResult<Vec<Agent>>
+```
+
+List all agents.
+
+#### get_capacity_info
+
+```rust
+pub async fn get_capacity_info(&self) -> RunAgentResult<CapacityInfo>
+```
+
+Get capacity information.
+
+## Error Types
+
+### RunAgentError
+
+Main error type for the SDK.
+
+```rust
+pub enum RunAgentError {
+    Authentication { message: String },
+    Validation { message: String },
+    Connection { message: String },
+    Server { message: String },
+    Database { message: String },
+    Config { message: String },
+    // ... other variants
+}
+```
+
+### Methods
+
+#### category
+
+```rust
+pub fn category(&self) -> &'static str
+```
+
+Get the error category as a string.
+
+#### is_retryable
+
+```rust
+pub fn is_retryable(&self) -> bool
+```
+
+Check if the error is retryable.
+
+### Constructor Methods
+
+```rust
+pub fn authentication<S: Into<String>>(message: S) -> Self
+pub fn validation<S: Into<String>>(message: S) -> Self
+pub fn connection<S: Into<String>>(message: S) -> Self
+pub fn server<S: Into<String>>(message: S) -> Self
+pub fn database<S: Into<String>>(message: S) -> Self
+pub fn config<S: Into<String>>(message: S) -> Self
+```
+
+## Configuration Types
+
+### RunAgentConfig
+
+Configuration builder for the SDK.
+
+```rust
+pub struct RunAgentConfig {
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub local_db_path: Option<PathBuf>,
+    pub enable_logging: bool,
+}
+```
+
+### Methods
+
+```rust
+pub fn new() -> Self
+pub fn with_api_key<S: Into<String>>(mut self, api_key: S) -> Self
+pub fn with_base_url<S: Into<String>>(mut self, base_url: S) -> Self
+pub fn with_local_db_path<P: Into<PathBuf>>(mut self, path: P) -> Self
+pub fn with_logging(mut self) -> Self
+pub fn build(self) -> Self
+```
+
+## Utility Functions
+
+### init_logging
+
+```rust
+pub fn init_logging()
+```
+
+Initialize logging for the RunAgent SDK.
+
+### Framework Detection
+
+```rust
+pub fn detect_framework<P: AsRef<Path>>(agent_path: P) -> RunAgentResult<String>
+```
+
+Detect the framework used by an agent.
+
+### Agent Validation
+
+```rust
+pub fn validate_agent<P: AsRef<Path>>(agent_path: P) -> RunAgentResult<ValidationResult>
+```
+
+Validate an agent project structure.
+
+## Complete Example
+
+```rust
+use runagent::{
+    client::RunAgentClient,
+    server::LocalServer,
+    types::{RunAgentError, RunAgentResult},
+    RunAgentConfig,
+    init_logging,
+};
+use serde_json::json;
+use futures::StreamExt;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> RunAgentResult<()> {
+    // Initialize logging
+    init_logging();
+    
+    // Configure SDK
+    let _config = RunAgentConfig::new()
+        .with_api_key("your-api-key")
+        .with_logging()
+        .build();
+    
+    // Start local server
+    let server = LocalServer::from_path(
+        PathBuf::from("./my-agent"),
+        Some("localhost"),
+        Some(8450)
+    ).await?;
+    
+    let agent_id = server.agent_id().to_string();
+    
+    // Start server in background
+    tokio::spawn(async move {
+        server.start().await.unwrap();
+    });
+    
+    // Wait for server to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    
+    // Create client
+    let client = RunAgentClient::with_address(
+        &agent_id,
+        "generic",
+        true,
+        Some("localhost"),
+        Some(8450)
+    ).await?;
+    
+    // Test non-streaming
+    match client.run(&[
+        ("query", json!("Hello, world!")),
+        ("temperature", json!(0.7))
+    ]).await {
+        Ok(response) => println!("Response: {}", response),
+        Err(RunAgentError::Authentication { message }) => {
+            println!("Auth error: {}", message);
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+    
+    // Test streaming
+    let mut stream = client.run_stream(&[
+        ("query", json!("Tell me a story"))
+    ]).await?;
+    
+    while let Some(chunk_result) = stream.next().await {
+        match chunk_result {
+            Ok(chunk) => print!("{}", chunk),
+            Err(e) => {
+                println!("Stream error: {}", e);
+                break;
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+## Type Aliases
+
+```rust
+pub type RunAgentResult<T> = Result<T, RunAgentError>;
+```
+
+## Constants
+
+```rust
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+```
+```

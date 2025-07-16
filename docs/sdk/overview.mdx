@@ -1,10 +1,3 @@
----
-title: 'SDK Overview'
-description: 'Overview of RunAgent SDKs'
----
-
-Client libraries for interacting with RunAgent
-
 ## Introduction
 
 RunAgent provides native SDKs for multiple programming languages, making it easy to integrate deployed agents into your applications. All SDKs follow consistent patterns while respecting language-specific conventions.
@@ -17,16 +10,16 @@ Full-featured SDK with sync/async support
 pip install runagent
 ```
 
+### Rust
+High-performance SDK with zero-cost abstractions
+```bash
+cargo add runagent tokio
+```
+
 ### JavaScript
 Coming Soon - Node.js and browser support
 ```bash
 npm install @runagent/sdk
-```
-
-### Rust
-Coming Soon - High-performance native SDK
-```bash
-cargo add runagent
 ```
 
 ### Go
@@ -49,13 +42,13 @@ All SDKs provide:
 
 ## Quick Comparison
 
-| Feature | Python | JavaScript | Rust | Go |
-|---------|---------|------------|------|-----|
+| Feature | Python | Rust | JavaScript | Go |
+|---------|---------|------|------------|-----|
 | Sync Support | ✅ | ✅ | ✅ | ✅ |
 | Async Support | ✅ | ✅ | ✅ | ✅ |
-| Streaming | ✅ | 🚧 | 🚧 | 🚧 |
-| Type Hints | ✅ | ✅ (TS) | ✅ | ✅ |
-| Published | ✅ | 🚧 | 🚧 | 🚧 |
+| Streaming | ✅ | ✅ | 🚧 | 🚧 |
+| Type Safety | ✅ | ✅ | ✅ (TS) | ✅ |
+| Published | ✅ | ✅ | 🚧 | 🚧 |
 
 ## Basic Usage Pattern
 
@@ -69,20 +62,21 @@ client = RunAgentClient(agent_id="agent-123")
 result = client.run_generic({"query": "Hello"})
 ```
 
+### Rust
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+let client = RunAgentClient::new("agent-123", "generic", true).await?;
+let result = client.run(&[("query", json!("Hello"))]).await?;
+```
+
 ### JavaScript
 ```javascript
 import { RunAgentClient } from '@runagent/sdk';
 
 const client = new RunAgentClient({ agentId: 'agent-123' });
 const result = await client.runGeneric({ query: 'Hello' });
-```
-
-### Rust
-```rust
-use runagent::Client;
-
-let client = Client::new("agent-123");
-let result = client.run_generic(json!({ "query": "Hello" })).await?;
 ```
 
 ### Go
@@ -190,19 +184,20 @@ Best for:
 - Scripts and automation
 - Jupyter notebooks
 
+### Rust SDK
+Best for:
+- High-performance applications
+- Systems programming
+- WebAssembly targets
+- Memory-efficient applications
+- Concurrent processing
+
 ### JavaScript SDK
 Best for:
 - Web applications
 - Node.js backends
 - React/Vue/Angular apps
 - Serverless functions
-
-### Rust SDK
-Best for:
-- High-performance applications
-- Systems programming
-- WebAssembly targets
-- Embedded systems
 
 ### Go SDK
 Best for:
@@ -213,12 +208,12 @@ Best for:
 
 ## Performance Considerations
 
-| SDK | Startup Time | Memory Usage | Throughput |
-|-----|--------------|--------------|------------|
-| Python | Medium | Medium | Good |
-| JavaScript | Fast | Low | Good |
-| Rust | Fast | Very Low | Excellent |
-| Go | Fast | Low | Excellent |
+| SDK | Startup Time | Memory Usage | Throughput | Type Safety |
+|-----|--------------|--------------|------------|-------------|
+| Python | Medium | Medium | Good | Runtime |
+| Rust | Fast | Very Low | Excellent | Compile-time |
+| JavaScript | Fast | Low | Good | Optional (TS) |
+| Go | Fast | Low | Excellent | Compile-time |
 
 ## Migration Guide
 
@@ -238,9 +233,12 @@ Moving between SDKs? The concepts remain the same:
 
 ## Next Steps
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Python SDK" icon="python" href="/sdk/python/getting-started">
     Start with our most mature SDK
+  </Card>
+  <Card title="Rust SDK" icon="rust" href="/sdk/rust/getting-started">
+    High-performance native SDK
   </Card>
   <Card title="API Reference" icon="book" href="/api-reference/introduction">
     Understand the underlying API
