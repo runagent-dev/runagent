@@ -149,7 +149,6 @@ deployments/
 target
 
 
-
 openapi_letta.json
 
 
@@ -158,4 +157,3 @@ go.sum
 
 myenv/
 myvenv/
-
