@@ -31,29 +31,39 @@ All RunAgent commands support these global options:
 ## Available Commands
 
 <CardGroup cols={2}>
+  <Card title="setup" icon="gear" href="/cli/commands/setup">
+    Configure authentication and API keys (Coming Soon)
+  </Card>
+  <Card title="teardown" icon="trash" href="/cli/commands/teardown">
+    Remove RunAgent configuration (Coming Soon)
+  </Card>
   <Card title="init" icon="sparkles" href="/cli/commands/init">
     Initialize a new agent project
+  </Card>
+  <Card title="template" icon="copy" href="/cli/commands/template">
+    Manage project templates
   </Card>
   <Card title="serve" icon="server" href="/cli/commands/serve">
     Run agent locally for testing
   </Card>
+
+  <Card title="upload" icon="upload" href="/cli/commands/upload">
+    Upload agent to remote server (Coming Soon)
+  </Card>
+  <Card title="start" icon="power-off" href="/cli/commands/start">
+    Start uploaded agent on remote server (Coming Soon)
+  </Card>
   <Card title="deploy" icon="rocket" href="/cli/commands/deploy">
-    Deploy agent to production
+    Full deployment (upload + start) or local deploy
   </Card>
   <Card title="run" icon="play" href="/cli/commands/run">
     Execute a deployed agent
   </Card>
-  <Card title="upload" icon="upload" href="/cli/commands/upload">
-    Upload agent to server
+  <Card title="db-status" icon="database" href="/cli/commands/db-status">
+    Show local database status and statistics
   </Card>
-  <Card title="start" icon="power-off" href="/cli/commands/start">
-    Start uploaded agent
-  </Card>
-  <Card title="setup" icon="gear" href="/cli/commands/setup">
-    Configure authentication
-  </Card>
-  <Card title="template" icon="copy" href="/cli/commands/template">
-    Manage project templates
+  <Card title="delete" icon="x" href="/cli/commands/delete">
+    Delete an agent from local database
   </Card>
 </CardGroup>
 
@@ -69,15 +79,45 @@ Examples:
 ```bash
 runagent init my-agent --framework langgraph
 runagent serve . --port 8080
-runagent deploy . --env production
-runagent run agent-id --input '{"query": "Hello"}'
+runagent run --id agent-id --tag main --input '{"query": "Hello"}'
 ```
+
+*Note: Authentication and remote deployment commands are coming soon*
+
+## Command Categories
+
+### **Setup & Configuration** (Authentication Coming Soon)
+- `setup` - Configure authentication with API keys (Coming Soon)
+- `teardown` - Remove all RunAgent configuration (Coming Soon)
+- `db-status` - Monitor local database and capacity
+
+### **Project Management**
+- `init` - Create new agent projects from templates
+- `template` - List and manage available templates
+
+### **Local Development**
+- `serve` - Start local FastAPI server for testing and deployment
+- `delete` - Remove agents from local database
+
+### **Remote Deployment** (Coming Soon)
+- `upload` - Upload agent code to remote server
+- `start` - Start uploaded agent on remote server
+- `deploy` - Full deployment workflow (upload + start)
+
+### **Execution**
+- `run` - Execute deployed agents with flexible input options
 
 ## Common Workflows
 
 ### Development Workflow
 
 <Steps>
+  <Step title="Setup Authentication (Coming Soon)">
+    ```bash
+    runagent setup --api-key your-api-key
+    ```
+    *Note: Authentication features are coming soon*
+  </Step>
   <Step title="Create Project">
     ```bash
     runagent init my-agent --framework langgraph
@@ -95,94 +135,182 @@ runagent run agent-id --input '{"query": "Hello"}'
     # Edit .env with your API keys
     ```
   </Step>
-  <Step title="Test Locally">
+  <Step title="Test & Deploy Locally">
     ```bash
     runagent serve .
     ```
   </Step>
-  <Step title="Deploy">
+  <Step title="Deploy to Remote (Coming Soon)">
     ```bash
     runagent deploy .
     ```
+    *Note: Remote deployment features are coming soon*
   </Step>
 </Steps>
 
 ### Quick Commands Reference
 
 <Tabs>
+  <Tab title="Setup & Auth (Coming Soon)">
+    ```bash
+    # Initial setup (Coming Soon)
+    runagent setup --api-key your-key
+    
+    # Check configuration status
+    runagent db-status --capacity
+    
+    # Remove configuration (Coming Soon)
+    runagent teardown
+    ```
+    *Note: Authentication features are coming soon*
+  </Tab>
   <Tab title="Project Management">
     ```bash
     # Create new project
     runagent init PROJECT_NAME
     
     # List available templates
-    runagent template list
+    runagent template --list
     
     # Create from specific template
-    runagent init PROJECT_NAME --template chatbot
+    runagent init PROJECT_NAME --langgraph --template advanced
+    
+    # Interactive mode
+    runagent init --interactive
     ```
   </Tab>
-  <Tab title="Development">
+  <Tab title="Local Development">
     ```bash
-    # Start local server
+    # Start local server (automatically deploys with port allocation)
     runagent serve .
     
     # Use custom port
     runagent serve . --port 8080
     
-    # Enable hot reload
-    runagent serve . --reload
+    # Replace existing agent
+    runagent serve . --replace agent-id
+    
+    # Check database status
+    runagent db-status
     ```
   </Tab>
-  <Tab title="Deployment">
+  <Tab title="Remote Deployment (Coming Soon)">
     ```bash
-    # Deploy locally
-    runagent deploy . --local
+    # Upload agent (Coming Soon)
+    runagent upload --folder .
     
-    # Upload to server
-    runagent upload .
+    # Start uploaded agent (Coming Soon)
+    runagent start --id AGENT_ID
     
-    # Start uploaded agent
-    runagent start AGENT_ID
+    # Full deployment (upload + start) (Coming Soon)
+    runagent deploy --folder .
+    
+    # Deploy locally with serve command
+    runagent serve .
     ```
+    *Note: Remote deployment features are coming soon*
   </Tab>
   <Tab title="Execution">
     ```bash
-    # Run deployed agent
-    runagent run AGENT_ID --input '{"key": "value"}'
+    # Run agent with parameters
+    runagent run --id AGENT_ID --tag main --param1=value1 --param2=value2
     
-    # Run with file input
-    runagent run AGENT_ID --input-file input.json
+    # Run with input file
+    runagent run --id AGENT_ID --tag main --input config.json
+    
+    # Run locally
+    runagent run --id AGENT_ID --tag main --local
+    
+    # Run with host/port
+    runagent run --host localhost --port 8080 --tag main
+    ```
+  </Tab>
+  <Tab title="Management">
+    ```bash
+    # List local agents
+    runagent db-status
+    
+    # Check capacity
+    runagent db-status --capacity
+    
+    # Delete agent
+    runagent delete --id AGENT_ID
+    
+    # Get agent details
+    runagent db-status --agent-id AGENT_ID
     ```
   </Tab>
 </Tabs>
 
 ## Configuration Management
 
-### Authentication Setup
+### Authentication Setup (Coming Soon)
 
 ```bash
-# Initial setup
-runagent setup
+# Setup with API key (Coming Soon)
+runagent setup --api-key your-api-key
 
-# Remove configuration
+# Setup with custom base URL (Coming Soon)
+runagent setup --api-key your-key --base-url https://custom-api.com
+
+# Force reconfiguration (Coming Soon)
+runagent setup --api-key new-key --force
+
+# Remove all configuration (Coming Soon)
 runagent teardown
 ```
 
-The setup command creates a configuration file at:
-- Linux/Mac: `~/.runagent/config.json`
-- Windows: `%USERPROFILE%\.runagent\config.json`
+*Note: Authentication and remote deployment features are coming soon.*
 
-### Environment Variables
+The setup command will create a configuration file at:
+- Linux/Mac: `~/.runagent/user_data.json`
+- Windows: `%USERPROFILE%\.runagent\user_data.json`
 
-RunAgent CLI respects these environment variables:
+### Environment Variables (Coming Soon)
+
+RunAgent CLI will support these environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `RUNAGENT_API_KEY` | API key for authentication |
-| `RUNAGENT_API_URL` | Custom API endpoint |
-| `RUNAGENT_CONFIG_PATH` | Custom config file location |
+| `RUNAGENT_API_KEY` | API key for authentication (Coming Soon) |
+| `RUNAGENT_BASE_URL` | Custom API endpoint (Coming Soon) |
+| `RUNAGENT_CACHE_DIR` | Custom cache directory location |
 | `RUNAGENT_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+*Note: Authentication-related environment variables are coming soon.*
+
+## Local Database Management
+
+RunAgent maintains a local SQLite database for managing agents:
+
+```bash
+# View database status
+runagent db-status
+
+# Check capacity (5 agents max)
+runagent db-status --capacity
+
+# View specific agent
+runagent db-status --agent-id AGENT_ID
+
+# Delete agent
+runagent delete --id AGENT_ID
+
+# Clean up old records
+runagent db-status --cleanup-days 30
+```
+
+### Capacity Management
+
+The local database supports up to **5 agents** simultaneously. When at capacity:
+
+```bash
+# Replace oldest agent
+runagent serve . --replace OLDEST_AGENT_ID
+
+# Or delete an agent first
+runagent delete --id AGENT_ID
+```
 
 ## Output Formats
 
@@ -190,13 +318,13 @@ Most commands support different output formats:
 
 ```bash
 # Default human-readable output
-runagent list
+runagent template --list
 
 # JSON output for scripting
-runagent list --json
+runagent template --list --format json
 
 # Minimal output
-runagent list --quiet
+runagent serve . --quiet
 ```
 
 ## Error Handling
@@ -207,7 +335,7 @@ RunAgent provides clear error messages:
 $ runagent serve nonexistent
 Error: Directory 'nonexistent' does not exist
 
-$ runagent run invalid-id
+$ runagent run --id invalid-id --tag main
 Error: Agent 'invalid-id' not found
 ```
 
@@ -224,17 +352,43 @@ Error: Agent 'invalid-id' not found
 
 ## Advanced Usage
 
+### Animation Control
+
+```bash
+# Skip startup animation
+runagent serve . --no-animation
+
+# Use different animation style
+runagent serve . --animation-style quick
+runagent serve . --animation-style minimal
+```
+
+### Debugging
+
+Enable verbose output for troubleshooting:
+
+```bash
+# Verbose mode
+runagent --verbose serve .
+
+# Debug logging
+RUNAGENT_LOG_LEVEL=DEBUG runagent serve .
+
+# Check configuration status
+runagent db-status --capacity
+```
+
 ### Piping and Scripting
 
 ```bash
 # Pipe input from file
-cat input.json | runagent run AGENT_ID --input -
+cat input.json | runagent run --id AGENT_ID --tag main --input -
 
 # Use in scripts
-if runagent serve . --check; then
-    echo "Agent configuration valid"
+if runagent db-status --capacity; then
+    echo "Database has available slots"
 else
-    echo "Configuration errors found"
+    echo "Database is at capacity"
     exit 1
 fi
 ```
@@ -248,6 +402,7 @@ Add to your shell configuration:
 alias ra='runagent'
 alias ras='runagent serve .'
 alias rad='runagent deploy .'
+alias radb='runagent db-status'
 
 # Function for quick agent creation
 new-agent() {
@@ -255,32 +410,20 @@ new-agent() {
 }
 ```
 
-## Debugging
-
-Enable verbose output for troubleshooting:
-
-```bash
-# Verbose mode
-runagent --verbose serve .
-
-# Debug logging
-RUNAGENT_LOG_LEVEL=DEBUG runagent serve .
-
-# Dry run (coming soon)
-runagent deploy . --dry-run
-```
-
 ## Best Practices
 
 <AccordionGroup>
   <Accordion title="Use Version Control">
-    Always commit your `runagent.config.json` but never commit `.env` files
+    Always commit your `runagent.config.json` but never commit `.env` files containing API keys
   </Accordion>
   <Accordion title="Test Before Deploying">
-    Use `runagent serve` to test locally before deploying
+    Use `runagent serve` and `runagent deploy-local` to test locally before deploying remotely
+  </Accordion>
+  <Accordion title="Monitor Capacity">
+    Use `runagent db-status --capacity` to monitor local database usage
   </Accordion>
   <Accordion title="Use Templates">
-    Start with templates for faster development
+    Start with templates for faster development: `runagent template --list`
   </Accordion>
   <Accordion title="Automate with Scripts">
     Use the CLI in CI/CD pipelines for automated deployments
@@ -296,11 +439,15 @@ runagent --help
 # Command-specific help
 runagent init --help
 runagent serve --help
+runagent run --help
 
 # Check version
 runagent --version
+
+# View configuration status
+runagent db-status --capacity
 ```
 
 <Info>
-  Join our [Discord community](https://discord.gg/runagent) for support and discussions
+  Join our [Discord community](https://discord.gg/runagent) for support and discussions about RunAgent CLI
 </Info>
