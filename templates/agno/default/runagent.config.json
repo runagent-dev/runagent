@@ -28,8 +28,17 @@
           "timestamp": "$.created_at",
           "content": "$.content"
         }
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "agent_print_response",
+        "tag": "agno_print_response"
+      },
+      {
+        "file": "simple_assistant.py",
+        "module": "agent_print_response_stream",
+        "tag": "agno_print_response_stream"
       }
     ]
   }
 }
-

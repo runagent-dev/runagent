@@ -147,3 +147,6 @@ deployments/
 
 *.lock
 target
+
+
+openapi_letta.json
