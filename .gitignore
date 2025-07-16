@@ -150,3 +150,6 @@ target
 
 
 openapi_letta.json
+
+# Go
+go.sum
