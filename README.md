@@ -27,6 +27,7 @@
   <a href="https://pypi.org/project/runagent/">
     <img src="https://img.shields.io/pypi/v/runagent" alt="PyPI" />
   </a>
+
   <a href="https://pypi.org/project/runagent/">
     <img src="https://img.shields.io/pypi/dm/runagent" alt="PyPI - Downloads" />
   </a>
@@ -37,6 +38,7 @@
     <img src="https://img.shields.io/discord/1389567838825480192?color=7289DA&label=Discord&logo=discord&logoColor=white" alt="Discord" />
   </a>
 </p>
+
 
 <p align="center">
   <strong>Write AI agents once in Python, access them natively from any language.</strong><br>
@@ -951,6 +953,8 @@ RunAgent stands on the shoulders of giants. We're grateful to the entire AI and 
   <a href="https://discord.gg/runagent">💬 Join Discord</a> •
   <a href="https://docs.run-agent.ai">📚 Read the Docs</a>
 </p>
+
+  ![Visitor Badge](https://visitor-badge.laobi.icu/badge?page_id=runagent-dev.runagent)
 
 <p align="center">
   Made with ❤️ by the RunAgent Team
