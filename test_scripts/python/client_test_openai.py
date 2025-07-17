@@ -20,7 +20,7 @@ from runagent import RunAgentClient
 
 ra = RunAgentClient(
     agent_id="40ca8515-a19a-49b2-8ef4-030f83bfc074",
-    entrypoint_tag="simple_assistant_extracted_stream",  # "simple_assistant_extracted_stream",
+    entrypoint_tag="simple_assistant_extracted_stream",
     local=True
     )
 
