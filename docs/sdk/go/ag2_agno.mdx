@@ -1,0 +1,268 @@
+# RunAgent Go Client Documentation
+
+The RunAgent Go client provides a simple interface for interacting with RunAgent services from Go applications.
+
+## Installation
+
+```bash
+go get github.com/runagent-dev/runagent-go
+```
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    agentClient, err := client.NewWithAddress(
+        "your-agent-id",
+        "your-agent-name",
+        true,
+        "localhost",
+        8453,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    result, err := agentClient.Run(ctx, map[string]interface{}{
+        "message": "Hello, agent!",
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+## Client Creation
+
+### NewWithAddress
+
+Creates a new client instance with a specific server address.
+
+```go
+func NewWithAddress(
+    agentID string,
+    agentName string,
+    secure bool,
+    host string,
+    port int,
+) (*Client, error)
+```
+
+**Parameters:**
+- `agentID` (string): Unique identifier for the agent
+- `agentName` (string): Name of the agent to invoke
+- `secure` (bool): Whether to use secure connection (HTTPS/TLS)
+- `host` (string): Server hostname or IP address
+- `port` (int): Server port number
+
+**Returns:**
+- `*Client`: Configured client instance
+- `error`: Error if client creation fails
+
+## Client Methods
+
+### Run
+
+Executes the agent with the provided parameters.
+
+```go
+func (c *Client) Run(ctx context.Context, params map[string]interface{}) (interface{}, error)
+```
+
+**Parameters:**
+- `ctx` (context.Context): Context for request timeout and cancellation
+- `params` (map[string]interface{}): Parameters to pass to the agent
+
+**Returns:**
+- `interface{}`: Result from the agent execution
+- `error`: Error if execution fails
+
+### Close
+
+Closes the client connection and releases resources.
+
+```go
+func (c *Client) Close() error
+```
+
+## Examples
+
+### Example 1: AG2 Invoke Agent
+
+This example demonstrates using an AG2 invoke agent with message and turn limit parameters.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    agentClient, err := client.NewWithAddress(
+        "7c8c54d0-297b-4c63-86ae-38326a882067",
+        "ag2_invoke",
+        true,
+        "localhost",
+        8453,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    result, err := agentClient.Run(ctx, map[string]interface{}{
+        "message":   "The capital of bd is dhaka",
+        "max_turns": 4,
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+### Example 2: Assistant Agent
+
+This example shows how to use an assistant agent with a simple prompt.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    agentClient, err := client.NewWithAddress(
+        "0a0765df-96d4-4884-90b8-74a6c3632010",
+        "agno_assistant",
+        true,
+        "localhost",
+        8453,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    result, err := agentClient.Run(ctx, map[string]interface{}{
+        "prompt": "I want to know about chocolate",
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+## Common Parameters
+
+Different agent types accept different parameters. Here are some common ones:
+
+### AG2 Invoke Agent Parameters
+- `message` (string): The message to send to the agent
+- `max_turns` (int): Maximum number of conversation turns
+
+### Assistant Agent Parameters
+- `prompt` (string): The prompt or question for the assistant
+
+## Best Practices
+
+### Error Handling
+
+Always handle errors when creating clients and running agents:
+
+```go
+agentClient, err := client.NewWithAddress(...)
+if err != nil {
+    log.Fatalf("Failed to create client: %v", err)
+}
+
+result, err := agentClient.Run(ctx, params)
+if err != nil {
+    log.Fatalf("Failed to run agent: %v", err)
+}
+```
+
+### Resource Management
+
+Always close the client when done to free resources:
+
+```go
+defer agentClient.Close()
+```
+
+### Context and Timeouts
+
+Use context with timeouts to prevent hanging requests:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+defer cancel()
+```
+
+### Connection Configuration
+
+For local development, use:
+```go
+client.NewWithAddress(agentID, agentName, true, "localhost", 8453)
+```
+
+For production, adjust the host and port accordingly:
+```go
+client.NewWithAddress(agentID, agentName, true, "your-production-host", 443)
+```
+
+## Error Handling
+
+The client returns errors in the following scenarios:
+
+1. **Client Creation Errors**: Invalid parameters, connection failures
+2. **Runtime Errors**: Agent execution failures, network issues, timeouts
+3. **Context Errors**: Request cancellation, timeout exceeded
+
+Always check for errors and handle them appropriately in your application.
+
+## Threading and Concurrency
+
+The client is designed to be used from a single goroutine. For concurrent usage, create separate client instances for each goroutine or implement proper synchronization.
+
+## Logging
+
+The examples use Go's standard `log` package for error logging. In production applications, consider using structured logging libraries like `logrus` or `zap`.

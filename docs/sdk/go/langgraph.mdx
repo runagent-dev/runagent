@@ -1,0 +1,643 @@
+---
+title: 'Go SDK Examples'
+description: 'Real-world examples using the RunAgent Go SDK'
+---
+
+This page contains practical examples demonstrating how to use the RunAgent Go SDK with different types of agents and use cases.
+
+## Problem-Solving Agent
+
+This example shows how to use a generic problem-solving agent that can provide multiple solutions to everyday problems.
+
+### Basic Problem Solving
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"dba4bf28-01f4-4517-b0b2-e7fa92d75317",
+		"generic",
+		true,
+		"localhost",
+		8451,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"query":         "My phone battery is dead",
+		"num_solutions": 4,
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+
+### Advanced Problem Solving with Error Handling
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func solveProblem(problem string, numSolutions int) (map[string]interface{}, error) {
+	agentClient, err := client.NewWithAddress(
+		"dba4bf28-01f4-4517-b0b2-e7fa92d75317",
+		"generic",
+		true,
+		"localhost",
+		8451,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"query":         problem,
+		"num_solutions": numSolutions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to run agent: %w", err)
+	}
+
+	return result, nil
+}
+
+func main() {
+	problems := []string{
+		"My phone battery is dead",
+		"I'm locked out of my house",
+		"My car won't start",
+		"I spilled coffee on my laptop",
+	}
+
+	for _, problem := range problems {
+		fmt.Printf("\nProblem: %s\n", problem)
+		fmt.Println("=" + strings.Repeat("=", len(problem)))
+		
+		result, err := solveProblem(problem, 3)
+		if err != nil {
+			log.Printf("Error solving problem '%s': %v", problem, err)
+			continue
+		}
+
+		// Parse and display solutions
+		if solutions, ok := result["solutions"].([]interface{}); ok {
+			for i, solution := range solutions {
+				fmt.Printf("%d. %v\n", i+1, solution)
+			}
+		} else {
+			fmt.Printf("Solutions: %v\n", result)
+		}
+	}
+}
+```
+
+### Interactive Problem Solver
+
+```go
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"dba4bf28-01f4-4517-b0b2-e7fa92d75317",
+		"generic",
+		true,
+		"localhost",
+		8451,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("🔧 Problem Solver Assistant")
+	fmt.Println("Enter your problems and I'll provide solutions!")
+	fmt.Println("Type 'quit' to exit.")
+
+	for {
+		fmt.Print("\n📝 What's your problem? ")
+		problem, _ := reader.ReadString('\n')
+		problem = strings.TrimSpace(problem)
+
+		if strings.ToLower(problem) == "quit" {
+			fmt.Println("👋 Goodbye!")
+			break
+		}
+
+		if problem == "" {
+			fmt.Println("⚠️  Please enter a problem description.")
+			continue
+		}
+
+		fmt.Print("🔢 How many solutions would you like? (default: 3) ")
+		numStr, _ := reader.ReadString('\n')
+		numStr = strings.TrimSpace(numStr)
+		
+		numSolutions := 3
+		if numStr != "" {
+			if n, err := strconv.Atoi(numStr); err == nil && n > 0 {
+				numSolutions = n
+			}
+		}
+
+		fmt.Println("🤔 Thinking...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		
+		result, err := agentClient.Run(ctx, map[string]interface{}{
+			"query":         problem,
+			"num_solutions": numSolutions,
+		})
+		
+		if err != nil {
+			log.Printf("❌ Error: %v", err)
+			cancel()
+			continue
+		}
+
+		fmt.Printf("\n💡 Solutions for: %s\n", problem)
+		fmt.Println(strings.Repeat("-", 50))
+		
+		// Display results
+		if solutions, ok := result["solutions"].([]interface{}); ok {
+			for i, solution := range solutions {
+				fmt.Printf("%d. %v\n", i+1, solution)
+			}
+		} else {
+			fmt.Printf("Result: %v\n", result)
+		}
+
+		cancel()
+	}
+}
+```
+
+<Note>
+  The problem-solving agent expects a `query` field with the problem description and an optional `num_solutions` field to specify how many solutions to generate.
+</Note>
+
+## Math Agent
+
+This example demonstrates how to use a specialized math agent for mathematical calculations and problem-solving.
+
+### Basic Math Calculations
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		"math_run",
+		true,
+		"localhost",
+		8452,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"math_query": "What is 2 * 2?",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+
+### Advanced Math Problem Solver
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func solveMath(mathQuery string) (map[string]interface{}, error) {
+	agentClient, err := client.NewWithAddress(
+		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		"math_run",
+		true,
+		"localhost",
+		8452,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"math_query": mathQuery,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to run agent: %w", err)
+	}
+
+	return result, nil
+}
+
+func main() {
+	mathProblems := []string{
+		"What is 2 * 2?",
+		"Calculate the square root of 144",
+		"What is the derivative of x^2 + 3x + 2?",
+		"Solve the quadratic equation: x^2 - 5x + 6 = 0",
+		"What is the integral of 2x dx?",
+		"Calculate 15% of 200",
+		"What is 2^10?",
+		"Find the area of a circle with radius 5",
+	}
+
+	fmt.Println("🔢 Math Problem Solver")
+	fmt.Println("=====================")
+
+	for i, problem := range mathProblems {
+		fmt.Printf("\n%d. Problem: %s\n", i+1, problem)
+		
+		result, err := solveMath(problem)
+		if err != nil {
+			log.Printf("   ❌ Error: %v", err)
+			continue
+		}
+
+		// Display the result
+		if answer, ok := result["answer"]; ok {
+			fmt.Printf("   ✅ Answer: %v\n", answer)
+		} else {
+			fmt.Printf("   📊 Result: %v\n", result)
+		}
+
+		// Add a small delay to avoid overwhelming the agent
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+```
+
+### Interactive Math Calculator
+
+```go
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		"math_run",
+		true,
+		"localhost",
+		8452,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("🧮 Interactive Math Calculator")
+	fmt.Println("==============================")
+	fmt.Println("Enter mathematical expressions or problems!")
+	fmt.Println("Examples:")
+	fmt.Println("  - Basic: 2 + 2, 10 * 5, sqrt(16)")
+	fmt.Println("  - Advanced: derivative of x^2, solve x^2 - 4 = 0")
+	fmt.Println("  - Geometry: area of circle with radius 3")
+	fmt.Println("Type 'quit' to exit.")
+
+	for {
+		fmt.Print("\n🔢 Math > ")
+		mathQuery, _ := reader.ReadString('\n')
+		mathQuery = strings.TrimSpace(mathQuery)
+
+		if strings.ToLower(mathQuery) == "quit" {
+			fmt.Println("👋 Thanks for using the Math Calculator!")
+			break
+		}
+
+		if mathQuery == "" {
+			fmt.Println("⚠️  Please enter a mathematical expression or problem.")
+			continue
+		}
+
+		fmt.Println("🤔 Calculating...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		
+		result, err := agentClient.Run(ctx, map[string]interface{}{
+			"math_query": mathQuery,
+		})
+		
+		if err != nil {
+			log.Printf("❌ Error: %v", err)
+			cancel()
+			continue
+		}
+
+		// Display the result in a formatted way
+		fmt.Printf("📊 Query: %s\n", mathQuery)
+		
+		if answer, ok := result["answer"]; ok {
+			fmt.Printf("✅ Answer: %v\n", answer)
+		} else if explanation, ok := result["explanation"]; ok {
+			fmt.Printf("📝 Explanation: %v\n", explanation)
+		} else {
+			fmt.Printf("📈 Result: %v\n", result)
+		}
+
+		cancel()
+	}
+}
+```
+
+### Math Agent with Streaming
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	fmt.Println("🧮 Math Agent with Streaming")
+	fmt.Println("============================")
+
+	agentClient, err := client.NewWithAddress(
+		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		"math_stream", // Assuming there's a streaming entrypoint
+		true,
+		"localhost",
+		8452,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	complexProblem := "Solve this step by step: Find the derivative of f(x) = x^3 + 2x^2 - 5x + 3, then find the critical points"
+
+	fmt.Printf("🔢 Problem: %s\n", complexProblem)
+	fmt.Println("💭 Solution:")
+	fmt.Println(strings.Repeat("-", 50))
+
+	stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+		"math_query": complexProblem,
+	})
+	if err != nil {
+		log.Fatalf("Failed to start stream: %v", err)
+	}
+	defer stream.Close()
+
+	for {
+		data, hasMore, err := stream.Next(ctx)
+		if err != nil {
+			log.Printf("Stream error: %v", err)
+			break
+		}
+
+		if !hasMore {
+			fmt.Println("\n✅ Solution completed!")
+			break
+		}
+
+		fmt.Print(data)
+	}
+}
+```
+
+<Note>
+  The math agent expects a `math_query` field with the mathematical expression or problem to solve.
+</Note>
+
+## Comparison: Different Agent Types
+
+<Tabs>
+  <Tab title="Problem-Solving Agent">
+    **Port**: 8451  
+    **Entrypoint**: `generic`  
+    **Input Format**:
+    ```json
+    {
+      "query": "Problem description",
+      "num_solutions": 3
+    }
+    ```
+    **Use Cases**:
+    - Everyday problem solving
+    - Creative solutions
+    - Multiple approach generation
+    - Troubleshooting guides
+  </Tab>
+  
+  <Tab title="Math Agent">
+    **Port**: 8452  
+    **Entrypoint**: `math_run`  
+    **Input Format**:
+    ```json
+    {
+      "math_query": "Mathematical expression or problem"
+    }
+    ```
+    **Use Cases**:
+    - Mathematical calculations
+    - Equation solving
+    - Calculus problems
+    - Geometry calculations
+  </Tab>
+</Tabs>
+
+## Best Practices for Multiple Agents
+
+<CardGroup cols={2}>
+  <Card title="Agent Selection" icon="target">
+    Choose the right agent for your specific use case - generic for problems, math for calculations
+  </Card>
+  <Card title="Input Formatting" icon="code">
+    Use the correct input field names: `query` for generic, `math_query` for math
+  </Card>
+  <Card title="Error Handling" icon="shield">
+    Implement proper error handling for each agent type
+  </Card>
+  <Card title="Resource Management" icon="recycle">
+    Always close client connections and manage contexts properly
+  </Card>
+</CardGroup>
+
+## Agent Configuration Reference
+
+| Agent Type | Agent ID | Port | Entrypoint | Input Field |
+|------------|----------|------|------------|-------------|
+| Problem Solving | `dba4bf28-01f4-4517-b0b2-e7fa92d75317` | 8451 | `generic` | `query` |
+| Math | `07b5ebc6-1669-41a6-b63d-2f892d6ae834` | 8452 | `math_run` | `math_query` |
+
+## Common Patterns
+
+### Agent Factory Pattern
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type AgentConfig struct {
+	ID         string
+	Entrypoint string
+	Port       int
+}
+
+var agentConfigs = map[string]AgentConfig{
+	"problem": {
+		ID:         "dba4bf28-01f4-4517-b0b2-e7fa92d75317",
+		Entrypoint: "generic",
+		Port:       8451,
+	},
+	"math": {
+		ID:         "07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		Entrypoint: "math_run",
+		Port:       8452,
+	},
+}
+
+func createAgent(agentType string) (*client.Client, error) {
+	config, exists := agentConfigs[agentType]
+	if !exists {
+		return nil, fmt.Errorf("unknown agent type: %s", agentType)
+	}
+
+	return client.NewWithAddress(
+		config.ID,
+		config.Entrypoint,
+		true,
+		"localhost",
+		config.Port,
+	)
+}
+
+func main() {
+	// Use problem-solving agent
+	problemAgent, err := createAgent("problem")
+	if err != nil {
+		log.Fatalf("Failed to create problem agent: %v", err)
+	}
+	defer problemAgent.Close()
+
+	// Use math agent
+	mathAgent, err := createAgent("math")
+	if err != nil {
+		log.Fatalf("Failed to create math agent: %v", err)
+	}
+	defer mathAgent.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Example usage
+	problemResult, _ := problemAgent.Run(ctx, map[string]interface{}{
+		"query":         "My laptop is running slow",
+		"num_solutions": 2,
+	})
+
+	mathResult, _ := mathAgent.Run(ctx, map[string]interface{}{
+		"math_query": "What is the quadratic formula?",
+	})
+
+	fmt.Printf("Problem Solutions: %v\n", problemResult)
+	fmt.Printf("Math Result: %v\n", mathResult)
+}
+```
+
+<Info>
+  Remember to adjust the agent IDs, ports, and entrypoints according to your specific RunAgent deployment configuration.
+</Info>
