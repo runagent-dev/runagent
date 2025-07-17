@@ -14,9 +14,7 @@
       "copy",
       "view",
       "chatgpt",
-      "claude",
-      "perplexity"
-    ]
+      "claude"    ]
   },
   "navigation": {    
     "global": {

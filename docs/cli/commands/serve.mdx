@@ -1,6 +1,6 @@
 ---
 title: 'runagent serve'
-description: 'Start local development server for testing agents'
+description: 'Start local FastAPI server with automatic agent deployment and database management'
 ---
 
 ## Synopsis
@@ -11,165 +11,385 @@ runagent serve [PATH] [OPTIONS]
 
 ## Description
 
-The `serve` command starts a local FastAPI server for testing your agent before deployment. It provides hot reload, logging, and debugging capabilities.
+The `serve` command starts a local FastAPI server that automatically deploys your agent with database persistence, port allocation, and capacity management. It's the primary command for local development and testing.
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--port`, `-p` | Port to run server on | `8000` |
-| `--host`, `-h` | Host to bind to | `127.0.0.1` |
-| `--reload` | Enable auto-reload | `true` in dev |
-| `--no-reload` | Disable auto-reload | - |
-| `--workers`, `-w` | Number of worker processes | `1` |
-| `--log-level` | Logging level | `info` |
+| `--port`, `-p` | Preferred port (auto-allocated if unavailable) | Auto-allocated |
+| `--host`, `-h` | Host to bind server to | `127.0.0.1` |
+| `--debug` | Run server in debug mode | `false` |
+| `--replace` | Replace existing agent with this agent ID | None |
+| `--no-animation` | Skip startup animation | `false` |
+| `--animation-style` | Animation style (field, ascii, minimal, quick) | `field` |
+
+## Auto Port Allocation
+
+The serve command automatically allocates ports starting from **8450**:
+
+- **Port Range**: 8450-8454 (supports up to 5 agents)
+- **Automatic Detection**: Finds next available port if preferred port is busy
+- **Conflict Resolution**: Never conflicts with existing agents
+
+```bash
+# Uses auto-allocated port
+runagent serve .
+# Output: 🔌 Auto-allocated address: 127.0.0.1:8450
+
+# Prefers specific port, falls back to auto-allocation
+runagent serve . --port 8080
+# Output: Using specified address: 127.0.0.1:8080
+```
+
+## Database Integration
+
+Each `serve` command automatically:
+
+- **Registers agent** in local SQLite database
+- **Manages capacity** (maximum 5 agents)
+- **Persists deployments** between restarts
+- **Tracks usage statistics**
+
+### Capacity Management
+
+```bash
+# Check current capacity
+runagent db-status --capacity
+
+# Replace oldest agent when at capacity
+runagent serve . --replace oldest-agent-id
+
+# Delete existing agent to free space
+runagent delete --id agent-id
+```
 
 ## Examples
 
 ### Basic Usage
 
 ```bash
-# Serve current directory
+# Serve current directory with auto port allocation
 runagent serve .
 
 # Serve specific project
 runagent serve ~/projects/my-agent
 
-# Custom port
+# Use preferred port
 runagent serve . --port 8080
 ```
 
 ### Advanced Usage
 
 ```bash
-# Production-like settings
-runagent serve . --no-reload --workers 4
+# Replace existing agent
+runagent serve . --replace a1b2c3d4-e5f6-7890
 
-# Debug mode
-runagent serve . --log-level debug
+# Debug mode with verbose output
+runagent serve . --debug
 
-# Expose to network
-runagent serve . --host 0.0.0.0
+# Skip startup animation
+runagent serve . --no-animation
+
+# Quick startup animation
+runagent serve . --animation-style quick
 ```
+
+## Startup Process
+
+The serve command follows this process:
+
+<Steps>
+  <Step title="Startup Animation">
+    Displays robotic runner animation (customizable with `--animation-style`)
+  </Step>
+  <Step title="Capacity Check">
+    Verifies database capacity (5 agents max) or handles replacement
+  </Step>
+  <Step title="Agent Registration">
+    Registers agent in database with unique ID and allocated port
+  </Step>
+  <Step title="Server Start">
+    Starts FastAPI server with automatic configuration
+  </Step>
+</Steps>
 
 ## Available Endpoints
 
-Once running, your agent exposes:
+Once running, your agent exposes these REST and WebSocket endpoints:
+
+### REST Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Welcome page |
+| `/` | GET | Agent information and status |
 | `/health` | GET | Health check |
-| `/invoke` | POST | Invoke agent |
-| `/stream` | POST | Stream responses |
-| `/docs` | GET | API documentation |
+| `/api/v1/agents/{agent_id}/run/{tag}` | POST | Execute agent entrypoint |
+| `/docs` | GET | Interactive API documentation |
+| `/redoc` | GET | Alternative API documentation |
+
+### WebSocket Endpoints
+
+| Endpoint | Protocol | Description |
+|----------|----------|-------------|
+| `/api/v1/agents/{agent_id}/stream/{tag}` | WebSocket | Stream agent responses |
 
 ## Testing Your Agent
 
 ### Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8450/health
 ```
 
-### Invoke Agent
+### Execute Agent
 
 ```bash
-curl -X POST http://localhost:8000/invoke \
+curl -X POST http://localhost:8450/api/v1/agents/{agent_id}/run/main \
   -H "Content-Type: application/json" \
-  -d '{"query": "Hello, agent!"}'
+  -d '{
+    "input_data": {
+      "input_args": [],
+      "input_kwargs": {"query": "Hello, agent!"}
+    }
+  }'
 ```
 
-### Stream Response
+### Using Python SDK
+
+```python
+from runagent import RunAgentClient
+
+# Connect to local agent
+client = RunAgentClient(
+    agent_id="your-agent-id", 
+    entrypoint_tag="main",
+    local=True
+)
+
+# Execute agent
+result = client.run(query="Hello, agent!")
+print(result)
+```
+
+### Using CLI
 
 ```bash
-curl -X POST http://localhost:8000/stream \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Tell me a story"}' \
-  --no-buffer
+# Execute local agent
+runagent run --id agent-id --tag main --local --query="Hello"
+```
+
+## Output Information
+
+### Successful Startup
+
+```
+🚀 Starting local server with auto port allocation...
+🔌 Auto-allocated address: 127.0.0.1:8450
+🌐 URL: http://127.0.0.1:8450
+📖 Docs: http://127.0.0.1:8450/docs
+
+✅ Agent started successfully!
+🆔 Agent ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+📊 Capacity: 1/5 slots used
+```
+
+### Capacity Warning
+
+```
+❌ Database is full!
+💡 Suggested commands:
+   Replace: runagent serve . --replace oldest-agent-id
+   Delete:  runagent delete --id agent-id
+```
+
+### Replacement Success
+
+```
+🔄 Replacing agent: old-agent-id
+✅ Agent replaced successfully!
+🆔 New Agent ID: new-agent-id
+🔌 Address: 127.0.0.1:8451
+```
+
+## Agent Configuration
+
+The serve command reads from `runagent.config.json`:
+
+```json
+{
+  "agent_name": "my-agent",
+  "description": "My awesome agent",
+  "framework": "langgraph",
+  "template": "basic",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "agent",
+        "tag": "main"
+      },
+      {
+        "file": "main.py", 
+        "module": "agent_stream",
+        "tag": "main_stream"
+      }
+    ]
+  }
+}
 ```
 
 ## Development Features
 
-### Hot Reload
+### Automatic Framework Detection
 
-Changes to your agent code automatically restart the server:
-
-```
-INFO:     Detected change in 'agent.py'
-INFO:     Reloading...
-```
-
-### Request Logging
-
-All requests are logged with details:
-
-```
-INFO:     127.0.0.1:53234 - "POST /invoke HTTP/1.1" 200 OK
-DEBUG:    Request body: {"query": "test"}
-DEBUG:    Response time: 0.123s
+```bash
+# Automatically detects framework from config
+runagent serve .
+# Output: Framework: langgraph
 ```
 
-### Error Display
+### Database Persistence
 
-Errors show full traceback in development:
+- Agent registrations persist between restarts
+- Usage statistics are tracked
+- Port allocations are remembered
 
+### Error Handling
+
+Clear error messages for common issues:
+
+```bash
+# Missing configuration
+❌ Validation error: No config file found
+
+# Invalid entrypoint
+❌ Validation error: Module 'agent' not found in main.py
+
+# Capacity exceeded
+❌ Database at capacity. Use --replace or 'runagent delete'
 ```
-ERROR:    Exception in ASGI application
-Traceback (most recent call last):
-  File "agent.py", line 42, in process
-    ...
+
+## Integration with Other Commands
+
+### Database Management
+
+```bash
+# Check all local agents
+runagent db-status
+
+# View specific agent details
+runagent db-status --agent-id your-agent-id
+
+# Clean up agents
+runagent delete --id agent-id
 ```
 
-## Configuration
+### Execution
 
-The server reads from `runagent.config.json`:
+```bash
+# Run agent locally
+runagent run --id agent-id --tag main --local
 
-```json
-{
-  "dev_server": {
-    "port": 8000,
-    "reload": true,
-    "log_level": "info"
-  }
-}
+# Use host/port directly
+runagent run --host 127.0.0.1 --port 8450 --tag main
+```
+
+## Animation Styles
+
+Customize the startup animation:
+
+```bash
+# Default robotic runner in field
+runagent serve .
+
+# ASCII art version
+runagent serve . --animation-style ascii
+
+# Minimal clean version
+runagent serve . --animation-style minimal
+
+# Quick startup
+runagent serve . --animation-style quick
+
+# No animation
+runagent serve . --no-animation
 ```
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Port Already in Use">
+  <Accordion title="Database Capacity Issues">
     ```bash
-    # Find process using port
-    lsof -i :8000  # macOS/Linux
-    netstat -ano | findstr :8000  # Windows
+    # Check current capacity
+    runagent db-status --capacity
     
-    # Use different port
-    runagent serve . --port 8080
+    # View all agents by age
+    runagent db-status
+    
+    # Replace oldest agent
+    runagent serve . --replace oldest-agent-id
+    
+    # Delete unused agents
+    runagent delete --id agent-id
     ```
   </Accordion>
   
-  <Accordion title="Import Errors">
-    Ensure you're in the right directory and dependencies are installed:
+  <Accordion title="Port Allocation Problems">
+    The serve command handles port conflicts automatically:
+    - Starts from port 8450
+    - Increments if port is busy  
+    - Shows allocated address in output
+    - Maximum 5 agents (ports 8450-8454)
+  </Accordion>
+  
+  <Accordion title="Agent Configuration Errors">
     ```bash
-    pwd  # Check current directory
+    # Validate configuration
+    runagent serve . --debug
+    
+    # Check config file
+    cat runagent.config.json | jq .
+    
+    # Verify framework detection
+    runagent serve . --verbose
+    ```
+  </Accordion>
+  
+  <Accordion title="Import/Module Errors">
+    ```bash
+    # Check entrypoint files exist
+    ls -la main.py
+    
+    # Verify dependencies
     pip install -r requirements.txt
-    ```
-  </Accordion>
-  
-  <Accordion title="Reload Not Working">
-    Some file changes might not trigger reload:
-    ```bash
-    # Force reload with file touch
-    touch agent.py
     
-    # Or restart manually
-    Ctrl+C and runagent serve .
+    # Test import manually
+    python -c "from main import agent"
     ```
   </Accordion>
 </AccordionGroup>
 
+## Best Practices
+
+1. **Monitor Capacity**: Regularly check `runagent db-status --capacity`
+2. **Clean Up**: Remove unused agents to free database slots
+3. **Use Replace**: When at capacity, replace oldest agents rather than failing
+4. **Test Locally**: Always test with `serve` before remote deployment
+5. **Version Control**: Keep `runagent.config.json` in version control
+
+## Performance Notes
+
+- **Single Process**: Each agent runs in a single FastAPI process
+- **Port Per Agent**: Each agent gets its own port for isolation
+- **Database Tracking**: Minimal overhead for registration and tracking
+- **Auto Cleanup**: Detect and handle stale agent registrations
+
 ## See Also
 
-- [`runagent deploy`](/cli/commands/deploy) - Deploy to production
-- [`runagent logs`](/cli/commands/logs) - View logs
+- [`runagent run`](/cli/commands/run) - Execute deployed agents
+- [`runagent db-status`](/cli/commands/db-status) - Check database status
+- [`runagent delete`](/cli/commands/delete) - Remove agents
+- [`runagent deploy`](/cli/commands/deploy) - Remote deployment (coming soon)
+- [`runagent logs`](/cli/commands/logs) - View logs (coming soon)

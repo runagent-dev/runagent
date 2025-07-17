@@ -1,0 +1,36 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
+		"math_run",
+		true,
+		"localhost",
+		8452,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"math_query": "What is 2 * 2?",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}

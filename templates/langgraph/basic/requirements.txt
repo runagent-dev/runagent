@@ -1,4 +1,0 @@
-langchain-openai
-langgraph
-openai==1.12.0
-python-dotenv==1.0.0

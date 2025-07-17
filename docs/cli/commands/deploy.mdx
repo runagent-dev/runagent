@@ -1,89 +1,186 @@
 ---
 title: 'runagent deploy'
-description: 'Deploy agent to production or local environment'
+description: 'Deploy agent locally or to remote server (remote coming soon)'
 ---
 
 ## Synopsis
 
 ```bash
-runagent deploy [PATH] [OPTIONS]
+runagent deploy [OPTIONS] [PATH]
 ```
 
 ## Description
 
-The `deploy` command packages and deploys your agent either locally with persistence or to RunAgent's cloud infrastructure (coming soon).
+The `deploy` command handles agent deployment workflows. Currently supports local deployment, with remote cloud deployment coming soon.
+
+<Info>
+**Note:** Remote deployment features require authentication and are coming soon. Local deployment is fully available through the `serve` command.
+</Info>
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--local`, `-l` | Deploy locally | `false` |
-| `--name`, `-n` | Deployment name | From config |
-| `--env`, `-e` | Environment | `production` |
-| `--no-validate` | Skip validation | `false` |
-| `--dry-run` | Show what would be deployed | `false` |
+| `--folder` | Folder containing agent files | Current directory |
+| `--local`, `-l` | Deploy locally (redirects to serve) | `false` |
+| `--id` | Agent ID (for remote start only) | None |
+| `--framework` | Framework type (auto-detected if not specified) | Auto-detect |
+| `--config` | JSON configuration for deployment | None |
 
-## Examples
+## Current Usage
 
 ### Local Deployment
 
-```bash
-# Deploy locally
-runagent deploy . --local
-
-# Deploy with custom name
-runagent deploy . --local --name my-test-agent
-
-# Dry run to see what would happen
-runagent deploy . --dry-run
-```
-
-### Cloud Deployment (Coming Soon)
+For local deployment, use the `serve` command directly:
 
 ```bash
-# Deploy to cloud
-runagent deploy .
+# Start local development server (recommended)
+runagent serve .
 
-# Deploy to staging environment
-runagent deploy . --env staging
-
-# Skip validation checks
-runagent deploy . --no-validate
+# Or use deploy with --local flag (redirects to serve)
+runagent deploy --folder . --local
 ```
 
-## Deployment Process
+The `--local` option internally calls the `serve` command with automatic:
+- Port allocation
+- Database management
+- Agent registration
+
+## Coming Soon: Remote Deployment
+
+### Remote Deployment Workflow (Coming Soon)
+
+```bash
+# Upload agent to remote server (Coming Soon)
+runagent upload --folder .
+
+# Start uploaded agent (Coming Soon)
+runagent start --id AGENT_ID
+
+# Full deployment workflow (Coming Soon)
+runagent deploy --folder .
+```
+
+### Planned Remote Features
+
+<Steps>
+  <Step title="Authentication Setup">
+    ```bash
+    # Setup API credentials (Coming Soon)
+    runagent setup --api-key your-api-key
+    ```
+  </Step>
+  <Step title="Agent Upload">
+    ```bash
+    # Upload agent code (Coming Soon)
+    runagent upload --folder .
+    ```
+  </Step>
+  <Step title="Remote Start">
+    ```bash
+    # Start on remote server (Coming Soon)
+    runagent start --id AGENT_ID
+    ```
+  </Step>
+  <Step title="Full Deployment">
+    ```bash
+    # Combined upload + start (Coming Soon)
+    runagent deploy --folder .
+    ```
+  </Step>
+</Steps>
+
+## Local Deployment Process (Available Now)
+
+Using `runagent serve` for local deployment:
 
 <Steps>
   <Step title="Validation">
     - Checks `runagent.config.json`
-    - Validates entrypoints
-    - Verifies dependencies
+    - Validates entrypoints and framework
+    - Verifies agent structure
   </Step>
-  <Step title="Packaging">
-    - Bundles agent code
-    - Includes dependencies
-    - Excludes unnecessary files
+  <Step title="Database Registration">
+    - Registers agent in local database
+    - Allocates unique port automatically
+    - Handles capacity management (5 agents max)
   </Step>
-  <Step title="Upload">
-    - Uploads to RunAgent servers
-    - Or creates local deployment
+  <Step title="Server Start">
+    - Starts FastAPI server
+    - Configures endpoints
+    - Enables real-time execution
   </Step>
-  <Step title="Initialization">
-    - Starts agent container
-    - Configures environment
-    - Runs health checks
+  <Step title="Ready for Use">
+    - Agent available at local endpoint
+    - Can execute via Python SDK or CLI
   </Step>
 </Steps>
 
+## Examples
+
+### Current Local Deployment
+
+```bash
+# Basic local deployment
+runagent serve .
+
+# With custom port
+runagent serve . --port 8080
+
+# Replace existing agent
+runagent serve . --replace agent-id
+
+# With animation disabled
+runagent serve . --no-animation
+```
+
+### Local Deployment via Deploy Command
+
+```bash
+# Local deployment (redirects to serve)
+runagent deploy --folder . --local
+
+# With framework specification
+runagent deploy --folder . --local --framework langgraph
+```
+
+### Future Remote Examples (Coming Soon)
+
+```bash
+# Full remote deployment (Coming Soon)
+runagent deploy --folder .
+
+# With custom configuration (Coming Soon)
+runagent deploy --folder . --config '{"memory": "1GB", "timeout": 60}'
+
+# Deploy specific agent (Coming Soon)
+runagent deploy --id existing-agent-id
+```
+
 ## Output
 
-Successful deployment shows:
+### Local Deployment Output
+
+```
+🚀 RunAgent Configuration:
+   Agent ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+   Local: Yes
+   Tag: main
+
+🔌 Auto-allocated address: 127.0.0.1:8450
+🌐 URL: http://127.0.0.1:8450
+📖 Docs: http://127.0.0.1:8450/docs
+
+✅ Agent started successfully!
+```
+
+### Future Remote Deployment Output (Coming Soon)
 
 ```
 Validating agent configuration... ✓
-Packaging agent files... ✓
-Uploading to RunAgent... ✓
-Initializing deployment... ✓
+Uploading agent files... ✓
+Starting remote deployment... ✓
+Initializing endpoints... ✓
 
 Deployment successful!
 Agent ID: 055b73d7-6239-4a94-a156-1193fcf33ff0
@@ -91,30 +188,55 @@ Status: Running
 Endpoint: https://api.run-agent.ai/agents/055b73d7
 
 To test your agent:
-  runagent run 055b73d7 --input '{"query": "test"}'
+  runagent run --id 055b73d7 --tag main --input '{"query": "test"}'
 ```
 
-## Local Deployment Details
+## Local Database Management
 
-Local deployments:
-- Run in Docker containers
-- Persist between restarts
-- Support multiple versions
-- Include local monitoring
+Local deployments are managed through a SQLite database:
 
 ```bash
-# List local deployments
-runagent list --local
+# Check local agent status
+runagent db-status
 
-# View deployment details
-runagent status <deployment-id>
+# View capacity information
+runagent db-status --capacity
+
+# Delete local agent
+runagent delete --id agent-id
 ```
+
+**Capacity Limits:**
+- Maximum 5 agents simultaneously
+- Automatic port allocation (8450-8454)
+- Replace oldest agent when at capacity
 
 ## Configuration
 
-### Deployment Settings
+### Agent Configuration
 
 In `runagent.config.json`:
+
+```json
+{
+  "agent_name": "my-agent",
+  "description": "My awesome agent",
+  "framework": "langgraph",
+  "template": "basic",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "agent",
+        "tag": "main"
+      }
+    ]
+  }
+}
+```
+
+### Future Remote Configuration (Coming Soon)
 
 ```json
 {
@@ -130,82 +252,109 @@ In `runagent.config.json`:
 }
 ```
 
-### Excluded Files
-
-By default, these are excluded:
-- `.git/`
-- `__pycache__/`
-- `*.pyc`
-- `.env`
-- `tests/`
-- `docs/`
-
-Create `.deployignore` to customize:
-
-```
-# Custom exclusions
-*.log
-temp/
-scratch.py
-```
-
 ## Validation Checks
 
 Before deployment, RunAgent validates:
 
 <Checklist>
-  - Configuration file is valid JSON
-  - Required fields are present
-  - Entrypoints can be imported
-  - Dependencies can be resolved
-  - No syntax errors in Python files
-  - Environment variables are defined
+  - Configuration file exists and is valid JSON
+  - Required fields are present in config
+  - Entrypoint files exist
+  - Framework is supported
+  - Agent structure is valid
+  - No syntax errors in configuration
 </Checklist>
+
+## Error Handling
+
+### Common Local Deployment Errors
+
+```bash
+# Database at capacity
+❌ Database is full!
+💡 Suggested commands:
+   Replace: runagent serve . --replace oldest-agent-id
+   Delete:  runagent delete --id agent-id
+
+# Port already in use
+🔌 Auto-allocated address: 127.0.0.1:8451
+
+# Invalid configuration
+❌ Validation error: Missing required field 'agent_name'
+```
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Validation Failures">
+  <Accordion title="Local Deployment Issues">
     ```bash
-    # Run validation separately
-    runagent validate .
+    # Check database status
+    runagent db-status
     
-    # See detailed errors
-    runagent deploy . --log-level debug
+    # Check specific agent
+    runagent db-status --agent-id AGENT_ID
+    
+    # Clean up old agents
+    runagent delete --id AGENT_ID
     ```
   </Accordion>
   
-  <Accordion title="Upload Failures">
-    Check:
-    - Internet connection
-    - API key is valid
-    - File sizes (limit: 50MB)
-    - Disk space available
+  <Accordion title="Configuration Errors">
+    ```bash
+    # Validate agent structure
+    runagent serve . --verbose
+    
+    # Check configuration
+    cat runagent.config.json | jq .
+    ```
   </Accordion>
   
-  <Accordion title="Deployment Stuck">
-    ```bash
-    # Check deployment status
-    runagent status <deployment-id>
-    
-    # View logs
-    runagent logs <deployment-id>
-    
-    # Force restart
-    runagent restart <deployment-id>
-    ```
+  <Accordion title="Port Conflicts">
+    Local deployment automatically handles port allocation:
+    - Starts from port 8450
+    - Increments if port is busy
+    - Maximum 5 agents (ports 8450-8454)
   </Accordion>
 </AccordionGroup>
 
 ## Best Practices
 
-1. **Test Locally First**: Always use `runagent serve` before deploying
-2. **Use Environments**: Deploy to staging before production
-3. **Version Your Agents**: Update version in config for each deployment
-4. **Monitor Deployments**: Check logs and metrics after deploying
+1. **Test with Serve**: Always use `runagent serve` for local development
+2. **Monitor Capacity**: Check `runagent db-status --capacity` regularly
+3. **Clean Up**: Remove unused agents with `runagent delete`
+4. **Version Control**: Keep `runagent.config.json` in version control
+5. **Environment Setup**: Configure `.env` files properly
+
+## Migration Guide
+
+### Current Workflow
+```bash
+# 1. Create agent
+runagent init my-agent --framework langgraph
+
+# 2. Develop locally
+runagent serve .
+
+# 3. Test execution
+runagent run --id agent-id --tag main --local
+```
+
+### Future Remote Workflow (Coming Soon)
+```bash
+# 1. Setup authentication
+runagent setup --api-key your-key
+
+# 2. Deploy remotely
+runagent deploy --folder .
+
+# 3. Test execution
+runagent run --id agent-id --tag main
+```
 
 ## See Also
 
-- [`runagent serve`](/cli/commands/serve) - Test locally first
-- [`runagent status`](/cli/commands/status) - Check deployment status
-- [`runagent logs`](/cli/commands/logs) - View deployment logs
+- [`runagent serve`](/cli/commands/serve) - Local development server (recommended)
+- [`runagent upload`](/cli/commands/upload) - Upload agent to remote (coming soon)
+- [`runagent start`](/cli/commands/start) - Start remote agent (coming soon)
+- [`runagent db-status`](/cli/commands/db-status) - Check local database
+- [`runagent run`](/cli/commands/run) - Execute agents
