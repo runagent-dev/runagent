@@ -127,6 +127,16 @@
             ]
           },
           {
+            "group": "Go SDK",
+            "pages": [
+              "sdk/go/getting-started",
+              "sdk/go/langgraph",
+              "sdk/go/ag2_agno",
+              "sdk/go/crewai",
+              "sdk/go/autogen"
+            ]
+          },
+          {
             "group": "Coming Soon",
             "pages": [
               "sdk/coming-soon"
