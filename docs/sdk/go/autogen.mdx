@@ -98,10 +98,7 @@ Tasks are submitted as `map[string]interface{}` allowing flexible parameter pass
 ```go
 result, err := agentClient.Run(ctx, map[string]interface{}{
     "task": "what is autogen",
-    "options": map[string]string{
-        "format": "json",
-        "verbose": "true",
-    },
+   
 })
 ```
 
@@ -178,35 +175,3 @@ Increase the context timeout for longer-running tasks:
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 ```
 
-### Invalid Parameters
-
-Verify that the task parameters match what the agent expects:
-
-```go
-// Ensure parameter types are correct
-params := map[string]interface{}{
-    "task": "string value",
-    "count": 42,           // int
-    "enabled": true,       // bool
-}
-```
-
-## API Reference
-
-### Client Methods
-
-#### `NewWithAddress(agentID, entrypointTag string, local bool, host string, port int) (*Client, error)`
-
-Creates a new client instance with the specified connection parameters.
-
-#### `Run(ctx context.Context, params map[string]interface{}) (interface{}, error)`
-
-Executes a task on the agent with the given parameters and returns the result.
-
-#### `Close() error`
-
-Closes the client connection and cleans up resources.
-
----
-
-For more information and advanced usage patterns, refer to the official RunAgent documentation.

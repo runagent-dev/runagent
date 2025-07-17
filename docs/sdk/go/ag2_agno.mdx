@@ -8,46 +8,7 @@ The RunAgent Go client provides a simple interface for interacting with RunAgent
 go get github.com/runagent-dev/runagent-go
 ```
 
-## Quick Start
 
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-    "time"
-
-    "github.com/runagent-dev/runagent-go/pkg/client"
-)
-
-func main() {
-    agentClient, err := client.NewWithAddress(
-        "your-agent-id",
-        "your-agent-name",
-        true,
-        "localhost",
-        8453,
-    )
-    if err != nil {
-        log.Fatalf("Failed to create client: %v", err)
-    }
-    defer agentClient.Close()
-
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-    defer cancel()
-
-    result, err := agentClient.Run(ctx, map[string]interface{}{
-        "message": "Hello, agent!",
-    })
-    if err != nil {
-        log.Fatalf("Failed to run agent: %v", err)
-    }
-
-    fmt.Printf("Result: %v\n", result)
-}
-```
 
 ## Client Creation
 
@@ -94,6 +55,34 @@ func (c *Client) Run(ctx context.Context, params map[string]interface{}) (interf
 - `interface{}`: Result from the agent execution
 - `error`: Error if execution fails
 
+### RunStream
+
+Executes the agent with streaming response support.
+
+```go
+func (c *Client) RunStream(ctx context.Context, params map[string]interface{}) (*Stream, error)
+```
+
+**Parameters:**
+- `ctx` (context.Context): Context for request timeout and cancellation
+- `params` (map[string]interface{}): Parameters to pass to the agent
+
+**Returns:**
+- `*Stream`: Stream instance for reading streaming responses
+- `error`: Error if stream creation fails
+
+#### Stream Methods
+
+The `Stream` type provides methods for reading streaming responses:
+
+```go
+func (s *Stream) Next(ctx context.Context) (interface{}, bool, error)
+func (s *Stream) Close() error
+```
+
+- `Next`: Returns the next data chunk, a boolean indicating if more data is available, and any error
+- `Close`: Closes the stream and releases resources
+
 ### Close
 
 Closes the client connection and releases resources.
@@ -104,7 +93,113 @@ func (c *Client) Close() error
 
 ## Examples
 
-### Example 1: AG2 Invoke Agent
+### Example 1: Assistant Agent
+
+This example shows how to use an assistant agent with a simple prompt.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    agentClient, err := client.NewWithAddress(
+        "0a0765df-96d4-4884-90b8-74a6c3632010",
+        "agno_assistant",
+        true,
+        "localhost",
+        8453,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    result, err := agentClient.Run(ctx, map[string]interface{}{
+        "prompt": "I want to know about chocolate",
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+### Example 2: Agno Assistant Streaming
+
+This example shows how to use streaming with an Agno assistant agent.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    fmt.Println("=== Agno Assistant Streaming Example ===")
+
+    // Create client for streaming entrypoint
+    agentClient, err := client.NewWithAddress(
+        "47d63228-cc58-43d9-a512-d3583f8bf019", // agentID
+        "agno_stream",                          // entrypoint tag
+        true,                                   // local
+        "localhost",                            // host
+        8450,                                   // port
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    // Run streaming
+    fmt.Println("Starting agno assistant stream...")
+    stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+        "prompt": "I want to know about chocolate",
+    })
+    if err != nil {
+        log.Fatalf("Failed to start stream: %v", err)
+    }
+    defer stream.Close()
+
+    // Read from stream
+    for {
+        data, hasMore, err := stream.Next(ctx)
+        if err != nil {
+            log.Printf("Stream error: %v", err)
+            break
+        }
+
+        if !hasMore {
+            fmt.Println("Stream completed")
+            break
+        }
+
+        fmt.Printf("Received: %v\n", data)
+    }
+}
+```
+
+### Example 3: AG2 Invoke Agent
 
 This example demonstrates using an AG2 invoke agent with message and turn limit parameters.
 
@@ -148,9 +243,9 @@ func main() {
 }
 ```
 
-### Example 2: Assistant Agent
+### Example 4: AG2 Streaming
 
-This example shows how to use an assistant agent with a simple prompt.
+This example demonstrates using the streaming functionality with an AG2 agent.
 
 ```go
 package main
@@ -165,12 +260,15 @@ import (
 )
 
 func main() {
+    fmt.Println("=== AG2 Invoke Streaming Example ===")
+
+    // Create client for streaming entrypoint
     agentClient, err := client.NewWithAddress(
-        "0a0765df-96d4-4884-90b8-74a6c3632010",
-        "agno_assistant",
-        true,
-        "localhost",
-        8453,
+        "6d9a6fb8-a58c-49de-92ef-cd64d53da932", // agentID
+        "ag2_stream",                           // entrypoint tag
+        true,                                   // local
+        "localhost",                            // host
+        8451,                                   // port
     )
     if err != nil {
         log.Fatalf("Failed to create client: %v", err)
@@ -180,14 +278,32 @@ func main() {
     ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
     defer cancel()
 
-    result, err := agentClient.Run(ctx, map[string]interface{}{
-        "prompt": "I want to know about chocolate",
+    // Run streaming
+    fmt.Println("Starting AG2 invoke stream...")
+    stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+        "message":   "The capital of bd is dhaka",
+        "max_turns": 4,
     })
     if err != nil {
-        log.Fatalf("Failed to run agent: %v", err)
+        log.Fatalf("Failed to start stream: %v", err)
     }
+    defer stream.Close()
 
-    fmt.Printf("Result: %v\n", result)
+    // Read from stream
+    for {
+        data, hasMore, err := stream.Next(ctx)
+        if err != nil {
+            log.Printf("Stream error: %v", err)
+            break
+        }
+
+        if !hasMore {
+            fmt.Println("Stream completed")
+            break
+        }
+
+        fmt.Printf("Received: %v\n", data)
+    }
 }
 ```
 
@@ -202,67 +318,3 @@ Different agent types accept different parameters. Here are some common ones:
 ### Assistant Agent Parameters
 - `prompt` (string): The prompt or question for the assistant
 
-## Best Practices
-
-### Error Handling
-
-Always handle errors when creating clients and running agents:
-
-```go
-agentClient, err := client.NewWithAddress(...)
-if err != nil {
-    log.Fatalf("Failed to create client: %v", err)
-}
-
-result, err := agentClient.Run(ctx, params)
-if err != nil {
-    log.Fatalf("Failed to run agent: %v", err)
-}
-```
-
-### Resource Management
-
-Always close the client when done to free resources:
-
-```go
-defer agentClient.Close()
-```
-
-### Context and Timeouts
-
-Use context with timeouts to prevent hanging requests:
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-defer cancel()
-```
-
-### Connection Configuration
-
-For local development, use:
-```go
-client.NewWithAddress(agentID, agentName, true, "localhost", 8453)
-```
-
-For production, adjust the host and port accordingly:
-```go
-client.NewWithAddress(agentID, agentName, true, "your-production-host", 443)
-```
-
-## Error Handling
-
-The client returns errors in the following scenarios:
-
-1. **Client Creation Errors**: Invalid parameters, connection failures
-2. **Runtime Errors**: Agent execution failures, network issues, timeouts
-3. **Context Errors**: Request cancellation, timeout exceeded
-
-Always check for errors and handle them appropriately in your application.
-
-## Threading and Concurrency
-
-The client is designed to be used from a single goroutine. For concurrent usage, create separate client instances for each goroutine or implement proper synchronization.
-
-## Logging
-
-The examples use Go's standard `log` package for error logging. In production applications, consider using structured logging libraries like `logrus` or `zap`.

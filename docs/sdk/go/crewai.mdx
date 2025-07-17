@@ -137,36 +137,3 @@ if err != nil {
 3. **Handle errors gracefully**: Check for errors at each step
 4. **Secure connections**: Use SSL/TLS for production environments
 
-## Common Parameters
-
-Different agents may accept different parameters. Common examples include:
-
-```go
-// Research agent
-result, err := agentClient.Run(ctx, map[string]interface{}{
-	"topic": "artificial intelligence",
-	"depth": "detailed",
-	"sources": []string{"academic", "news"},
-})
-
-// Data processing agent
-result, err := agentClient.Run(ctx, map[string]interface{}{
-	"input_file": "/path/to/data.csv",
-	"operation": "analyze",
-	"format": "json",
-})
-```
-
-## Troubleshooting
-
-- **Connection refused**: Ensure the RunAgent server is running on the specified port
-- **Timeout errors**: Increase the context timeout for long-running operations
-- **SSL/TLS errors**: Verify the SSL configuration matches your server setup
-- **Agent not found**: Check that the agent ID and name are correct
-
-## Next Steps
-
-- Explore different agent types and their parameters
-- Implement more sophisticated error handling
-- Add logging and monitoring
-- Consider using connection pooling for multiple requests
