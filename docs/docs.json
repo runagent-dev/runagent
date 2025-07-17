@@ -127,6 +127,16 @@
             ]
           },
           {
+            "group": "Rust SDK",
+            "pages": [
+              "sdk/rust/getting-started",
+              "sdk/rust/async-operations", 
+              "sdk/rust/streaming",
+              "sdk/rust/local-server",
+              "sdk/rust/api-reference"
+              ]
+          },
+          {
             "group": "Go SDK",
             "pages": [
               "sdk/go/getting-started",

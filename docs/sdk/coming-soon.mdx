@@ -10,7 +10,6 @@ We're actively working on native SDKs for additional programming languages. Each
 ## JavaScript/TypeScript SDK
 
 <Card title="JavaScript SDK" icon="js">
-  **Expected Release**: Q2 2024
   
   The JavaScript SDK will support both Node.js and browser environments with full TypeScript support.
   
@@ -43,43 +42,9 @@ We're actively working on native SDKs for additional programming languages. Each
   ```
 </Card>
 
-## Rust SDK
-
-<Card title="Rust SDK" icon="rust">
-  **Expected Release**: Q2 2024
-  
-  High-performance SDK with zero-cost abstractions and memory safety.
-  
-  ### Planned Features
-  - Async runtime support (Tokio)
-  - Zero-copy deserialization
-  - Connection pooling
-  - WASM compilation support
-  - Strong type safety with serde
-  
-  ### Preview
-  ```rust
-  use runagent::{Client, RunRequest};
-  
-  #[tokio::main]
-  async fn main() -> Result<(), Box<dyn std::error::Error>> {
-      let client = Client::new("your-agent-id")
-          .with_api_key("your-api-key");
-      
-      let request = RunRequest::new("Hello, agent!");
-      let response = client.run_generic(request).await?;
-      
-      println!("Response: {:?}", response);
-      Ok(())
-  }
-  ```
-</Card>
-
 ## Go SDK
 
-<Card title="Go SDK" icon="golang">
-  **Expected Release**: Q3 2024
-  
+<Card title="Go SDK" icon="golang">  
   Idiomatic Go client with excellent concurrency support.
   
   ### Planned Features
@@ -132,25 +97,6 @@ Want to try these SDKs before official release?
     Help us improve the SDKs with your feedback
   </Step>
 </Steps>
-
-## Language Support Roadmap
-
-### Phase 1 (Current)
-- ✅ Python SDK (Available now)
-
-### Phase 2 (Q2 2024)
-- 🚧 JavaScript/TypeScript SDK
-- 🚧 Rust SDK
-
-### Phase 3 (Q3 2024)
-- 📋 Go SDK
-- 📋 Java SDK
-
-### Phase 4 (Future)
-- 📋 Ruby SDK
-- 📋 PHP SDK
-- 📋 C# SDK
-- 📋 Swift SDK
 
 ## Community SDKs
 

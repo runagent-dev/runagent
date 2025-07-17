@@ -1,0 +1,217 @@
+The RunAgent Rust SDK is built on Tokio and provides full async/await support for high-performance applications.
+
+## Basic Async Usage
+
+All client operations are async and must be awaited:
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("agent-id", "generic", true).await?;
+    
+    let response = client.run(&[
+        ("query", json!("Hello, world!"))
+    ]).await?;
+    
+    println!("Response: {}", response);
+    Ok(())
+}
+```
+
+## Concurrent Operations
+
+Process multiple requests concurrently:
+
+```rust
+use futures::future::join_all;
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("agent-id", "generic", true).await?;
+    
+    // Create multiple tasks
+    let tasks = vec![
+        client.run(&[("query", json!("Question 1"))]),
+        client.run(&[("query", json!("Question 2"))]),
+        client.run(&[("query", json!("Question 3"))]),
+    ];
+    
+    // Execute concurrently
+    let results = join_all(tasks).await;
+    
+    for (i, result) in results.into_iter().enumerate() {
+        match result {
+            Ok(response) => println!("Result {}: {}", i + 1, response),
+            Err(e) => println!("Error {}: {}", i + 1, e),
+        }
+    }
+    
+    Ok(())
+}
+```
+
+## Timeout Handling
+
+Use `tokio::time::timeout` for request timeouts:
+
+```rust
+use tokio::time::{timeout, Duration};
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("agent-id", "generic", true).await?;
+    
+    match timeout(
+        Duration::from_secs(10),
+        client.run(&[("query", json!("Complex task"))])
+    ).await {
+        Ok(Ok(response)) => println!("Success: {}", response),
+        Ok(Err(e)) => println!("Agent error: {}", e),
+        Err(_) => println!("Request timed out"),
+    }
+    
+    Ok(())
+}
+```
+
+## Stream Processing
+
+Work with async streams for real-time responses:
+
+```rust
+use futures::StreamExt;
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("agent-id", "generic_stream", true).await?;
+    
+    let mut stream = client.run_stream(&[
+        ("query", json!("Tell me a story"))
+    ]).await?;
+    
+    while let Some(chunk_result) = stream.next().await {
+        match chunk_result {
+            Ok(chunk) => {
+                // Process each chunk as it arrives
+                if let Some(content) = chunk.get("content") {
+                    print!("{}", content.as_str().unwrap_or(""));
+                }
+            }
+            Err(e) => {
+                println!("Stream error: {}", e);
+                break;
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+## Error Handling Patterns
+
+### Result Chaining
+
+```rust
+use runagent::types::RunAgentResult;
+
+async fn process_query(query: &str) -> RunAgentResult<String> {
+    let client = RunAgentClient::new("agent-id", "generic", true).await?;
+    let response = client.run(&[("query", json!(query))]).await?;
+    
+    response.get("answer")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| RunAgentError::validation("No answer in response"))
+}
+```
+
+### Retry Logic
+
+```rust
+use tokio::time::{sleep, Duration};
+
+async fn run_with_retry(
+    client: &RunAgentClient,
+    query: &str,
+    max_retries: usize
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    for attempt in 0..max_retries {
+        match client.run(&[("query", json!(query))]).await {
+            Ok(response) => return Ok(response),
+            Err(e) if e.is_retryable() && attempt < max_retries - 1 => {
+                let delay = Duration::from_millis(1000 * (2_u64.pow(attempt as u32)));
+                sleep(delay).await;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    unreachable!()
+}
+```
+
+## Performance Tips
+
+1. **Reuse Clients**: Create client instances once and reuse them
+2. **Connection Pooling**: The SDK automatically manages connections
+3. **Batch Operations**: Use concurrent requests for multiple queries
+4. **Stream Processing**: Use streaming for large responses
+
+## Integration Examples
+
+### With Axum Web Framework
+
+```rust
+use axum::{extract::Query, response::Json, routing::post, Router};
+use runagent::client::RunAgentClient;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+#[derive(Deserialize)]
+struct QueryRequest {
+    message: String,
+}
+
+#[derive(Serialize)]
+struct QueryResponse {
+    answer: String,
+}
+
+async fn handle_query(
+    Query(req): Query<QueryRequest>,
+    client: Arc<RunAgentClient>
+) -> Result<Json<QueryResponse>, String> {
+    let response = client.run(&[
+        ("query", serde_json::json!(req.message))
+    ]).await.map_err(|e| e.to_string())?;
+    
+    let answer = response.get("answer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("No answer")
+        .to_string();
+    
+    Ok(Json(QueryResponse { answer }))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Arc::new(RunAgentClient::new("agent-id", "generic", true).await?);
+    
+    let app = Router::new()
+        .route("/query", post(handle_query))
+        .with_state(client);
+    
+    // Start server...
+    Ok(())
+}
+```

@@ -1,0 +1,294 @@
+The Rust SDK includes a local server implementation for testing and development of AI agents.
+
+## Basic Server Setup
+
+```rust
+use runagent::server::LocalServer;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create server from agent directory
+    let server = LocalServer::from_path(
+        PathBuf::from("./my-agent"),
+        Some("127.0.0.1"),
+        Some(8450)
+    ).await?;
+    
+    println!("Server info: {:?}", server.get_info());
+    
+    // Start the server (this will block)
+    server.start().await?;
+    
+    Ok(())
+}
+```
+
+## Server with Custom Configuration
+
+```rust
+use runagent::server::LocalServer;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let agent_id = "my-custom-agent".to_string();
+    let agent_path = PathBuf::from("./agents/my-agent");
+    
+    let server = LocalServer::new(
+        agent_id,
+        agent_path,
+        "0.0.0.0",  // Bind to all interfaces
+        8450
+    ).await?;
+    
+    println!("Starting server on {}", server.addr());
+    server.start().await?;
+    
+    Ok(())
+}
+```
+
+## Server Information
+
+Get details about the running server:
+
+```rust
+let server = LocalServer::from_path(
+    PathBuf::from("./my-agent"),
+    None,
+    None
+).await?;
+
+let info = server.get_info();
+println!("Agent ID: {}", info.agent_id);
+println!("Server URL: {}", info.url);
+println!("Agent Path: {}", info.agent_path.display());
+println!("Host: {}", info.host);
+println!("Port: {}", info.port);
+```
+
+## Database Integration
+
+When the `db` feature is enabled, the server automatically manages agent metadata:
+
+```rust
+// The server will automatically:
+// - Register the agent in the local database
+// - Track execution statistics
+// - Record agent runs and performance metrics
+
+let server = LocalServer::from_path(
+    PathBuf::from("./my-agent"),
+    Some("localhost"),
+    Some(8450)
+).await?;
+
+// Database operations happen automatically
+server.start().await?;
+```
+
+## Testing with Local Server
+
+```rust
+use runagent::{server::LocalServer, client::RunAgentClient};
+use std::path::PathBuf;
+use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Start server in background
+    let server = LocalServer::from_path(
+        PathBuf::from("./test-agent"),
+        Some("localhost"),
+        Some(8450)
+    ).await?;
+    
+    let agent_id = server.agent_id().to_string();
+    
+    // Start server in background task
+    tokio::spawn(async move {
+        if let Err(e) = server.start().await {
+            eprintln!("Server error: {}", e);
+        }
+    });
+    
+    // Wait for server to start
+    sleep(Duration::from_millis(1000)).await;
+    
+    // Test with client
+    let client = RunAgentClient::with_address(
+        &agent_id,
+        "generic",
+        true,
+        Some("localhost"),
+        Some(8450)
+    ).await?;
+    
+    let response = client.run(&[
+        ("query", serde_json::json!("Hello, server!"))
+    ]).await?;
+    
+    println!("Test response: {}", response);
+    
+    Ok(())
+}
+```
+
+## Server Endpoints
+
+The local server provides these endpoints:
+
+### Health Check
+```
+GET /health
+GET /api/v1/health
+```
+
+### Agent Architecture
+```
+GET /api/v1/agents/{agent_id}/architecture
+```
+
+### Execute Agent
+```
+POST /api/v1/agents/{agent_id}/execute/{entrypoint}
+```
+
+### WebSocket Streaming
+```
+WS /api/v1/agents/{agent_id}/execute/{entrypoint}/ws
+```
+
+## Custom Request Handling
+
+The server handles different agent frameworks automatically:
+
+```rust
+// For LangChain agents
+POST /api/v1/agents/my-agent/execute/generic
+{
+  "input_data": {
+    "input_kwargs": {
+      "messages": [{"role": "user", "content": "Hello"}]
+    }
+  }
+}
+
+// For AutoGen agents  
+POST /api/v1/agents/my-agent/execute/autogen_invoke
+{
+  "input_data": {
+    "input_kwargs": {
+      "task": "What is AutoGen?"
+    }
+  }
+}
+```
+
+## Server Configuration
+
+Configure server behavior with environment variables:
+
+```bash
+export RUNAGENT_SERVER_HOST="0.0.0.0"
+export RUNAGENT_SERVER_PORT="8450"
+export RUNAGENT_LOG_LEVEL="info"
+```
+
+Or programmatically:
+
+```rust
+use runagent::types::ServerConfig;
+
+let config = ServerConfig {
+    host: "127.0.0.1".to_string(),
+    port: 8450,
+    debug: true,
+    cors_enabled: true,
+    max_request_size: 16 * 1024 * 1024, // 16MB
+};
+```
+
+## Production Considerations
+
+For production deployment:
+
+1. **Security**: Configure appropriate CORS and authentication
+2. **Monitoring**: Enable logging and health checks
+3. **Performance**: Tune connection limits and timeouts
+4. **Error Handling**: Implement proper error recovery
+
+```rust
+use runagent::server::LocalServer;
+use tracing::{info, error};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logging
+    tracing_subscriber::fmt::init();
+    
+    let server = LocalServer::from_path(
+        std::path::PathBuf::from("./production-agent"),
+        Some("0.0.0.0"),
+        Some(8450)
+    ).await?;
+    
+    info!("Production server starting: {:?}", server.get_info());
+    
+    // Graceful shutdown handling
+    let shutdown_signal = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for ctrl+c");
+        info!("Shutdown signal received");
+    };
+    
+    tokio::select! {
+        result = server.start() => {
+            if let Err(e) = result {
+                error!("Server error: {}", e);
+            }
+        }
+        _ = shutdown_signal => {
+            info!("Shutting down gracefully");
+        }
+    }
+    
+    Ok(())
+}
+```
+
+## Multiple Servers
+
+Run multiple agents on different ports:
+
+```rust
+use futures::future::join_all;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let servers = vec![
+        LocalServer::from_path(PathBuf::from("./agent1"), Some("localhost"), Some(8450)),
+        LocalServer::from_path(PathBuf::from("./agent2"), Some("localhost"), Some(8451)),
+        LocalServer::from_path(PathBuf::from("./agent3"), Some("localhost"), Some(8452)),
+    ];
+    
+    let server_futures = Vec::new();
+    for server_result in servers {
+        let server = server_result.await?;
+        server_futures.push(server.start());
+    }
+    
+    // Run all servers concurrently
+    let results = join_all(server_futures).await;
+    
+    for (i, result) in results.into_iter().enumerate() {
+        if let Err(e) = result {
+            eprintln!("Server {} error: {}", i, e);
+        }
+    }
+    
+    Ok(())
+}
+```
