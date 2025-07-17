@@ -18,6 +18,7 @@
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",
     "@swc/jest": "~0.2.36",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^29.5.12",
     "@types/node": "18.16.9",
     "@types/ws": "^8.18.1",
@@ -31,6 +32,7 @@
     "jiti": "2.4.2",
     "jsdom": "~22.1.0",
     "jsonc-eslint-parser": "^2.1.0",
+    "node-gyp": "^11.2.0",
     "nx": "21.2.2",
     "prettier": "^2.6.2",
     "swc-loader": "0.1.15",
@@ -62,6 +64,9 @@
     }
   },
   "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "install": "^0.13.0",
+    "npm": "^11.4.2",
     "ws": "^8.18.3"
   }
 }
