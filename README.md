@@ -940,10 +940,10 @@ RunAgent stands on the shoulders of giants. We're grateful to the entire AI and 
 </p>
 
 <p align="center">
-  <a href="https://run-agent.ai">
+  <a href="https://docs.run-agent.ai">
     <img src="https://img.shields.io/badge/Get%20Started-Local%20Development-blue?style=for-the-badge" alt="Get Started Local">
   </a>
-  <a href="https://run-agent.ai/waitlist">
+  <a href="https://run-agent.ai">
     <img src="https://img.shields.io/badge/Join%20Waitlist-Cloud%20Platform-green?style=for-the-badge" alt="Join Cloud Waitlist">
   </a>
 </p>
