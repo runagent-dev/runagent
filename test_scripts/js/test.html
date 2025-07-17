@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RunAgent Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: 0 auto; 
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        button:hover { 
+            opacity: 0.8; 
+        }
+        button:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed; 
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-loading { background: #17a2b8; color: white; }
+        #output { 
+            background: #f5f5f5; 
+            padding: 15px; 
+            margin-top: 20px;
+            white-space: pre-wrap; 
+            font-family: monospace;
+            min-height: 200px;
+            border: 1px solid #ddd;
+        }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>RunAgent Browser Test</h1>
+    
+    <div>
+        <label>Agent ID: <input id="agentId" value="23859089-fa28-4b8c-8efb-a28d21902393" style="width: 300px;"></label><br><br>
+        <label>Host: <input id="host" value="localhost"></label>
+        <label>Port: <input id="port" value="8450" type="number"></label><br><br>
+        <label>Entrypoint Tag: <input id="entrypointTag" value="generic"></label><br><br>
+        
+        <label>Input JSON:</label><br>
+        <textarea id="inputJson" rows="4" cols="60">{"input": {"query": "How do I fix my broken phone?", "num_solutions": 4}}</textarea><br><br>
+        
+        <button id="testBtn" class="btn-warning" onclick="testEnvironment()">🔍 Test Environment</button>
+        <button id="runBtn" class="btn-success" onclick="runAgent()">▶️ Run Agent</button>
+        <button id="clearBtn" class="btn-secondary" onclick="clearOutput()">🗑️ Clear</button>
+    </div>
+    
+    <div id="output">Ready to test...</div>
+
+    <script type="module">
+        // Import your library
+        import { RunAgentClient } from './node_modules/@runagent/client/dist/runagent-client.js';
+
+        function log(message, type = '') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `<span class="${type}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setButtonState(buttonId, loading, text) {
+            const btn = document.getElementById(buttonId);
+            if (loading) {
+                btn.disabled = true;
+                btn.className = 'btn-loading';
+                btn.innerHTML = `⏳ ${text}`;
+            } else {
+                btn.disabled = false;
+                // Reset to original classes
+                if (buttonId === 'testBtn') btn.className = 'btn-warning';
+                else if (buttonId === 'runBtn') btn.className = 'btn-success';
+                else if (buttonId === 'clearBtn') btn.className = 'btn-secondary';
+                
+                // Reset to original text
+                if (buttonId === 'testBtn') btn.innerHTML = '🔍 Test Environment';
+                else if (buttonId === 'runBtn') btn.innerHTML = '▶️ Run Agent';
+                else if (buttonId === 'clearBtn') btn.innerHTML = '🗑️ Clear';
+            }
+        }
+
+        window.clearOutput = () => {
+            document.getElementById('output').innerHTML = '';
+        };
+
+        window.testEnvironment = () => {
+            setButtonState('testBtn', true, 'Testing...');
+            log('🔍 Testing environment...', 'info');
+            
+            try {
+                const client = new RunAgentClient({
+                    agentId: 'test',
+                    entrypointTag: 'test',
+                    local: true,
+                    host: 'localhost',
+                    port: 8450
+                });
+
+                log(`Environment: ${client.environment}`, 'success');
+                log(`Is Browser: ${client.isBrowser}`, 'success');
+                log(`Is Node: ${client.isNode}`, client.isNode ? 'error' : '');
+                log('✅ Environment test passed!', 'success');
+            } catch (error) {
+                log(`❌ Environment test failed: ${error.message}`, 'error');
+            } finally {
+                setTimeout(() => setButtonState('testBtn', false), 1000);
+            }
+        };
+
+        window.runAgent = async () => {
+            const entrypointTag = document.getElementById('entrypointTag').value;
+            const isStreaming = entrypointTag.endsWith('_stream');
+            
+            setButtonState('runBtn', true, isStreaming ? 'Streaming...' : 'Running...');
+            
+            try {
+                const agentId = document.getElementById('agentId').value;
+                const host = document.getElementById('host').value;
+                const port = parseInt(document.getElementById('port').value);
+                const inputText = document.getElementById('inputJson').value;
+
+                // Determine execution type based on tag
+                const executionType = isStreaming ? 'STREAM' : 'STANDARD';
+                const icon = isStreaming ? '📡' : '▶️';
+                
+                log(`${icon} Starting ${executionType} execution...`, 'info');
+
+                let inputData;
+                try {
+                    inputData = JSON.parse(inputText);
+                } catch (e) {
+                    log(`❌ Invalid JSON: ${e.message}`, 'error');
+                    return;
+                }
+
+                log(`📋 Config: ${agentId}@${entrypointTag} on ${host}:${port}`, 'info');
+                log(`📥 Input: ${JSON.stringify(inputData)}`, 'info');
+                log(`🎯 Mode: ${executionType}`, 'info');
+
+                log('🔄 Initializing client...', 'info');
+                const client = new RunAgentClient({
+                    agentId: agentId,
+                    entrypointTag: entrypointTag,
+                    local: true,
+                    host: host,
+                    port: port
+                });
+
+                await client.initialize();
+                log('✅ Client initialized successfully', 'success');
+
+                log(`🚀 Executing agent (${executionType} mode)...`, 'info');
+                const result = await client.run(inputData);
+
+                if (isStreaming) {
+                    // Handle streaming response
+                    log('🌊 Processing stream...', 'info');
+                    let count = 0;
+                    for await (const chunk of result) {
+                        count++;
+                        log(`📦 Chunk ${count}: ${JSON.stringify(chunk)}`, 'success');
+                    }
+                    log(`✅ Stream complete! Total chunks: ${count}`, 'success');
+                } else {
+                    // Handle standard response
+                    log(`✅ Execution complete!`, 'success');
+                    log(`📤 Result: ${JSON.stringify(result, null, 2)}`, 'success');
+                }
+
+            } catch (error) {
+                log(`❌ Agent execution failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            } finally {
+                setButtonState('runBtn', false);
+            }
+        };
+
+        log('Browser test ready!');
+    </script>
+</body>
+</html>
