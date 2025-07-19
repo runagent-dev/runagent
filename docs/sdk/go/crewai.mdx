@@ -1,0 +1,172 @@
+# RunAgent Go Client Example
+
+This example demonstrates how to use the RunAgent Go client to connect to and execute an agent for research tasks.
+
+## Prerequisites
+
+- Go 1.18 or later
+- RunAgent server running locally on port 8453
+- Access to the `research_crew` agent
+
+## Installation
+
+First, install the RunAgent Go client:
+
+```bash
+go mod init your-project
+go get github.com/runagent-dev/runagent-go/pkg/client
+```
+
+## Basic Usage
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	// Create a new client connection
+	agentClient, err := client.NewWithAddress(
+		"331fa66f-1089-43f0-8912-cc1b4c22ab01", // Agent ID
+		"research_crew",                        // Agent name
+		true,                                   // Enable SSL/TLS
+		"localhost",                            // Server address
+		8453,                                   // Server port
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Execute the agent with parameters
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"topic": "global warming",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+
+## Code Breakdown
+
+### Client Initialization
+
+The `client.NewWithAddress()` function creates a new RunAgent client with the following parameters:
+
+- **Agent ID**: `"331fa66f-1089-43f0-8912-cc1b4c22ab01"` - Unique identifier for the agent
+- **Agent Name**: `"research_crew"` - Human-readable name of the agent
+- **SSL/TLS**: `true` - Enable secure connection
+- **Address**: `"localhost"` - Server hostname or IP address
+- **Port**: `8453` - Server port number
+
+### Context and Timeout
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+defer cancel()
+```
+
+A context with a 2-minute timeout is created to prevent the agent execution from running indefinitely. The `defer cancel()` ensures proper cleanup.
+
+### Agent Execution
+
+```go
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"topic": "global warming",
+})
+```
+
+The `Run()` method executes the agent with the provided parameters. In this example, we're passing a `topic` parameter with the value `"global warming"`.
+
+## Configuration Options
+
+You can customize the client behavior by modifying the connection parameters:
+
+```go
+// For remote server
+agentClient, err := client.NewWithAddress(
+	"your-agent-id",
+	"your-agent-name",
+	true,           // Use HTTPS
+	"agent.example.com", // Remote server
+	443,            // HTTPS port
+)
+
+// For local development without SSL
+agentClient, err := client.NewWithAddress(
+	"your-agent-id",
+	"your-agent-name",
+	false,          // Disable SSL
+	"localhost",
+	8080,           // HTTP port
+)
+```
+
+## Error Handling
+
+The example includes basic error handling for:
+
+- Client creation failures
+- Agent execution failures
+- Context timeouts
+
+```go
+if err != nil {
+	log.Fatalf("Failed to create client: %v", err)
+}
+```
+
+## Best Practices
+
+1. **Always close the client**: Use `defer agentClient.Close()` to ensure proper cleanup
+2. **Set appropriate timeouts**: Use context with timeout to prevent hanging operations
+3. **Handle errors gracefully**: Check for errors at each step
+4. **Secure connections**: Use SSL/TLS for production environments
+
+## Common Parameters
+
+Different agents may accept different parameters. Common examples include:
+
+```go
+// Research agent
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"topic": "artificial intelligence",
+	"depth": "detailed",
+	"sources": []string{"academic", "news"},
+})
+
+// Data processing agent
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"input_file": "/path/to/data.csv",
+	"operation": "analyze",
+	"format": "json",
+})
+```
+
+## Troubleshooting
+
+- **Connection refused**: Ensure the RunAgent server is running on the specified port
+- **Timeout errors**: Increase the context timeout for long-running operations
+- **SSL/TLS errors**: Verify the SSL configuration matches your server setup
+- **Agent not found**: Check that the agent ID and name are correct
+
+## Next Steps
+
+- Explore different agent types and their parameters
+- Implement more sophisticated error handling
+- Add logging and monitoring
+- Consider using connection pooling for multiple requests
