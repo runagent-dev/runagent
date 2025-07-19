@@ -1,0 +1,2 @@
+-e git+https://github.com/RadeenXALNW/letta.git@9bfef1c0e809d69a458211fdabc7e74e51d9fb55#egg=letta
+openai
