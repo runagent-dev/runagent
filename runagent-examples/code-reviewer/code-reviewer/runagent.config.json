@@ -20,7 +20,14 @@
       {
         "file": "agent.py",
         "module": "letta_run_stream",
-        "tag": "code_review_stream"
+        "tag": "code_review_stream",
+        "extractor": {
+          "tool_response": "$.tool_return",
+          "message": "$.content",
+          "tool_name": "$.tool_call.name",
+          "reasoning_content": "$.reasoning"
+
+        }
       }
     ]
   },

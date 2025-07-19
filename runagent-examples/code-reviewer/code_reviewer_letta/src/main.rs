@@ -48,7 +48,7 @@ async fn review_code_stream(Json(request): Json<ReviewRequest>) -> Sse<ReceiverS
         println!("🌊 Starting streaming review for {} code", request.language.as_deref().unwrap_or("unknown"));
         
         // Connect to RunAgent - REPLACE "YOUR_AGENT_ID_HERE" with your actual agent ID
-        let client = match RunAgentClient::new("5bce7bff-a959-4df1-9ab3-91f6eadf049a", "code_review_stream", true).await {
+        let client = match RunAgentClient::new("355a44e4-c7a0-483b-85c8-80d9b676e293", "code_review_stream", true).await {
             Ok(client) => client,
             Err(e) => {
                 let _ = tx.send(Ok(axum::response::sse::Event::default()
@@ -202,9 +202,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(cors);
 
     // Start the server
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
-    println!("🌐 Server running at http://127.0.0.1:3000");
-    println!("💡 Make sure your RunAgent code reviewer is running on port 8450!");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
+    println!("🌐 Server running at http://127.0.0.1:3001");
     
     axum::serve(listener, app).await?;
     

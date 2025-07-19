@@ -175,11 +175,12 @@ def letta_run_stream(*input_args, **input_kwargs):
                 "role": "user",
                 "content": message
             }],
-            stream_tokens=True,
+            # stream_tokens=True,
         )
         
         # Yield chunks
         for chunk in stream:
+            print(chunk)
             yield chunk
             
     except Exception as e:
