@@ -259,64 +259,105 @@ RunAgent provides native-like access to your deployed agents across multiple lan
 
 When your Python agent streams responses, RunAgent makes it feel native in every target language:
 
-<Tabs>
-  <Tab title="Python Generator">
-    ```python
-    def generate_report(topic: str) -> Iterator[str]:
-        yield f"# {topic} Analysis Report\n\n"
-        yield "## Executive Summary\n"
-        for section in analyze_topic(topic):
-            yield f"### {section.title}\n{section.content}\n\n"
-    ```
-  </Tab>
-  
-  <Tab title="JavaScript Async Iterator">
-    ```javascript
-    const stream = await client.runStream({topic: "AI Market Trends"});
-    for await (const chunk of stream) {
-        document.getElementById('report').innerHTML += chunk;
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Rust Futures Stream">
-    ```rust
+<CodeGroup>
+```python Streams from Python
+from typing import Iterator
+
+def generate_report(topic: str) -> Iterator[str]:
+    yield f"# {topic} Analysis Report\n\n"
+    yield "## Executive Summary\n"
+    for section in analyze_topic(topic):
+        yield f"### {section.title}\n{section.content}\n\n"
+```
+
+```javascript Becomes JavaScript Streams
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your-agent-id',
+    entrypointTag: 'generate_report_stream',
+    local: true
+});
+
+await client.initialize();
+
+const stream = await client.runStream({topic: "AI Market Trends"});
+for await (const chunk of stream) {
+    document.getElementById('report').innerHTML += chunk;
+}
+```
+
+```rust Becomes Rust Streams
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("your-agent-id", "generate_report_stream", true).await?;
+    
     let mut stream = client.run_stream(&[("topic", json!("AI Market"))]).await?;
     while let Some(chunk) = stream.next().await {
-        println!("{}", chunk?);
+        print!("{}", chunk?);
     }
-    ```
-  </Tab>
+    Ok(())
+}
+```
 
-  <Tab title="Go Stream">
-    ```go
-    s, err := c.RunStream(ctx, map[string]interface{}{"role": "user", "message": "Analyze the benefits of remote work for software teams"})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer s.Close()
+```go And Go Streams
+package main
 
-	for {
-		data, hasMore, err := s.Next(ctx)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if !hasMore {
-			break
-		}
-		fmt.Printf("Received: %v\n", data)
-	}
-    ```
-  </Tab>
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/runagent-dev/runagent/runagent-go/runagent"
+)
 
-</Tabs>
+func main() {
+    client := runagent.NewRunAgentClient(runagent.Config{
+        AgentID:       "your-agent-id",
+        EntrypointTag: "generate_report_stream",
+        Local:         true,
+    })
+    
+    ctx := context.Background()
+    client.Initialize(ctx)
+    
+    s, err := client.RunStream(ctx, map[string]interface{}{
+        "topic": "AI Market Trends",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer s.Close()
+
+    for {
+        data, hasMore, err := s.Next(ctx)
+        if err != nil {
+            log.Fatal(err)
+        }
+        if !hasMore {
+            break
+        }
+        fmt.Printf("%v", data)
+    }
+}
+```
+</CodeGroup>
 
 **What's happening**: WebSocket connections, real-time data flow, and native iteration patterns—all handled automatically by RunAgent.
 
-<Card 
-    title='View All Features' 
-    icon='sparkles' 
-    href='/features'
->
-Explore streaming, monitoring, security, and enterprise features.
-</Card>
+## See Also
+
+- [Quick Start Guide](/get-started/quickstart) - Deploy your first AI agent in under 5 minutes and see the magic happen
+- [Core Concepts](/get-started/core-concepts) - Master the fundamental concepts that make RunAgent powerful
+
+- [Framework Overview](/frameworks/overview) - Deploy agents built with LangGraph, CrewAI, Letta, or any AI framework
+
+- [Python SDK](/sdk/python/getting-started) - Start using RunAgent SDKs in Python with complete examples
+
+- [CLI Overview](/cli/overview) - Master the RunAgent command-line interface for project management
+
+- [Configuration File](/configuration/config-file) - Understanding runagent.config.json and entrypoint configuration
