@@ -1,0 +1,654 @@
+---
+title: 'Getting Started with Go SDK'
+description: 'Start using the RunAgent Go SDK'
+---
+
+The RunAgent Go SDK provides a simple and powerful interface for interacting with your deployed agents. It supports both synchronous and asynchronous operations, with built-in streaming capabilities.
+
+## Installation
+
+Install the SDK using go get:
+
+```bash
+go get github.com/runagent-dev/runagent-go/pkg/client
+```
+
+<Info>
+  The SDK is available as a Go module. Make sure you have Go 1.18 or later installed.
+</Info>
+
+## Quick Start
+
+### Basic Usage
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	// Initialize the client
+	agentClient, err := client.NewWithAddress(
+		"your-agent-id",
+		"minimal",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Simple invocation
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"role":    "user",
+		"message": "What's the capital of France?",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+
+### With Custom Configuration
+
+```go
+// Local development setup
+agentClient, err := client.NewWithAddress(
+	"841debad-7433-46ae-a0ec-0540d0df7314", // Agent ID
+	"minimal",                              // Entrypoint tag
+	true,                                   // Local flag
+	"localhost",                            // Host
+	8450,                                   // Port
+)
+```
+
+## Authentication
+
+The SDK supports multiple authentication methods:
+
+<Tabs>
+  <Tab title="Environment Variables">
+    ```bash
+    export RUNAGENT_API_KEY="your-api-key"
+    export RUNAGENT_HOST="localhost"
+    export RUNAGENT_PORT="8450"
+    ```
+    
+    ```go
+    // SDK will automatically use the environment variables
+    agentClient, err := client.NewWithAddress(
+        "your-agent-id",
+        "minimal",
+        true,
+        "localhost",
+        8450,
+    )
+    ```
+  </Tab>
+  <Tab title="Direct Configuration">
+    ```go
+    // For production use
+    agentClient, err := client.NewWithAddress(
+        "your-agent-id",
+        "production",
+        false,                    // Not local
+        "api.run-agent.ai",      // Production host
+        443,                     // HTTPS port
+    )
+    ```
+  </Tab>
+  <Tab title="Local Development">
+    ```go
+    // Local development setup
+    agentClient, err := client.NewWithAddress(
+        "your-agent-id",
+        "minimal",
+        true,        // Local flag
+        "localhost",
+        8450,
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Response Formats
+
+### Standard Response
+
+```go
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	"role":        "user",
+	"message":     "Explain quantum computing",
+	"max_length":  200,
+	"temperature": 0.7,
+})
+if err != nil {
+	log.Fatalf("Failed to run agent: %v", err)
+}
+
+// Result is a map[string]interface{}
+fmt.Printf("Answer: %v\n", result["answer"])
+fmt.Printf("Confidence: %v\n", result["confidence"])
+fmt.Printf("Sources: %v\n", result["sources"])
+```
+
+### Streaming Response
+
+```go
+// Stream responses for real-time output
+stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+	"role":    "user",
+	"message": "Write a story about AI",
+})
+if err != nil {
+	log.Fatalf("Failed to start stream: %v", err)
+}
+defer stream.Close()
+
+// Read from stream
+for {
+	data, hasMore, err := stream.Next(ctx)
+	if err != nil {
+		log.Printf("Stream error: %v", err)
+		break
+	}
+
+	if !hasMore {
+		fmt.Println("Stream completed")
+		break
+	}
+
+	fmt.Printf("%v", data)
+}
+```
+
+## Error Handling
+
+The SDK provides comprehensive error handling:
+
+```go
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func safeAgentCall() {
+	agentClient, err := client.NewWithAddress(
+		"your-agent-id",
+		"minimal",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"role":    "user",
+		"message": "Hello",
+	})
+	if err != nil {
+		// Handle different error types
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("Request timed out: %v", err)
+		} else if errors.Is(err, context.Canceled) {
+			log.Printf("Request was canceled: %v", err)
+		} else {
+			log.Printf("Agent error: %v", err)
+		}
+		return
+	}
+
+	fmt.Printf("Success: %v\n", result)
+}
+```
+
+### Common Error Types
+
+| Error | Description |
+|-------|-------------|
+| `context.DeadlineExceeded` | Request timed out |
+| `context.Canceled` | Request was canceled |
+| `net.Error` | Network-related errors |
+| `AuthenticationError` | Invalid credentials |
+| `ValidationError` | Invalid input data |
+
+## Configuration Options
+
+```go
+// Create client with custom configuration
+agentClient, err := client.NewWithAddress(
+	"your-agent-id",           // Agent ID
+	"production",              // Entrypoint tag
+	false,                     // Local flag (false for production)
+	"api.run-agent.ai",        // Custom API endpoint
+	443,                       // Port
+)
+if err != nil {
+	log.Fatalf("Failed to create client: %v", err)
+}
+defer agentClient.Close()
+
+// Configure context with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+```
+
+## Input Validation
+
+The SDK validates inputs before sending requests:
+
+```go
+// This will return an error if required fields are missing
+result, err := agentClient.Run(ctx, map[string]interface{}{
+	// Missing required fields
+})
+if err != nil {
+	log.Printf("Validation failed: %v", err)
+}
+```
+
+## Logging
+
+Enable logging for debugging:
+
+```go
+import (
+	"log"
+	"os"
+)
+
+func init() {
+	// Enable debug logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
+}
+
+func main() {
+	// Now SDK operations will print debug information
+	agentClient, err := client.NewWithAddress(
+		"your-agent-id",
+		"minimal",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	// Your code here...
+}
+```
+
+## Complete Examples
+
+### Question-Answering Bot
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func askAgent(question string) string {
+	agentClient, err := client.NewWithAddress(
+		"qa-bot-agent",
+		"minimal",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		return fmt.Sprintf("Error creating client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"role":        "user",
+		"message":     question,
+		"max_tokens":  500,
+		"temperature": 0.7,
+	})
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
+
+	if answer, ok := result["answer"].(string); ok {
+		return answer
+	}
+	return "No answer available"
+}
+
+func main() {
+	answer := askAgent("What is machine learning?")
+	fmt.Println(answer)
+}
+```
+
+### Interactive Chat
+
+```go
+package main
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func chatWithAgent() {
+	agentClient, err := client.NewWithAddress(
+		"chat-agent",
+		"minimal_stream",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Chat started. Type 'quit' to exit.")
+
+	for {
+		fmt.Print("\nYou: ")
+		userInput, _ := reader.ReadString('\n')
+		userInput = strings.TrimSpace(userInput)
+
+		if strings.ToLower(userInput) == "quit" {
+			break
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+
+		fmt.Print("\nAgent: ")
+		stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+			"role":            "user",
+			"message":         userInput,
+			"conversation_id": "session-123",
+		})
+		if err != nil {
+			log.Printf("Failed to start stream: %v", err)
+			cancel()
+			continue
+		}
+
+		for {
+			data, hasMore, err := stream.Next(ctx)
+			if err != nil {
+				log.Printf("Stream error: %v", err)
+				break
+			}
+
+			if !hasMore {
+				fmt.Println() // New line after response
+				break
+			}
+
+			fmt.Print(data)
+		}
+
+		stream.Close()
+		cancel()
+	}
+}
+
+func main() {
+	chatWithAgent()
+}
+```
+
+### Batch Processing
+
+```go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type BatchResult struct {
+	Input  string      `json:"input"`
+	Output interface{} `json:"output"`
+	Status string      `json:"status"`
+	Error  string      `json:"error,omitempty"`
+}
+
+func processBatch(items []string) []BatchResult {
+	agentClient, err := client.NewWithAddress(
+		"processor-agent",
+		"minimal",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	results := make([]BatchResult, 0, len(items))
+
+	for _, item := range items {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		result, err := agentClient.Run(ctx, map[string]interface{}{
+			"data":      item,
+			"operation": "analyze",
+		})
+
+		if err != nil {
+			results = append(results, BatchResult{
+				Input:  item,
+				Output: nil,
+				Status: "error",
+				Error:  err.Error(),
+			})
+		} else {
+			results = append(results, BatchResult{
+				Input:  item,
+				Output: result,
+				Status: "success",
+			})
+		}
+
+		cancel()
+	}
+
+	return results
+}
+
+func main() {
+	items := []string{"data1", "data2", "data3"}
+	results := processBatch(items)
+
+	jsonData, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal results: %v", err)
+	}
+
+	fmt.Println(string(jsonData))
+}
+```
+
+### Streaming Analysis Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	fmt.Println("=== Remote Work Analysis (Streaming) ===")
+
+	agentClient, err := client.NewWithAddress(
+		"841debad-7433-46ae-a0ec-0540d0df7314",
+		"minimal_stream",
+		true,
+		"localhost",
+		8450,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	fmt.Println("Starting analysis...")
+	stream, err := agentClient.RunStream(ctx, map[string]interface{}{
+		"role":    "user",
+		"message": "Analyze the benefits of remote work for software teams",
+	})
+	if err != nil {
+		log.Fatalf("Failed to start stream: %v", err)
+	}
+	defer stream.Close()
+
+	for {
+		data, hasMore, err := stream.Next(ctx)
+		if err != nil {
+			log.Printf("Stream error: %v", err)
+			break
+		}
+
+		if !hasMore {
+			fmt.Println("\nAnalysis completed")
+			break
+		}
+
+		fmt.Print(data)
+	}
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Resource Management" icon="shield">
+    Always use defer for cleanup: `defer agentClient.Close()` and `defer stream.Close()`
+  </Card>
+  <Card title="Context Management" icon="clock">
+    Use context with timeouts and handle cancellation gracefully
+  </Card>
+  <Card title="Error Handling" icon="exclamation-triangle">
+    Check errors after every operation and handle different error types appropriately
+  </Card>
+  <Card title="Use Streaming" icon="stream">
+    Use streaming for long responses to improve user experience
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Synchronous Client" icon="circle-play" href="/sdk/go/sync-client">
+    Deep dive into synchronous operations
+  </Card>
+  <Card title="Streaming Responses" icon="stream" href="/sdk/go/streaming">
+    Master real-time streaming capabilities
+  </Card>
+  <Card title="Error Handling" icon="exclamation-triangle" href="/sdk/go/error-handling">
+    Advanced error handling patterns
+  </Card>
+  <Card title="API Reference" icon="book" href="/sdk/go/api-reference">
+    Complete API documentation
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Client Creation Fails">
+```go
+// Check if the agent is running and accessible
+agentClient, err := client.NewWithAddress(
+	"your-agent-id",
+	"minimal",
+	true,
+	"localhost",
+	8450,
+)
+if err != nil {
+	log.Printf("Client creation failed: %v", err)
+	// Check network connectivity and agent status
+}
+```
+</Accordion>
+
+<Accordion title="Stream Timeout">
+```go
+// Increase timeout for long-running operations
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+```
+</Accordion>
+
+<Accordion title="Connection Refused">
+Common solutions:
+- Verify that the agent is running on the specified host and port
+- Check firewall settings and network connectivity
+- Ensure the agent ID and entrypoint tag are correct
+- Verify SSL/TLS configuration for production environments
+</Accordion>
+
+<Note>
+  Remember to always handle errors appropriately and use proper resource management patterns with `defer` statements in Go.
+</Note>
