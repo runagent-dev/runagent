@@ -1,0 +1,38 @@
+{
+  "agent_name": "smart_code_reviewer",
+  "description": "AI-powered code reviewer with security analysis and improvement suggestions",
+  "framework": "letta",
+  "template": "code_reviewer",
+  "version": "1.0.0",
+  "created_at": "2025-01-20 12:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/letta/code_reviewer",
+    "author": "runagent-dev"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_run",
+        "tag": "code_review"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_stream",
+        "tag": "code_review_stream",
+        "extractor": {
+          "tool_response": "$.tool_return",
+          "message": "$.content",
+          "tool_name": "$.tool_call.name",
+          "reasoning_content": "$.reasoning"
+
+        }
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "LETTA_SERVER_URL": "http://localhost:8283"
+  }
+}

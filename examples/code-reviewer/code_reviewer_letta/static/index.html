@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Code Reviewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.5;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            font-weight: 300;
+            letter-spacing: -1px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 70vh;
+        }
+
+        .input-panel {
+            padding: 40px;
+            border-right: 1px solid #e8ecef;
+            background: #fafbfc;
+        }
+
+        .output-panel {
+            padding: 40px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e8ecef;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            background: white;
+        }
+
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            min-height: 250px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            resize: vertical;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .examples {
+            margin-top: 30px;
+        }
+
+        .examples h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .example-item {
+            background: white;
+            border: 1px solid #e8ecef;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .example-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .example-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .example-preview {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 12px;
+            color: #7f8c8d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .output-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e8ecef;
+        }
+
+        .output-header h3 {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .streaming-indicator {
+            display: none;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            animation: pulse 2s infinite;
+        }
+
+        .streaming-indicator.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .output {
+            flex: 1;
+            background: #f8f9fa;
+            border: 1px solid #e8ecef;
+            border-radius: 12px;
+            padding: 25px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #2c3e50;
+            position: relative;
+            max-height: 500px;
+            scroll-behavior: smooth;
+        }
+
+        .output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .output::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .output::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .output.welcome {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7f8c8d;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .output.analyzing {
+            background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
+                       linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
+                       linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
+                       linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            animation: moveBackground 2s linear infinite;
+        }
+
+        @keyframes moveBackground {
+            0% { background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+            100% { background-position: 20px 20px, 20px 30px, 30px 10px, 10px 20px; }
+        }
+
+        .error {
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .success {
+            color: #27ae60;
+            background: rgba(39, 174, 96, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            border-top: 1px solid #e8ecef;
+            background: #fafbfc;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Code syntax highlighting */
+        .output .security-issue {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 3px solid #e74c3c;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .output .quality-issue {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 3px solid #f39c12;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .output .recommendation {
+            background: rgba(39, 174, 96, 0.1);
+            border-left: 3px solid #27ae60;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-panel {
+                border-right: none;
+                border-bottom: 1px solid #e8ecef;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+        }
+
+        /* Loading animation */
+        .loading-dots {
+            display: inline-block;
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart Code Reviewer</h1>
+            <p>AI-powered code analysis with RunAgent + Letta + Rust</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-panel">
+                <div class="form-group">
+                    <label for="language">Programming Language</label>
+                    <select id="language">
+                        <option value="auto">Auto-detect</option>
+                        <option value="rust" selected>Rust</option>
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="typescript">TypeScript</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="focusArea">Analysis Focus</label>
+                    <select id="focusArea">
+                        <option value="all">Comprehensive Analysis</option>
+                        <option value="security">Security Focus</option>
+                        <option value="performance">Performance Focus</option>
+                        <option value="readability">Readability Focus</option>
+                        <option value="structure">Structure Focus</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="codeInput">Source Code</label>
+                    <textarea id="codeInput" placeholder="Paste your code here for AI-powered analysis...">fn main() {
+    let password = "hardcoded_secret";
+    unsafe {
+        println!("Unsafe operation!");
+    }
+    println!("Password: {}", password);
+}</textarea>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-primary" onclick="streamReview()" id="streamBtn">
+                        Analyze Code
+                    </button>
+                </div>
+
+                <div class="examples">
+                    <h3>Example Code Snippets</h3>
+                    <div id="examplesList">
+                        <div class="loading">Loading examples<span class="loading-dots"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="output-panel">
+                <div class="output-header">
+                    <h3>Analysis Results</h3>
+                    <div class="streaming-indicator" id="streamingIndicator">
+                        <span>Analyzing</span>
+                        <span class="loading-dots"></span>
+                    </div>
+                </div>
+                <div id="output" class="output welcome">
+                    Welcome to Smart Code Reviewer
+                    
+Paste your code and click "Analyze Code" to get started.
+
+This demo showcases:
+• Real-time streaming AI code analysis
+• Security vulnerability detection  
+• Performance optimization suggestions
+• Multi-language support
+• Live feedback as AI processes your code
+
+Try the example snippets or paste your own code!
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by <strong>RunAgent</strong> + <strong>Letta</strong> + <strong>Rust</strong> | 
+            <a href="https://github.com/runagent-dev/runagent" target="_blank">GitHub</a></p>
+        </div>
+    </div>
+
+    <script>
+        let currentEventSource = null;
+
+        // Load examples on page load
+        window.addEventListener('DOMContentLoaded', loadExamples);
+
+        async function loadExamples() {
+            try {
+                const response = await fetch('/api/examples');
+                const examples = await response.json();
+                
+                const examplesList = document.getElementById('examplesList');
+                examplesList.innerHTML = '';
+                
+                Object.entries(examples).forEach(([language, snippets]) => {
+                    snippets.forEach(([title, code]) => {
+                        const item = document.createElement('div');
+                        item.className = 'example-item';
+                        item.onclick = () => loadExample(code, language);
+                        item.innerHTML = `
+                            <div class="example-title">${language.toUpperCase()}: ${title}</div>
+                            <div class="example-preview">${code.split('\n')[0]}</div>
+                        `;
+                        examplesList.appendChild(item);
+                    });
+                });
+            } catch (error) {
+                document.getElementById('examplesList').innerHTML = 
+                    '<div class="error">Failed to load examples</div>';
+            }
+        }
+
+        function loadExample(code, language) {
+            document.getElementById('codeInput').value = code;
+            document.getElementById('language').value = language;
+        }
+
+        function streamReview() {
+            const code = document.getElementById('codeInput').value.trim();
+            const language = document.getElementById('language').value;
+            const focusArea = document.getElementById('focusArea').value;
+            const outputDiv = document.getElementById('output');
+            const streamBtn = document.getElementById('streamBtn');
+            const indicator = document.getElementById('streamingIndicator');
+            
+            if (!code) {
+                outputDiv.innerHTML = '<div class="error">Please enter some code to review!</div>';
+                outputDiv.className = 'output';
+                return;
+            }
+
+            // Close existing stream
+            if (currentEventSource) {
+                currentEventSource.close();
+            }
+
+            // Setup UI for streaming
+            outputDiv.innerHTML = 'Initializing code analysis...\n\n';
+            outputDiv.className = 'output analyzing';
+            streamBtn.disabled = true;
+            streamBtn.textContent = 'Stop Analysis';
+            indicator.classList.add('active');
+
+            // Create new EventSource for streaming
+            const payload = {
+                code,
+                language: language === 'auto' ? null : language,
+                focus_area: focusArea === 'all' ? null : focusArea
+            };
+
+            // We need to make a POST request first, then listen to the stream
+            fetch('/api/review/stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                outputDiv.innerHTML = '';
+                outputDiv.className = 'output';
+                
+                function readStream() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            streamBtn.disabled = false;
+                            streamBtn.textContent = 'Analyze Code';
+                            indicator.classList.remove('active');
+                            outputDiv.innerHTML += '\n\nAnalysis completed successfully.';
+                            return;
+                        }
+                        
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    
+                                    // Remove emojis and format content
+                                    let content = data.content || '';
+                                    content = content.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '');
+                                    
+                                    if (content) {
+                                        outputDiv.innerHTML += content;
+                                        // Auto-scroll to bottom
+                                        outputDiv.scrollTop = outputDiv.scrollHeight;
+                                    }
+                                    
+                                    if (data.finished) {
+                                        streamBtn.disabled = false;
+                                        streamBtn.textContent = 'Analyze Code';
+                                        indicator.classList.remove('active');
+                                        return;
+                                    }
+                                } catch (e) {
+                                    console.log('Non-JSON line:', line);
+                                }
+                            }
+                        }
+                        
+                        readStream();
+                    }).catch(error => {
+                        outputDiv.innerHTML += `\n\nStream error: ${error.message}`;
+                        outputDiv.className = 'output';
+                        streamBtn.disabled = false;
+                        streamBtn.textContent = 'Analyze Code';
+                        indicator.classList.remove('active');
+                    });
+                }
+                
+                readStream();
+            }).catch(error => {
+                outputDiv.innerHTML = `<div class="error">Analysis error: ${error.message}</div>`;
+                outputDiv.className = 'output';
+                streamBtn.disabled = false;
+                streamBtn.textContent = 'Analyze Code';
+                indicator.classList.remove('active');
+            });
+
+            // Handle stop button
+            streamBtn.onclick = function() {
+                if (streamBtn.disabled) return;
+                
+                streamBtn.disabled = false;
+                streamBtn.textContent = 'Analyze Code';
+                indicator.classList.remove('active');
+                outputDiv.innerHTML += '\n\nAnalysis stopped by user.';
+                outputDiv.className = 'output';
+                streamBtn.onclick = streamReview;
+            };
+        }
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                streamReview();
+            }
+        });
+
+        // Enhanced auto-formatting for code display
+        function formatCodeOutput(content) {
+            // Apply syntax highlighting classes for better readability
+            content = content.replace(/### Security Issues Found:/g, '<div class="security-issue">SECURITY ISSUES FOUND:</div>');
+            content = content.replace(/### Code Quality:/g, '<div class="quality-issue">CODE QUALITY:</div>');
+            content = content.replace(/### Recommendations:/g, '<div class="recommendation">RECOMMENDATIONS:</div>');
+            
+            return content;
+        }
+    </script>
+</body>
+</html>
