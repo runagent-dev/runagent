@@ -1,0 +1,212 @@
+# RunAgent Go Client Documentation
+
+## Overview
+
+The RunAgent Go client provides a simple interface for connecting to and executing tasks on RunAgent instances. This documentation covers the basic usage pattern for creating a client, establishing connections, and running agent tasks.
+
+## Installation
+
+```bash
+go get github.com/runagent-dev/runagent-go/pkg/client
+```
+
+## Basic Usage
+
+### Creating a Client
+
+The `NewWithAddress` function creates a new RunAgent client with the following parameters:
+
+```go
+agentClient, err := client.NewWithAddress(
+    agentID,        // string: Unique identifier for the agent
+    entrypointTag,  // string: Tag identifying the entry point
+    local,          // bool: Whether running locally
+    host,           // string: Host address
+    port,           // int: Port number
+)
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agentID` | `string` | Unique identifier for the agent instance |
+| `entrypointTag` | `string` | Tag that identifies the specific entry point to use |
+| `local` | `bool` | Set to `true` for local development, `false` for remote |
+| `host` | `string` | Host address (e.g., "localhost", "api.runagent.dev") |
+| `port` | `int` | Port number for the connection |
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    // Create client with local development settings
+    agentClient, err := client.NewWithAddress(
+        "f285ecb8-a2fc-4b9c-840d-1795386b84cd", // agentID
+        "autogen_invoke",                       // entrypointTag
+        true,                                   // local
+        "localhost",                            // host
+        8453,                                   // port
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer agentClient.Close()
+
+    // Create context with timeout
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    // Run the agent with task parameters
+    result, err := agentClient.Run(ctx, map[string]interface{}{
+        "task": "what is autogen",
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+## Key Features
+
+### Context Management
+
+The client supports Go's context package for timeout and cancellation:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+defer cancel()
+```
+
+### Task Parameters
+
+Tasks are submitted as `map[string]interface{}` allowing flexible parameter passing:
+
+```go
+result, err := agentClient.Run(ctx, map[string]interface{}{
+    "task": "what is autogen",
+    "options": map[string]string{
+        "format": "json",
+        "verbose": "true",
+    },
+})
+```
+
+### Resource Management
+
+Always ensure proper cleanup of resources:
+
+```go
+defer agentClient.Close()
+```
+
+## Error Handling
+
+The client provides detailed error information for common failure scenarios:
+
+- **Connection errors**: Network connectivity issues
+- **Timeout errors**: Task execution exceeding context timeout
+- **Agent errors**: Issues with agent execution or invalid parameters
+
+```go
+result, err := agentClient.Run(ctx, params)
+if err != nil {
+    log.Printf("Agent execution failed: %v", err)
+    // Handle error appropriately
+    return
+}
+```
+
+## Configuration Examples
+
+### Local Development
+
+```go
+agentClient, err := client.NewWithAddress(
+    "your-agent-id",
+    "your-entrypoint",
+    true,           // local = true
+    "localhost",
+    8453,
+)
+```
+
+### Production Environment
+
+```go
+agentClient, err := client.NewWithAddress(
+    "your-agent-id",
+    "your-entrypoint",
+    false,                    // local = false
+    "api.runagent.dev",      // production host
+    443,                     // HTTPS port
+)
+```
+
+## Best Practices
+
+1. **Always use context with timeouts** to prevent hanging operations
+2. **Defer client cleanup** to ensure resources are properly released
+3. **Handle errors appropriately** and provide meaningful error messages
+4. **Use structured logging** for better debugging and monitoring
+5. **Validate parameters** before sending to the agent
+
+## Common Issues
+
+### Connection Failures
+
+Ensure the RunAgent service is running and accessible at the specified host and port.
+
+### Timeout Errors
+
+Increase the context timeout for longer-running tasks:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+```
+
+### Invalid Parameters
+
+Verify that the task parameters match what the agent expects:
+
+```go
+// Ensure parameter types are correct
+params := map[string]interface{}{
+    "task": "string value",
+    "count": 42,           // int
+    "enabled": true,       // bool
+}
+```
+
+## API Reference
+
+### Client Methods
+
+#### `NewWithAddress(agentID, entrypointTag string, local bool, host string, port int) (*Client, error)`
+
+Creates a new client instance with the specified connection parameters.
+
+#### `Run(ctx context.Context, params map[string]interface{}) (interface{}, error)`
+
+Executes a task on the agent with the given parameters and returns the result.
+
+#### `Close() error`
+
+Closes the client connection and cleans up resources.
+
+---
+
+For more information and advanced usage patterns, refer to the official RunAgent documentation.
