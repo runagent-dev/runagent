@@ -2,6 +2,7 @@
 import click
 
 from . import commands
+from .agent_builder import agent_builder
 
 
 @click.group()
@@ -21,5 +22,7 @@ runagent.add_command(commands.serve)
 runagent.add_command(commands.run)
 runagent.add_command(commands.delete)
 runagent.add_command(commands.db) 
+runagent.add_command(agent_builder)
+
 if __name__ == "__main__":
     runagent()
