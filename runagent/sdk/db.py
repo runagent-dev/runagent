@@ -450,7 +450,7 @@ class DBService:
                 session.add(invocation)
                 session.commit()
                 
-                console.print(f"🚀 [cyan]Started invocation: Invocation ID = {invocation_id}...[/cyan]")
+                console.print(f"🚀 [cyan]Started invocation: Invocation ID = {invocation_id}[/cyan]")
                 return invocation_id
                 
             except Exception as e:

@@ -59,7 +59,7 @@ use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let agent_id = "69605c0d-0e62-4980-80e6-b3f7b2cbba49";
+    let agent_id = "d8dad1cc-5b7c-4894-9feb-a346553e585f";
     
     let constraints = json!([{"type": "budget", "value": 100, "priority": "high"}]);
     let user_context = json!({"experience_level": "beginner"});
