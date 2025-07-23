@@ -48,7 +48,7 @@ async fn review_code_stream(Json(request): Json<ReviewRequest>) -> Sse<ReceiverS
         println!("🌊 Starting streaming review for {} code", request.language.as_deref().unwrap_or("unknown"));
         
         // Connect to RunAgent - REPLACE "YOUR_AGENT_ID_HERE" with your actual agent ID
-        let client = match RunAgentClient::new("355a44e4-c7a0-483b-85c8-80d9b676e293", "code_review_stream", true).await {
+        let client = match RunAgentClient::new("e826280e-82df-4e83-8e4c-a5d47bbfaf29", "code_review_stream", true).await {
             Ok(client) => client,
             Err(e) => {
                 let _ = tx.send(Ok(axum::response::sse::Event::default()
