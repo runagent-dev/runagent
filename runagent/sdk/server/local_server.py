@@ -420,7 +420,7 @@ class LocalServer:
             )(self.create_endpoint_handler_with_tracking(runner, self.agent_id, entrypoint.tag))
 
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
-        """ENHANCED - Create endpoint handler with invocation tracking"""
+        """ENHANCED - Create endpoint handler with invocation tracking and FIXED serialization"""
         async def run_agent(request: AgentRunRequest):
             """Run a deployed agent with full invocation tracking"""
             
@@ -457,12 +457,35 @@ class LocalServer:
                 execution_time = time.time() - start_time
                 execution_success = True
 
-                # Complete invocation tracking with success
-                self.db_service.complete_invocation(
-                    invocation_id=invocation_id,
-                    output_data=result_data,
-                    execution_time_ms=execution_time * 1000  # Convert to milliseconds
-                )
+                # FIXED: Complete invocation tracking with success and proper serialization
+                try:
+                    # Convert result_data to serializable format
+                    serializable_output = self._convert_to_serializable(result_data)
+                    
+                    self.db_service.complete_invocation(
+                        invocation_id=invocation_id,
+                        output_data=serializable_output,
+                        execution_time_ms=execution_time * 1000  # Convert to milliseconds
+                    )
+                    console.print(f"✅ [green]Invocation tracking completed successfully[/green]")
+                    
+                except Exception as e:
+                    console.print(f"❌ [red]Failed to complete invocation tracking: {str(e)}[/red]")
+                    # Try with minimal safe data
+                    try:
+                        self.db_service.complete_invocation(
+                            invocation_id=invocation_id,
+                            output_data={
+                                "execution_completed": True,
+                                "result_type": str(type(result_data)),
+                                "result_length": len(str(result_data)) if result_data else 0,
+                                "serialization_note": f"Could not serialize result: {str(e)}"
+                            },
+                            execution_time_ms=execution_time * 1000
+                        )
+                        console.print(f"✅ [green]Invocation tracking completed with safe fallback[/green]")
+                    except Exception as e2:
+                        console.print(f"❌ [red]Critical: Could not complete invocation tracking: {str(e2)}[/red]")
 
                 # Record in original agent_runs table for backward compatibility
                 self.db_service.record_agent_run(
@@ -516,6 +539,53 @@ class LocalServer:
                 )
         
         return run_agent
+
+    def _convert_to_serializable(self, obj):
+        """Convert objects to JSON-serializable format"""
+        try:
+            # Try direct JSON serialization first
+            import json
+            json.dumps(obj)
+            return obj
+        except (TypeError, ValueError):
+            # Handle common non-serializable objects
+            if hasattr(obj, '__dict__'):
+                # Objects with __dict__ (like ChatResult, TextEvent, etc.)
+                return {
+                    "type": type(obj).__name__,
+                    "data": {k: self._convert_to_serializable(v) for k, v in obj.__dict__.items()}
+                }
+            elif hasattr(obj, '_asdict'):
+                # Named tuples
+                return {
+                    "type": type(obj).__name__,
+                    "data": obj._asdict()
+                }
+            elif hasattr(obj, 'dict'):
+                # Pydantic models (v1)
+                try:
+                    return obj.dict()
+                except:
+                    return {"type": type(obj).__name__, "repr": repr(obj)[:500]}
+            elif hasattr(obj, 'model_dump'):
+                # Pydantic models (v2)
+                try:
+                    return obj.model_dump()
+                except:
+                    return {"type": type(obj).__name__, "repr": repr(obj)[:500]}
+            elif isinstance(obj, (list, tuple)):
+                # Handle lists/tuples recursively
+                return [self._convert_to_serializable(item) for item in obj]
+            elif isinstance(obj, dict):
+                # Handle dictionaries recursively
+                return {k: self._convert_to_serializable(v) for k, v in obj.items()}
+            else:
+                # Fallback to string representation
+                return {
+                    "type": type(obj).__name__,
+                    "repr": repr(obj)[:500],  # Limit length
+                    "str": str(obj)[:500]     # Limit length
+                }
 
     def _setup_websocket_routes(self):
         """Setup WebSocket routes with invocation tracking"""
