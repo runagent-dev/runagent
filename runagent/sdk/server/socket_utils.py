@@ -233,7 +233,7 @@ class AgentWebSocketHandler:
         invocation_id: str,
         db_service
     ):
-        """NEW METHOD - Enhanced stream start with invocation tracking"""
+        """NEW METHOD - Enhanced stream start with invocation tracking and FIXED serialization"""
         start_time = time.time()
         chunk_count = 0
         stream_output_data = []
@@ -273,9 +273,24 @@ class AgentWebSocketHandler:
                 chunk_count += 1
                 self.active_streams[connection_id]["chunk_count"] = chunk_count
                 
-                # Store chunk for final output tracking
-                if chunk_count <= 100:  # Limit stored chunks to prevent memory issues
-                    stream_output_data.append(chunk)
+                # FIXED: Convert chunk to serializable format before storing
+                try:
+                    # Use our serializer to convert the chunk to a safe format
+                    serializable_chunk = self._convert_to_serializable(chunk)
+                    
+                    # Store chunk for final output tracking (limit to prevent memory issues)
+                    if chunk_count <= 100:
+                        stream_output_data.append(serializable_chunk)
+                    
+                except Exception as e:
+                    console.print(f"⚠️ [yellow]Warning: Could not serialize chunk {chunk_count}: {e}[/yellow]")
+                    # Store a safe representation
+                    stream_output_data.append({
+                        "chunk_number": chunk_count,
+                        "serialization_error": str(e),
+                        "chunk_type": str(type(chunk)),
+                        "chunk_preview": str(chunk)[:100] + "..." if len(str(chunk)) > 100 else str(chunk)
+                    })
                 
                 raw_data_msg = SafeMessage(
                     id="raw_chunk",
@@ -301,17 +316,41 @@ class AgentWebSocketHandler:
                 "execution_time": execution_time
             })
             
-            # Complete invocation tracking with success
-            db_service.complete_invocation(
-                invocation_id=invocation_id,
-                output_data={
-                    "stream_completed": True,
-                    "total_chunks": chunk_count,
-                    "sample_chunks": stream_output_data[:10] if stream_output_data else [],  # Store first 10 chunks
-                    "execution_time_seconds": execution_time
-                },
-                execution_time_ms=execution_time * 1000
-            )
+            # FIXED: Complete invocation tracking with success and safe serialization
+            try:
+                db_service.complete_invocation(
+                    invocation_id=invocation_id,
+                    output_data={
+                        "stream_completed": True,
+                        "total_chunks": chunk_count,
+                        "sample_chunks": stream_output_data[:10] if stream_output_data else [],  # Store first 10 chunks
+                        "execution_time_seconds": execution_time,
+                        "chunk_summary": {
+                            "total_chunks": chunk_count,
+                            "stored_samples": min(len(stream_output_data), 10),
+                            "stream_type": "websocket"
+                        }
+                    },
+                    execution_time_ms=execution_time * 1000
+                )
+                console.print(f"✅ [green]Invocation tracking completed successfully[/green]")
+            except Exception as e:
+                console.print(f"❌ [red]Failed to complete invocation tracking: {str(e)}[/red]")
+                # Try to complete with minimal data
+                try:
+                    db_service.complete_invocation(
+                        invocation_id=invocation_id,
+                        output_data={
+                            "stream_completed": True,
+                            "total_chunks": chunk_count,
+                            "execution_time_seconds": execution_time,
+                            "serialization_note": "Some chunks could not be serialized"
+                        },
+                        execution_time_ms=execution_time * 1000
+                    )
+                    console.print(f"✅ [green]Invocation tracking completed with minimal data[/green]")
+                except Exception as e2:
+                    console.print(f"❌ [red]Critical: Could not complete invocation tracking: {str(e2)}[/red]")
             
             # Record in original agent_runs table for backward compatibility
             self.db_service.record_agent_run(
@@ -354,6 +393,46 @@ class AgentWebSocketHandler:
         
         finally:
             self._cleanup_stream(connection_id)
+
+    def _convert_to_serializable(self, obj):
+        """Convert objects to JSON-serializable format"""
+        try:
+            # Try direct JSON serialization first
+            json.dumps(obj)
+            return obj
+        except (TypeError, ValueError):
+            # Handle common non-serializable objects
+            if hasattr(obj, '__dict__'):
+                # Objects with __dict__ (like TextEvent)
+                return {
+                    "type": type(obj).__name__,
+                    "data": {k: self._convert_to_serializable(v) for k, v in obj.__dict__.items()}
+                }
+            elif hasattr(obj, '_asdict'):
+                # Named tuples
+                return {
+                    "type": type(obj).__name__,
+                    "data": obj._asdict()
+                }
+            elif hasattr(obj, 'dict'):
+                # Pydantic models
+                try:
+                    return obj.dict()
+                except:
+                    return {"type": type(obj).__name__, "repr": repr(obj)}
+            elif hasattr(obj, 'model_dump'):
+                # Pydantic v2 models
+                try:
+                    return obj.model_dump()
+                except:
+                    return {"type": type(obj).__name__, "repr": repr(obj)}
+            else:
+                # Fallback to string representation
+                return {
+                    "type": type(obj).__name__,
+                    "repr": repr(obj)[:500],  # Limit length
+                    "str": str(obj)[:500]     # Limit length
+                }
     
     async def _safe_agent_stream(self, agent_execution_streamer, *input_args, **input_kwargs):
         """UNCHANGED - Safely wrap the agent's generic_stream method"""
