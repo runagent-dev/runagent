@@ -1,0 +1,27 @@
+{
+  "agent_name": "simple_translation_agent",
+  "description": "A simple agent to translate text based on a specified language parameter and input text.",
+  "framework": "langchain",
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-07-23T21:48:23.225718",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/langchain/default",
+    "author": "runagent-builder"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "translate",
+        "tag": "text_translation"
+      },
+      {
+        "file": "main.py",
+        "module": "translate_stream",
+        "tag": "text_translation_stream"
+      }
+    ]
+  }
+}
