@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 # Assuming you're using the runagent Rust SDK
-runagent = { path = "/home/riamdriad5/runagent/runagent/runagent/rust_sdk/runagent" }
+runagent = { path = "/home/riamdriad5/runagent/runagent/runagent-rust/runagent" }
 
 # Required dependencies
 tokio = { version = "1.0", features = ["full"] }

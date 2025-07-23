@@ -95,6 +95,7 @@
                   "cli/commands/serve",
                   "cli/commands/deploy",
                   "cli/commands/run",
+                  "cli/commands/db",
                   "cli/commands/upload",
                   "cli/commands/start",
                   "cli/commands/setup",

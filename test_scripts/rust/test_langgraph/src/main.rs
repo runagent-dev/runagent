@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ******************************Streaming Part with LangChain****************************************
+// ******************************Streaming Part with Langgraph****************************************
 
 
 use runagent::client::RunAgentClient;
@@ -59,7 +59,7 @@ use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let agent_id = "758f3ed9-4867-469a-bbdd-6e83eddb5a4d";
+    let agent_id = "d8dad1cc-5b7c-4894-9feb-a346553e585f";
     
     let constraints = json!([{"type": "budget", "value": 100, "priority": "high"}]);
     let user_context = json!({"experience_level": "beginner"});

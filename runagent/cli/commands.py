@@ -1033,13 +1033,188 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         raise click.ClickException(f"Execution failed: {e}")
 
 
-@click.command()
+# @click.command()
+# @click.option("--cleanup-days", type=int, help="Clean up records older than N days")
+# @click.option("--agent-id", help="Show detailed info for specific agent")
+# @click.option("--capacity", is_flag=True, help="Show detailed capacity information")
+# def db_status(cleanup_days, agent_id, capacity):
+#     """Show local database status and statistics"""
+
+#     try:
+#         sdk = RunAgent()
+
+#         if capacity:
+#             # Show detailed capacity info
+#             capacity_info = sdk.db_service.get_database_capacity_info()
+
+#             console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
+#             console.print(
+#                 f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents"
+#             )
+#             console.print(
+#                 f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]"
+#             )
+
+#             status = "🔴 FULL" if capacity_info.get("is_full") else "🟢 Available"
+#             console.print(f"Status: {status}")
+
+#             agents = capacity_info.get("agents", [])
+#             if agents:
+#                 console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
+                
+#                 # Create table for agents
+#                 table = Table(title="Agents by Deployment Age")
+#                 table.add_column("#", style="dim", width=3)
+#                 table.add_column("Status", width=6)
+#                 table.add_column("Agent ID", style="magenta", width=20)
+#                 table.add_column("Framework", style="green", width=12)
+#                 table.add_column("Deployed At", style="cyan", width=20)
+#                 table.add_column("Age Note", style="yellow", width=10)
+                
+#                 for i, agent in enumerate(agents):
+#                     status_icon = (
+#                         "🟢"
+#                         if agent["status"] == "deployed"
+#                         else "🔴" if agent["status"] == "error" else "🟡"
+#                     )
+#                     age_label = (
+#                         "oldest"
+#                         if i == 0
+#                         else "newest" if i == len(agents) - 1 else ""
+#                     )
+                    
+#                     table.add_row(
+#                         str(i+1),
+#                         status_icon,
+#                         agent['agent_id'][:18] + "...",
+#                         agent['framework'],
+#                         agent['deployed_at'] or "Unknown",
+#                         age_label
+#                     )
+                
+#                 console.print(table)
+
+#             if capacity_info.get("is_full"):
+#                 oldest = capacity_info.get("oldest_agent", {})
+#                 console.print(
+#                     f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]"
+#                 )
+#                 console.print(
+#                     f"   [cyan]runagent serve --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]"
+#                 )
+#                 console.print(
+#                     f"   [cyan]runagent delete --id {oldest.get('agent_id', '')}[/cyan]"
+#                 )
+
+#             return
+
+#         if agent_id:
+#             # ... (keep existing agent_id specific logic unchanged)
+#             result = sdk.get_agent_info(agent_id, local=True)
+#             # ... rest of the existing code for this section
+#             return
+
+#         # Show general database stats
+#         stats = sdk.db_service.get_database_stats()
+#         capacity_info = sdk.db_service.get_database_capacity_info()
+
+#         console.print("\n📊 [bold]Local Database Status[/bold]")
+
+#         current_count = capacity_info.get("current_count", 0)
+#         is_full = capacity_info.get("is_full", False)
+#         status = "FULL" if is_full else "OK"
+#         console.print(
+#             f"Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red])"
+#             if is_full
+#             else f"Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])"
+#         )
+
+#         console.print(f"Total Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
+#         console.print(
+#             f"Database Size: [yellow]{stats.get('database_size_mb', 0)} MB[/yellow]"
+#         )
+#         console.print(
+#             f"Database Path: [blue]{stats.get('database_path', 'Unknown')}[/blue]"
+#         )
+
+#         # Show agent status breakdown
+#         status_counts = stats.get("agent_status_counts", {})
+#         if status_counts:
+#             console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
+#             for status, count in status_counts.items():
+#                 console.print(f"  [cyan]{status}[/cyan]: {count}")
+
+#         # CHANGED: List agents in table format instead of simple list
+#         agents = sdk.db_service.list_agents()
+
+#         if agents:
+#             console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
+            
+#             # Create table for better formatting
+#             table = Table(title=f"Local Agents ({len(agents)} total)")
+#             table.add_column("Status", width=8)
+#             table.add_column("Files", width=6)
+#             table.add_column("Agent ID", style="magenta", width=20)
+#             table.add_column("Framework", style="green", width=12)
+#             table.add_column("Host:Port", style="blue", width=15)
+#             table.add_column("Runs", style="cyan", width=6)
+#             table.add_column("Status", style="yellow", width=10)
+            
+#             for agent in agents:
+#                 status_icon = (
+#                     "🟢"
+#                     if agent["status"] == "deployed"
+#                     else "🔴" if agent["status"] == "error" else "🟡"
+#                 )
+#                 exists_icon = "📁" if agent.get("exists") else "❌"
+                
+#                 table.add_row(
+#                     status_icon,
+#                     exists_icon,
+#                     agent['agent_id'][:18] + "...",
+#                     agent['framework'],
+#                     f"{agent.get('host', 'N/A')}:{agent.get('port', 'N/A')}",
+#                     str(agent.get('run_count', 0)),
+#                     agent['status']
+#                 )
+            
+#             console.print(table)
+
+#             console.print(f"\n💡 Use [cyan]--agent-id <id>[/cyan] for detailed info")
+#             console.print(
+#                 f"💡 Use [cyan]--capacity[/cyan] for capacity management info"
+#             )
+
+#         # Cleanup if requested (keep existing logic)
+#         if cleanup_days:
+#             console.print(f"\n🧹 Cleaning up records older than {cleanup_days} days...")
+#             cleanup_result = sdk.cleanup_local_database(cleanup_days)
+#             if cleanup_result.get("success"):
+#                 console.print(f"✅ [green]{cleanup_result.get('message')}[/green]")
+#             else:
+#                 console.print(f"❌ [red]{cleanup_result.get('error')}[/red]")
+
+#     except Exception as e:
+#         if os.getenv('DISABLE_TRY_CATCH'):
+#             raise
+#         console.print(f"❌ [red]Database status error:[/red] {e}")
+#         raise click.ClickException("Failed to get database status")
+
+
+# Replace the individual invocation commands with this grouped approach
+# in your runagent/cli/commands.py file
+
+@click.group()
+def db():
+    """Database management and monitoring commands"""
+    pass
+
+@db.command()
 @click.option("--cleanup-days", type=int, help="Clean up records older than N days")
 @click.option("--agent-id", help="Show detailed info for specific agent")
 @click.option("--capacity", is_flag=True, help="Show detailed capacity information")
-def db_status(cleanup_days, agent_id, capacity):
-    """Show local database status and statistics"""
-
+def status(cleanup_days, agent_id, capacity):
+    """Show local database status and statistics (ENHANCED with invocation stats)"""
     try:
         sdk = RunAgent()
 
@@ -1109,9 +1284,21 @@ def db_status(cleanup_days, agent_id, capacity):
             return
 
         if agent_id:
-            # ... (keep existing agent_id specific logic unchanged)
+            # Show agent-specific details including invocations
             result = sdk.get_agent_info(agent_id, local=True)
-            # ... rest of the existing code for this section
+            if result.get("success"):
+                agent_data = result["agent_info"]
+                console.print(f"\n🔍 [bold]Agent Details: {agent_id}[/bold]")
+                console.print(f"Framework: [green]{agent_data.get('framework')}[/green]")
+                console.print(f"Status: [yellow]{agent_data.get('status')}[/yellow]")
+                console.print(f"Path: [blue]{agent_data.get('deployment_path')}[/blue]")
+                
+                # Show agent-specific invocation stats
+                agent_inv_stats = sdk.db_service.get_invocation_stats(agent_id=agent_id)
+                console.print(f"\n📊 [bold]Invocation Statistics for {agent_id}[/bold]")
+                console.print(f"Total: [cyan]{agent_inv_stats.get('total_invocations', 0)}[/cyan]")
+                console.print(f"Success Rate: [blue]{agent_inv_stats.get('success_rate', 0)}%[/blue]")
+                
             return
 
         # Show general database stats
@@ -1124,18 +1311,33 @@ def db_status(cleanup_days, agent_id, capacity):
         is_full = capacity_info.get("is_full", False)
         status = "FULL" if is_full else "OK"
         console.print(
-            f"Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red])"
+            f"Agent Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red])"
             if is_full
-            else f"Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])"
+            else f"Agent Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])"
         )
 
-        console.print(f"Total Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
+        console.print(f"Total Agent Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
         console.print(
             f"Database Size: [yellow]{stats.get('database_size_mb', 0)} MB[/yellow]"
         )
-        console.print(
-            f"Database Path: [blue]{stats.get('database_path', 'Unknown')}[/blue]"
-        )
+
+        # NEW: Show invocation statistics
+        overall_stats = sdk.db_service.get_invocation_stats()
+        
+        console.print(f"\n📊 [bold]Invocation Statistics[/bold]")
+        console.print(f"Total Invocations: [cyan]{overall_stats.get('total_invocations', 0)}[/cyan]")
+        console.print(f"Completed: [green]{overall_stats.get('completed_invocations', 0)}[/green]")
+        console.print(f"Failed: [red]{overall_stats.get('failed_invocations', 0)}[/red]")
+        console.print(f"Pending: [yellow]{overall_stats.get('pending_invocations', 0)}[/yellow]")
+        console.print(f"Success Rate: [blue]{overall_stats.get('success_rate', 0)}%[/blue]")
+        
+        if overall_stats.get('avg_execution_time_ms'):
+            avg_time = overall_stats['avg_execution_time_ms']
+            if avg_time < 1000:
+                time_display = f"{avg_time:.1f}ms"
+            else:
+                time_display = f"{avg_time/1000:.2f}s"
+            console.print(f"Average Execution Time: [cyan]{time_display}[/cyan]")
 
         # Show agent status breakdown
         status_counts = stats.get("agent_status_counts", {})
@@ -1144,7 +1346,7 @@ def db_status(cleanup_days, agent_id, capacity):
             for status, count in status_counts.items():
                 console.print(f"  [cyan]{status}[/cyan]: {count}")
 
-        # CHANGED: List agents in table format instead of simple list
+        # List agents in table format
         agents = sdk.db_service.list_agents()
 
         if agents:
@@ -1180,10 +1382,20 @@ def db_status(cleanup_days, agent_id, capacity):
             
             console.print(table)
 
-            console.print(f"\n💡 Use [cyan]--agent-id <id>[/cyan] for detailed info")
-            console.print(
-                f"💡 Use [cyan]--capacity[/cyan] for capacity management info"
-            )
+        # Show recent invocations
+        recent_invocations = sdk.db_service.list_invocations(limit=5)
+        if recent_invocations:
+            console.print(f"\n📋 [bold]Recent Invocations:[/bold]")
+            for inv in recent_invocations:
+                status_color = "green" if inv['status'] == "completed" else "red" if inv['status'] == "failed" else "yellow"
+                console.print(f"   • {inv['invocation_id'][:12]}... [{status_color}]{inv['status']}[/{status_color}] ({inv.get('entrypoint_tag', 'N/A')})")
+
+        console.print(f"\n💡 [bold]Database Commands:[/bold]")
+        console.print(f"   • [cyan]runagent db invocations[/cyan] - Show all invocations")
+        console.print(f"   • [cyan]runagent db invocation <id>[/cyan] - Show specific invocation")
+        console.print(f"   • [cyan]runagent db cleanup[/cyan] - Clean up old records")
+        console.print(f"   • [cyan]runagent db status --agent-id <id>[/cyan] - Agent-specific info")
+        console.print(f"   • [cyan]runagent db status --capacity[/cyan] - Capacity management info")
 
         # Cleanup if requested (keep existing logic)
         if cleanup_days:
@@ -1199,3 +1411,265 @@ def db_status(cleanup_days, agent_id, capacity):
             raise
         console.print(f"❌ [red]Database status error:[/red] {e}")
         raise click.ClickException("Failed to get database status")
+
+
+@db.command()
+@click.option("--agent-id", help="Filter by specific agent ID")
+@click.option("--status", type=click.Choice(["pending", "completed", "failed"]), help="Filter by status")
+@click.option("--limit", type=int, default=20, help="Maximum number of invocations to show")
+@click.option("--format", "output_format", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def invocations(agent_id, status, limit, output_format):
+    """Show agent invocation history and statistics"""
+    try:
+        sdk = RunAgent()
+        
+        # Get invocations
+        invocations_list = sdk.db_service.list_invocations(
+            agent_id=agent_id,
+            status=status,
+            limit=limit
+        )
+        
+        if output_format == "json":
+            console.print(json.dumps(invocations_list, indent=2))
+            return
+        
+        if not invocations_list:
+            console.print("📭 [yellow]No invocations found[/yellow]")
+            if agent_id:
+                console.print(f"   • Agent ID: {agent_id}")
+            if status:
+                console.print(f"   • Status: {status}")
+            return
+        
+        # Show statistics first
+        if agent_id:
+            stats = sdk.db_service.get_invocation_stats(agent_id=agent_id)
+        else:
+            stats = sdk.db_service.get_invocation_stats()
+        
+        console.print(f"\n📊 [bold]Invocation Statistics[/bold]")
+        if agent_id:
+            console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
+        console.print(f"   Total: [cyan]{stats.get('total_invocations', 0)}[/cyan]")
+        console.print(f"   Completed: [green]{stats.get('completed_invocations', 0)}[/green]")
+        console.print(f"   Failed: [red]{stats.get('failed_invocations', 0)}[/red]")
+        console.print(f"   Pending: [yellow]{stats.get('pending_invocations', 0)}[/yellow]")
+        console.print(f"   Success Rate: [blue]{stats.get('success_rate', 0)}%[/blue]")
+        if stats.get('avg_execution_time_ms'):
+            console.print(f"   Avg Execution Time: [cyan]{stats.get('avg_execution_time_ms', 0):.1f}ms[/cyan]")
+        
+        # Show invocations table
+        console.print(f"\n📋 [bold]Recent Invocations (showing {len(invocations_list)} of {limit} max)[/bold]")
+        
+        table = Table(title="Agent Invocations")
+        table.add_column("Invocation", style="dim", width=12)
+        table.add_column("Agent", style="magenta", width=12)
+        table.add_column("Entrypoint", style="green", width=12)
+        table.add_column("Status", width=10)
+        table.add_column("Duration", style="cyan", width=10)
+        table.add_column("Started", style="dim", width=16)
+        table.add_column("SDK", style="yellow", width=10)
+        
+        for inv in invocations_list:
+            # Status with color
+            status_text = inv['status']
+            if status_text == "completed":
+                status_display = f"[green]{status_text}[/green]"
+            elif status_text == "failed":
+                status_display = f"[red]{status_text}[/red]"
+            else:
+                status_display = f"[yellow]{status_text}[/yellow]"
+            
+            # Duration calculation
+            duration_display = "N/A"
+            if inv.get('execution_time_ms'):
+                if inv['execution_time_ms'] < 1000:
+                    duration_display = f"{inv['execution_time_ms']:.0f}ms"
+                else:
+                    duration_display = f"{inv['execution_time_ms']/1000:.1f}s"
+            
+            # Format timestamp
+            started_display = "N/A"
+            if inv.get('request_timestamp'):
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(inv['request_timestamp'].replace('Z', '+00:00'))
+                    started_display = dt.strftime('%m-%d %H:%M:%S')
+                except:
+                    started_display = inv['request_timestamp'][:16]
+            
+            table.add_row(
+                inv['invocation_id'][:8] + "...",
+                inv['agent_id'][:8] + "...",
+                inv.get('entrypoint_tag', 'N/A')[:12],
+                status_display,
+                duration_display,
+                started_display,
+                inv.get('sdk_type', 'unknown')[:10]
+            )
+        
+        console.print(table)
+        
+        # Show usage tips
+        console.print(f"\n💡 [dim]Usage tips:[/dim]")
+        console.print(f"   • View specific invocation: [cyan]runagent db invocation <invocation_id>[/cyan]")
+        console.print(f"   • Filter by agent: [cyan]runagent db invocations --agent-id <agent_id>[/cyan]")
+        console.print(f"   • Filter by status: [cyan]runagent db invocations --status completed[/cyan]")
+        console.print(f"   • JSON output: [cyan]runagent db invocations --format json[/cyan]")
+    
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Error getting invocations:[/red] {e}")
+        raise click.ClickException("Failed to get invocations")
+
+
+@db.command()
+@click.argument("invocation_id")
+@click.option("--format", "output_format", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def invocation(invocation_id, output_format):
+    """Show detailed information about a specific invocation"""
+    try:
+        sdk = RunAgent()
+        
+        invocation = sdk.db_service.get_invocation(invocation_id)
+        
+        if not invocation:
+            console.print(f"❌ [red]Invocation {invocation_id} not found[/red]")
+            
+            # Show available invocations
+            console.print("\n💡 Recent invocations:")
+            recent = sdk.db_service.list_invocations(limit=5)
+            for inv in recent:
+                console.print(f"   • {inv['invocation_id']} ({inv['status']})")
+            
+            raise click.ClickException("Invocation not found")
+        
+        if output_format == "json":
+            console.print(json.dumps(invocation, indent=2))
+            return
+        
+        # Display detailed information
+        console.print(f"\n🔍 [bold]Invocation Details[/bold]")
+        console.print(f"   Invocation ID: [bold magenta]{invocation['invocation_id']}[/bold magenta]")
+        console.print(f"   Agent ID: [bold cyan]{invocation['agent_id']}[/bold cyan]")
+        console.print(f"   Entrypoint: [green]{invocation.get('entrypoint_tag', 'N/A')}[/green]")
+        console.print(f"   SDK Type: [yellow]{invocation.get('sdk_type', 'unknown')}[/yellow]")
+        
+        # Status with color
+        status = invocation['status']
+        if status == "completed":
+            status_display = f"[green]{status}[/green]"
+        elif status == "failed":
+            status_display = f"[red]{status}[/red]"
+        else:
+            status_display = f"[yellow]{status}[/yellow]"
+        console.print(f"   Status: {status_display}")
+        
+        # Timing information
+        console.print(f"\n⏱️ [bold]Timing Information[/bold]")
+        if invocation.get('request_timestamp'):
+            console.print(f"   Started: [cyan]{invocation['request_timestamp']}[/cyan]")
+        if invocation.get('response_timestamp'):
+            console.print(f"   Completed: [cyan]{invocation['response_timestamp']}[/cyan]")
+        if invocation.get('execution_time_ms'):
+            exec_time = invocation['execution_time_ms']
+            if exec_time < 1000:
+                time_display = f"{exec_time:.1f}ms"
+            else:
+                time_display = f"{exec_time/1000:.2f}s"
+            console.print(f"   Duration: [green]{time_display}[/green]")
+        
+        # Input data
+        console.print(f"\n📥 [bold]Input Data[/bold]")
+        if invocation.get('input_data'):
+            input_str = json.dumps(invocation['input_data'], indent=2)
+            if len(input_str) > 500:
+                console.print(f"   [dim]{input_str[:500]}...\n   (truncated - use --format json for full data)[/dim]")
+            else:
+                console.print(f"   [dim]{input_str}[/dim]")
+        else:
+            console.print("   [dim]No input data[/dim]")
+        
+        # Output data or error
+        if invocation['status'] == 'failed' and invocation.get('error_detail'):
+            console.print(f"\n❌ [bold red]Error Details[/bold red]")
+            console.print(f"   [red]{invocation['error_detail']}[/red]")
+        elif invocation.get('output_data'):
+            console.print(f"\n📤 [bold]Output Data[/bold]")
+            output_str = json.dumps(invocation['output_data'], indent=2)
+            if len(output_str) > 500:
+                console.print(f"   [dim]{output_str[:500]}...\n   (truncated - use --format json for full data)[/dim]")
+            else:
+                console.print(f"   [dim]{output_str}[/dim]")
+        
+        # Client info
+        if invocation.get('client_info'):
+            console.print(f"\n🔧 [bold]Client Information[/bold]")
+            client_str = json.dumps(invocation['client_info'], indent=2)
+            console.print(f"   [dim]{client_str}[/dim]")
+        
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Error getting invocation details:[/red] {e}")
+        raise click.ClickException("Failed to get invocation details")
+
+
+@db.command()
+@click.option("--days", type=int, default=30, help="Clean up invocations older than N days")
+@click.option("--agent-runs", is_flag=True, help="Also clean up old agent_runs records")
+@click.option("--yes", is_flag=True, help="Skip confirmation")
+def cleanup(days, agent_runs, yes):
+    """Clean up old database records"""
+    try:
+        sdk = RunAgent()
+        
+        # Get count of records to be cleaned
+        all_invocations = sdk.db_service.list_invocations(limit=1000)
+        
+        # Filter by date (simple approximation for preview)
+        from datetime import datetime, timedelta
+        cutoff_date = datetime.now() - timedelta(days=days)
+        
+        old_invocations_count = len([
+            inv for inv in all_invocations 
+            if inv.get('request_timestamp') and 
+            datetime.fromisoformat(inv['request_timestamp'].replace('Z', '+00:00')) < cutoff_date
+        ])
+        
+        console.print(f"🧹 [yellow]Cleanup Preview (older than {days} days):[/yellow]")
+        console.print(f"   • Invocations: {old_invocations_count} records")
+        
+        if agent_runs:
+            console.print(f"   • Agent runs: Will be cleaned too")
+        
+        if old_invocations_count == 0:
+            console.print(f"✅ [green]No records found older than {days} days[/green]")
+            return
+        
+        if not yes:
+            if not click.confirm(f"⚠️ This will permanently delete {old_invocations_count} invocation records. Continue?"):
+                console.print("Cleanup cancelled.")
+                return
+        
+        # Perform cleanup
+        deleted_invocations = sdk.db_service.cleanup_old_invocations(days_old=days)
+        
+        console.print(f"✅ [green]Cleaned up {deleted_invocations} old invocation records[/green]")
+        
+        if agent_runs:
+            deleted_runs = sdk.cleanup_local_database(days)
+            if deleted_runs.get("success"):
+                console.print(f"✅ [green]Also cleaned up old agent runs[/green]")
+        
+        # Show updated stats
+        stats = sdk.db_service.get_invocation_stats()
+        console.print(f"📊 Remaining invocations: [cyan]{stats.get('total_invocations', 0)}[/cyan]")
+    
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Error cleaning up records:[/red] {e}")
+        raise click.ClickException("Cleanup failed")
