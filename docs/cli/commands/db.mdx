@@ -1,0 +1,188 @@
+---
+title: 'runagent local db'
+description: 'Deploy agent locally in your own sqlite database'
+---
+
+
+## Description
+
+
+The `db` command group provides database management and monitoring capabilities for local agent deployments. It includes tools for viewing invocation history, analyzing performance metrics, and maintaining database health.
+
+## Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `status` | Show database status and agent information |
+| `invocations` | List agent invocation history |
+| `invocation` | View detailed invocation information |
+| `cleanup` | Clean up old database records |
+
+## `runagent db status`
+
+Shows comprehensive database status including agent capacity, invocation statistics, and recent activity.
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--agent-id` | Show details for specific agent | None |
+| `--capacity` | Show detailed capacity information | `false` |
+| `--cleanup-days` | Clean up records older than N days | None |
+
+### Examples
+
+```bash
+# Show general database status
+runagent db status
+
+# Show capacity management details
+runagent db status --capacity
+
+# Show agent-specific information
+runagent db status --agent-id abc123def456
+```
+
+## `runagent db invocations`
+
+Lists agent invocation history with filtering and formatting options.
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--agent-id` | Filter by specific agent | None |
+| `--status` | Filter by status (pending/completed/failed) | None |
+| `--limit` | Maximum number of results | `20` |
+| `--format` | Output format (table/json) | `table` |
+
+### Examples
+
+```bash
+# Show recent invocations
+runagent db invocations
+
+# Filter by agent and status
+runagent db invocations --agent-id abc123 --status completed
+
+# Get JSON output for analysis
+runagent db invocations --format json --limit 50
+```
+
+## `runagent db invocation`
+
+Displays detailed information about a specific invocation including input/output data, timing, and error details.
+
+### Arguments
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `invocation_id` | Full or partial invocation ID | Yes |
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--format` | Output format (table/json) | `table` |
+
+### Examples
+
+```bash
+# View invocation details
+runagent db invocation bb3c7a39-c582-4243-a913
+
+# Get JSON output
+runagent db invocation bb3c7a39 --format json
+```
+
+## `runagent db cleanup`
+
+Removes old database records to maintain performance and reduce storage usage.
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--days` | Remove records older than N days | `30` |
+| `--agent-runs` | Also clean old agent_runs table | `false` |
+| `--yes` | Skip confirmation prompt | `false` |
+
+### Examples
+
+```bash
+# Clean up records older than 30 days
+runagent db cleanup
+
+# Clean up records older than 7 days
+runagent db cleanup --days 7
+
+# Clean up with no confirmation
+runagent db cleanup --days 14 --yes
+```
+
+## Common Use Cases
+
+### Monitor Agent Performance
+
+```bash
+# Check overall health
+runagent db status
+
+# View recent activity
+runagent db invocations --limit 10
+
+# Check for errors
+runagent db invocations --status failed
+```
+
+### Debug Failed Invocations
+
+```bash
+# Find failed invocations
+runagent db invocations --status failed
+
+# Get detailed error information
+runagent db invocation <failed_invocation_id>
+```
+
+### Analyze Agent Usage
+
+```bash
+# View agent-specific metrics
+runagent db status --agent-id your_agent_id
+
+# Export data for analysis
+runagent db invocations --format json > invocations.json
+```
+
+### Database Maintenance
+
+```bash
+# Check capacity status
+runagent db status --capacity
+
+# Clean up old records
+runagent db cleanup --days 30 --agent-runs
+```
+
+## Database Schema
+
+The database tracks the following key information:
+
+- **Agents**: Deployed agent metadata and statistics
+- **Invocations**: Detailed execution records with timing and I/O data
+- **Agent Runs**: Legacy execution tracking (maintained for compatibility)
+
+Each invocation includes:
+- Unique invocation ID
+- Input/output data
+- Execution timing
+- Error details (if failed)
+- SDK type and client information
+
+## Notes
+
+- All timestamps are in ISO format
+- JSON output can be piped to files for further analysis
+- Cleanup operations are irreversible - use with caution
+- Database is automatically created when first agent is deployed
