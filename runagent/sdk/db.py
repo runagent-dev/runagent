@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -34,7 +35,7 @@ Base = declarative_base()
 
 
 class Agent(Base):
-    """Agent model"""
+    """Agent model - UNCHANGED to maintain SDK compatibility"""
 
     __tablename__ = "agents"
 
@@ -54,9 +55,12 @@ class Agent(Base):
         DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
 
-    # Relationship
+    # Relationships
     runs = relationship(
         "AgentRun", back_populates="agent", cascade="all, delete-orphan"
+    )
+    invocations = relationship(
+        "AgentInvocation", back_populates="agent", cascade="all, delete-orphan"
     )
 
     # Indexes
@@ -64,7 +68,7 @@ class Agent(Base):
 
 
 class AgentRun(Base):
-    """Agent run model"""
+    """Agent run model - UNCHANGED to maintain compatibility"""
 
     __tablename__ = "agent_runs"
 
@@ -89,6 +93,46 @@ class AgentRun(Base):
         Index("idx_agent_runs_started_at", "started_at"),
     )
 
+
+class AgentInvocation(Base):
+    """NEW: Agent invocation tracking table"""
+
+    __tablename__ = "agent_invocations"
+
+    # Primary fields
+    invocation_id = Column(String, primary_key=True)  # UUID for each invocation
+    agent_id = Column(
+        String, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=False
+    )
+    
+    # Input/Output tracking
+    input_data = Column(Text, nullable=False)  # JSON serialized input
+    output_data = Column(Text, nullable=True)  # JSON serialized output
+    error_detail = Column(Text, nullable=True)  # Error details if failed
+    
+    # Timing tracking
+    request_timestamp = Column(DateTime, nullable=False, default=func.current_timestamp())
+    response_timestamp = Column(DateTime, nullable=True)
+    execution_time_ms = Column(Float, nullable=True)  # Execution time in milliseconds
+    
+    # Status tracking
+    status = Column(String, nullable=False, default="pending")  # pending, completed, failed
+    
+    # Additional metadata
+    entrypoint_tag = Column(String, nullable=True)  # Which entrypoint was called
+    sdk_type = Column(String, nullable=True)  # cli, python-sdk, etc.
+    client_info = Column(Text, nullable=True)  # JSON with client details
+    
+    # Relationship
+    agent = relationship("Agent", back_populates="invocations")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_invocations_agent_id", "agent_id"),
+        Index("idx_invocations_request_timestamp", "request_timestamp"),
+        Index("idx_invocations_status", "status"),
+        Index("idx_invocations_agent_status", "agent_id", "status"),  # Composite index
+    )
 
 class DBManager:
     """Low-level database manager for SQLAlchemy operations"""
@@ -365,6 +409,381 @@ class DBService:
             ),
             "rest_client_configured": self.rest_client is not None,
         }
+
+    def start_invocation(
+        self,
+        agent_id: str,
+        input_data: Dict[str, Any],
+        entrypoint_tag: str = None,
+        sdk_type: str = "unknown",
+        client_info: Dict[str, Any] = None
+    ) -> str:
+        """
+        Start a new agent invocation and return invocation_id
+        
+        Args:
+            agent_id: ID of the agent being invoked
+            input_data: Input data for the invocation
+            entrypoint_tag: Which entrypoint is being called
+            sdk_type: Type of SDK (cli, python-sdk, etc.)
+            client_info: Additional client information
+            
+        Returns:
+            invocation_id: Unique ID for this invocation
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                # Generate unique invocation ID
+                invocation_id = str(uuid.uuid4())
+                
+                # Create invocation record
+                invocation = AgentInvocation(
+                    invocation_id=invocation_id,
+                    agent_id=agent_id,
+                    input_data=json.dumps(input_data),
+                    entrypoint_tag=entrypoint_tag,
+                    sdk_type=sdk_type,
+                    client_info=json.dumps(client_info) if client_info else None,
+                    status="pending"
+                )
+                
+                session.add(invocation)
+                session.commit()
+                
+                console.print(f"🚀 [cyan]Started invocation: {invocation_id[:8]}...[/cyan]")
+                return invocation_id
+                
+            except Exception as e:
+                session.rollback()
+                console.print(f"❌ [red]Failed to start invocation: {e}[/red]")
+                raise
+
+    def complete_invocation(
+        self,
+        invocation_id: str,
+        output_data: Any = None,
+        error_detail: str = None,
+        execution_time_ms: float = None
+    ) -> bool:
+        """
+        Complete an agent invocation with results
+        
+        Args:
+            invocation_id: ID of the invocation to complete
+            output_data: Output data from the invocation (if successful)
+            error_detail: Error details (if failed)
+            execution_time_ms: Execution time in milliseconds
+            
+        Returns:
+            bool: True if update successful
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                # Find the invocation
+                invocation = session.query(AgentInvocation).filter(
+                    AgentInvocation.invocation_id == invocation_id
+                ).first()
+                
+                if not invocation:
+                    console.print(f"⚠️ [yellow]Invocation {invocation_id} not found[/yellow]")
+                    return False
+                
+                # Update invocation with results
+                invocation.response_timestamp = func.current_timestamp()
+                invocation.execution_time_ms = execution_time_ms
+                
+                if error_detail:
+                    invocation.status = "failed"
+                    invocation.error_detail = error_detail
+                    console.print(f"❌ [red]Completed invocation {invocation_id[:8]}... with error[/red]")
+                else:
+                    invocation.status = "completed"
+                    invocation.output_data = json.dumps(output_data) if output_data else None
+                    console.print(f"✅ [green]Completed invocation {invocation_id[:8]}... successfully[/green]")
+                
+                session.commit()
+                return True
+                
+            except Exception as e:
+                session.rollback()
+                console.print(f"❌ [red]Failed to complete invocation: {e}[/red]")
+                return False
+
+    def get_invocation(self, invocation_id: str) -> Optional[Dict]:
+        """Get invocation details by ID"""
+        with self.db_manager.get_session() as session:
+            try:
+                invocation = session.query(AgentInvocation).filter(
+                    AgentInvocation.invocation_id == invocation_id
+                ).first()
+                
+                if not invocation:
+                    return None
+                
+                return {
+                    "invocation_id": invocation.invocation_id,
+                    "agent_id": invocation.agent_id,
+                    "input_data": json.loads(invocation.input_data) if invocation.input_data else None,
+                    "output_data": json.loads(invocation.output_data) if invocation.output_data else None,
+                    "error_detail": invocation.error_detail,
+                    "request_timestamp": invocation.request_timestamp.isoformat() if invocation.request_timestamp else None,
+                    "response_timestamp": invocation.response_timestamp.isoformat() if invocation.response_timestamp else None,
+                    "execution_time_ms": invocation.execution_time_ms,
+                    "status": invocation.status,
+                    "entrypoint_tag": invocation.entrypoint_tag,
+                    "sdk_type": invocation.sdk_type,
+                    "client_info": json.loads(invocation.client_info) if invocation.client_info else None,
+                }
+                
+            except Exception as e:
+                console.print(f"Error getting invocation: {e}")
+                return None
+
+    def list_invocations(
+        self, 
+        agent_id: str = None, 
+        status: str = None, 
+        limit: int = 50,
+        order_by: str = "request_timestamp"
+    ) -> List[Dict]:
+        """List invocations with optional filtering"""
+        with self.db_manager.get_session() as session:
+            try:
+                query = session.query(AgentInvocation)
+                
+                # Apply filters
+                if agent_id:
+                    query = query.filter(AgentInvocation.agent_id == agent_id)
+                if status:
+                    query = query.filter(AgentInvocation.status == status)
+                
+                # Apply ordering
+                if order_by == "request_timestamp":
+                    query = query.order_by(desc(AgentInvocation.request_timestamp))
+                elif order_by == "response_timestamp":
+                    query = query.order_by(desc(AgentInvocation.response_timestamp))
+                
+                # Apply limit
+                invocations = query.limit(limit).all()
+                
+                return [
+                    {
+                        "invocation_id": inv.invocation_id,
+                        "agent_id": inv.agent_id,
+                        "input_data": json.loads(inv.input_data) if inv.input_data else None,
+                        "output_data": json.loads(inv.output_data) if inv.output_data else None,
+                        "error_detail": inv.error_detail,
+                        "request_timestamp": inv.request_timestamp.isoformat() if inv.request_timestamp else None,
+                        "response_timestamp": inv.response_timestamp.isoformat() if inv.response_timestamp else None,
+                        "execution_time_ms": inv.execution_time_ms,
+                        "status": inv.status,
+                        "entrypoint_tag": inv.entrypoint_tag,
+                        "sdk_type": inv.sdk_type,
+                        "client_info": json.loads(inv.client_info) if inv.client_info else None,
+                    }
+                    for inv in invocations
+                ]
+                
+            except Exception as e:
+                console.print(f"Error listing invocations: {e}")
+                return []
+
+    def get_invocation_stats(self, agent_id: str = None) -> Dict:
+        """Get invocation statistics"""
+        with self.db_manager.get_session() as session:
+            try:
+                query = session.query(AgentInvocation)
+                if agent_id:
+                    query = query.filter(AgentInvocation.agent_id == agent_id)
+                
+                # Basic counts
+                total_invocations = query.count()
+                completed_invocations = query.filter(AgentInvocation.status == "completed").count()
+                failed_invocations = query.filter(AgentInvocation.status == "failed").count()
+                pending_invocations = query.filter(AgentInvocation.status == "pending").count()
+                
+                # Calculate success rate
+                success_rate = (completed_invocations / total_invocations * 100) if total_invocations > 0 else 0
+                
+                # Average execution time
+                avg_execution_time = None
+                if completed_invocations > 0:
+                    avg_result = session.query(func.avg(AgentInvocation.execution_time_ms)).filter(
+                        AgentInvocation.status == "completed"
+                    )
+                    if agent_id:
+                        avg_result = avg_result.filter(AgentInvocation.agent_id == agent_id)
+                    avg_execution_time = avg_result.scalar()
+                
+                return {
+                    "total_invocations": total_invocations,
+                    "completed_invocations": completed_invocations,
+                    "failed_invocations": failed_invocations,
+                    "pending_invocations": pending_invocations,
+                    "success_rate": round(success_rate, 2),
+                    "avg_execution_time_ms": round(avg_execution_time, 2) if avg_execution_time else None,
+                    "agent_id": agent_id,
+                }
+                
+            except Exception as e:
+                console.print(f"Error getting invocation stats: {e}")
+                return {}
+
+    def cleanup_old_invocations(self, days_old: int = 30) -> int:
+        """Clean up old invocation records"""
+        with self.db_manager.get_session() as session:
+            try:
+                cutoff_date = datetime.now() - timedelta(days=days_old)
+                deleted_count = (
+                    session.query(AgentInvocation)
+                    .filter(AgentInvocation.request_timestamp < cutoff_date)
+                    .delete()
+                )
+                session.commit()
+                console.print(f"🧹 [green]Cleaned up {deleted_count} old invocations[/green]")
+                return deleted_count
+            except Exception as e:
+                session.rollback()
+                console.print(f"Error cleaning up old invocations: {e}")
+                return 0
+
+
+    def _load_system_constraints(self) -> Dict[str, Any]:
+        """Load system deployment constraints and resource limits"""
+        # Obfuscated calculation to make default limit less obvious
+        tier_multiplier = 0x1  # Base tier
+        resource_factor = int("101", 2)  # Convert binary string to int (5)
+
+        # Calculate deployment limits based on system architecture
+        base_limit = resource_factor  # This gives us 5
+        deployment_ceiling = base_limit  # Keep it as 5
+
+        # Apply enterprise scaling factor (no-op in this case)
+        enterprise_modifier = lambda x: x
+        final_limit = enterprise_modifier(deployment_ceiling)
+
+        return {
+            "max_concurrent_instances": final_limit,
+            "resource_tier": "standard",
+            "allocation_strategy": "fixed_pool",
+        }
+
+    def _get_default_limit(self) -> int:
+        """Get the default agent limit (obfuscated calculation)"""
+        return self._deployment_config["max_concurrent_instances"]
+
+    def _should_check_api_before_adding(self, current_count: int) -> bool:
+        """Determine if we should check API before adding an agent"""
+        default_limit = self._get_default_limit()
+
+        # Only check API if we're at or exceeding default limits
+        return current_count >= default_limit
+
+    def _check_enhanced_limits_with_fallback(self) -> Dict:
+        """
+        Check enhanced limits via RestClient API with fallback to default limits
+
+        Returns:
+            Dictionary with limit information
+        """
+        # Check cache first (5 minutes cache)
+        if (
+            self._limits_cache
+            and self._cache_expiry
+            and datetime.now() < self._cache_expiry
+        ):
+            return self._limits_cache
+
+        default_limit = self._get_default_limit()
+
+        # If no RestClient available, use default limits
+        if not self.rest_client:
+            result = {
+                "limit": default_limit,
+                "enhanced": False,
+                "source": "default",
+                "api_available": False,
+                "api_validated": False,
+                "error": "No RestClient configured",
+            }
+            return result
+
+        try:
+            console.print("🔍 [dim]Checking enhanced limits via API...[/dim]")
+
+            # Use RestClient to get limits
+            limits_data = self.rest_client.get_local_db_limits()
+
+            if limits_data.get("success"):
+                max_agents = limits_data.get("max_agents", default_limit)
+                enhanced = limits_data.get("enhanced_limits", False)
+
+                # Handle unlimited case
+                if max_agents == -1:
+                    max_agents = 999  # Practical unlimited
+                    enhanced = True
+
+                result = {
+                    "limit": max_agents,
+                    "enhanced": enhanced,
+                    "source": "api" if enhanced else "default",
+                    "api_available": True,
+                    "api_validated": limits_data.get("api_validated", False),
+                    "tier_info": limits_data.get("tier_info", {}),
+                    "features": limits_data.get("features", []),
+                    "expires_at": limits_data.get("expires_at"),
+                    "unlimited": max_agents == 999,
+                }
+
+                # Cache for 5 minutes
+                self._limits_cache = result
+                self._cache_expiry = datetime.now() + timedelta(minutes=5)
+
+                if enhanced:
+                    console.print(
+                        f"🔑 [green]Enhanced limits active: {max_agents} agents[/green]"
+                    )
+                else:
+                    console.print(
+                        f"🔑 [yellow]Using default limits: {max_agents} agents[/yellow]"
+                    )
+
+                return result
+
+            else:
+                # API call failed, use default limits
+                error_msg = limits_data.get("error", "Unknown API error")
+                result = {
+                    "limit": default_limit,
+                    "enhanced": False,
+                    "source": "default",
+                    "api_available": True,
+                    "api_validated": limits_data.get("api_validated", False),
+                    "error": error_msg,
+                }
+
+                console.print(
+                    f"[yellow]⚠️ API limit check failed: {error_msg} - using default limits[/yellow]"
+                )
+                return result
+
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            # Exception during API call, fallback to default
+            result = {
+                "limit": default_limit,
+                "enhanced": False,
+                "source": "default",
+                "api_available": False,
+                "api_validated": False,
+                "error": f"API check exception: {str(e)}",
+            }
+
+            console.print(
+                f"[red]❌ Error checking enhanced limits: {str(e)} - using default limits[/red]"
+            )
+            return result
 
     def add_agent(
         self,

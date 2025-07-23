@@ -1,4 +1,4 @@
-# runagent/server/local_server.py
+# runagent/sdk/server/local_server.py
 import json
 import os
 import subprocess
@@ -31,7 +31,7 @@ console = Console()
 
 
 class LocalServer:
-    """FastAPI-based local server for testing deployed agents"""
+    """FastAPI-based local server for testing deployed agents - ENHANCED with invocation tracking"""
 
     def __init__(
         self,
@@ -77,13 +77,11 @@ class LocalServer:
         self._setup_websocket_routes()
         self._setup_routes()
 
-
-
     def _setup_fastapi_app(self):
         """Setup FastAPI app"""
         app = FastAPI(
             title=f"RunAgent API - {self.agent_name}",
-            description=f"Agend ID: {self.agent_id}",
+            description=f"Agent ID: {self.agent_id}",
             version=self.agent_version,
         )
 
@@ -103,11 +101,13 @@ class LocalServer:
         req_txt_path = self.agent_path / "requirements.txt"
         if req_txt_path.exists():
             try:
+                console.print(f"📦 Installing dependencies from {req_txt_path}")
                 _ = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "-r", req_txt_path],
                     capture_output=False,  # Shows output directly
                     check=True,
                 )
+                console.print("✅ Dependencies installed successfully")
             except subprocess.CalledProcessError as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
                     raise
@@ -292,10 +292,6 @@ class LocalServer:
             console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
             console.print(f"🔌 [green]Allocated address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
             
-            if framework == "letta":
-                console.print(f"🤖 [yellow]Letta agent will be created when first called[/yellow]")
-                console.print(f"💡 [dim]Make sure Letta server is running: letta server[/dim]")
-            
             return LocalServer(
                 agent_path=agent_path,
                 agent_id=agent_id,
@@ -305,7 +301,7 @@ class LocalServer:
             )
 
     def _setup_routes(self):
-        """Setup FastAPI routes"""
+        """Setup FastAPI routes - ENHANCED with invocation tracking"""
 
         @self.app.get("/api/v1", response_model=AgentInfo)
         async def home():
@@ -322,7 +318,9 @@ class LocalServer:
                     endpoints={
                         "GET /": "Agent info",
                         "GET /health": "Health check",
-                        "POST /api/v1/agents/{agent_id}/run": "Run an agent",
+                        "POST /api/v1/agents/{agent_id}/execute/{entrypoint}": "Execute agent",
+                        "GET /api/v1/agents/{agent_id}/invocations": "Get invocation history",
+                        "GET /api/v1/agents/{agent_id}/invocations/stats": "Get invocation stats",
                     },
                 )
 
@@ -341,16 +339,75 @@ class LocalServer:
                 "timestamp": datetime.now().isoformat(),
                 "uptime_seconds": time.time() - self.start_time,
                 "version": "1.0.0",
+                "agent_id": self.agent_id,
+                "agent_name": self.agent_name,
+                "framework": self.agent_framework,
             }
+        
         @self.app.get(f"/api/v1/agents/{self.agent_id}/architecture")
         async def get_agent_architecture():
-            """Health check endpoint"""
+            """Get agent architecture endpoint"""
             return {
                 "agent_id": self.agent_id,
-                "entrypoints": self.agent_config.agent_architecture.entrypoints
+                "entrypoints": [ep.dict() for ep in self.agent_config.agent_architecture.entrypoints]
             }
 
-        # Then in your loop:
+        # NEW: Invocation history endpoints
+        @self.app.get(f"/api/v1/agents/{self.agent_id}/invocations")
+        async def get_agent_invocations(limit: int = 50, status: str = None):
+            """Get invocation history for this agent"""
+            try:
+                invocations = self.db_service.list_invocations(
+                    agent_id=self.agent_id,
+                    status=status,
+                    limit=limit
+                )
+                return {
+                    "agent_id": self.agent_id,
+                    "invocations": invocations,
+                    "total_count": len(invocations)
+                }
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to get invocations: {str(e)}",
+                )
+
+        @self.app.get(f"/api/v1/agents/{self.agent_id}/invocations/stats")
+        async def get_agent_invocation_stats():
+            """Get invocation statistics for this agent"""
+            try:
+                stats = self.db_service.get_invocation_stats(agent_id=self.agent_id)
+                return {
+                    "agent_id": self.agent_id,
+                    "stats": stats
+                }
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to get invocation stats: {str(e)}",
+                )
+
+        @self.app.get("/api/v1/invocations/{invocation_id}")
+        async def get_invocation_details(invocation_id: str):
+            """Get details of a specific invocation"""
+            try:
+                invocation = self.db_service.get_invocation(invocation_id)
+                if not invocation:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Invocation {invocation_id} not found"
+                    )
+                return invocation
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to get invocation: {str(e)}",
+                )
+
+        # Setup dynamic entrypoint routes with invocation tracking
         for entrypoint in self.agent_architecture.entrypoints:
             if entrypoint.tag.endswith("_stream"):
                 continue
@@ -360,24 +417,54 @@ class LocalServer:
             self.app.post(
                 f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}",
                 response_model=AgentRunResponse
-            )(self.create_endpoint_handler(runner, self.agent_id))
+            )(self.create_endpoint_handler_with_tracking(runner, self.agent_id, entrypoint.tag))
 
-    def create_endpoint_handler(self, runner, agent_id):
+    def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
+        """ENHANCED - Create endpoint handler with invocation tracking"""
         async def run_agent(request: AgentRunRequest):
-            """Run a deployed agent"""
+            """Run a deployed agent with full invocation tracking"""
+            
+            # Start invocation tracking
+            invocation_id = self.db_service.start_invocation(
+                agent_id=agent_id,
+                input_data={
+                    "input_args": request.input_data.input_args,
+                    "input_kwargs": request.input_data.input_kwargs
+                },
+                entrypoint_tag=entrypoint_tag,
+                sdk_type="local_server",
+                client_info={
+                    "server_host": self.host,
+                    "server_port": self.port,
+                    "agent_name": self.agent_name,
+                    "agent_framework": self.agent_framework
+                }
+            )
+
             start_time = time.time()
+            execution_success = False
+            error_detail = None
+            result_data = None
 
             try:
-                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan]")
+                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan] (invocation: {invocation_id[:8]}...)")
 
-                result = await runner(
+                result_data = await runner(
                     *request.input_data.input_args, **request.input_data.input_kwargs
                 )
 
-                result_str = self.serializer.serialize_object(result)
+                result_str = self.serializer.serialize_object(result_data)
                 execution_time = time.time() - start_time
+                execution_success = True
 
-                # Record successful run in database
+                # Complete invocation tracking with success
+                self.db_service.complete_invocation(
+                    invocation_id=invocation_id,
+                    output_data=result_data,
+                    execution_time_ms=execution_time * 1000  # Convert to milliseconds
+                )
+
+                # Record in original agent_runs table for backward compatibility
                 self.db_service.record_agent_run(
                     agent_id=agent_id,
                     input_data=request.input_data,
@@ -388,7 +475,7 @@ class LocalServer:
 
                 console.print(
                     f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
-                    f"{execution_time:.2f}s"
+                    f"{execution_time:.2f}s (invocation: {invocation_id[:8]}...)"
                 )
 
                 return AgentRunResponse(
@@ -402,81 +489,55 @@ class LocalServer:
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
                     raise
-                error_msg = f"Server error running agent {agent_id}: {str(e)}"
+                error_detail = f"Server error running agent {agent_id}: {str(e)}"
                 execution_time = time.time() - start_time
 
-                # Record failed run in database
+                # Complete invocation tracking with error
+                self.db_service.complete_invocation(
+                    invocation_id=invocation_id,
+                    error_detail=error_detail,
+                    execution_time_ms=execution_time * 1000  # Convert to milliseconds
+                )
+
+                # Record in original agent_runs table for backward compatibility
                 self.db_service.record_agent_run(
                     agent_id=agent_id,
                     input_data=request.input_data,
                     output_data=None,
                     success=False,
-                    error_message=error_msg,
+                    error_message=error_detail,
                     execution_time=execution_time,
                 )
 
-                console.print(f"💥 [red]{error_msg}[/red]")
+                console.print(f"💥 [red]{error_detail}[/red] (invocation: {invocation_id[:8]}...)")
 
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_msg
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail
                 )
         
         return run_agent
 
-    # def _setup_websocket_routes(self):
-    #     """Add WebSocket routes to your existing FastAPI app"""
-    #     for entrypoint in self.agent_architecture.entrypoints:
-
-    #         if not entrypoint.tag.endswith("_stream"):
-    #             continue
-
-    #         stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
-
-    #         @self.app.websocket("/api/v1/agents/{agent_id}" + f"/execute/{entrypoint.tag}")
-    #         async def run_agent_stream(websocket: WebSocket, agent_id: str):
-    #             """WebSocket endpoint for agent streaming"""
-    #             await self.websocket_handler.handle_agent_stream(
-    #                 websocket, agent_id, stream_runner
-    #             )
-
-    # def create_websocket_handler(self, stream_runner, entrypoint_tag):
-    #     async def run_agent_stream(websocket: WebSocket, agent_id: str):
-    #         """WebSocket endpoint for agent streaming"""
-    #         await self.websocket_handler.handle_agent_stream(
-    #             websocket, agent_id, stream_runner
-    #         )
-    #     return run_agent_stream
-
-    # def _setup_websocket_routes(self):
-    #     """Add WebSocket routes to your existing FastAPI app"""
-
-    #     for entrypoint in self.agent_architecture.entrypoints:
-    #         if not entrypoint.tag.endswith("_stream"):
-    #             continue
-
-    #         stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
-            
-    #         self.app.websocket(
-    #             f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}"
-    #         )(self.create_websocket_handler(stream_runner, entrypoint.tag))
-            
     def _setup_websocket_routes(self):
+        """Setup WebSocket routes with invocation tracking"""
         for entrypoint in self.agent_architecture.entrypoints:
             if not entrypoint.tag.endswith("_stream"):
                 continue
 
             stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
 
-            # Create a separate function for each entrypoint
-            def make_websocket_handler(runner):  # ← Factory function
-                @self.app.websocket(f"/api/v1/agents/{self.agent_id}/execute/{entrypoint.tag}")
+            # Create a separate function for each entrypoint with invocation tracking
+            def make_websocket_handler_with_tracking(runner, entrypoint_tag):  # Factory function
+                @self.app.websocket(f"/api/v1/agents/{self.agent_id}/execute/{entrypoint_tag}")
                 async def websocket_endpoint(websocket: WebSocket, agent_id: str = self.agent_id):
-                    await self.websocket_handler.handle_agent_stream(websocket, agent_id, runner)
+                    await self.websocket_handler.handle_agent_stream_with_tracking(
+                        websocket, agent_id, runner, entrypoint_tag, self.db_service
+                    )
                 return websocket_endpoint
             
-            make_websocket_handler(stream_runner)
+            make_websocket_handler_with_tracking(stream_runner, entrypoint.tag)
 
     def extract_endpoints(self):
+        """Extract all endpoints from the FastAPI app"""
         endpoints = []
 
         for route in self.app.routes:
@@ -541,6 +602,11 @@ class LocalServer:
             # Print agent ID
             console.print(f"🆔 Agent ID: [bold magenta]{self.agent_id}[/bold magenta]")
 
+            # NEW: Print invocation tracking info
+            console.print(f"📊 Invocation tracking: [green]ENABLED[/green]")
+            console.print(f"   • View stats: [cyan]GET /api/v1/agents/{self.agent_id}/invocations/stats[/cyan]")
+            console.print(f"   • View history: [cyan]GET /api/v1/agents/{self.agent_id}/invocations[/cyan]")
+
             # Start uvicorn server
             uvicorn.run(
                 self.app,
@@ -575,14 +641,15 @@ class LocalServer:
         return {
             "host": self.host,
             "port": self.port,
-            "deployments_dir": str(self.deployments_dir.absolute()),
             "url": f"http://{self.host}:{self.port}",
             "docs_url": f"http://{self.host}:{self.port}/docs",
             "status": "running",
             "server_type": "FastAPI",
+            "agent_id": self.agent_id,
+            "agent_name": self.agent_name,
+            "agent_framework": self.agent_framework,
+            "invocation_tracking": True,
         }
-
-
 
     def _ensure_agent_in_database(self):
         """Ensure regular agent is in database"""
@@ -651,3 +718,9 @@ class LocalServer:
             
         except Exception as e:
             console.print(f"⚠️ Could not update Letta agent ID in database: {e}")
+
+    def __repr__(self):
+        return f"LocalServer(agent_id='{self.agent_id}', host='{self.host}', port={self.port})"
+
+    def __str__(self):
+        return f"RunAgent Local Server - {self.agent_name} ({self.agent_id}) at http://{self.host}:{self.port}"
