@@ -58,9 +58,18 @@
 
 ## 🎯 What is RunAgent?
 
-RunAgent is a revolutionary platform that solves the **language barrier problem** in AI development. Write your AI agents once in Python using any framework, then access them natively from Rust, JavaScript, Go, or any other language(Python itself) through our comprehensive SDKs. No more REST API complexity, no more language barriers - just seamless AI agent integration across your entire technology stack.
 
-With RunAgent, you get both a powerful local development environment and a clear path to production-scale serverless deployment. Whether you're building a prototype on your laptop or scaling to millions of users, RunAgent provides the infrastructure and tools to deploy your agents seamlessly.
+RunAgent is an **AI Agent Deployment Platform**, built for builders who are **using AI agents to empower/enhance their products**. From development to deployment, RunAgent enables the developer to fully focus on actual agent development, and not care about:
+
+- Deploying AI Agents with powerful **RunAgent CLI** with a simple configuration file.
+- Spinning up a configurable **REST-API and WebSocket server** for your agents with one cli command.
+- **Langugae SDK's** for most major languages, to use the deployed agents.
+ 
+As a result you, the developer gets the freedom to:
+
+* Focus on the agent development and **avoid repeatative process** of implementing REST and Streaming API to use the agents through.
+* Use their developed agent in **any devlopment environment**(Web App, Mobile or Desktop App, Games)
+* Build application with **cross language response streaming**, without even thinking about the complex underlying serialization & deserialization logic.
 
 <div style="width:100%;display:flex;justify-content:center;align-items:center;">
   <a href="https://run-agent.ai/#gh-dark-mode-only" style="flex:1;">
@@ -70,6 +79,9 @@ With RunAgent, you get both a powerful local development environment and a clear
     <img src="./docs/images/runagent_dia_light.jpg" style="width:100%;max-width:900px;" alt="RunAgent Diagram" />
   </a>
 </div>
+
+
+With RunAgent, you get both a powerful local development environment and a clear path to production-scale serverless deployment. Whether you're building a prototype on your laptop or scaling to millions of users, RunAgent provides the infrastructure and tools to deploy your agents seamlessly.
 
 
 ## 📖 Table of Contents
