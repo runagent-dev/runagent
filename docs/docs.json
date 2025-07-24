@@ -182,6 +182,17 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/overview"
+            ]
+          }
+        ]
       }
     ]
   },
