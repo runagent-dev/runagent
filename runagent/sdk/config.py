@@ -132,15 +132,19 @@ class SDKConfig:
     def _test_authentication(self) -> bool:
         """Test authentication with current configuration"""
         try:
-            from .http import EndpointHandler
-
-            handler = EndpointHandler(
+            from .rest_client import RestClient
+            
+            rest_client = RestClient(
                 api_key=self._config.get("api_key"),
                 base_url=self._config.get("base_url"),
             )
-            response = handler.validate_api_key()
+            
+            # Use the validate endpoint specifically
+            response = rest_client._make_request("GET", "/validate")
             return response.get("status") == "success"
-        except Exception:
+            
+        except Exception as e:
+            print(f"Authentication test failed: {e}")
             return False
 
     def is_configured(self) -> bool:
