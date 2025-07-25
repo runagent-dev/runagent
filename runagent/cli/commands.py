@@ -21,9 +21,10 @@ from runagent.client.client import RunAgentClient
 from runagent.sdk.server.local_server import LocalServer
 from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
+from runagent.utils.config import Config
+from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 
 console = Console()
-
 
 @click.command()
 @click.option("--api-key", required=True, help="Your API key")
@@ -46,7 +47,7 @@ def setup(api_key, base_url, force):
             if not click.confirm("Do you want to reconfigure?"):
                 return
 
-        # Configure SDK
+        # Configure SDK - FIXED: Remove validate_auth parameter
         sdk.configure(api_key=api_key, base_url=base_url, save=True)
 
         console.print("✅ [green]Setup completed successfully![/green]")
@@ -59,6 +60,24 @@ def setup(api_key, base_url, force):
             for key, value in user_info.items():
                 console.print(f"   {key}: [cyan]{value}[/cyan]")
 
+        # Show local sync status
+        from runagent.utils.config import Config
+        sync_enabled = Config.get_user_config().get("local_sync_enabled", True)
+        console.print(f"\n🔄 [bold]Local Sync Status:[/bold]")
+        console.print(f"   Middleware Sync: [{'green' if sync_enabled else 'yellow'}]{'Enabled' if sync_enabled else 'Disabled'}[/{'green' if sync_enabled else 'yellow'}]")
+        
+        if sync_enabled:
+            console.print("   📊 Your local agent runs will be synced to middleware")
+        else:
+            console.print("   📊 Local agent runs will only be stored locally")
+            console.print("   💡 Enable sync: [cyan]runagent local-sync --enable[/cyan]")
+        
+        console.print(f"\n💡 [bold]Next Steps:[/bold]")
+        console.print(f"   • Test local agent: [cyan]runagent serve <path>[/cyan]")
+        console.print(f"   • Check sync status: [cyan]runagent local-sync --status[/cyan]")
+        if not sync_enabled:
+            console.print(f"   • Enable middleware sync: [cyan]runagent local-sync --enable[/cyan]")
+
     except AuthenticationError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
@@ -69,7 +88,6 @@ def setup(api_key, base_url, force):
             raise
         console.print(f"❌ [red]Setup error:[/red] {e}")
         raise click.ClickException("Setup failed")
-
 
 @click.command()
 @click.option("--yes", is_flag=True, help="Skip confirmation")
@@ -838,6 +856,41 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
         console.print(f"🌐 URL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
         console.print(f"📖 Docs: [link]http://{allocated_host}:{allocated_port}/docs[/link]")
 
+        try:
+                        
+            sync_service = get_middleware_sync()
+            sync_enabled = sync_service.is_sync_enabled()
+            api_key_set = bool(Config.get_api_key())
+            
+            console.print(f"\n🔄 [bold]Middleware Sync Status:[/bold]")
+            if sync_enabled:
+                console.print(f"   Status: [green]✅ ENABLED[/green]")
+                console.print(f"   📊 Local invocations will sync to middleware")
+                
+                # Test connection
+                try:
+                    test_result = sync_service.test_connection()
+                    if test_result.get("success"):
+                        console.print(f"   Connection: [green]✅ Connected to middleware[/green]")
+                    else:
+                        console.print(f"   Connection: [red]❌ Failed to connect: {test_result.get('error', 'Unknown error')}[/red]")
+                except Exception as e:
+                    console.print(f"   Connection: [red]❌ Connection test failed: {e}[/red]")
+            else:
+                console.print(f"   Status: [yellow]⚠️ DISABLED[/yellow]")
+                if not api_key_set:
+                    console.print(f"   Reason: [yellow]API key not configured[/yellow]")
+                    console.print(f"   💡 Setup: [cyan]runagent setup --api-key <key>[/cyan]")
+                else:
+                    user_disabled = not Config.get_user_config().get("local_sync_enabled", True)
+                    if user_disabled:
+                        console.print(f"   Reason: [yellow]Disabled by user[/yellow]")
+                        console.print(f"   💡 Enable: [cyan]runagent local-sync --enable[/cyan]")
+                console.print(f"   📊 Local invocations will only be stored locally")
+                
+        except Exception as e:
+            console.print(f"[dim]Note: Could not check middleware sync status: {e}[/dim]")
+
         # Start server (this will block)
         server.start(debug=debug)
 
@@ -1032,177 +1085,6 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
             raise
         raise click.ClickException(f"Execution failed: {e}")
 
-
-# @click.command()
-# @click.option("--cleanup-days", type=int, help="Clean up records older than N days")
-# @click.option("--agent-id", help="Show detailed info for specific agent")
-# @click.option("--capacity", is_flag=True, help="Show detailed capacity information")
-# def db_status(cleanup_days, agent_id, capacity):
-#     """Show local database status and statistics"""
-
-#     try:
-#         sdk = RunAgent()
-
-#         if capacity:
-#             # Show detailed capacity info
-#             capacity_info = sdk.db_service.get_database_capacity_info()
-
-#             console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
-#             console.print(
-#                 f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents"
-#             )
-#             console.print(
-#                 f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]"
-#             )
-
-#             status = "🔴 FULL" if capacity_info.get("is_full") else "🟢 Available"
-#             console.print(f"Status: {status}")
-
-#             agents = capacity_info.get("agents", [])
-#             if agents:
-#                 console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
-                
-#                 # Create table for agents
-#                 table = Table(title="Agents by Deployment Age")
-#                 table.add_column("#", style="dim", width=3)
-#                 table.add_column("Status", width=6)
-#                 table.add_column("Agent ID", style="magenta", width=20)
-#                 table.add_column("Framework", style="green", width=12)
-#                 table.add_column("Deployed At", style="cyan", width=20)
-#                 table.add_column("Age Note", style="yellow", width=10)
-                
-#                 for i, agent in enumerate(agents):
-#                     status_icon = (
-#                         "🟢"
-#                         if agent["status"] == "deployed"
-#                         else "🔴" if agent["status"] == "error" else "🟡"
-#                     )
-#                     age_label = (
-#                         "oldest"
-#                         if i == 0
-#                         else "newest" if i == len(agents) - 1 else ""
-#                     )
-                    
-#                     table.add_row(
-#                         str(i+1),
-#                         status_icon,
-#                         agent['agent_id'][:18] + "...",
-#                         agent['framework'],
-#                         agent['deployed_at'] or "Unknown",
-#                         age_label
-#                     )
-                
-#                 console.print(table)
-
-#             if capacity_info.get("is_full"):
-#                 oldest = capacity_info.get("oldest_agent", {})
-#                 console.print(
-#                     f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]"
-#                 )
-#                 console.print(
-#                     f"   [cyan]runagent serve --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]"
-#                 )
-#                 console.print(
-#                     f"   [cyan]runagent delete --id {oldest.get('agent_id', '')}[/cyan]"
-#                 )
-
-#             return
-
-#         if agent_id:
-#             # ... (keep existing agent_id specific logic unchanged)
-#             result = sdk.get_agent_info(agent_id, local=True)
-#             # ... rest of the existing code for this section
-#             return
-
-#         # Show general database stats
-#         stats = sdk.db_service.get_database_stats()
-#         capacity_info = sdk.db_service.get_database_capacity_info()
-
-#         console.print("\n📊 [bold]Local Database Status[/bold]")
-
-#         current_count = capacity_info.get("current_count", 0)
-#         is_full = capacity_info.get("is_full", False)
-#         status = "FULL" if is_full else "OK"
-#         console.print(
-#             f"Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red])"
-#             if is_full
-#             else f"Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])"
-#         )
-
-#         console.print(f"Total Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
-#         console.print(
-#             f"Database Size: [yellow]{stats.get('database_size_mb', 0)} MB[/yellow]"
-#         )
-#         console.print(
-#             f"Database Path: [blue]{stats.get('database_path', 'Unknown')}[/blue]"
-#         )
-
-#         # Show agent status breakdown
-#         status_counts = stats.get("agent_status_counts", {})
-#         if status_counts:
-#             console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
-#             for status, count in status_counts.items():
-#                 console.print(f"  [cyan]{status}[/cyan]: {count}")
-
-#         # CHANGED: List agents in table format instead of simple list
-#         agents = sdk.db_service.list_agents()
-
-#         if agents:
-#             console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
-            
-#             # Create table for better formatting
-#             table = Table(title=f"Local Agents ({len(agents)} total)")
-#             table.add_column("Status", width=8)
-#             table.add_column("Files", width=6)
-#             table.add_column("Agent ID", style="magenta", width=20)
-#             table.add_column("Framework", style="green", width=12)
-#             table.add_column("Host:Port", style="blue", width=15)
-#             table.add_column("Runs", style="cyan", width=6)
-#             table.add_column("Status", style="yellow", width=10)
-            
-#             for agent in agents:
-#                 status_icon = (
-#                     "🟢"
-#                     if agent["status"] == "deployed"
-#                     else "🔴" if agent["status"] == "error" else "🟡"
-#                 )
-#                 exists_icon = "📁" if agent.get("exists") else "❌"
-                
-#                 table.add_row(
-#                     status_icon,
-#                     exists_icon,
-#                     agent['agent_id'][:18] + "...",
-#                     agent['framework'],
-#                     f"{agent.get('host', 'N/A')}:{agent.get('port', 'N/A')}",
-#                     str(agent.get('run_count', 0)),
-#                     agent['status']
-#                 )
-            
-#             console.print(table)
-
-#             console.print(f"\n💡 Use [cyan]--agent-id <id>[/cyan] for detailed info")
-#             console.print(
-#                 f"💡 Use [cyan]--capacity[/cyan] for capacity management info"
-#             )
-
-#         # Cleanup if requested (keep existing logic)
-#         if cleanup_days:
-#             console.print(f"\n🧹 Cleaning up records older than {cleanup_days} days...")
-#             cleanup_result = sdk.cleanup_local_database(cleanup_days)
-#             if cleanup_result.get("success"):
-#                 console.print(f"✅ [green]{cleanup_result.get('message')}[/green]")
-#             else:
-#                 console.print(f"❌ [red]{cleanup_result.get('error')}[/red]")
-
-#     except Exception as e:
-#         if os.getenv('DISABLE_TRY_CATCH'):
-#             raise
-#         console.print(f"❌ [red]Database status error:[/red] {e}")
-#         raise click.ClickException("Failed to get database status")
-
-
-# Replace the individual invocation commands with this grouped approach
-# in your runagent/cli/commands.py file
 
 @click.group()
 def db():
@@ -1673,3 +1555,57 @@ def cleanup(days, agent_runs, yes):
             raise
         console.print(f"❌ [red]Error cleaning up records:[/red] {e}")
         raise click.ClickException("Cleanup failed")
+
+
+@click.command()
+@click.option("--enable", is_flag=True, help="Enable local sync to middleware")
+@click.option("--disable", is_flag=True, help="Disable local sync to middleware")
+@click.option("--status", is_flag=True, help="Show current sync status")
+def local_sync(enable, disable, status):
+    """Manage local data sync to middleware"""
+    try:
+        from runagent.utils.config import Config
+        
+        if enable and disable:
+            raise click.UsageError("Cannot specify both --enable and --disable")
+        
+        if status or (not enable and not disable):
+            # Show current status
+            current_status = Config.get_user_config().get("local_sync_enabled", True)
+            api_key_set = bool(Config.get_api_key())
+            
+            console.print("\n📊 [bold]Local Sync Status[/bold]")
+            console.print(f"   Sync Enabled: [{'green' if current_status else 'red'}]{current_status}[/{'green' if current_status else 'red'}]")
+            console.print(f"   API Key Set: [{'green' if api_key_set else 'red'}]{api_key_set}[/{'green' if api_key_set else 'red'}]")
+            
+            if current_status and api_key_set:
+                console.print("   Status: [green]✅ Local data will sync to middleware[/green]")
+            elif not current_status:
+                console.print("   Status: [yellow]⚠️ Local sync is disabled[/yellow]")
+            elif not api_key_set:
+                console.print("   Status: [yellow]⚠️ API key not configured[/yellow]")
+                console.print("   💡 Run: [cyan]runagent setup --api-key <key>[/cyan]")
+            
+            console.print(f"\n💡 [bold]Commands:[/bold]")
+            console.print(f"   Enable sync:  [cyan]runagent local-sync --enable[/cyan]")
+            console.print(f"   Disable sync: [cyan]runagent local-sync --disable[/cyan]")
+            return
+        
+        if enable:
+            Config.set_user_config("local_sync_enabled", True)
+            console.print("✅ [green]Local sync to middleware enabled[/green]")
+            
+            # Check if API key is set
+            if not Config.get_api_key():
+                console.print("⚠️ [yellow]API key not configured. Run:[/yellow] [cyan]runagent setup --api-key <key>[/cyan]")
+        
+        elif disable:
+            Config.set_user_config("local_sync_enabled", False)
+            console.print("🔕 [yellow]Local sync to middleware disabled[/yellow]")
+            console.print("💡 Your local invocations will still be tracked locally")
+    
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Sync configuration error:[/red] {e}")
+        raise click.ClickException("Sync configuration failed")
