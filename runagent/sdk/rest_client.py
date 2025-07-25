@@ -709,6 +709,59 @@ class RestClient:
                 "error": f"Connection failed: {str(e)}",
             }
 
+
+
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
+        """
+        Make authenticated HTTP request to middleware API (for middleware sync)
+        
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            endpoint: API endpoint path
+            **kwargs: Additional arguments for requests
+            
+        Returns:
+            Response data as dict
+        """
+        if not self.api_key:
+            raise Exception("API key not configured")
+        
+        try:
+            # Convert 'json' kwarg to 'data' to match HttpHandler interface
+            if 'json' in kwargs:
+                kwargs['data'] = kwargs.pop('json')
+            
+            # Use the existing HTTP handler for consistency
+            if method.upper() == "GET":
+                response = self.http.get(endpoint, **kwargs)
+            elif method.upper() == "POST":
+                response = self.http.post(endpoint, **kwargs)
+            elif method.upper() == "PUT":
+                response = self.http.put(endpoint, **kwargs)
+            elif method.upper() == "DELETE":
+                response = self.http.delete(endpoint, **kwargs)
+            elif method.upper() == "PATCH":
+                response = self.http.patch(endpoint, **kwargs)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            # Handle response - check if it's already a dict or a Response object
+            if hasattr(response, 'json') and callable(response.json):
+                return response.json()
+            elif isinstance(response, dict):
+                return response
+            else:
+                # Fallback: try to get json content
+                try:
+                    return response.json()
+                except:
+                    return {"success": False, "error": "Invalid response format"}
+                
+        except (ClientError, ServerError, ConnectionError, AuthenticationError, ValidationError) as e:
+            raise Exception(f"API request failed: {e.message}")
+        except Exception as e:
+            raise Exception(f"Request error: {e}")
+
     def run_agent(
         self,
         agent_id: str,
