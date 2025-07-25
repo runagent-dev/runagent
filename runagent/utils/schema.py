@@ -25,6 +25,7 @@ class EntryPoint(BaseModel):
     )
 
 
+
 class AgentArchitecture(BaseModel):
     """Agent architecture configuration"""
 
