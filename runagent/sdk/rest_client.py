@@ -233,9 +233,14 @@ class RestClient:
         api_prefix: Optional[str] = "/api/v1",
     ):
         """Initialize REST client for middleware server"""
-        self.base_url = base_url or Config.get_base_url()
         self.api_key = api_key or Config.get_api_key()
-        self.base_url = self.base_url.rstrip("/") + api_prefix
+        
+        # Fix base URL construction
+        if base_url:
+            self.base_url = base_url.rstrip("/") + api_prefix
+        else:
+            raw_base_url = Config.get_base_url()
+            self.base_url = raw_base_url.rstrip("/") + api_prefix
 
         # Initialize HTTP handler
         self.http = HttpHandler(api_key=self.api_key, base_url=self.base_url)
@@ -815,3 +820,59 @@ class RestClient:
             self.close()
         except:
             pass
+
+    def debug_connection(self) -> Dict:
+        """Debug middleware connection"""
+        try:
+            print(f"🔍 Debug: Testing connection to {self.base_url}")
+            
+            # Test health endpoint
+            try:
+                response = self.http.get("health", timeout=5)
+                print(f"✅ Health check successful: {response}")
+                health_data = response.json() if hasattr(response, 'json') else response
+                
+                # Test auth validation if API key exists
+                if self.api_key:
+                    try:
+                        auth_response = self.http.get("validate", timeout=5)
+                        print(f"✅ Auth validation successful: {auth_response}")
+                        auth_data = auth_response.json() if hasattr(auth_response, 'json') else auth_response
+                        
+                        return {
+                            "success": True,
+                            "health": health_data,
+                            "auth": auth_data,
+                            "base_url": self.base_url
+                        }
+                    except Exception as auth_e:
+                        print(f"❌ Auth validation failed: {auth_e}")
+                        return {
+                            "success": False,
+                            "health": health_data,
+                            "auth_error": str(auth_e),
+                            "base_url": self.base_url
+                        }
+                else:
+                    return {
+                        "success": True,
+                        "health": health_data,
+                        "auth": "No API key provided",
+                        "base_url": self.base_url
+                    }
+                    
+            except Exception as health_e:
+                print(f"❌ Health check failed: {health_e}")
+                return {
+                    "success": False,
+                    "health_error": str(health_e),
+                    "base_url": self.base_url
+                }
+                
+        except Exception as e:
+            print(f"❌ Connection debug failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "base_url": self.base_url
+            }

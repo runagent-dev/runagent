@@ -1,167 +1,191 @@
-# File: runagent/sdk/middleware_sync.py
-# New file to handle middleware synchronization
+# runagent/sdk/deployment/middleware_sync.py
+# NEW FILE - Create this file
 
-import json
 import time
-from typing import Dict, Any, Optional
+from datetime import datetime
+from typing import Optional, Dict, Any
 from rich.console import Console
-from runagent.utils.config import Config
-from runagent.sdk.rest_client import RestClient
 
 console = Console()
 
 
 class MiddlewareSync:
-    """Service to sync local invocations to middleware"""
+    """Handle synchronization with middleware server"""
     
-    def __init__(self):
-        self.rest_client = None
-        self._initialize_client()
+    def __init__(self, rest_client=None):
+        self.rest_client = rest_client
+        self.enabled = False
+        self._test_connection()
     
-    def _initialize_client(self):
-        """Initialize REST client if API key is available"""
-        api_key = Config.get_api_key()
-        base_url = Config.get_base_url()
-        
-        if api_key and base_url:
-            try:
-                self.rest_client = RestClient(api_key=api_key, base_url=base_url)
-            except Exception as e:
-                console.print(f"[dim]Warning: Could not initialize middleware client: {e}[/dim]")
-                self.rest_client = None
-    
-    def is_sync_enabled(self) -> bool:
-        """Check if sync is enabled and properly configured"""
-        # Check if sync is disabled by user
-        user_config = Config.get_user_config()
-        if not user_config.get("local_sync_enabled", True):
-            return False
-        
-        # Check if API key is available
-        if not Config.get_api_key():
-            return False
-        
-        # Check if client is initialized
-        if not self.rest_client:
-            return False
-        
-        return True
-    
-    def sync_invocation_start(
-        self, 
-        agent_id: str, 
-        input_data: Dict[str, Any], 
-        entrypoint_tag: str,
-        client_info: Dict[str, Any] = None
-    ) -> Optional[str]:
-        """
-        Sync invocation start to middleware
-        
-        Returns:
-            middleware_invocation_id if successful, None otherwise
-        """
-        if not self.is_sync_enabled():
-            return None
-        
+    def _test_connection(self):
+        """Test connection to middleware and set enabled status"""
         try:
-            sync_data = {
+            if not self.rest_client:
+                from runagent.sdk.rest_client import RestClient
+                from runagent.utils.config import Config
+                
+                api_key = Config.get_api_key()
+                if not api_key:
+                    console.print("ℹ️ [dim]No API key configured - middleware sync disabled[/dim]")
+                    return
+                
+                self.rest_client = RestClient()
+            
+            # Test health endpoint
+            response = self.rest_client.http.get("health", timeout=3)
+            if response.status_code == 200:
+                self.enabled = True
+                console.print("✅ [green]Middleware connection verified[/green]")
+            else:
+                console.print(f"⚠️ [yellow]Middleware health check failed: {response.status_code}[/yellow]")
+                
+        except Exception as e:
+            console.print(f"ℹ️ [dim]Middleware sync disabled: {e}[/dim]")
+            self.enabled = False
+    
+    def sync_agent(self, agent_id: str, agent_config, host: str, port: int, agent_path: str) -> bool:
+        """Sync agent information to middleware"""
+        if not self.enabled:
+            return False
+            
+        try:
+            console.print(f"🔄 [cyan]Syncing agent to middleware: {agent_id}[/cyan]")
+            
+            # Prepare agent data
+            agent_data = {
+                "local_agent_id": agent_id,
+                "name": agent_config.agent_name,
+                "framework": agent_config.framework,
+                "version": agent_config.version,
+                "path": str(agent_path),
+                "host": host,
+                "port": port,
+                "entrypoints": [ep.dict() for ep in agent_config.agent_architecture.entrypoints],
+                "status": "running",
+                "sync_timestamp": datetime.utcnow().isoformat()
+            }
+            
+            # Send to middleware
+            response = self.rest_client.http.post(
+                "local-agents", 
+                data=agent_data, 
+                timeout=10
+            )
+            
+            if response.status_code in [200, 201]:
+                result = response.json()
+                action = result.get('action', 'synced')
+                console.print(f"✅ [green]Agent {action} in middleware: {agent_id}[/green]")
+                return True
+            else:
+                console.print(f"⚠️ [yellow]Agent sync failed: {response.status_code} - {response.text}[/yellow]")
+                return False
+                
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Agent sync error: {e}[/yellow]")
+            return False
+    
+    def start_invocation(self, agent_id: str, local_invocation_id: str, 
+                        input_data: Dict[str, Any], entrypoint_tag: str,
+                        client_info: Dict[str, Any]) -> Optional[str]:
+        """Start invocation tracking in middleware"""
+        if not self.enabled:
+            return None
+            
+        try:
+            invocation_data = {
                 "local_agent_id": agent_id,
                 "input_data": input_data,
                 "entrypoint_tag": entrypoint_tag,
                 "source": "local",
                 "sdk_type": "local_server",
-                "client_info": client_info or {},
+                "client_info": {
+                    **client_info,
+                    "local_invocation_id": local_invocation_id,
+                },
                 "local_timestamp": time.time()
             }
             
-            # Call middleware API to create invocation record
-            response = self.rest_client._make_request(
-                "POST", 
-                "/api/v1/local-invocations", 
-                json=sync_data
+            response = self.rest_client.http.post(
+                "local-invocations", 
+                data=invocation_data, 
+                timeout=5
             )
             
-            if response.get("success"):
-                middleware_id = response.get("invocation_id")
-                console.print(f"[dim]🔄 Synced invocation start to middleware: {middleware_id[:8]}...[/dim]")
+            if response.status_code in [200, 201]:
+                result = response.json()
+                middleware_id = result.get("invocation_id")
+                console.print(f"✅ [green]Middleware invocation started: {middleware_id[:8] if middleware_id else 'none'}...[/green]")
                 return middleware_id
-            
+            else:
+                console.print(f"⚠️ [yellow]Middleware invocation start failed: {response.status_code}[/yellow]")
+                return None
+                
         except Exception as e:
-            # Don't fail the main operation if sync fails
-            console.print(f"[dim]⚠️ Failed to sync invocation start: {e}[/dim]")
-        
-        return None
+            console.print(f"⚠️ [yellow]Middleware invocation start error: {e}[/yellow]")
+            return None
     
-    def sync_invocation_complete(
-        self,
-        middleware_invocation_id: str,
-        output_data: Any = None,
-        error_detail: str = None,
-        execution_time_ms: float = None
-    ) -> bool:
-        """
-        Sync invocation completion to middleware
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        if not self.is_sync_enabled() or not middleware_invocation_id:
+    def complete_invocation(self, middleware_invocation_id: str, 
+                          output_data: Optional[Dict[str, Any]] = None,
+                          execution_time_ms: Optional[float] = None,
+                          error_detail: Optional[str] = None) -> bool:
+        """Complete invocation tracking in middleware"""
+        if not self.enabled or not middleware_invocation_id:
             return False
-        
+            
         try:
-            sync_data = {
-                "output_data": output_data,
-                "error_detail": error_detail,
-                "execution_time_ms": execution_time_ms,
+            update_data = {
                 "completed_timestamp": time.time()
             }
             
-            # Call middleware API to update invocation record
-            response = self.rest_client._make_request(
-                "PUT", 
-                f"/api/v1/local-invocations/{middleware_invocation_id}", 
-                json=sync_data
+            if execution_time_ms is not None:
+                update_data["execution_time_ms"] = execution_time_ms
+                
+            if error_detail:
+                update_data["error_detail"] = error_detail
+            elif output_data is not None:
+                update_data["output_data"] = output_data
+            
+            response = self.rest_client.http.put(
+                f"local-invocations/{middleware_invocation_id}", 
+                data=update_data, 
+                timeout=5
             )
             
-            if response.get("success"):
-                console.print(f"[dim]✅ Synced invocation completion to middleware: {middleware_invocation_id[:8]}...[/dim]")
+            if response.status_code == 200:
+                console.print(f"✅ [green]Middleware invocation completed: {middleware_invocation_id[:8]}...[/green]")
                 return True
+            else:
+                console.print(f"⚠️ [yellow]Middleware invocation completion failed: {response.status_code}[/yellow]")
+                return False
+                
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Middleware invocation completion error: {e}[/yellow]")
+            return False
+
+    def remove_agent(self, agent_id: str) -> bool:
+        """Remove agent from middleware when server shuts down"""
+        if not self.enabled:
+            return False
             
-        except Exception as e:
-            # Don't fail the main operation if sync fails
-            console.print(f"[dim]⚠️ Failed to sync invocation completion: {e}[/dim]")
-        
-        return False
-    
-    def test_connection(self) -> Dict[str, Any]:
-        """Test connection to middleware"""
-        if not self.rest_client:
-            return {
-                "success": False,
-                "error": "REST client not initialized. Check API key configuration."
-            }
-        
         try:
-            # Test with a simple ping or health check
-            response = self.rest_client._make_request("GET", "/health")
-            return {
-                "success": True,
-                "middleware_status": response.get("status"),
-                "response": response
-            }
+            response = self.rest_client.http.delete(
+                f"local-agents/{agent_id}", 
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                console.print(f"✅ [green]Agent removed from middleware: {agent_id}[/green]")
+                return True
+            else:
+                console.print(f"⚠️ [yellow]Agent removal failed: {response.status_code}[/yellow]")
+                return False
+                
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            console.print(f"⚠️ [yellow]Agent removal error: {e}[/yellow]")
+            return False
 
-
-# Global instance for easy access
-_middleware_sync = None
 
 def get_middleware_sync() -> MiddlewareSync:
-    """Get global middleware sync instance"""
-    global _middleware_sync
-    if _middleware_sync is None:
-        _middleware_sync = MiddlewareSync()
-    return _middleware_sync
+    """Get a configured middleware sync instance"""
+    return MiddlewareSync()

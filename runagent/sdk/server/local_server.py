@@ -32,7 +32,7 @@ console = Console()
 
 
 class LocalServer:
-    """FastAPI-based local server for testing deployed agents - ENHANCED with invocation tracking"""
+    """FastAPI-based local server for testing deployed agents - ENHANCED with middleware sync"""
 
     def __init__(
         self,
@@ -49,7 +49,6 @@ class LocalServer:
         self.agent_path = agent_path
         self.importer = PackageImporter(verbose=True)
         self.serializer = CoreSerializer(max_size_mb=5.0)
-        self.middleware_sync = get_middleware_sync()
 
         self.agent_config = get_agent_config(agent_path)
 
@@ -72,13 +71,25 @@ class LocalServer:
         # Handle agent setup (simplified - no special Letta handling needed)
         self._ensure_agent_in_database()
 
+        # Initialize middleware sync
+        self.middleware_sync = get_middleware_sync()
+        
+        # Sync agent to middleware if enabled
+        if self.middleware_sync.enabled:
+            self.middleware_sync.sync_agent(
+                self.agent_id, 
+                self.agent_config, 
+                self.host, 
+                self.port, 
+                str(self.agent_path)
+            )
+
         self.websocket_handler = AgentWebSocketHandler(self.db_service)
         self.start_time = time.time()
 
         self.app = self._setup_fastapi_app()
         self._setup_websocket_routes()
         self._setup_routes()
-
     def _setup_fastapi_app(self):
         """Setup FastAPI app"""
         app = FastAPI(
@@ -116,6 +127,217 @@ class LocalServer:
                 raise Exception(
                     f"Failed to install dependencies from {req_txt_path}: {str(e)}"
                 )
+
+    def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
+        """Enhanced endpoint handler with both local and middleware invocation tracking"""
+        async def run_agent(request: AgentRunRequest):
+            """Run a deployed agent with full invocation tracking and middleware sync"""
+            
+            # Start local invocation tracking
+            invocation_id = self.db_service.start_invocation(
+                agent_id=agent_id,
+                input_data={
+                    "input_args": request.input_data.input_args,
+                    "input_kwargs": request.input_data.input_kwargs
+                },
+                entrypoint_tag=entrypoint_tag,
+                sdk_type="local_server",
+                client_info={
+                    "server_host": self.host,
+                    "server_port": self.port,
+                    "agent_name": self.agent_name,
+                    "agent_framework": self.agent_framework
+                }
+            )
+
+            # Start middleware invocation tracking if configured
+            middleware_invocation_id = None
+            try:
+                middleware_invocation_id = await self._start_middleware_invocation(
+                    agent_id, invocation_id, request, entrypoint_tag
+                )
+            except Exception as e:
+                console.print(f"⚠️ [yellow]Middleware invocation tracking failed: {e}[/yellow]")
+
+            start_time = time.time()
+            execution_success = False
+            error_detail = None
+            result_data = None
+
+            try:
+                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan] (local: {invocation_id[:8]}..., middleware: {middleware_invocation_id[:8] if middleware_invocation_id else 'none'}...)")
+
+                result_data = await runner(
+                    *request.input_data.input_args, **request.input_data.input_kwargs
+                )
+
+                result_str = self.serializer.serialize_object(result_data)
+                execution_time = time.time() - start_time
+                execution_success = True
+
+                # Complete local invocation tracking
+                try:
+                    serializable_output = self._convert_to_serializable(result_data)
+                    
+                    self.db_service.complete_invocation(
+                        invocation_id=invocation_id,
+                        output_data=serializable_output,
+                        execution_time_ms=execution_time * 1000
+                    )
+                    console.print(f"✅ [green]Local invocation tracking completed[/green]")
+                    
+                except Exception as e:
+                    console.print(f"❌ [red]Failed to complete local invocation tracking: {str(e)}[/red]")
+
+                # Complete middleware invocation tracking
+                if middleware_invocation_id:
+                    try:
+                        await self._complete_middleware_invocation(
+                            middleware_invocation_id, serializable_output, execution_time * 1000
+                        )
+                        console.print(f"✅ [green]Middleware invocation tracking completed[/green]")
+                    except Exception as e:
+                        console.print(f"⚠️ [yellow]Middleware invocation completion failed: {e}[/yellow]")
+
+                # Record in original agent_runs table for backward compatibility
+                self.db_service.record_agent_run(
+                    agent_id=agent_id,
+                    input_data=request.input_data,
+                    output_data=result_str,
+                    success=True,
+                    execution_time=execution_time,
+                )
+
+                console.print(
+                    f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
+                    f"{execution_time:.2f}s"
+                )
+
+                return AgentRunResponse(
+                    success=True,
+                    output_data=result_str,
+                    error=None,
+                    execution_time=execution_time,
+                    agent_id=agent_id,
+                )
+
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                error_detail = f"Server error running agent {agent_id}: {str(e)}"
+                execution_time = time.time() - start_time
+
+                # Complete local invocation tracking with error
+                self.db_service.complete_invocation(
+                    invocation_id=invocation_id,
+                    error_detail=error_detail,
+                    execution_time_ms=execution_time * 1000
+                )
+
+                # Complete middleware invocation tracking with error
+                if middleware_invocation_id:
+                    try:
+                        await self._complete_middleware_invocation(
+                            middleware_invocation_id, None, execution_time * 1000, error_detail
+                        )
+                    except Exception as e:
+                        console.print(f"⚠️ [yellow]Middleware error tracking failed: {e}[/yellow]")
+
+                # Record in original agent_runs table for backward compatibility
+                self.db_service.record_agent_run(
+                    agent_id=agent_id,
+                    input_data=request.input_data,
+                    output_data=None,
+                    success=False,
+                    error_message=error_detail,
+                    execution_time=execution_time,
+                )
+
+                console.print(f"💥 [red]{error_detail}[/red]")
+
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail
+                )
+        
+        return run_agent
+
+    async def _start_middleware_invocation(self, agent_id, local_invocation_id, request, entrypoint_tag):
+        """Start invocation tracking in middleware"""
+        try:
+            from runagent.sdk.rest_client import RestClient
+            from runagent.utils.config import Config
+            
+            api_key = Config.get_api_key()
+            if not api_key:
+                return None
+
+            rest_client = RestClient()
+            
+            invocation_data = {
+                "local_agent_id": agent_id,
+                "input_data": {
+                    "input_args": request.input_data.input_args,
+                    "input_kwargs": request.input_data.input_kwargs
+                },
+                "entrypoint_tag": entrypoint_tag,
+                "source": "local",
+                "sdk_type": "local_server",
+                "client_info": {
+                    "local_invocation_id": local_invocation_id,
+                    "server_host": self.host,
+                    "server_port": self.port,
+                    "agent_name": self.agent_name,
+                    "agent_framework": self.agent_framework
+                },
+                "local_timestamp": time.time()
+            }
+            
+            response = rest_client.http.post(
+                "local-invocations", 
+                data=invocation_data, 
+                timeout=5
+            )
+            
+            if response.status_code in [200, 201]:
+                result = response.json()
+                return result.get("invocation_id")
+            else:
+                console.print(f"⚠️ [yellow]Middleware invocation start failed: {response.status_code}[/yellow]")
+                return None
+                
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Middleware invocation start error: {e}[/yellow]")
+            return None
+
+    async def _complete_middleware_invocation(self, middleware_invocation_id, output_data, execution_time_ms, error_detail=None):
+        """Complete invocation tracking in middleware"""
+        try:
+            from runagent.sdk.rest_client import RestClient
+            
+            rest_client = RestClient()
+            
+            update_data = {
+                "execution_time_ms": execution_time_ms,
+                "completed_timestamp": time.time()
+            }
+            
+            if error_detail:
+                update_data["error_detail"] = error_detail
+            else:
+                update_data["output_data"] = output_data
+            
+            response = rest_client.http.put(
+                f"local-invocations/{middleware_invocation_id}", 
+                data=update_data, 
+                timeout=5
+            )
+            
+            if response.status_code != 200:
+                console.print(f"⚠️ [yellow]Middleware invocation completion failed: {response.status_code}[/yellow]")
+                
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Middleware invocation completion error: {e}[/yellow]")
+
                 
     @staticmethod
     def from_id(agent_id: str) -> "LocalServer":
@@ -421,166 +643,6 @@ class LocalServer:
                 response_model=AgentRunResponse
             )(self.create_endpoint_handler_with_tracking(runner, self.agent_id, entrypoint.tag))
 
-    def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
-        """ENHANCED - Create endpoint handler with invocation tracking and middleware sync"""
-        async def run_agent(request: AgentRunRequest):
-            """Run a deployed agent with full invocation tracking and middleware sync"""
-            
-            # Start local invocation tracking
-            invocation_id = self.db_service.start_invocation(
-                agent_id=agent_id,
-                input_data={
-                    "input_args": request.input_data.input_args,
-                    "input_kwargs": request.input_data.input_kwargs
-                },
-                entrypoint_tag=entrypoint_tag,
-                sdk_type="local_server",
-                client_info={
-                    "server_host": self.host,
-                    "server_port": self.port,
-                    "agent_name": self.agent_name,
-                    "agent_framework": self.agent_framework
-                }
-            )
-
-            # Start middleware sync if enabled
-            middleware_invocation_id = None
-            if self.middleware_sync.is_sync_enabled():
-                middleware_invocation_id = self.middleware_sync.sync_invocation_start(
-                    agent_id=agent_id,
-                    input_data={
-                        "input_args": request.input_data.input_args,
-                        "input_kwargs": request.input_data.input_kwargs
-                    },
-                    entrypoint_tag=entrypoint_tag,
-                    client_info={
-                        "server_host": self.host,
-                        "server_port": self.port,
-                        "agent_name": self.agent_name,
-                        "agent_framework": self.agent_framework,
-                        "local_invocation_id": invocation_id
-                    }
-                )
-
-            start_time = time.time()
-            execution_success = False
-            error_detail = None
-            result_data = None
-
-            try:
-                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan] (invocation: {invocation_id[:8]}...)")
-
-                result_data = await runner(
-                    *request.input_data.input_args, **request.input_data.input_kwargs
-                )
-
-                result_str = self.serializer.serialize_object(result_data)
-                execution_time = time.time() - start_time
-                execution_success = True
-
-                # Complete local invocation tracking with success
-                try:
-                    serializable_output = self._convert_to_serializable(result_data)
-                    
-                    self.db_service.complete_invocation(
-                        invocation_id=invocation_id,
-                        output_data=serializable_output,
-                        execution_time_ms=execution_time * 1000
-                    )
-                    console.print(f"✅ [green]Local invocation tracking completed successfully[/green]")
-                    
-                except Exception as e:
-                    console.print(f"❌ [red]Failed to complete local invocation tracking: {str(e)}[/red]")
-                    try:
-                        self.db_service.complete_invocation(
-                            invocation_id=invocation_id,
-                            output_data={
-                                "execution_completed": True,
-                                "result_type": str(type(result_data)),
-                                "result_length": len(str(result_data)) if result_data else 0,
-                                "serialization_note": f"Could not serialize result: {str(e)}"
-                            },
-                            execution_time_ms=execution_time * 1000
-                        )
-                        console.print(f"✅ [green]Local invocation tracking completed with safe fallback[/green]")
-                    except Exception as e2:
-                        console.print(f"❌ [red]Critical: Could not complete local invocation tracking: {str(e2)}[/red]")
-
-                # Complete middleware sync if enabled
-                if middleware_invocation_id:
-                    try:
-                        serializable_output = self._convert_to_serializable(result_data)
-                        self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id=middleware_invocation_id,
-                            output_data=serializable_output,
-                            execution_time_ms=execution_time * 1000
-                        )
-                    except Exception as e:
-                        console.print(f"[dim]⚠️ Failed to sync completion to middleware: {e}[/dim]")
-
-                # Record in original agent_runs table for backward compatibility
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=result_str,
-                    success=True,
-                    execution_time=execution_time,
-                )
-
-                console.print(
-                    f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
-                    f"{execution_time:.2f}s (invocation: {invocation_id[:8]}...)"
-                )
-
-                return AgentRunResponse(
-                    success=True,
-                    output_data=result_str,
-                    error=None,
-                    execution_time=execution_time,
-                    agent_id=agent_id,
-                )
-
-            except Exception as e:
-                if os.getenv('DISABLE_TRY_CATCH'):
-                    raise
-                error_detail = f"Server error running agent {agent_id}: {str(e)}"
-                execution_time = time.time() - start_time
-
-                # Complete local invocation tracking with error
-                self.db_service.complete_invocation(
-                    invocation_id=invocation_id,
-                    error_detail=error_detail,
-                    execution_time_ms=execution_time * 1000
-                )
-
-                # Complete middleware sync with error if enabled
-                if middleware_invocation_id:
-                    try:
-                        self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id=middleware_invocation_id,
-                            error_detail=error_detail,
-                            execution_time_ms=execution_time * 1000
-                        )
-                    except Exception as sync_e:
-                        console.print(f"[dim]⚠️ Failed to sync error to middleware: {sync_e}[/dim]")
-
-                # Record in original agent_runs table for backward compatibility
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=None,
-                    success=False,
-                    error_message=error_detail,
-                    execution_time=execution_time,
-                )
-
-                console.print(f"💥 [red]{error_detail}[/red] (invocation: {invocation_id[:8]}...)")
-
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail
-                )
-        
-        return run_agent
 
     def _convert_to_serializable(self, obj):
         """Convert objects to JSON-serializable format"""
@@ -679,8 +741,19 @@ class LocalServer:
         return endpoints
 
     def start(self, debug: bool = False):
-        """Start the FastAPI server"""
+        """Start the FastAPI server with middleware sync status"""
         try:
+            # Print middleware sync status
+            if self.middleware_sync.enabled:
+                console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
+                console.print("   Status: ✅ ENABLED")
+                console.print("   📊 Local invocations will sync to middleware")
+                console.print("   Connection: ✅ Connected to middleware")
+            else:
+                console.print("🔄 [yellow]Middleware Sync Status:[/yellow]")
+                console.print("   Status: ❌ DISABLED")
+                console.print("   💡 Configure API key to enable sync")
+
             # Print server info
             console.print(
                 f"🌐 Server URL: [bold blue]http://{self.host}:{self.port}[/bold blue]"
@@ -688,7 +761,6 @@ class LocalServer:
 
             # Print available endpoints
             console.print("\n📋 Available endpoints:")
-
             endpoints = self.extract_endpoints()
             for endpoint in endpoints:
                 route_path = endpoint["path"]
@@ -714,7 +786,7 @@ class LocalServer:
             # Print agent ID
             console.print(f"🆔 Agent ID: [bold magenta]{self.agent_id}[/bold magenta]")
 
-            # NEW: Print invocation tracking info
+            # Print invocation tracking info
             console.print(f"📊 Invocation tracking: [green]ENABLED[/green]")
             console.print(f"   • View stats: [cyan]GET /api/v1/agents/{self.agent_id}/invocations/stats[/cyan]")
             console.print(f"   • View history: [cyan]GET /api/v1/agents/{self.agent_id}/invocations[/cyan]")
@@ -742,6 +814,11 @@ class LocalServer:
             raise
         except KeyboardInterrupt:
             console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
+            
+            # Clean up middleware sync on shutdown
+            if self.middleware_sync.enabled:
+                console.print("🧹 [cyan]Cleaning up middleware sync...[/cyan]")
+                self.middleware_sync.remove_agent(self.agent_id)
         except Exception as e:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
