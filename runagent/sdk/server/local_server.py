@@ -26,14 +26,20 @@ from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 from runagent.utils.port import PortManager
 from runagent.utils.serializer import CoreSerializer
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
+try:
+    from runagent.sdk.deployment.middleware_sync import get_middleware_sync
+except ImportError:
+    # Fallback function if middleware sync is not available
+    def get_middleware_sync():
+        return None
+
 
 console = Console()
 
 
 # runagent/sdk/server/local_server.py (ENHANCED with Middleware Sync)
 # Add these imports at the top
-from runagent.sdk.middleware_sync import MiddlewareSyncService
+from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
 from runagent.sdk.config import SDKConfig
 
 class LocalServer:

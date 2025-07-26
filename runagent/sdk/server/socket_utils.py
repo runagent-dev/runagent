@@ -7,8 +7,14 @@ from runagent.utils.serializer import CoreSerializer
 from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest
 from typing import Callable, Dict, Any
 from runagent.utils.schema import MessageType, SafeMessage
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 
+# Import middleware sync with error handling
+try:
+    from runagent.sdk.deployment.middleware_sync import get_middleware_sync
+except ImportError:
+    # Fallback function if middleware sync is not available
+    def get_middleware_sync():
+        return None
 
 console = Console()
 
@@ -16,10 +22,10 @@ console = Console()
 class AgentWebSocketHandler:
     """WebSocket handler for agent streaming - ENHANCED with invocation tracking"""
 
-    def __init__(self, db_service):
+    def __init__(self, db_service, middleware_sync=None):
         self.db_service = db_service
         self.serializer = CoreSerializer(max_size_mb=10.0)
-        self.middleware_sync = get_middleware_sync()
+        self.middleware_sync = middleware_sync or get_middleware_sync()
         self.active_streams = {}
 
     async def handle_agent_stream(self, websocket: WebSocket, agent_id: str, agent_execution_streamer: Callable):

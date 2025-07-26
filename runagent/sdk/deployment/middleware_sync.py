@@ -1,4 +1,4 @@
-# runagent/sdk/middleware_sync.py
+# runagent/sdk/deployment/middleware_sync.py
 """
 Middleware synchronization service for syncing local agent data to middleware
 """
@@ -9,27 +9,41 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from rich.console import Console
 
-from runagent.sdk.constants import DEFAULT_BASE_URL
-from .rest_client import RestClient
-from .config import SDKConfig
-
 console = Console()
 
 
 class MiddlewareSyncService:
     """Service to sync local agent data with middleware"""
     
-    def __init__(self, config: SDKConfig):
+    def __init__(self, config):
         self.config = config
-        self.rest_client = RestClient(
-            base_url=config.base_url,
-            api_key=config.api_key
-        ) if config.is_configured() else None
+        self.rest_client = None
+        
+        # Import RestClient only if config is available and configured
+        if hasattr(config, 'is_configured') and config.is_configured():
+            try:
+                from runagent.sdk.rest_client import RestClient
+                self.rest_client = RestClient(
+                    base_url=config.base_url,
+                    api_key=config.api_key
+                )
+            except Exception as e:
+                console.print(f"⚠️ [yellow]Could not initialize RestClient: {e}[/yellow]")
+                self.rest_client = None
+        
         self.sync_enabled = self._check_sync_enabled()
     
     def _check_sync_enabled(self) -> bool:
         """Check if middleware sync is enabled"""
-        return bool(self.rest_client and self.config.api_key)
+        return bool(
+            self.rest_client and 
+            hasattr(self.config, 'api_key') and 
+            self.config.api_key
+        )
+    
+    def is_sync_enabled(self) -> bool:
+        """Public method to check if sync is enabled"""
+        return self.sync_enabled
     
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
         """Sync agent data when local server starts"""
@@ -131,25 +145,30 @@ class MiddlewareSyncService:
     
     async def _make_async_request(self, method: str, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Make async HTTP request to middleware"""
+        if not self.rest_client:
+            return {"success": False, "error": "No REST client available"}
+            
         try:
             if method == "POST":
                 response = await asyncio.to_thread(
-                    self.rest_client.http.post, 
+                    self.rest_client._make_request, 
+                    "POST",
                     endpoint, 
-                    data=data, 
+                    json=data, 
                     timeout=30
                 )
             elif method == "PUT":
                 response = await asyncio.to_thread(
-                    self.rest_client.http.put, 
+                    self.rest_client._make_request, 
+                    "PUT",
                     endpoint, 
-                    data=data, 
+                    json=data, 
                     timeout=30
                 )
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
-            return response.json()
+            return response
             
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -158,8 +177,8 @@ class MiddlewareSyncService:
         """Get current sync status"""
         return {
             "sync_enabled": self.sync_enabled,
-            "api_configured": bool(self.config.api_key),
-            "base_url": self.config.base_url,
+            "api_configured": bool(getattr(self.config, 'api_key', None)),
+            "base_url": getattr(self.config, 'base_url', None),
             "middleware_available": self._test_middleware_connection()
         }
     
@@ -173,3 +192,34 @@ class MiddlewareSyncService:
             return response.status_code == 200
         except:
             return False
+
+
+# Global instance for easy access
+_global_middleware_sync = None
+
+
+def get_middleware_sync() -> Optional[MiddlewareSyncService]:
+    """Get the global middleware sync instance"""
+    global _global_middleware_sync
+    
+    if _global_middleware_sync is None:
+        try:
+            from runagent.sdk.config import SDKConfig
+            config = SDKConfig()
+            _global_middleware_sync = MiddlewareSyncService(config)
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Could not initialize middleware sync: {e}[/yellow]")
+            _global_middleware_sync = None
+    
+    return _global_middleware_sync
+
+
+# Create an alias for backwards compatibility
+class MiddlewareSync:
+    """Alias for MiddlewareSyncService for backwards compatibility"""
+    
+    def __init__(self, config):
+        self._service = MiddlewareSyncService(config)
+    
+    def __getattr__(self, name):
+        return getattr(self._service, name)
