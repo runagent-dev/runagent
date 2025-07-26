@@ -21,6 +21,6 @@ runagent.add_command(commands.serve)
 runagent.add_command(commands.run)
 runagent.add_command(commands.delete)
 runagent.add_command(commands.db) 
-runagent.add_command(commands.local_sync, name="local-sync")
+runagent.add_command(commands.local_sync) 
 if __name__ == "__main__":
     runagent()

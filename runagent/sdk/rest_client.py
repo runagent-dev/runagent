@@ -814,6 +814,89 @@ class RestClient:
         except Exception as e:
             return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
 
+
+    def sync_local_agent(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Sync local agent to middleware"""
+        try:
+            response = self.http.post("/local-agents", data=agent_data, timeout=30)
+            return response.json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def create_local_invocation(self, invocation_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create local invocation in middleware"""
+        try:
+            response = self.http.post("/local-invocations", data=invocation_data, timeout=30)
+            return response.json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def update_local_invocation(self, invocation_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update local invocation in middleware"""
+        try:
+            response = self.http.put(f"/local-invocations/{invocation_id}", data=update_data, timeout=30)
+            return response.json()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def validate_api_connection(self) -> Dict[str, Any]:
+        """Validate API connection and authentication - ENHANCED"""
+        try:
+            # Test basic connectivity
+            try:
+                health_response = self.http.get("/health", timeout=10)
+                
+                if health_response.status_code != 200:
+                    return {
+                        "success": False,
+                        "api_connected": False,
+                        "error": f"Health check failed: {health_response.status_code}",
+                    }
+
+                # Test authentication if API key provided
+                if self.api_key:
+                    auth_response = self.http.get("/auth/validate", timeout=10)
+                    
+                    if auth_response.status_code == 200:
+                        auth_data = auth_response.json()
+                        return {
+                            "success": True,
+                            "api_connected": True,
+                            "api_authenticated": True,
+                            "user_info": auth_data.get("user", {}),
+                            "base_url": self.base_url,
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "api_connected": True,
+                            "api_authenticated": False,
+                            "error": f"Authentication failed: {auth_response.status_code}",
+                            "base_url": self.base_url,
+                        }
+                else:
+                    return {
+                        "success": True,
+                        "api_connected": True,
+                        "api_authenticated": False,
+                        "base_url": self.base_url,
+                        "message": "No API key provided",
+                    }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "api_connected": False,
+                    "error": f"Connection failed: {str(e)}",
+                }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "api_connected": False,
+                "error": f"Validation failed: {str(e)}",
+            }
+
     def __del__(self):
         """Cleanup on deletion"""
         try:

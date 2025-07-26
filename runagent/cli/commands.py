@@ -26,6 +26,8 @@ from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 
 console = Console()
 
+# runagent/cli/commands.py (ENHANCED setup command)
+
 @click.command()
 @click.option("--api-key", required=True, help="Your API key")
 @click.option("--base-url", help="API base URL")
@@ -47,7 +49,7 @@ def setup(api_key, base_url, force):
             if not click.confirm("Do you want to reconfigure?"):
                 return
 
-        # Configure SDK - FIXED: Remove validate_auth parameter
+        # Configure SDK
         sdk.configure(api_key=api_key, base_url=base_url, save=True)
 
         console.print("✅ [green]Setup completed successfully![/green]")
@@ -60,23 +62,26 @@ def setup(api_key, base_url, force):
             for key, value in user_info.items():
                 console.print(f"   {key}: [cyan]{value}[/cyan]")
 
-        # Show local sync status
-        from runagent.utils.config import Config
-        sync_enabled = Config.get_user_config().get("local_sync_enabled", True)
-        console.print(f"\n🔄 [bold]Local Sync Status:[/bold]")
-        console.print(f"   Middleware Sync: [{'green' if sync_enabled else 'yellow'}]{'Enabled' if sync_enabled else 'Disabled'}[/{'green' if sync_enabled else 'yellow'}]")
-        
-        if sync_enabled:
-            console.print("   📊 Your local agent runs will be synced to middleware")
-        else:
-            console.print("   📊 Local agent runs will only be stored locally")
-            console.print("   💡 Enable sync: [cyan]runagent local-sync --enable[/cyan]")
-        
-        console.print(f"\n💡 [bold]Next Steps:[/bold]")
-        console.print(f"   • Test local agent: [cyan]runagent serve <path>[/cyan]")
-        console.print(f"   • Check sync status: [cyan]runagent local-sync --status[/cyan]")
-        if not sync_enabled:
-            console.print(f"   • Enable middleware sync: [cyan]runagent local-sync --enable[/cyan]")
+        # NEW: Show sync status
+        console.print("\n🔄 [bold]Local Sync Status:[/bold]")
+        try:
+            from runagent.sdk.middleware_sync import MiddlewareSyncService
+            sync_service = MiddlewareSyncService(sdk.config)
+            sync_status = sync_service.get_sync_status()
+            
+            if sync_status["sync_enabled"]:
+                console.print("   Middleware Sync: [green]Enabled[/green]")
+                console.print("   📊 Your local agent runs will be synced to middleware")
+            else:
+                console.print("   Middleware Sync: [red]Disabled[/red]")
+                console.print("   ⚠️ Local agents will only be stored locally")
+        except Exception as e:
+            console.print(f"   Sync Status: [yellow]Unknown ({e})[/yellow]")
+
+        # NEW: Show next steps
+        console.print("\n💡 [bold]Next Steps:[/bold]")
+        console.print("   • Test local agent: [cyan]runagent serve <path>[/cyan]")
+        console.print("   • Check sync status: [cyan]runagent local-sync --status[/cyan]")
 
     except AuthenticationError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
@@ -89,6 +94,8 @@ def setup(api_key, base_url, force):
         console.print(f"❌ [red]Setup error:[/red] {e}")
         raise click.ClickException("Setup failed")
 
+
+        
 @click.command()
 @click.option("--yes", is_flag=True, help="Skip confirmation")
 def teardown(yes):
@@ -1558,54 +1565,97 @@ def cleanup(days, agent_runs, yes):
 
 
 @click.command()
-@click.option("--enable", is_flag=True, help="Enable local sync to middleware")
-@click.option("--disable", is_flag=True, help="Disable local sync to middleware")
-@click.option("--status", is_flag=True, help="Show current sync status")
-def local_sync(enable, disable, status):
-    """Manage local data sync to middleware"""
+@click.option("--status", is_flag=True, help="Show sync status")
+@click.option("--enable", is_flag=True, help="Enable middleware sync")
+@click.option("--disable", is_flag=True, help="Disable middleware sync")
+@click.option("--test", is_flag=True, help="Test middleware connection")
+def local_sync(status, enable, disable, test):
+    """Manage local agent sync with middleware"""
     try:
-        from runagent.utils.config import Config
+        sdk = RunAgent()
         
-        if enable and disable:
-            raise click.UsageError("Cannot specify both --enable and --disable")
+        if not sdk.config.is_configured():
+            console.print("❌ [red]RunAgent not configured. Run 'runagent setup --api-key <key>' first[/red]")
+            raise click.ClickException("Setup required")
         
-        if status or (not enable and not disable):
-            # Show current status
-            current_status = Config.get_user_config().get("local_sync_enabled", True)
-            api_key_set = bool(Config.get_api_key())
-            
-            console.print("\n📊 [bold]Local Sync Status[/bold]")
-            console.print(f"   Sync Enabled: [{'green' if current_status else 'red'}]{current_status}[/{'green' if current_status else 'red'}]")
-            console.print(f"   API Key Set: [{'green' if api_key_set else 'red'}]{api_key_set}[/{'green' if api_key_set else 'red'}]")
-            
-            if current_status and api_key_set:
-                console.print("   Status: [green]✅ Local data will sync to middleware[/green]")
-            elif not current_status:
-                console.print("   Status: [yellow]⚠️ Local sync is disabled[/yellow]")
-            elif not api_key_set:
-                console.print("   Status: [yellow]⚠️ API key not configured[/yellow]")
-                console.print("   💡 Run: [cyan]runagent setup --api-key <key>[/cyan]")
-            
-            console.print(f"\n💡 [bold]Commands:[/bold]")
-            console.print(f"   Enable sync:  [cyan]runagent local-sync --enable[/cyan]")
-            console.print(f"   Disable sync: [cyan]runagent local-sync --disable[/cyan]")
-            return
+        # Import here to avoid circular imports
+        from runagent.sdk.middleware_sync import MiddlewareSyncService
+        sync_service = MiddlewareSyncService(sdk.config)
         
-        if enable:
-            Config.set_user_config("local_sync_enabled", True)
-            console.print("✅ [green]Local sync to middleware enabled[/green]")
+        if status or (not enable and not disable and not test):
+            # Show sync status (default action)
+            sync_status = sync_service.get_sync_status()
             
-            # Check if API key is set
-            if not Config.get_api_key():
-                console.print("⚠️ [yellow]API key not configured. Run:[/yellow] [cyan]runagent setup --api-key <key>[/cyan]")
+            console.print("\n📡 [bold]Middleware Sync Status[/bold]")
+            console.print("=" * 40)
+            
+            if sync_status["sync_enabled"]:
+                console.print("✅ [green]Sync Status: ENABLED[/green]")
+            else:
+                console.print("❌ [red]Sync Status: DISABLED[/red]")
+            
+            console.print(f"🔑 API Configured: [cyan]{'Yes' if sync_status['api_configured'] else 'No'}[/cyan]")
+            console.print(f"🌐 Base URL: [blue]{sync_status['base_url']}[/blue]")
+            
+            if sync_status["api_configured"]:
+                if sync_status["middleware_available"]:
+                    console.print("🟢 [green]Middleware: AVAILABLE[/green]")
+                else:
+                    console.print("🔴 [red]Middleware: UNAVAILABLE[/red]")
+            else:
+                console.print("⚠️ [yellow]Middleware: NOT CONFIGURED[/yellow]")
+            
+            console.print("\n💡 [bold]How it works:[/bold]")
+            console.print("   • When you run 'runagent serve', the agent is synced to middleware")
+            console.print("   • All invocations are tracked in both local and middleware databases")
+            console.print("   • You can view your agents and runs in the middleware dashboard")
+            
+            if not sync_status["sync_enabled"]:
+                console.print("\n🔧 [yellow]To enable sync:[/yellow]")
+                console.print("   1. Get an API key from the middleware dashboard")
+                console.print("   2. Run: [cyan]runagent setup --api-key <your-key>[/cyan]")
+        
+        elif enable:
+            if not sdk.config.api_key:
+                console.print("❌ [red]No API key configured. Run 'runagent setup --api-key <key>' first[/red]")
+                raise click.ClickException("API key required")
+            
+            console.print("✅ [green]Middleware sync is already enabled via API key configuration[/green]")
+            console.print("💡 Sync will happen automatically when you run 'runagent serve'")
         
         elif disable:
-            Config.set_user_config("local_sync_enabled", False)
-            console.print("🔕 [yellow]Local sync to middleware disabled[/yellow]")
-            console.print("💡 Your local invocations will still be tracked locally")
+            console.print("⚠️ [yellow]To disable middleware sync, clear your API key:[/yellow]")
+            console.print("   Run: [cyan]runagent teardown[/cyan]")
+            console.print("   Or manually remove API key from config")
+        
+        elif test:
+            console.print("🧪 [cyan]Testing middleware connection...[/cyan]")
+            
+            if not sync_service.sync_enabled:
+                console.print("❌ [red]Sync not enabled (no API key configured)[/red]")
+                raise click.ClickException("Sync not enabled")
+            
+            # Test connection
+            if sync_service._test_middleware_connection():
+                console.print("✅ [green]Middleware connection successful![/green]")
+                
+                # Try to validate API key
+                try:
+                    response = sync_service.rest_client.http.get("/auth/validate", timeout=10)
+                    if response.status_code == 200:
+                        user_data = response.json()
+                        console.print(f"🔑 [green]API key valid for user: {user_data.get('user', {}).get('email', 'Unknown')}[/green]")
+                    else:
+                        console.print("⚠️ [yellow]API key validation failed[/yellow]")
+                except Exception as e:
+                    console.print(f"⚠️ [yellow]API key validation error: {e}[/yellow]")
+            else:
+                console.print("❌ [red]Middleware connection failed[/red]")
+                console.print(f"🌐 Trying to connect to: [blue]{sync_service.config.base_url}[/blue]")
+                raise click.ClickException("Connection failed")
     
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        console.print(f"❌ [red]Sync configuration error:[/red] {e}")
-        raise click.ClickException("Sync configuration failed")
+        console.print(f"❌ [red]Local sync error:[/red] {e}")
+        raise click.ClickException("Local sync command failed")
