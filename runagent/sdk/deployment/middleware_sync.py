@@ -32,7 +32,11 @@ class MiddlewareSyncService:
                 self.rest_client = None
         
         self.sync_enabled = self._check_sync_enabled()
-    
+        # Add missing attributes
+        self.enabled = self.sync_enabled  # Add this line
+        # Add missing attributes
+        self.enabled = self.sync_enabled  # Add this line
+
     def _check_sync_enabled(self) -> bool:
         """Check if middleware sync is enabled"""
         return bool(
@@ -45,6 +49,53 @@ class MiddlewareSyncService:
         """Public method to check if sync is enabled"""
         return self.sync_enabled
     
+    def test_connection(self) -> bool:
+        """Test if middleware connection is working"""
+        return self._test_middleware_connection()
+    
+    def test_connection(self) -> bool:
+        """Test if middleware connection is working"""
+        return self._test_middleware_connection()
+    
+    def _test_middleware_connection(self) -> bool:
+        """Test if middleware is reachable"""
+        if not self.rest_client:
+            return False
+            
+        try:
+            response = self.rest_client.http.get("/health", timeout=5)
+            return response.status_code == 200
+        except:
+            return False
+
+    # Add missing method for cleanup
+    def remove_agent(self, agent_id: str) -> bool:
+        """Remove agent from middleware (called on shutdown)"""
+        if not self.sync_enabled:
+            return False
+            
+        try:
+            # This could be implemented if middleware supports agent removal
+            console.print(f"🧹 [dim]Would remove agent {agent_id} from middleware[/dim]")
+            return True
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Could not remove agent from middleware: {e}[/yellow]")
+            return False
+
+    # Rest of the methods remain the same...
+    def remove_agent(self, agent_id: str) -> bool:
+        """Remove agent from middleware (called on shutdown)"""
+        if not self.sync_enabled:
+            return False
+            
+        try:
+            # This could be implemented if middleware supports agent removal
+            console.print(f"🧹 [dim]Would remove agent {agent_id} from middleware[/dim]")
+            return True
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Could not remove agent from middleware: {e}[/yellow]")
+            return False
+
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
         """Sync agent data when local server starts"""
         if not self.sync_enabled:

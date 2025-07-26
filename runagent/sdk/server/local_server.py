@@ -26,13 +26,7 @@ from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 from runagent.utils.port import PortManager
 from runagent.utils.serializer import CoreSerializer
-try:
-    from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-except ImportError:
-    # Fallback function if middleware sync is not available
-    def get_middleware_sync():
-        return None
-
+from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 
 console = Console()
 
@@ -64,7 +58,7 @@ class LocalServer:
         # NEW: Initialize middleware sync service
         try:
             from runagent.sdk.config import SDKConfig
-            from runagent.sdk.middleware_sync import MiddlewareSyncService
+            from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
             self.config = SDKConfig()
             self.middleware_sync = MiddlewareSyncService(self.config)
         except Exception as e:
@@ -325,6 +319,45 @@ class LocalServer:
             }
         }
 
+
+    def _setup_fastapi_app(self):
+        """Setup FastAPI app"""
+        app = FastAPI(
+            title=f"RunAgent API - {self.agent_name}",
+            description=f"Agent ID: {self.agent_id}",
+            version=self.agent_version,
+        )
+
+        # Setup CORS
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        return app
+
+    def _install_dependencies(self):
+        """Install agent dependencies from requirements.txt if it exists"""
+        req_txt_path = self.agent_path / "requirements.txt"
+        if req_txt_path.exists():
+            try:
+                console.print(f"📦 Installing dependencies from {req_txt_path}")
+                _ = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", req_txt_path],
+                    capture_output=False,  # Shows output directly
+                    check=True,
+                )
+                console.print("✅ Dependencies installed successfully")
+            except subprocess.CalledProcessError as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                raise Exception(
+                    f"Failed to install dependencies from {req_txt_path}: {str(e)}"
+                )
+                
                 
     @staticmethod
     def from_id(agent_id: str) -> "LocalServer":
@@ -731,7 +764,7 @@ class LocalServer:
         """Start the FastAPI server with middleware sync status"""
         try:
             # Print middleware sync status
-            if self.middleware_sync.enabled:
+            if self.middleware_sync and self.middleware_sync.is_sync_enabled():
                 console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
                 console.print("   Status: ✅ ENABLED")
                 console.print("   📊 Local invocations will sync to middleware")

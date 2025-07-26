@@ -65,7 +65,7 @@ def setup(api_key, base_url, force):
         # NEW: Show sync status
         console.print("\n🔄 [bold]Local Sync Status:[/bold]")
         try:
-            from runagent.sdk.middleware_sync import MiddlewareSyncService
+            from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
             sync_service = MiddlewareSyncService(sdk.config)
             sync_status = sync_service.get_sync_status()
             
@@ -1579,7 +1579,7 @@ def local_sync(status, enable, disable, test):
             raise click.ClickException("Setup required")
         
         # Import here to avoid circular imports
-        from runagent.sdk.middleware_sync import MiddlewareSyncService
+        from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
         sync_service = MiddlewareSyncService(sdk.config)
         
         if status or (not enable and not disable and not test):
