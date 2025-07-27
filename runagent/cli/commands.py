@@ -197,6 +197,7 @@ def delete(agent_id, yes):
 @click.option("--letta", is_flag=True, help="Use Letta framework")
 @click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
 @click.option("--openai", is_flag=True, help="Use OpenAI framework")
+@click.option("--n8n", is_flag=True, help="Use N8N workflows")
 @click.argument(
     "path",
     type=click.Path(
@@ -222,6 +223,7 @@ def init(
     letta,
     llamaindex,
     openai,
+    n8n,
     path
 ):
     """Initialize a new RunAgent project"""
@@ -240,6 +242,7 @@ def init(
             "letta": letta,
             "llamaindex": llamaindex,
             "openai": openai,
+            "n8n": n8n
         }
         total_flags = sum(flag for flag in framework_dict.values())
         if total_flags > 1:
