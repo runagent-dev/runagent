@@ -15,11 +15,9 @@
       {
         "webhook_url": "https://taniatinni.app.n8n.cloud/webhook/recipe-nutrition",
         "method": "post",
+        "timeout": 60,
         "tag": "food_doctor"
       }
     ]
-  },
-  "env_vars": {
-    "OPENAI_API_KEY": "sk-proj-1234567890"
   }
 }
