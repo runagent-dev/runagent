@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List
 from rich.console import Console
 from runagent.utils.imports import PackageImporter
-from runagent.utils.schema import EntryPoint, RunAgentConfig
+from runagent.utils.schema import PythonicEntryPoint, RunAgentConfig
 from runagent.utils.serializer import CoreSerializer
 from runagent.utils.response import extract_jsonpath, to_dict
 
@@ -19,7 +19,7 @@ class GenericExecutor:
         self.agent_dir = agent_dir
         self.importer = PackageImporter(verbose=False)
 
-    def get_runner(self, entrypoint: EntryPoint):
+    def get_runner(self, entrypoint: PythonicEntryPoint):
         """
         Always returns an async function, regardless of whether the 
         underlying entrypoint is sync or async.
@@ -50,7 +50,7 @@ class GenericExecutor:
         
         return normalized_runner
 
-    def get_stream_runner(self, entrypoint: EntryPoint):
+    def get_stream_runner(self, entrypoint: PythonicEntryPoint):
         """
         Always returns an async generator, regardless of whether the 
         underlying entrypoint is sync or async.

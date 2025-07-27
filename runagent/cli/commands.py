@@ -720,9 +720,9 @@ def deploy(folder, agent_id, local, framework, config):
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
 @click.option("--replace", help="Replace existing agent with this agent ID")
 @click.option("--no-animation", is_flag=True, help="Skip startup animation")
-@click.option("--animation-style", 
-              type=click.Choice(["field", "ascii", "minimal", "quick"]), 
-              default="field", 
+@click.option("--animation-style",
+              type=click.Choice(["field", "ascii", "minimal", "quick"]),
+              default="field",
               help="Animation style")
 @click.argument(
     "path",
@@ -900,7 +900,7 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         raise click.UsageError(
             "Must specify either --agent-id or both --host and --port."
         )
-    
+
     # If using host/port, both must be provided
     if host_port_provided and (host is None or port is None):
         raise click.UsageError(

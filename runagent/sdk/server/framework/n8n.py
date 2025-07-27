@@ -5,29 +5,29 @@ from pathlib import Path
 from typing import Dict, List
 from rich.console import Console
 from runagent.utils.imports import PackageImporter
-from runagent.utils.schema import EntryPoint, RunAgentConfig
+from runagent.utils.schema import WebHookEntryPoint, RunAgentConfig
 from runagent.utils.serializer import CoreSerializer
 from runagent.utils.response import extract_jsonpath, to_dict
 
 console = Console()
 
 
-class N8nExecutor:
+class N8NExecutor:
 
     rerserved_tags = list()
 
     def __init__(self, agent_dir: Path):
         self.agent_dir = agent_dir
 
-    def get_runner(self, entrypoint: EntryPoint):
+    def get_runner(self, entrypoint: WebHookEntryPoint):
         """
         Always returns an async function, regardless of whether the 
         underlying entrypoint is sync or async.
         """
-        resolved_entrypoint = self._entrypoint_resolver(
-            entrypoint_filepath=self.agent_dir / entrypoint.file,
-            entrypoint_module=entrypoint.module,
-        )
+        # resolved_entrypoint = self._entrypoint_resolver(
+        #     entrypoint_filepath=self.agent_dir / entrypoint.file,
+        #     entrypoint_module=entrypoint.module,
+        # )
 
         async def normalized_runner(*input_args, **input_kwargs):
             console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
@@ -53,8 +53,14 @@ class N8nExecutor:
             else:
                 # normalized_runner()
                 payload = None
-    
-            async with httpx.AsyncClient() as client:
+
+            timeout = httpx.Timeout(
+                timeout=entrypoint.timeout,  # 60 seconds total timeout
+                connect=10.0,  # 10 seconds to connect
+                read=50.0,     # 50 seconds to read response
+                write=10.0     # 10 seconds to write request
+            )
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 if entrypoint.method == "post":
                     # POST request with JSON payload
                     response = await client.post(
@@ -73,123 +79,5 @@ class N8nExecutor:
                     result = extract_jsonpath(result, entrypoint.extractor)
                 
                 return result
-                
 
-            
-        
-        # async def normalized_runner(*input_args, **input_kwargs):
-        #     console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
-        #     console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
-            
-        #     if inspect.iscoroutinefunction(resolved_entrypoint):
-        #         print("resolved async", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-        #         result = await resolved_entrypoint(*input_args, **input_kwargs)
-        #     else:
-        #         print("resolved sync (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-        #         # Run sync function in executor to avoid blocking
-        #         result = await asyncio.get_event_loop().run_in_executor(
-        #             None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
-        #         )
-            
-        #     if entrypoint.extractor:
-        #         result = extract_jsonpath(result, entrypoint.extractor)
-            
-        #     return result
-        
-        # return normalized_runner
-
-    # def get_stream_runner(self, entrypoint: EntryPoint):
-    #     """
-    #     Always returns an async generator, regardless of whether the 
-    #     underlying entrypoint is sync or async.
-    #     """
-    #     resolved_entrypoint = self._entrypoint_resolver(
-    #         entrypoint_filepath=self.agent_dir / entrypoint.file,
-    #         entrypoint_module=entrypoint.module,
-    #     )
-
-    #     async def normalized_stream_runner(*input_args, **input_kwargs):
-    #         console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
-    #         console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
-            
-    #         if inspect.isasyncgenfunction(resolved_entrypoint):
-    #             # Native async generator
-    #             print("resolved async generator", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-    #             async for chunk in resolved_entrypoint(*input_args, **input_kwargs):
-    #                 if entrypoint.extractor:
-    #                     chunk = extract_jsonpath(chunk, entrypoint.extractor)
-    #                 yield chunk
-    #                 await asyncio.sleep(0)
-            
-    #         elif inspect.iscoroutinefunction(resolved_entrypoint):
-    #             # Async function that returns iterable
-    #             print("resolved async function (returns iterable)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-    #             result = await resolved_entrypoint(*input_args, **input_kwargs)
-    #             for chunk in result:
-    #                 if entrypoint.extractor:
-    #                     chunk = extract_jsonpath(chunk, entrypoint.extractor)
-    #                 yield chunk
-    #                 await asyncio.sleep(0)
-            
-    #         elif inspect.isgeneratorfunction(resolved_entrypoint):
-    #             # Sync generator - consume in executor
-    #             print("resolved sync generator (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-    #             generator = await asyncio.get_event_loop().run_in_executor(
-    #                 None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
-    #             )
-    #             for chunk in generator:
-    #                 if entrypoint.extractor:
-    #                     chunk = extract_jsonpath(chunk, entrypoint.extractor)
-    #                 yield chunk
-    #                 await asyncio.sleep(0)
-            
-    #         else:
-    #             # Sync function that returns iterable
-    #             print("resolved sync function (returns iterable, wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
-    #             result = await asyncio.get_event_loop().run_in_executor(
-    #                 None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
-    #             )
-    #             for chunk in result:
-    #                 if entrypoint.extractor:
-    #                     chunk = extract_jsonpath(chunk, entrypoint.extractor)
-    #                 yield chunk
-    #                 await asyncio.sleep(0)
-
-    #     return normalized_stream_runner
-
-    # def _entrypoint_resolver(self, entrypoint_filepath: Path, entrypoint_module: str):
-    #     print(f"DEBUG: Resolving entrypoint - filepath: {entrypoint_filepath}, module: {entrypoint_module}")
-    #     primary_module, secondary_attr = (
-    #         entrypoint_module.split(".", 1) + [""]
-    #     )[:2]
-    #     print(f"DEBUG: Split module - primary: {primary_module}, secondary: {secondary_attr}")
-        
-    #     resolved_module = self.importer.resolve_import(
-    #             entrypoint_filepath, primary_module
-    #         )
-    #     print(f"DEBUG: Resolved primary module: {resolved_module}")
-        
-    #     if secondary_attr:
-    #         attrs = secondary_attr.split('.')
-    #         print(f"DEBUG: Secondary attributes to resolve: {attrs}")
-    #         for attr in attrs:
-    #             resolved_module = getattr(resolved_module, attr)
-    #             print(f"DEBUG: Resolved attribute {attr}: {resolved_module}")
-
-    #     print(f"DEBUG: Final resolved module: {resolved_module}")
-    #     print("Resolving", (entrypoint_module, resolved_module))
-    #     return resolved_module
-
-    # def _get_function_type(self, func):
-    #     """
-    #     Determine the type of function for debugging purposes.
-    #     Returns: str describing the function type
-    #     """
-    #     if inspect.isasyncgenfunction(func):
-    #         return "async_generator"
-    #     elif inspect.iscoroutinefunction(func):
-    #         return "async_function"
-    #     elif inspect.isgeneratorfunction(func):
-    #         return "sync_generator"
-    #     else:
-    #         return "sync_function"
+        return normalized_runner
