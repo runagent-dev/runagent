@@ -1,4 +1,3 @@
-# runagent/sdk/deployment/middleware_sync.py
 """
 Middleware synchronization service for syncing local agent data to middleware
 """
@@ -32,10 +31,8 @@ class MiddlewareSyncService:
                 self.rest_client = None
         
         self.sync_enabled = self._check_sync_enabled()
-        # Add missing attributes
-        self.enabled = self.sync_enabled  # Add this line
-        # Add missing attributes
-        self.enabled = self.sync_enabled  # Add this line
+        self.enabled = self.sync_enabled  
+        self.enabled = self.sync_enabled  
 
     def _check_sync_enabled(self) -> bool:
         """Check if middleware sync is enabled"""
@@ -68,7 +65,6 @@ class MiddlewareSyncService:
         except:
             return False
 
-    # Add missing method for cleanup
     def remove_agent(self, agent_id: str) -> bool:
         """Remove agent from middleware (called on shutdown)"""
         if not self.sync_enabled:
@@ -89,7 +85,7 @@ class MiddlewareSyncService:
             return False
             
         try:
-            # This could be implemented if middleware supports agent removal
+
             console.print(f"🧹 [dim]Would remove agent {agent_id} from middleware[/dim]")
             return True
         except Exception as e:

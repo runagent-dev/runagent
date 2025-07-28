@@ -27,14 +27,11 @@ from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 from runagent.utils.port import PortManager
 from runagent.utils.serializer import CoreSerializer
 from runagent.sdk.deployment.middleware_sync import get_middleware_sync
+from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
+from runagent.sdk.config import SDKConfig
 
 console = Console()
 
-
-# runagent/sdk/server/local_server.py (ENHANCED with Middleware Sync)
-# Add these imports at the top
-from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
-from runagent.sdk.config import SDKConfig
 
 class LocalServer:
     """FastAPI-based local server for testing deployed agents - ENHANCED with middleware sync"""
