@@ -47,7 +47,7 @@ use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let agent_id = "ca7a82a2-70c4-4ded-b7e3-17d0a13f94cd";
+    let agent_id = "338d629e-53b4-46cb-a6d9-9db1b5b5c5c8";
     
     println!("🌊 ag2 Streaming Test");
     let client = RunAgentClient::new(agent_id, "ag2_stream", true).await?;

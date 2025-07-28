@@ -92,22 +92,23 @@ class LocalServer:
         self.app = self._setup_fastapi_app()
         self._setup_websocket_routes()
         self._setup_routes()
+        self.agent_synced_to_middleware = False
 
 
-    def _sync_agent_to_middleware(self):
-        """Sync agent data to middleware on startup - FIXED"""
+    async def _sync_agent_to_middleware_and_wait(self):
+        """Sync agent to middleware and wait for completion - FIXED VERSION"""
         if not hasattr(self, 'middleware_sync') or not self.middleware_sync:
             console.print("[dim]Middleware sync not available[/dim]")
-            return
+            return False
             
         if not self.middleware_sync.sync_enabled:
             console.print("[dim]Middleware sync disabled (no API key configured)[/dim]")
-            return
+            return False
 
         try:
             # Prepare agent data for sync
             agent_data = {
-                "local_agent_id": self.agent_id,  # IMPORTANT: Set the agent ID
+                "local_agent_id": self.agent_id,  # CRITICAL: Use the correct agent ID
                 "name": self.agent_name,
                 "framework": self.agent_framework,
                 "version": self.agent_version,
@@ -119,14 +120,25 @@ class LocalServer:
                 "sync_timestamp": datetime.utcnow().isoformat()
             }
 
-            # Store the agent data in middleware sync for later use
-            if hasattr(self.middleware_sync, 'set_pending_agent_data'):
-                self.middleware_sync.set_pending_agent_data(agent_data)
+            console.print(f"🔄 [cyan]Syncing agent {self.agent_id} to middleware...[/cyan]")
+            console.print(f"🔍 [dim]Agent data: {agent_data['name']} ({agent_data['framework']})[/dim]")
             
-            console.print(f"[dim]Agent data prepared for middleware sync[/dim]")
+            # CRITICAL: Wait for sync to complete
+            sync_result = await self.middleware_sync.sync_agent_startup(self.agent_id, agent_data)
+            
+            if sync_result:
+                console.print(f"✅ [green]Agent successfully synced to middleware[/green]")
+                self.agent_synced_to_middleware = True
+                return True
+            else:
+                console.print(f"⚠️ [yellow]Agent sync failed - logs will be local only[/yellow]")
+                self.agent_synced_to_middleware = False
+                return False
 
         except Exception as e:
-            console.print(f"⚠️ [yellow]Failed to prepare agent data for middleware sync: {e}[/yellow]")
+            console.print(f"❌ [red]Failed to sync agent to middleware: {e}[/red]")
+            self.agent_synced_to_middleware = False
+            return False
 
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
         """ENHANCED - Create endpoint handler with invocation tracking and middleware sync"""
@@ -769,23 +781,26 @@ class LocalServer:
         return endpoints
 
     def start(self, debug: bool = False):
-        """Start the FastAPI server with enhanced logging and middleware sync"""
+        """Start the FastAPI server with FIXED middleware sync timing"""
         try:
-            # Sync agent to middleware BEFORE starting server
-            sync_success = self._sync_agent_to_middleware()
-            
-            # Log server startup
+            # STEP 1: Log server startup to LOCAL database first
             if hasattr(self, 'agent_logger'):
                 self.agent_logger.info("FastAPI server starting...")
                 self.agent_logger.info(f"Debug mode: {'ON' if debug else 'OFF'}")
                 self.agent_logger.info(f"Server URL: http://{self.host}:{self.port}")
                 self.agent_logger.info(f"Docs URL: http://{self.host}:{self.port}/docs")
-                if sync_success:
-                    self.agent_logger.info("Middleware sync completed successfully")
-                else:
-                    self.agent_logger.warning("Middleware sync failed or disabled")
             
-            # Print middleware sync status
+            # STEP 2: Sync agent to middleware BEFORE starting server (BLOCKING)
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                sync_success = loop.run_until_complete(self._sync_agent_to_middleware_and_wait())
+            finally:
+                loop.close()
+            
+            # STEP 3: Print sync status
             if self.middleware_sync and self.middleware_sync.sync_enabled:
                 console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
                 if sync_success:
@@ -794,8 +809,8 @@ class LocalServer:
                     console.print("   📡 Agent registered in middleware")
                 else:
                     console.print("   Status: ⚠️ ENABLED BUT SYNC FAILED")
-                    console.print("   📊 Local logs may not sync properly")
-                    console.print("   💡 Check network connection and API key")
+                    console.print("   📊 Local logs will be stored locally only")
+                    console.print("   💡 Check network connection and agent permissions")
             else:
                 console.print("🔄 [yellow]Middleware Sync Status:[/yellow]")
                 console.print("   Status: ❌ DISABLED")
@@ -844,6 +859,10 @@ class LocalServer:
             # Log that server is about to start
             if hasattr(self, 'agent_logger'):
                 self.agent_logger.info("Starting uvicorn server...")
+                if sync_success:
+                    self.agent_logger.info("Agent synced to middleware - full sync mode enabled")
+                else:
+                    self.agent_logger.info("Agent sync failed - running in local-only mode")
 
             # Start uvicorn server
             uvicorn.run(
@@ -979,7 +998,7 @@ class LocalServer:
 
             
     def _setup_logging(self):
-        """Setup enhanced logging with database integration - FIXED order"""
+        """Setup enhanced logging with database integration - FIXED with sync check"""
         try:
             # Create custom logger for this agent
             self.agent_logger = logging.getLogger(f'runagent_agent_{self.agent_id}')
@@ -989,13 +1008,14 @@ class LocalServer:
             for handler in self.agent_logger.handlers[:]:
                 self.agent_logger.removeHandler(handler)
             
-            # Add database handler
+            # Add database handler with sync-aware middleware
             try:
                 from runagent.utils.logs import DatabaseLogHandler
                 self.db_handler = DatabaseLogHandler(
                     self.db_service, 
                     self.agent_id, 
-                    getattr(self, 'middleware_sync', None)
+                    getattr(self, 'middleware_sync', None),
+                    sync_check_callback=lambda: getattr(self, 'agent_synced_to_middleware', False)  # NEW
                 )
                 self.db_handler.setFormatter(logging.Formatter(
                     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -1010,11 +1030,6 @@ class LocalServer:
                 '%(asctime)s - %(levelname)s - %(message)s'
             ))
             self.agent_logger.addHandler(console_handler)
-            
-            # IMPORTANT: Log initial startup messages AFTER sync setup
-            self.agent_logger.info(f"Agent {self.agent_id} local server started")
-            self.agent_logger.info(f"Framework: {self.agent_framework}")
-            self.agent_logger.info(f"Host: {self.host}, Port: {self.port}")
             
         except Exception as e:
             console.print(f"⚠️ [yellow]Enhanced logging setup failed: {e}[/yellow]")

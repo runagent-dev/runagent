@@ -18,12 +18,12 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="17fd48cf-f677-49f5-9e2a-22d0ee971a87",
+    agent_id="338d629e-53b4-46cb-a6d9-9db1b5b5c5c8",
     entrypoint_tag="ag2_stream",
     local=True
     )
 
-# print(ra.run(message="The water is blue.", max_turn=3))
+# print(ra.run(message="The water is blue.", max_turns=3))
 
 for chunk in ra.run(
     message="Man breathe oxygen.",
