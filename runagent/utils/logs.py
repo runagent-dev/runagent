@@ -1,16 +1,29 @@
-# Update the DatabaseLogHandler class in local_server.py to fix the AgentLog issue:
+# runagent/utils/logs.py - ENHANCED with debug logging
 
 import logging
+import asyncio
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+
 
 class DatabaseLogHandler(logging.Handler):
-    """Custom logging handler that sends logs to middleware database"""
+    """Custom logging handler that sends logs to local database and middleware"""
     
-    def __init__(self, db_service, agent_id, middleware_sync=None):
+    def __init__(self, db_service, agent_id: str, middleware_sync=None):
         super().__init__()
         self.db_service = db_service
         self.agent_id = agent_id 
         self.middleware_sync = middleware_sync
-        self.log_buffer = []
+        self.log_buffer: List[Dict[str, Any]] = []
+        self.max_buffer_size = 10
+        self.sync_enabled = (
+            middleware_sync and 
+            hasattr(middleware_sync, 'is_sync_enabled') and 
+            middleware_sync.is_sync_enabled()
+        )
+        
+        # DEBUG: Print the agent ID being used
+        print(f"🔍 DatabaseLogHandler initialized with agent_id: {self.agent_id}")
         
     def emit(self, record):
         """Handle log emission to both local database and middleware"""
@@ -18,7 +31,7 @@ class DatabaseLogHandler(logging.Handler):
             # Format the log message
             formatted_message = self.format(record)
             
-            # Store in local database (using the new method)
+            # Store in local database
             try:
                 self.db_service.record_agent_log(
                     agent_id=self.agent_id,
@@ -27,81 +40,80 @@ class DatabaseLogHandler(logging.Handler):
                     execution_id=getattr(record, 'execution_id', None)
                 )
             except Exception as log_error:
-                # If the new method doesn't exist, silently continue
-                # This maintains compatibility while the database is being updated
-                pass
+                # If local logging fails, print to console as fallback
+                print(f"Local log storage failed: {log_error}")
             
-            # If middleware sync is enabled, buffer the log for sending
-            if self.middleware_sync and self.middleware_sync.is_sync_enabled():
-                self.log_buffer.append({
-                    'agent_id': self.agent_id,
+            # If middleware sync is enabled, buffer the log
+            if self.sync_enabled:
+                log_entry = {
+                    'agent_id': self.agent_id,  # Make sure we're using the correct agent_id
                     'log_level': record.levelname,
                     'message': formatted_message,
                     'execution_id': getattr(record, 'execution_id', None),
-                    'timestamp': record.created
-                })
+                    'timestamp': datetime.fromtimestamp(record.created)
+                }
                 
-                # Send buffered logs periodically (every 10 logs or on ERROR/CRITICAL)
-                if len(self.log_buffer) >= 10 or record.levelno >= logging.ERROR:
+                self.log_buffer.append(log_entry)
+                
+                # DEBUG: Print agent ID being buffered
+                if len(self.log_buffer) == 1:  # First log in buffer
+                    print(f"🔍 Buffering log for agent_id: {self.agent_id}")
+                
+                # Send buffered logs when buffer is full or on ERROR/CRITICAL
+                if (len(self.log_buffer) >= self.max_buffer_size or 
+                    record.levelno >= logging.ERROR):
                     self._flush_logs_to_middleware()
                     
         except Exception as e:
             # Don't let logging errors break the application
-            pass  # Silently fail to prevent breaking the server
+            print(f"Log handler error: {e}")
     
     def _flush_logs_to_middleware(self):
         """Send buffered logs to middleware"""
-        if not self.log_buffer or not self.middleware_sync:
+        if not self.log_buffer or not self.sync_enabled:
             return
             
         try:
-            # For now, just clear the buffer since the middleware sync doesn't have log sync yet
-            # TODO: Implement actual middleware log sync
+            # Create a copy of buffer and clear it immediately
+            logs_to_sync = self.log_buffer.copy()
             self.log_buffer.clear()
             
-        except Exception as e:
-            self.log_buffer.clear()
-
-# Update the _setup_logging method to be more defensive:
-
-    def _setup_logging(self):
-        """Setup enhanced logging with database integration"""
-        try:
-            # Create custom logger for this agent
-            self.agent_logger = logging.getLogger(f'runagent_agent_{self.agent_id}')
-            self.agent_logger.setLevel(logging.DEBUG)
+            # DEBUG: Print what we're syncing
+            print(f"🔍 Flushing {len(logs_to_sync)} logs to middleware for agent_id: {self.agent_id}")
+            for i, log in enumerate(logs_to_sync[:3]):  # Show first 3 logs
+                print(f"   Log {i+1}: agent_id={log['agent_id']}, level={log['log_level']}")
             
-            # Remove existing handlers to avoid duplicates
-            for handler in self.agent_logger.handlers[:]:
-                self.agent_logger.removeHandler(handler)
-            
-            # Add database handler with middleware sync
-            try:
-                db_handler = DatabaseLogHandler(
-                    self.db_service, 
-                    self.agent_id, 
-                    getattr(self, 'middleware_sync', None)
-                )
-                db_handler.setFormatter(logging.Formatter(
-                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-                ))
-                self.agent_logger.addHandler(db_handler)
-            except Exception as e:
-                # If database handler fails, continue without it
-                console.print(f"⚠️ [yellow]Could not setup database logging: {e}[/yellow]")
-            
-            # Also keep console output
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(logging.Formatter(
-                '%(asctime)s - %(levelname)s - %(message)s'
-            ))
-            self.agent_logger.addHandler(console_handler)
-            
-            # Log initial startup
-            self.agent_logger.info(f"Agent {self.agent_id} local server started")
-            self.agent_logger.info(f"Framework: {self.agent_framework}")
-            self.agent_logger.info(f"Host: {self.host}, Port: {self.port}")
+            # Try to sync logs asynchronously
+            if hasattr(self.middleware_sync, 'sync_agent_logs'):
+                # Schedule the async sync in a new task
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # If we're in an async context, schedule for later
+                        asyncio.create_task(
+                            self.middleware_sync.sync_agent_logs(logs_to_sync)
+                        )
+                    else:
+                        # Run in the current loop
+                        loop.run_until_complete(
+                            self.middleware_sync.sync_agent_logs(logs_to_sync)
+                        )
+                except RuntimeError:
+                    # No event loop, create a new one
+                    asyncio.run(self.middleware_sync.sync_agent_logs(logs_to_sync))
+                except Exception as e:
+                    print(f"Middleware log sync failed: {e}")
             
         except Exception as e:
-            # If all logging setup fails, continue without enhanced logging
-            console.print(f"⚠️ [yellow]Enhanced logging setup failed: {e}[/yellow]")
+            print(f"Error flushing logs to middleware: {e}")
+    
+    def force_flush(self):
+        """Force flush all remaining logs"""
+        if self.log_buffer:
+            print(f"🔍 Force flushing {len(self.log_buffer)} remaining logs for agent_id: {self.agent_id}")
+            self._flush_logs_to_middleware()
+    
+    def close(self):
+        """Close handler and flush remaining logs"""
+        self.force_flush()
+        super().close()

@@ -53,53 +53,8 @@ class LocalServer:
         self.agent_path = agent_path
         self.importer = PackageImporter(verbose=True)
         self.serializer = CoreSerializer(max_size_mb=5.0)
-        self.middleware_sync = get_middleware_sync()
         
-        if self.middleware_sync and self.middleware_sync.is_sync_enabled():
-            console.print("🔄 Middleware Sync Status:")
-            console.print("   Status: ✅ ENABLED")
-            console.print("   📊 Local invocations will sync to middleware")
-            
-            # Test connection
-            connection_ok = self.middleware_sync.test_connection()
-            if connection_ok:
-                console.print("   Connection: ✅ Connected to middleware")
-                
-                # Sync agent startup data
-                agent_data = {
-                    "name": self.agent_name,
-                    "framework": self.agent_framework,
-                    "version": self.agent_version,
-                    "path": str(self.agent_path),
-                    "host": self.host,
-                    "port": self.port,
-                    "entrypoints": [ep.dict() for ep in self.agent_architecture.entrypoints]
-                }
-                
-                # Run sync in background
-                import asyncio
-                try:
-                    # Create a new event loop if one doesn't exist
-                    try:
-                        loop = asyncio.get_running_loop()
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    
-                    # Schedule the sync task
-                    asyncio.create_task(
-                        self.middleware_sync.sync_agent_startup(self.agent_id, agent_data)
-                    )
-                except Exception as e:
-                    console.print(f"   Sync: ⚠️ Background sync failed: {e}")
-            else:
-                console.print("   Connection: ❌ Connection test failed")
-        else:
-            console.print("🔄 Middleware Sync Status:")
-            console.print("   Status: ❌ DISABLED")
-            console.print("   💡 Set RUNAGENT_API_KEY and configure to enable")
-
-        # NEW: Initialize middleware sync service
+        # Initialize middleware sync service
         try:
             self.config = SDKConfig()
             self.middleware_sync = MiddlewareSyncService(self.config)
@@ -108,11 +63,10 @@ class LocalServer:
             self.middleware_sync = None
 
         self.agent_config = get_agent_config(agent_path)
-
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
         self.agent_framework = self.agent_config.framework
-        self.agent_architecture = self.agent_config.agent_architecture  
+        self.agent_architecture = self.agent_config.agent_architecture
 
         # Install dependencies if requirements.txt exists
         self._install_dependencies()
@@ -127,9 +81,10 @@ class LocalServer:
 
         # Handle agent setup and sync to middleware
         self._ensure_agent_in_database()
-        self._sync_agent_to_middleware()  # NEW: Sync to middleware
+        
+        # REMOVED: Don't sync during __init__ - sync during server start instead
+        # self._sync_agent_to_middleware()  # REMOVED THIS LINE
 
-        # NEW: Pass middleware sync to websocket handler
         self.websocket_handler = AgentWebSocketHandler(self.db_service, self.middleware_sync)
         self.start_time = time.time()
         self._setup_logging()
@@ -138,40 +93,40 @@ class LocalServer:
         self._setup_websocket_routes()
         self._setup_routes()
 
+
     def _sync_agent_to_middleware(self):
-        """Sync agent data to middleware on startup"""
+        """Sync agent data to middleware on startup - FIXED"""
+        if not hasattr(self, 'middleware_sync') or not self.middleware_sync:
+            console.print("[dim]Middleware sync not available[/dim]")
+            return
+            
         if not self.middleware_sync.sync_enabled:
-            console.print("📡 [dim]Middleware sync disabled (no API key configured)[/dim]")
+            console.print("[dim]Middleware sync disabled (no API key configured)[/dim]")
             return
 
         try:
             # Prepare agent data for sync
             agent_data = {
+                "local_agent_id": self.agent_id,  # IMPORTANT: Set the agent ID
                 "name": self.agent_name,
                 "framework": self.agent_framework,
                 "version": self.agent_version,
                 "path": str(self.agent_path),
                 "host": self.host,
                 "port": self.port,
-                "entrypoints": [ep.dict() for ep in self.agent_architecture.entrypoints]
+                "entrypoints": [ep.dict() for ep in self.agent_architecture.entrypoints],
+                "status": "running",
+                "sync_timestamp": datetime.utcnow().isoformat()
             }
 
-            # Run async sync in a new event loop
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're in an async context, schedule for later
-                    asyncio.create_task(self.middleware_sync.sync_agent_startup(self.agent_id, agent_data))
-                else:
-                    # Run in the current loop
-                    loop.run_until_complete(self.middleware_sync.sync_agent_startup(self.agent_id, agent_data))
-            except RuntimeError:
-                # No event loop, create a new one
-                asyncio.run(self.middleware_sync.sync_agent_startup(self.agent_id, agent_data))
+            # Store the agent data in middleware sync for later use
+            if hasattr(self.middleware_sync, 'set_pending_agent_data'):
+                self.middleware_sync.set_pending_agent_data(agent_data)
+            
+            console.print(f"[dim]Agent data prepared for middleware sync[/dim]")
 
         except Exception as e:
-            console.print(f"⚠️ [yellow]Failed to sync agent to middleware: {e}[/yellow]")
+            console.print(f"⚠️ [yellow]Failed to prepare agent data for middleware sync: {e}[/yellow]")
 
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
         """ENHANCED - Create endpoint handler with invocation tracking and middleware sync"""
@@ -814,18 +769,40 @@ class LocalServer:
         return endpoints
 
     def start(self, debug: bool = False):
-        """Start the FastAPI server with middleware sync status"""
+        """Start the FastAPI server with enhanced logging and middleware sync"""
         try:
+            # Sync agent to middleware BEFORE starting server
+            sync_success = self._sync_agent_to_middleware()
+            
+            # Log server startup
+            if hasattr(self, 'agent_logger'):
+                self.agent_logger.info("FastAPI server starting...")
+                self.agent_logger.info(f"Debug mode: {'ON' if debug else 'OFF'}")
+                self.agent_logger.info(f"Server URL: http://{self.host}:{self.port}")
+                self.agent_logger.info(f"Docs URL: http://{self.host}:{self.port}/docs")
+                if sync_success:
+                    self.agent_logger.info("Middleware sync completed successfully")
+                else:
+                    self.agent_logger.warning("Middleware sync failed or disabled")
+            
             # Print middleware sync status
-            if self.middleware_sync and self.middleware_sync.is_sync_enabled():
+            if self.middleware_sync and self.middleware_sync.sync_enabled:
                 console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
-                console.print("   Status: ✅ ENABLED")
-                console.print("   📊 Local invocations will sync to middleware")
-                console.print("   Connection: ✅ Connected to middleware")
+                if sync_success:
+                    console.print("   Status: ✅ ENABLED & SYNCED")
+                    console.print("   📊 Local logs will sync to middleware")
+                    console.print("   📡 Agent registered in middleware")
+                else:
+                    console.print("   Status: ⚠️ ENABLED BUT SYNC FAILED")
+                    console.print("   📊 Local logs may not sync properly")
+                    console.print("   💡 Check network connection and API key")
             else:
                 console.print("🔄 [yellow]Middleware Sync Status:[/yellow]")
                 console.print("   Status: ❌ DISABLED")
                 console.print("   💡 Configure API key to enable sync")
+                
+                if hasattr(self, 'agent_logger'):
+                    self.agent_logger.warning("Middleware sync disabled - logs stored locally only")
 
             # Print server info
             console.print(
@@ -864,6 +841,10 @@ class LocalServer:
             console.print(f"   • View stats: [cyan]GET /api/v1/agents/{self.agent_id}/invocations/stats[/cyan]")
             console.print(f"   • View history: [cyan]GET /api/v1/agents/{self.agent_id}/invocations[/cyan]")
 
+            # Log that server is about to start
+            if hasattr(self, 'agent_logger'):
+                self.agent_logger.info("Starting uvicorn server...")
+
             # Start uvicorn server
             uvicorn.run(
                 self.app,
@@ -875,28 +856,42 @@ class LocalServer:
             )
 
         except OSError as e:
-            if "Address already in use" in str(e):
+            error_msg = str(e)
+            if "Address already in use" in error_msg:
                 console.print(f"💥 [red]Port {self.port} is already in use![/red]")
                 console.print(
                     f"💡 Try using a different port: "
                     f"[cyan]runagent serve --port {self.port + 1}[/cyan]"
                 )
                 console.print("💡 Or stop the existing server and try again")
+                
+                if hasattr(self, 'agent_logger'):
+                    self.agent_logger.error(f"Port {self.port} already in use")
             else:
-                console.print(f"💥 [red]Network error: {str(e)}[/red]")
+                console.print(f"💥 [red]Network error: {error_msg}[/red]")
+                if hasattr(self, 'agent_logger'):
+                    self.agent_logger.error(f"Network error: {error_msg}")
             raise
         except KeyboardInterrupt:
             console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
+            
+            # Log shutdown
+            if hasattr(self, 'agent_logger'):
+                self.agent_logger.info("Server shutdown initiated by user")
+            
             self.shutdown_logging()
             
             # Clean up middleware sync on shutdown
-            if self.middleware_sync.enabled:
+            if self.middleware_sync and hasattr(self.middleware_sync, 'enabled') and self.middleware_sync.enabled:
                 console.print("🧹 [cyan]Cleaning up middleware sync...[/cyan]")
-                self.middleware_sync.remove_agent(self.agent_id)
+                if hasattr(self.middleware_sync, 'remove_agent'):
+                    self.middleware_sync.remove_agent(self.agent_id)
         except Exception as e:
-            if os.getenv('DISABLE_TRY_CATCH'):
-                raise
-            console.print(f"💥 [red]Server error: {str(e)}[/red]")
+            error_msg = f"Server error: {str(e)}"
+            console.print(f"💥 [red]{error_msg}[/red]")
+            
+            if hasattr(self, 'agent_logger'):
+                self.agent_logger.error(error_msg, exc_info=True)
             raise
 
     def get_server_info(self) -> dict:
@@ -982,75 +977,146 @@ class LocalServer:
         except Exception as e:
             console.print(f"⚠️ Could not update Letta agent ID in database: {e}")
 
-
+            
     def _setup_logging(self):
-        """Setup enhanced logging with database integration"""
-        # Create custom logger for this agent
-        self.agent_logger = logging.getLogger(f'runagent_agent_{self.agent_id}')
-        self.agent_logger.setLevel(logging.DEBUG)
-        
-        # Remove existing handlers to avoid duplicates
-        for handler in self.agent_logger.handlers[:]:
-            self.agent_logger.removeHandler(handler)
-        
-        # Add database handler with middleware sync
-        self.db_handler = DatabaseLogHandler(
-            self.db_service, 
-            self.agent_id, 
-            getattr(self, 'middleware_sync', None)
-        )
-        self.db_handler.setFormatter(logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        ))
-        self.agent_logger.addHandler(self.db_handler)
-        
-        # Also keep console output
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'
-        ))
-        self.agent_logger.addHandler(console_handler)
-        
-        # Log initial startup
-        self.agent_logger.info(f"Agent {self.agent_id} local server started")
-        self.agent_logger.info(f"Framework: {self.agent_framework}")
-        self.agent_logger.info(f"Host: {self.host}, Port: {self.port}")
+        """Setup enhanced logging with database integration - FIXED order"""
+        try:
+            # Create custom logger for this agent
+            self.agent_logger = logging.getLogger(f'runagent_agent_{self.agent_id}')
+            self.agent_logger.setLevel(logging.DEBUG)
+            
+            # Remove existing handlers to avoid duplicates
+            for handler in self.agent_logger.handlers[:]:
+                self.agent_logger.removeHandler(handler)
+            
+            # Add database handler
+            try:
+                from runagent.utils.logs import DatabaseLogHandler
+                self.db_handler = DatabaseLogHandler(
+                    self.db_service, 
+                    self.agent_id, 
+                    getattr(self, 'middleware_sync', None)
+                )
+                self.db_handler.setFormatter(logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                ))
+                self.agent_logger.addHandler(self.db_handler)
+            except Exception as e:
+                console.print(f"⚠️ [yellow]Could not setup database logging: {e}[/yellow]")
+            
+            # Also keep console output
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            ))
+            self.agent_logger.addHandler(console_handler)
+            
+            # IMPORTANT: Log initial startup messages AFTER sync setup
+            self.agent_logger.info(f"Agent {self.agent_id} local server started")
+            self.agent_logger.info(f"Framework: {self.agent_framework}")
+            self.agent_logger.info(f"Host: {self.host}, Port: {self.port}")
+            
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Enhanced logging setup failed: {e}[/yellow]")
+
 
     def log_execution_start(self, execution_id: str, entrypoint_tag: str):
         """Log execution start with execution context"""
         extra = {'execution_id': execution_id}
-        self.agent_logger.info(
-            f"Starting execution {execution_id[:8]}... for entrypoint '{entrypoint_tag}'", 
-            extra=extra
-        )
+        if hasattr(self, 'agent_logger'):
+            self.agent_logger.info(
+                f"Starting execution {execution_id[:8]}... for entrypoint '{entrypoint_tag}'", 
+                extra=extra
+            )
+        else:
+            console.print(f"🚀 Starting execution {execution_id[:8]}... for entrypoint '{entrypoint_tag}'")
     
     def log_execution_complete(self, execution_id: str, success: bool, execution_time: float):
         """Log execution completion"""
         extra = {'execution_id': execution_id}
-        if success:
-            self.agent_logger.info(
-                f"Execution {execution_id[:8]}... completed successfully in {execution_time:.2f}s", 
-                extra=extra
-            )
+        if hasattr(self, 'agent_logger'):
+            if success:
+                self.agent_logger.info(
+                    f"Execution {execution_id[:8]}... completed successfully in {execution_time:.2f}s", 
+                    extra=extra
+                )
+            else:
+                self.agent_logger.error(
+                    f"Execution {execution_id[:8]}... failed after {execution_time:.2f}s", 
+                    extra=extra
+                )
         else:
-            self.agent_logger.error(
-                f"Execution {execution_id[:8]}... failed after {execution_time:.2f}s", 
-                extra=extra
-            )
+            status = "completed successfully" if success else "failed"
+            console.print(f"✅ Execution {execution_id[:8]}... {status} in {execution_time:.2f}s")
     
     def log_execution_error(self, execution_id: str, error: Exception):
         """Log execution error"""
         extra = {'execution_id': execution_id}
-        self.agent_logger.error(
-            f"Execution {execution_id[:8]}... error: {str(error)}", 
-            extra=extra, 
-            exc_info=True
-        )
+        if hasattr(self, 'agent_logger'):
+            self.agent_logger.error(
+                f"Execution {execution_id[:8]}... error: {str(error)}", 
+                extra=extra, 
+                exc_info=True
+            )
+        else:
+            console.print(f"💥 [red]Execution {execution_id[:8]}... error: {str(error)}[/red]")
 
     def shutdown_logging(self):
         """Properly shutdown logging and flush remaining logs"""
-        if hasattr(self, 'db_handler'):
-            self.db_handler.close()
+        try:
+            if hasattr(self, 'db_handler'):
+                self.db_handler.close()
+            if hasattr(self, 'agent_logger'):
+                for handler in self.agent_logger.handlers[:]:
+                    handler.close()
+                    self.agent_logger.removeHandler(handler)
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Error during logging shutdown: {e}[/yellow]")
+
+    def shutdown_logging(self):
+        """Properly shutdown logging and flush remaining logs"""
+        try:
+            if hasattr(self, 'db_handler'):
+                self.db_handler.close()
+            if hasattr(self, 'agent_logger'):
+                for handler in self.agent_logger.handlers[:]:
+                    handler.close()
+                    self.agent_logger.removeHandler(handler)
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Error during logging shutdown: {e}[/yellow]")
+
+    def log_raw(self, level: str, message: str, execution_id: str = None):
+        """Simple method to log raw messages - use this for all server logs"""
+        if hasattr(self, 'agent_logger'):
+            extra = {'execution_id': execution_id} if execution_id else {}
+            log_method = getattr(self.agent_logger, level.lower(), self.agent_logger.info)
+            log_method(message, extra=extra)
+        else:
+            # Fallback to console if logger not available
+            level_colors = {
+                'info': 'cyan',
+                'warning': 'yellow', 
+                'error': 'red',
+                'debug': 'dim'
+            }
+            color = level_colors.get(level.lower(), 'white')
+            console.print(f"[{color}]{level.upper()}: {message}[/{color}]")
+
+    def log_info(self, message: str, execution_id: str = None):
+        """Log info message"""
+        self.log_raw('info', message, execution_id)
+
+    def log_warning(self, message: str, execution_id: str = None):
+        """Log warning message"""
+        self.log_raw('warning', message, execution_id)
+
+    def log_error(self, message: str, execution_id: str = None):
+        """Log error message"""
+        self.log_raw('error', message, execution_id)
+
+    def log_debug(self, message: str, execution_id: str = None):
+        """Log debug message"""
+        self.log_raw('debug', message, execution_id)
 
     def __repr__(self):
         return f"LocalServer(agent_id='{self.agent_id}', host='{self.host}', port={self.port})"
