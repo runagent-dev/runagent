@@ -196,26 +196,34 @@ class MiddlewareSyncService:
             return {"success": False, "error": "No REST client available"}
             
         try:
+            # Use the correct RestClient method
             if method == "POST":
                 response = await asyncio.to_thread(
-                    self.rest_client._make_request, 
-                    "POST",
+                    self.rest_client.http.post, 
                     endpoint, 
-                    json=data, 
+                    data=data, 
                     timeout=30
                 )
             elif method == "PUT":
                 response = await asyncio.to_thread(
-                    self.rest_client._make_request, 
-                    "PUT",
+                    self.rest_client.http.put, 
                     endpoint, 
-                    json=data, 
+                    data=data, 
                     timeout=30
                 )
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
-            return response
+            # Parse the response properly
+            if hasattr(response, 'json'):
+                return response.json()
+            elif hasattr(response, 'status_code'):
+                if 200 <= response.status_code < 300:
+                    return {"success": True}
+                else:
+                    return {"success": False, "error": f"HTTP {response.status_code}"}
+            else:
+                return {"success": True, "response": response}
             
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -235,9 +243,11 @@ class MiddlewareSyncService:
             return False
             
         try:
+            # Use the correct method to make HTTP requests
             response = self.rest_client.http.get("/health", timeout=5)
             return response.status_code == 200
-        except:
+        except Exception as e:
+            console.print(f"🔍 [dim]Connection test failed: {str(e)}[/dim]")
             return False
 
 

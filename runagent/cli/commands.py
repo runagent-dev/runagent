@@ -1659,3 +1659,144 @@ def local_sync(status, enable, disable, test):
             raise
         console.print(f"❌ [red]Local sync error:[/red] {e}")
         raise click.ClickException("Local sync command failed")
+
+
+
+# Add this simplified logs command to the db group in runagent/cli/commands.py
+
+@db.command()
+@click.option("--agent-id", help="Filter by specific agent ID")
+@click.option("--limit", type=int, default=100, help="Maximum number of logs to show")
+@click.option("--format", "output_format", type=click.Choice(["table", "json"]), default="table", help="Output format")
+def logs(agent_id, limit, output_format):
+    """Show all agent logs (no filtering)"""
+    try:
+        sdk = RunAgent()
+        
+        if agent_id:
+            # Show logs for specific agent
+            logs = sdk.db_service.get_agent_logs(agent_id=agent_id, limit=limit)
+            
+            if not logs:
+                console.print("📭 [yellow]No logs found[/yellow]")
+                console.print(f"   • Agent ID: {agent_id}")
+                return
+            
+            if output_format == "json":
+                console.print(json.dumps(logs, indent=2))
+                return
+            
+            console.print(f"\n📋 [bold]Agent Logs: {agent_id}[/bold]")
+            
+            table = Table(title=f"All Agent Logs (showing {len(logs)} entries)")
+            table.add_column("Time", style="dim", width=16)
+            table.add_column("Level", width=8)
+            table.add_column("Message", style="white", width=80)
+            table.add_column("Execution", style="cyan", width=12)
+            
+            for log in logs:
+                # Format timestamp
+                time_str = "N/A"
+                if log.get('created_at'):
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(log['created_at'])
+                        time_str = dt.strftime('%m-%d %H:%M:%S')
+                    except:
+                        time_str = log['created_at'][:16]
+                
+                # Color code log levels
+                level = log.get('log_level', 'INFO')
+                if level == 'ERROR' or level == 'CRITICAL':
+                    level_display = f"[red]{level}[/red]"
+                elif level == 'WARNING':
+                    level_display = f"[yellow]{level}[/yellow]"
+                elif level == 'DEBUG':
+                    level_display = f"[dim]{level}[/dim]"
+                else:
+                    level_display = f"[green]{level}[/green]"
+                
+                # Don't truncate messages - show full log
+                message = log.get('message', '')
+                
+                # Show execution ID if available
+                exec_id = log.get('execution_id', '')
+                exec_display = exec_id[:8] + "..." if exec_id else ""
+                
+                table.add_row(time_str, level_display, message, exec_display)
+            
+            console.print(table)
+            
+        else:
+            # Show log summary for all agents
+            agents = sdk.db_service.list_agents()
+            
+            if not agents:
+                console.print("📭 [yellow]No agents found[/yellow]")
+                return
+            
+            console.print(f"\n📊 [bold]Agent Log Summary[/bold]")
+            
+            table = Table(title="Log Counts by Agent")
+            table.add_column("Agent ID", style="magenta", width=20)
+            table.add_column("Framework", style="green", width=12)
+            table.add_column("Total Logs", style="cyan", width=10)
+            table.add_column("Errors", style="red", width=8)
+            table.add_column("Last Log", style="dim", width=16)
+            
+            for agent in agents[:10]:  # Show first 10 agents
+                agent_logs = sdk.db_service.get_agent_logs(agent['agent_id'], limit=1000)
+                error_logs = [log for log in agent_logs if log.get('log_level') in ['ERROR', 'CRITICAL']]
+                
+                last_log_time = "Never"
+                if agent_logs:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(agent_logs[0]['created_at'])
+                        last_log_time = dt.strftime('%m-%d %H:%M')
+                    except:
+                        last_log_time = "Recent"
+                
+                table.add_row(
+                    agent['agent_id'][:18] + "...",
+                    agent['framework'],
+                    str(len(agent_logs)),
+                    str(len(error_logs)),
+                    last_log_time
+                )
+            
+            console.print(table)
+        
+        console.print(f"\n💡 [bold]Usage tips:[/bold]")
+        console.print(f"   • View agent logs: [cyan]runagent db logs --agent-id <agent_id>[/cyan]")
+        console.print(f"   • JSON output: [cyan]runagent db logs --agent-id <agent_id> --format json[/cyan]")
+        console.print(f"   • More logs: [cyan]runagent db logs --agent-id <agent_id> --limit 500[/cyan]")
+
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Error getting logs:[/red] {e}")
+        raise click.ClickException("Failed to get logs")
+
+
+@db.command()
+@click.option("--days", type=int, default=7, help="Clean up logs older than N days")
+@click.option("--yes", is_flag=True, help="Skip confirmation")
+def cleanup_logs(days, yes):
+    """Clean up old agent logs"""
+    try:
+        sdk = RunAgent()
+        
+        if not yes:
+            if not click.confirm(f"⚠️ This will delete logs older than {days} days for ALL agents. Continue?"):
+                console.print("Cleanup cancelled.")
+                return
+        
+        deleted_count = sdk.db_service.cleanup_old_logs(days_old=days)
+        console.print(f"✅ [green]Cleaned up {deleted_count} old log entries[/green]")
+        
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Error cleaning up logs:[/red] {e}")
+        raise click.ClickException("Log cleanup failed")
