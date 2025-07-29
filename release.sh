@@ -272,63 +272,6 @@ generate_changelog() {
     echo "✅ Changelog generated successfully"
 }
 
-# create_basic_changelog() {
-#     local version=$1
-#     local last_tag=$2
-    
-#     cat > "CHANGELOG_NEW.md" << EOF
-# ## What's Changed
-
-# ### ✨ Features
-# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^feat" | sed 's/^feat[:(]//' | sed 's/^feat: //' || echo "- No new features")
-
-# ### 🐛 Bug Fixes
-# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^fix" | sed 's/^fix[:(]//' | sed 's/^fix: //' || echo "- No bug fixes")
-
-# ### 📚 Documentation
-# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^docs" | sed 's/^docs[:(]//' | sed 's/^docs: //' || echo "- No documentation changes")
-
-# ### Other Changes
-# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -v -i "^\(feat\|fix\|docs\)" || echo "- No other changes")
-# EOF
-# }
-
-# create_initial_changelog() {
-#     local version=$1
-    
-#     cat > "CHANGELOG_NEW.md" << EOF
-# ## Initial Release
-
-# 🎉 First release of RunAgent Universal AI Agent Platform!
-
-# ### Features
-# - Universal AI agent platform supporting multiple languages
-# - Python, JavaScript, Rust, and Go SDKs
-# - Framework-agnostic agent deployment
-# - Real-time streaming support
-# EOF
-# }
-
-# update_main_changelog() {
-#     local version=$1
-    
-#     # Create the new changelog with header
-#     echo "# Changelog" > "CHANGELOG.md"
-#     echo "" >> "CHANGELOG.md"
-#     echo "## [v$version] - $(date +%Y-%m-%d)" >> "CHANGELOG.md"
-#     echo "" >> "CHANGELOG.md"
-#     cat "CHANGELOG_NEW.md" >> "CHANGELOG.md"
-#     echo "" >> "CHANGELOG.md"
-    
-#     # Append existing changelog if it exists and has content
-#     if [[ -f "CHANGELOG.md.bak" ]] && [[ -s "CHANGELOG.md.bak" ]]; then
-#         # Skip the header of existing changelog
-#         tail -n +2 "CHANGELOG.md.bak" >> "CHANGELOG.md"
-#     fi
-    
-#     # Clean up
-#     rm -f "CHANGELOG_NEW.md" "CHANGELOG.md.bak"
-# }
 
 show_update_summary() {
     echo ""
@@ -375,23 +318,6 @@ check_prerequisites() {
         exit 1
     fi
     
-    # echo "📍 Current branch: $current_branch"
-    
-    # # Check if we're on main/master for releases
-    # if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
-    #     echo "⚠️  Warning: You're not on main/master branch"
-    #     echo "   Some tags might not be reachable from current branch"
-    #     echo "   Reachable tags from current branch:"
-    #     git tag --merged HEAD | sed 's/^/   - /'
-    #     echo ""
-    #     read -p "Continue anyway? [y/N]: " -r
-    #     echo ""
-    #     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    #         echo "Release cancelled. Consider switching to main branch:"
-    #         echo "  git checkout main"
-    #         exit 0
-    #     fi
-    # fi
 }
 
 handle_existing_tag() {
@@ -414,7 +340,12 @@ handle_existing_tag() {
         fi
         
         echo "Moving tag $tag_name to current commit..."
-        git tag -f -a "$tag_name" -m "Release $tag_name (moved)"
+        
+        git tag -f -a "$tag_name" -m "Release $tag_name (moved)
+
+RunAgent Universal Release $tag_name
+
+All SDKs updated to version $version"
 
         return 0
     fi
@@ -441,10 +372,6 @@ check_git_cliff
 
 check_prerequisites
 
-# Backup existing CHANGELOG.md
-# if [[ -f "CHANGELOG.md" ]]; then
-#     cp "CHANGELOG.md" "CHANGELOG.md.bak"
-# fi
 
 # Update all package files
 update_python_version "$VERSION"
@@ -476,15 +403,6 @@ fi
 if ! git diff --name-only --quiet 2>/dev/null; then
     echo "Changes detected:"
     git diff --name-only 2>/dev/null | sed 's/^/  /'
-    # echo ""
-    # echo "📄 Changelog preview:"
-    # echo "--------------------"
-    # if [[ -f "CHANGELOG.md" ]]; then
-    #     head -20 "CHANGELOG.md"
-    #     if [[ $(wc -l < "CHANGELOG.md") -gt 20 ]]; then
-    #         echo "... ($(wc -l < "CHANGELOG.md") total lines)"
-    #     fi
-    # fi
 else
     echo "⚠️  No git changes detected"
 fi
@@ -495,15 +413,10 @@ echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Release cancelled."
     git checkout -- . 2>/dev/null || true
-    # # Restore backup
-    # if [[ -f "CHANGELOG.md.bak" ]]; then
-    #     mv "CHANGELOG.md.bak" "CHANGELOG.md"
-    # fi
+
     exit 0
 fi
 
-# Clean up backup
-# rm -f "CHANGELOG.md.bak"
 
 # Handle existing tag
 if handle_existing_tag "$VERSION"; then
@@ -529,9 +442,7 @@ git commit -m "chore: bump version to v$VERSION
 - Generated changelog with git-cliff" -q
 
 # # Create new tag
-# git tag -a "v$VERSION" -m "Release v$VERSION
-
-
+git tag -a "v$VERSION" -m "Release v$VERSION
 
 RunAgent Universal Release v$VERSION"
 
