@@ -82,127 +82,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-    # - name: Generate changelog with git-cliff
-    #   if: steps.check-release.outputs.should_release == 'true'
-    #   uses: orhun/git-cliff-action@v4
-    #   id: git-cliff
-    #   with:
-    #     config: cliff.toml
-    #     args: --tag "${{ steps.find-tags.outputs.latest_tag }}" --strip header --strip footer --verbose
-    #   env:
-    #     OUTPUT: current_changelog.md
-    #     GITHUB_REPO: ${{ github.repository }}
-    
-    # - name: Process changelog and create fallback if needed
-    #   if: steps.check-release.outputs.should_release == 'true'
-    #   id: changelog
-    #   run: |
-    #     echo "📝 Processing changelog for v${{ steps.find-tags.outputs.version }}..."
-        
-    #     # Check if git-cliff generated content
-    #     if [ -s "current_changelog.md" ] && [ $(wc -l < current_changelog.md) -gt 2 ]; then
-    #       echo "✅ Git-cliff generated changelog successfully"
-    #       CHANGELOG_CONTENT=$(cat current_changelog.md)
-    #     else
-    #       echo "⚠️ Git-cliff output was minimal, creating fallback changelog"
-          
-    #       # Find the last tag to show range
-    #       LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.find-tags.outputs.latest_tag }}^ 2>/dev/null || echo "")
-          
-    #       if [ -n "$LAST_TAG" ]; then
-    #         echo "📍 Generating changelog for range: $LAST_TAG → ${{ steps.find-tags.outputs.latest_tag }}"
-    #         COMMIT_COUNT=$(git rev-list --count $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }})
-    #         echo "📊 Found $COMMIT_COUNT commits since $LAST_TAG"
-            
-    #         echo "## What's Changed" > current_changelog.md
-    #         echo "" >> current_changelog.md
-            
-    #         # Categorize commits
-    #         echo "### ✨ Features" >> current_changelog.md
-    #         git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^feat" | sed 's/^feat[:(]//' | sed 's/^feat: //' >> current_changelog.md || echo "- No new features" >> current_changelog.md
-    #         echo "" >> current_changelog.md
-            
-    #         echo "### 🐛 Bug Fixes" >> current_changelog.md
-    #         git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^fix" | sed 's/^fix[:(]//' | sed 's/^fix: //' >> current_changelog.md || echo "- No bug fixes" >> current_changelog.md
-    #         echo "" >> current_changelog.md
-            
-    #         echo "### 📚 Documentation" >> current_changelog.md
-    #         git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^docs" | sed 's/^docs[:(]//' | sed 's/^docs: //' >> current_changelog.md || echo "- No documentation changes" >> current_changelog.md
-    #         echo "" >> current_changelog.md
-            
-    #         echo "### Other Changes" >> current_changelog.md
-    #         git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -v -i "^\(feat\|fix\|docs\)" >> current_changelog.md || echo "- No other changes" >> current_changelog.md
-    #       else
-    #         echo "📍 No previous tags found - generating changelog for initial release"
-    #         echo "## Initial Release" > current_changelog.md
-    #         echo "" >> current_changelog.md
-    #         echo "🎉 First release of RunAgent Universal AI Agent Platform!" >> current_changelog.md
-    #         echo "" >> current_changelog.md
-    #         echo "### Features" >> current_changelog.md
-    #         echo "- Universal AI agent platform supporting multiple languages" >> current_changelog.md
-    #         echo "- Python, JavaScript, Rust, and Go SDKs" >> current_changelog.md
-    #         echo "- Framework-agnostic agent deployment" >> current_changelog.md
-    #         echo "- Real-time streaming support" >> current_changelog.md
-    #       fi
-          
-    #       CHANGELOG_CONTENT=$(cat current_changelog.md)
-    #     fi
-        
-    #     # Save changelog content for use in release body
-    #     echo "changelog<<EOF" >> $GITHUB_OUTPUT
-    #     echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
-    #     echo "EOF" >> $GITHUB_OUTPUT
-        
-    #     echo "✅ Changelog processed successfully"
-    #     echo "📄 Preview:"
-    #     echo "----------"
-    #     head -15 current_changelog.md
-    #     if [ $(wc -l < current_changelog.md) -gt 15 ]; then
-    #       echo "... ($(wc -l < current_changelog.md) total lines)"
-    #     fi
-    
-    # - name: Update CHANGELOG.md in repository
-    #   if: steps.check-release.outputs.should_release == 'true'
-    #   run: |
-    #     echo "📝 Updating CHANGELOG.md in repository..."
 
-    #     # Create the new changelog entry
-    #     echo "# Changelog" > CHANGELOG_NEW.md
-    #     echo "" >> CHANGELOG_NEW.md
-    #     echo "## [v${{ steps.find-tags.outputs.version }}] - $(date +%Y-%m-%d)" >> CHANGELOG_NEW.md
-    #     echo "" >> CHANGELOG_NEW.md
-    #     cat current_changelog.md >> CHANGELOG_NEW.md
-    #     echo "" >> CHANGELOG_NEW.md
-        
-    #     # Append existing changelog if it exists
-    #     if [ -f "CHANGELOG.md" ] && [ -s "CHANGELOG.md" ]; then
-    #       # Skip the header of existing changelog
-    #       tail -n +2 CHANGELOG.md >> CHANGELOG_NEW.md
-    #     fi
-        
-    #     mv CHANGELOG_NEW.md CHANGELOG.md
-        
-    #     echo "✅ CHANGELOG.md updated"
-    
-    # - name: Commit updated CHANGELOG.md
-    #   if: steps.check-release.outputs.should_release == 'true'
-    #   run: |
-    #     echo "💾 Committing updated CHANGELOG.md..."
-        
-    #     # Configure git
-    #     git config user.name "github-actions[bot]"
-    #     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        
-    #     # Add and commit the changelog
-    #     git add CHANGELOG.md
-    #     if git diff --staged --quiet; then
-    #       echo "No changes to commit"
-    #     else
-    #       git commit -m "docs: update CHANGELOG.md for v${{ steps.find-tags.outputs.version }}"
-    #       git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
-    #       echo "✅ CHANGELOG.md committed and pushed"
-    #     fi
-    
     - name: Create main GitHub Release
       if: steps.check-release.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v1
@@ -213,15 +93,16 @@ jobs:
           # 🚀 RunAgent v${{ steps.find-tags.outputs.version }}
           
           **Universal AI Agent Platform - All SDKs synchronized at v${{ steps.find-tags.outputs.version }}**
-
           
-          ## 📋 Changes in this Release
+          ## 📋 What's New
           
-          ${{ steps.changelog.outputs.changelog }}
+          For detailed changes in this release, see [CHANGELOG.md](./CHANGELOG.md).
+          
+          This release synchronizes all RunAgent SDKs (Python, JavaScript, Rust, Go) to version ${{ steps.find-tags.outputs.version }}.
           
         draft: false
         prerelease: false
-        generate_release_notes: false
+        generate_release_notes: true  # Let GitHub add commit-based notes
         files: |
           CHANGELOG.md
       env:
