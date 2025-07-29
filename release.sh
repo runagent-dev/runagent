@@ -444,7 +444,7 @@ git tag -a "v$VERSION" -m "Release v$VERSION
 RunAgent Universal Release v$VERSION"
 
 git push --tag
-echo "✅ Tag v$VERSION created successfully!"
+echo "✅ Tag v$VERSION created and pushed successfully!"
 
 generate_changelog
 
