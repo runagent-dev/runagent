@@ -443,7 +443,8 @@ git commit -m "chore: bump version to v$VERSION
 git tag -a "v$VERSION" -m "Release v$VERSION
 RunAgent Universal Release v$VERSION"
 
-echo "✅ Tag v$VERSION created successfully!"
+git push --tag
+echo "✅ Tag v$VERSION created and pushed successfully!"
 
 generate_changelog
 
