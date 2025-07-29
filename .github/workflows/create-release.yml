@@ -12,6 +12,10 @@ jobs:
   detect-and-release:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event.pull_request.merged == true)
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
     
     steps:
     - uses: actions/checkout@v4
@@ -195,7 +199,7 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "docs: update CHANGELOG.md for v${{ steps.find-tags.outputs.version }}"
-          git push origin main
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
           echo "✅ CHANGELOG.md committed and pushed"
         fi
     
