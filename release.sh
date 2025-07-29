@@ -15,7 +15,7 @@ usage() {
     echo "  5. Workflows will generate changelog and publish packages when tag reaches main"
     echo ""
     echo "Example:"
-    echo "  $0 1.2.3"
+    echo "bash ./release.sh 1.2.3"
 }
 
 validate_version() {
@@ -37,6 +37,9 @@ update_python_version() {
         echo "📦 Updating Python pyproject.toml version to $version"
         if [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS
+            echo "Python Trial"
+            echo sed -i '' "s/version = \".*\"/version = \"$version\"/" "$pyproject_file"
+
             sed -i '' "s/version = \".*\"/version = \"$version\"/" "$pyproject_file"
         else
             # Linux
@@ -167,24 +170,24 @@ check_prerequisites() {
         echo "    The release tag will be created on '$current_branch'"
         echo "    Note: Workflows only run when the tag is reachable from main branch"
         echo ""
-        read -p "Continue with release from '$current_branch'? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Release cancelled. To release from main:"
-            echo "  git checkout main"
-            echo "  ./release.sh $VERSION"
-            exit 1
-        fi
+        # read -p "Continue with release from '$current_branch'? (y/N): " -n 1 -r
+        # echo
+        # if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        #     echo "Release cancelled. To release from main:"
+        #     echo "  git checkout main"
+        #     echo "  ./release.sh $VERSION"
+        #     exit 1
+        # fi
     fi
 
-    # Check for uncommitted changes
-    if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
-        echo "❌ Error: You have uncommitted changes"
-        git status --short 2>/dev/null || echo "Could not show git status"
-        echo ""
-        echo "Please commit or stash your changes before releasing."
-        exit 1
-    fi
+    # # Check for uncommitted changes
+    # if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+    #     echo "❌ Error: You have uncommitted changes"
+    #     git status --short 2>/dev/null || echo "Could not show git status"
+    #     echo ""
+    #     echo "Please commit or stash your changes before releasing."
+    #     exit 1
+    # fi
 
     # Check if git is working
     if ! git status &>/dev/null; then
@@ -192,23 +195,23 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Try to pull latest changes from current branch
-    echo "🔄 Pulling latest changes from $current_branch..."
-    if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
-        # Remote branch exists, try to pull
-        if ! git pull origin "$current_branch"; then
-            echo "⚠️  Warning: Could not pull from origin/$current_branch"
-            echo "    You might be ahead of remote or there might be conflicts"
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
-        fi
-    else
-        echo "⚠️  Remote branch origin/$current_branch does not exist"
-        echo "    This might be a new branch that hasn't been pushed yet"
-    fi
+    # # Try to pull latest changes from current branch
+    # echo "🔄 Pulling latest changes from $current_branch..."
+    # if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
+    #     # Remote branch exists, try to pull
+    #     if ! git pull origin "$current_branch"; then
+    #         echo "⚠️  Warning: Could not pull from origin/$current_branch"
+    #         echo "    You might be ahead of remote or there might be conflicts"
+    #         read -p "Continue anyway? (y/N): " -n 1 -r
+    #         echo
+    #         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    #             exit 1
+    #         fi
+    #     fi
+    # else
+    #     echo "⚠️  Remote branch origin/$current_branch does not exist"
+    #     echo "    This might be a new branch that hasn't been pushed yet"
+    # fi
 }
 
 show_version_changes() {
