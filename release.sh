@@ -434,11 +434,6 @@ if git diff --staged --quiet; then
     exit 1
 fi
 
-git commit -m "chore: bump version to v$VERSION
-
-- Updated all SDK versions to $VERSION
-- Generated changelog with git-cliff" -q
-
 # # Create new tag
 git tag -a "v$VERSION" -m "Release v$VERSION
 RunAgent Universal Release v$VERSION"
@@ -449,6 +444,10 @@ echo "✅ Tag v$VERSION created and pushed successfully!"
 generate_changelog
 
 
+git commit -m "chore: bump version to v$VERSION
+
+- Updated all SDK versions to $VERSION
+- Generated changelog with git-cliff" -q
 
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
 echo ""
