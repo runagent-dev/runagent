@@ -78,60 +78,58 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Install git-cliff for changelog generation
+    - name: Generate changelog with git-cliff
       if: steps.check-release.outputs.should_release == 'true'
-      run: |
-        echo "📥 Installing git-cliff for changelog generation..."
-        curl -L https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-0.24.2-x86_64-unknown-linux-gnu.tar.gz | tar -xz
-        sudo mv git-cliff-0.24.2/git-cliff /usr/local/bin/
-        git-cliff --version
+      uses: orhun/git-cliff-action@v4
+      id: git-cliff
+      with:
+        config: cliff.toml
+        args: --tag "${{ steps.find-tags.outputs.latest_tag }}" --strip header --strip footer --verbose
+      env:
+        OUTPUT: current_changelog.md
+        GITHUB_REPO: ${{ github.repository }}
     
-    - name: Generate changelog
+    - name: Process changelog and create fallback if needed
       if: steps.check-release.outputs.should_release == 'true'
       id: changelog
       run: |
-        echo "📝 Generating changelog for v${{ steps.find-tags.outputs.version }}..."
+        echo "📝 Processing changelog for v${{ steps.find-tags.outputs.version }}..."
         
-        # Find the last tag to show range
-        LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.find-tags.outputs.latest_tag }}^ 2>/dev/null || echo "")
-        
-        if [ -n "$LAST_TAG" ]; then
-          echo "📍 Generating changelog for range: $LAST_TAG → ${{ steps.find-tags.outputs.latest_tag }}"
-          COMMIT_COUNT=$(git rev-list --count $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }})
-          echo "📊 Found $COMMIT_COUNT commits since $LAST_TAG"
+        # Check if git-cliff generated content
+        if [ -s "current_changelog.md" ] && [ $(wc -l < current_changelog.md) -gt 2 ]; then
+          echo "✅ Git-cliff generated changelog successfully"
+          CHANGELOG_CONTENT=$(cat current_changelog.md)
         else
-          echo "📍 No previous tags found - generating changelog for initial release"
-          COMMIT_COUNT=$(git rev-list --count ${{ steps.find-tags.outputs.latest_tag }})
-          echo "📊 Found $COMMIT_COUNT total commits"
-        fi
-        
-        # Generate changelog using git-cliff
-        git-cliff --tag "${{ steps.find-tags.outputs.latest_tag }}" --strip header --strip footer > current_changelog.md
-        
-        # If git-cliff output is empty or too short, create a basic changelog
-        if [ ! -s current_changelog.md ] || [ $(wc -l < current_changelog.md) -lt 3 ]; then
-          echo "⚠️ Git-cliff output was minimal, creating basic changelog"
+          echo "⚠️ Git-cliff output was minimal, creating fallback changelog"
+          
+          # Find the last tag to show range
+          LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.find-tags.outputs.latest_tag }}^ 2>/dev/null || echo "")
           
           if [ -n "$LAST_TAG" ]; then
+            echo "📍 Generating changelog for range: $LAST_TAG → ${{ steps.find-tags.outputs.latest_tag }}"
+            COMMIT_COUNT=$(git rev-list --count $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }})
+            echo "📊 Found $COMMIT_COUNT commits since $LAST_TAG"
+            
             echo "## What's Changed" > current_changelog.md
             echo "" >> current_changelog.md
             
             # Categorize commits
             echo "### ✨ Features" >> current_changelog.md
-            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- feat" | sed 's/^- feat[:(]/- /' | sed 's/^- feat: /- /' >> current_changelog.md || echo "- No new features" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^feat" | sed 's/^feat[:(]//' | sed 's/^feat: //' >> current_changelog.md || echo "- No new features" >> current_changelog.md
             echo "" >> current_changelog.md
             
             echo "### 🐛 Bug Fixes" >> current_changelog.md
-            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- fix" | sed 's/^- fix[:(]/- /' | sed 's/^- fix: /- /' >> current_changelog.md || echo "- No bug fixes" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^fix" | sed 's/^fix[:(]//' | sed 's/^fix: //' >> current_changelog.md || echo "- No bug fixes" >> current_changelog.md
             echo "" >> current_changelog.md
             
             echo "### 📚 Documentation" >> current_changelog.md
-            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- docs" | sed 's/^- docs[:(]/- /' | sed 's/^- docs: /- /' >> current_changelog.md || echo "- No documentation changes" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^docs" | sed 's/^docs[:(]//' | sed 's/^docs: //' >> current_changelog.md || echo "- No documentation changes" >> current_changelog.md
             echo "" >> current_changelog.md
             
             echo "### Other Changes" >> current_changelog.md
-            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -v -i "^- \(feat\|fix\|docs\)" >> current_changelog.md || echo "- No other changes" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -v -i "^\(feat\|fix\|docs\)" >> current_changelog.md || echo "- No other changes" >> current_changelog.md
           else
+            echo "📍 No previous tags found - generating changelog for initial release"
             echo "## Initial Release" > current_changelog.md
             echo "" >> current_changelog.md
             echo "🎉 First release of RunAgent Universal AI Agent Platform!" >> current_changelog.md
@@ -142,17 +140,16 @@ jobs:
             echo "- Framework-agnostic agent deployment" >> current_changelog.md
             echo "- Real-time streaming support" >> current_changelog.md
           fi
+          
+          CHANGELOG_CONTENT=$(cat current_changelog.md)
         fi
-        
-        # Read the changelog content
-        CHANGELOG_CONTENT=$(cat current_changelog.md)
         
         # Save changelog content for use in release body
         echo "changelog<<EOF" >> $GITHUB_OUTPUT
         echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
         
-        echo "✅ Changelog generated successfully"
+        echo "✅ Changelog processed successfully"
         echo "📄 Preview:"
         echo "----------"
         head -15 current_changelog.md
