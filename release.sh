@@ -14,13 +14,71 @@ usage() {
     echo "Version: semantic version (e.g., 1.2.3)"
     echo ""
     echo "This will:"
-    echo "  1. Update version in all SDK package files"
-    echo "  2. Commit the changes"
-    echo "  3. Create a git tag v<version>"
-    echo "  4. Push everything to current branch"
+    echo "  1. Check for git-cliff installation"
+    echo "  2. Update version in all SDK package files"
+    echo "  3. Generate changelog with git-cliff"
+    echo "  4. Commit the changes"
+    echo "  5. Create a git tag v<version>"
+    echo "  6. Push everything to current branch"
     echo ""
     echo "Example:"
     echo "bash ./release.sh 1.2.3"
+}
+
+check_git_cliff() {
+    echo "🔍 Checking for git-cliff..."
+    
+    if ! command -v git-cliff &> /dev/null; then
+        echo ""
+        echo "❌ Error: git-cliff is not installed!"
+        echo ""
+        echo "📥 Installation options:"
+        echo ""
+        echo "1. Using Cargo (Rust):"
+        echo "   cargo install git-cliff"
+        echo ""
+        echo "2. Using Homebrew (macOS):"
+        echo "   brew install git-cliff"
+        echo ""
+        echo "3. Using package managers:"
+        echo "   # Arch Linux"
+        echo "   pacman -S git-cliff"
+        echo ""
+        echo "   # Fedora"
+        echo "   dnf install git-cliff"
+        echo ""
+        echo "4. Download binary from GitHub:"
+        echo "   https://github.com/orhun/git-cliff/releases"
+        echo ""
+        echo "5. Quick install script:"
+        echo "   curl -L https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-\$(uname -m)-unknown-linux-gnu.tar.gz | tar -xz"
+        echo "   sudo mv git-cliff-*/git-cliff /usr/local/bin/"
+        echo ""
+        echo "Please install git-cliff and run this script again."
+        exit 1
+    fi
+    
+    local cliff_version
+    cliff_version=$(git-cliff --version 2>/dev/null | head -1)
+    echo "✅ Found: $cliff_version"
+    
+    # Check if cliff.toml exists
+    if [[ ! -f "cliff.toml" ]]; then
+        echo ""
+        echo "⚠️  Warning: cliff.toml configuration file not found!"
+        echo "   git-cliff will use default configuration."
+        echo "   Consider creating cliff.toml for better changelog formatting."
+        echo ""
+        echo "📝 To create a basic cliff.toml:"
+        echo "   git-cliff --init"
+        echo ""
+        read -p "Continue without cliff.toml? [y/N]: " -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Release cancelled. Please create cliff.toml first."
+            exit 0
+        fi
+    fi
 }
 
 validate_version() {
@@ -163,6 +221,115 @@ EOF
     fi
 }
 
+generate_changelog() {
+    # local version=$1
+    # local tag_name="v$version"
+    
+    # echo "📝 Generating changelog with git-cliff..."
+    
+    # # Find the previous tag to determine range
+    # local last_tag
+    # last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    
+    # if [[ -n "$last_tag" ]]; then
+    #     echo "📍 Generating changelog for range: $last_tag → $tag_name"
+        
+    #     # Generate changelog for the current version using --latest if we're at the latest
+    #     # Or specify the tag explicitly for historical generation
+    #     if [[ -f "cliff.toml" ]]; then
+            # First try to generate for the specific tag
+    # git-cliff --tag "$tag_name" --latest --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
+    #             echo "⚠️  git-cliff --latest failed, trying full tag generation"
+    #             git-cliff --tag "$tag_name" --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
+    #                 echo "⚠️  git-cliff failed, creating basic changelog"
+    #                 create_basic_changelog "$version" "$last_tag"
+    #                 return
+    #             }
+    #         }
+    #     else
+    #         git-cliff --tag "$tag_name" --latest --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
+    #             echo "⚠️  git-cliff failed, creating basic changelog"
+    #             create_basic_changelog "$version" "$last_tag"
+    #             return
+    #         }
+    #     fi
+    # else
+    #     echo "📍 No previous tags found - generating changelog for initial release"
+    #     create_initial_changelog "$version"
+    #     return
+    # fi
+    
+    # Check if we got meaningful output
+    # if [[ ! -s "CHANGELOG_NEW.md" ]] || [[ $(wc -l < "CHANGELOG_NEW.md") -lt 2 ]]; then
+    #     echo "⚠️  git-cliff produced minimal output, creating basic changelog"
+    #     create_basic_changelog "$version" "$last_tag"
+    #     return
+    # fi
+    git-cliff --output CHANGELOG.md --latest
+    # Update main CHANGELOG.md
+    # update_main_changelog "$version"
+    
+    echo "✅ Changelog generated successfully"
+}
+
+# create_basic_changelog() {
+#     local version=$1
+#     local last_tag=$2
+    
+#     cat > "CHANGELOG_NEW.md" << EOF
+# ## What's Changed
+
+# ### ✨ Features
+# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^feat" | sed 's/^feat[:(]//' | sed 's/^feat: //' || echo "- No new features")
+
+# ### 🐛 Bug Fixes
+# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^fix" | sed 's/^fix[:(]//' | sed 's/^fix: //' || echo "- No bug fixes")
+
+# ### 📚 Documentation
+# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -i "^docs" | sed 's/^docs[:(]//' | sed 's/^docs: //' || echo "- No documentation changes")
+
+# ### Other Changes
+# $(git log --pretty=format:"- %s" "$last_tag"..HEAD | grep -v -i "^\(feat\|fix\|docs\)" || echo "- No other changes")
+# EOF
+# }
+
+# create_initial_changelog() {
+#     local version=$1
+    
+#     cat > "CHANGELOG_NEW.md" << EOF
+# ## Initial Release
+
+# 🎉 First release of RunAgent Universal AI Agent Platform!
+
+# ### Features
+# - Universal AI agent platform supporting multiple languages
+# - Python, JavaScript, Rust, and Go SDKs
+# - Framework-agnostic agent deployment
+# - Real-time streaming support
+# EOF
+# }
+
+# update_main_changelog() {
+#     local version=$1
+    
+#     # Create the new changelog with header
+#     echo "# Changelog" > "CHANGELOG.md"
+#     echo "" >> "CHANGELOG.md"
+#     echo "## [v$version] - $(date +%Y-%m-%d)" >> "CHANGELOG.md"
+#     echo "" >> "CHANGELOG.md"
+#     cat "CHANGELOG_NEW.md" >> "CHANGELOG.md"
+#     echo "" >> "CHANGELOG.md"
+    
+#     # Append existing changelog if it exists and has content
+#     if [[ -f "CHANGELOG.md.bak" ]] && [[ -s "CHANGELOG.md.bak" ]]; then
+#         # Skip the header of existing changelog
+#         tail -n +2 "CHANGELOG.md.bak" >> "CHANGELOG.md"
+#     fi
+    
+#     # Clean up
+#     rm -f "CHANGELOG_NEW.md" "CHANGELOG.md.bak"
+# }
+
 show_update_summary() {
     echo ""
     echo "📋 Update Summary:"
@@ -207,6 +374,24 @@ check_prerequisites() {
         echo "❌ Error: Not in a git repository or git is not working"
         exit 1
     fi
+    
+    # echo "📍 Current branch: $current_branch"
+    
+    # # Check if we're on main/master for releases
+    # if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
+    #     echo "⚠️  Warning: You're not on main/master branch"
+    #     echo "   Some tags might not be reachable from current branch"
+    #     echo "   Reachable tags from current branch:"
+    #     git tag --merged HEAD | sed 's/^/   - /'
+    #     echo ""
+    #     read -p "Continue anyway? [y/N]: " -r
+    #     echo ""
+    #     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    #         echo "Release cancelled. Consider switching to main branch:"
+    #         echo "  git checkout main"
+    #         exit 0
+    #     fi
+    # fi
 }
 
 handle_existing_tag() {
@@ -254,7 +439,15 @@ fi
 
 echo "🚀 RunAgent Version Bump to v$VERSION"
 
+# FIRST: Check git-cliff before making any changes
+check_git_cliff
+
 check_prerequisites
+
+# Backup existing CHANGELOG.md
+# if [[ -f "CHANGELOG.md" ]]; then
+#     cp "CHANGELOG.md" "CHANGELOG.md.bak"
+# fi
 
 # Update all package files
 update_python_version "$VERSION"
@@ -272,13 +465,29 @@ fi
 
 if [[ "$any_success" == "false" ]]; then
     echo "❌ No version updates succeeded. Aborting release."
+    # # Restore backup
+    # if [[ -f "CHANGELOG.md.bak" ]]; then
+    #     mv "CHANGELOG.md.bak" "CHANGELOG.md"
+    # fi
     exit 1
 fi
+
+# Generate changelog
+# generate_changelog "$VERSION"
 
 # Show git changes
 if ! git diff --name-only --quiet 2>/dev/null; then
     echo "Changes detected:"
     git diff --name-only 2>/dev/null | sed 's/^/  /'
+    # echo ""
+    # echo "📄 Changelog preview:"
+    # echo "--------------------"
+    # if [[ -f "CHANGELOG.md" ]]; then
+    #     head -20 "CHANGELOG.md"
+    #     if [[ $(wc -l < "CHANGELOG.md") -gt 20 ]]; then
+    #         echo "... ($(wc -l < "CHANGELOG.md") total lines)"
+    #     fi
+    # fi
 else
     echo "⚠️  No git changes detected"
 fi
@@ -289,8 +498,15 @@ echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Release cancelled."
     git checkout -- . 2>/dev/null || true
+    # # Restore backup
+    # if [[ -f "CHANGELOG.md.bak" ]]; then
+    #     mv "CHANGELOG.md.bak" "CHANGELOG.md"
+    # fi
     exit 0
 fi
+
+# Clean up backup
+# rm -f "CHANGELOG.md.bak"
 
 # Handle existing tag
 if handle_existing_tag "$VERSION"; then
@@ -306,10 +522,15 @@ if git diff --staged --quiet; then
     exit 1
 fi
 
-git commit -m "chore: bump version to v$VERSION" -q
+git commit -m "chore: bump version to v$VERSION
+
+- Updated all SDK versions to $VERSION
+- Generated changelog with git-cliff" -q
 
 # Create new tag
 git tag -a "v$VERSION" -m "Release v$VERSION
+
+generate_changelog
 
 RunAgent Universal Release v$VERSION"
 
