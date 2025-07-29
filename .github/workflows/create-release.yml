@@ -213,52 +213,12 @@ jobs:
           # 🚀 RunAgent v${{ steps.find-tags.outputs.version }}
           
           **Universal AI Agent Platform - All SDKs synchronized at v${{ steps.find-tags.outputs.version }}**
-          
-          ## 📦 Installation
-          
-          Choose your preferred language:
-          
-          ### Python
-          ```bash
-          pip install runagent==${{ steps.find-tags.outputs.version }}
-          ```
-          
-          ### JavaScript/TypeScript
-          ```bash
-          npm install runagent@${{ steps.find-tags.outputs.version }}
-          ```
-          
-          ### Rust
-          ```toml
-          [dependencies]
-          runagent = "${{ steps.find-tags.outputs.version }}"
-          ```
-          
-          ### Go
-          ```bash
-          go get github.com/runagent-dev/runagent/runagent-go@${{ steps.find-tags.outputs.latest_tag }}
-          ```
+
           
           ## 📋 Changes in this Release
           
           ${{ steps.changelog.outputs.changelog }}
           
-          ## 🔗 Package Links
-          
-          - 🐍 [PyPI Package](https://pypi.org/project/runagent/${{ steps.find-tags.outputs.version }}/) (Publishing...)
-          - 📦 [npm Package](https://www.npmjs.com/package/runagent/v/${{ steps.find-tags.outputs.version }}) (Publishing...)
-          - 🦀 [crates.io Package](https://crates.io/crates/runagent/${{ steps.find-tags.outputs.version }}) (Publishing...)
-          - 🐹 [Go Module](https://pkg.go.dev/github.com/runagent-dev/runagent/runagent-go@${{ steps.find-tags.outputs.latest_tag }}) ✅
-          
-          ## 📚 Documentation
-          
-          - 📖 [Documentation](https://docs.run-agent.ai)
-          - 🚀 [Quick Start Guide](https://docs.run-agent.ai/get-started/quickstart)
-          - 💬 [Discord Community](https://discord.gg/runagent)
-          
-          ---
-          
-          **Note**: Individual SDK status will be updated below as packages are published.
         draft: false
         prerelease: false
         generate_release_notes: false
