@@ -3,91 +3,215 @@ name: Create GitHub Release
 
 on:
   push:
-    tags:
-      - 'v*'  # Triggers on tags like v1.2.3
+    branches: [main]  # Trigger on ANY push to main (including PR merges)
+  pull_request:
+    types: [closed]   # Also trigger when PRs are merged
+    branches: [main]
 
 jobs:
-  create-main-release:
+  detect-and-release:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true)
     
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Need full history for changelog
+        fetch-depth: 0  # Need full history to find tags
     
-    - name: Extract version from tag
-      id: extract_version
+    - name: Find new tags reachable from main
+      id: find-tags
       run: |
-        VERSION=${GITHUB_REF#refs/tags/v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
-        echo "Extracted version: $VERSION"
+        echo "🔍 [MAIN RELEASE] Checking for version tags now reachable from main..."
+        
+        # Get all version tags
+        ALL_TAGS=$(git tag -l 'v*' | sort -V)
+        echo "All version tags: $ALL_TAGS"
+        
+        # Find tags that are reachable from main
+        REACHABLE_TAGS=""
+        for tag in $ALL_TAGS; do
+          TAG_COMMIT=$(git rev-list -n 1 $tag)
+          if git merge-base --is-ancestor $TAG_COMMIT HEAD; then
+            echo "✅ Tag $tag is reachable from main (commit: $TAG_COMMIT)"
+            REACHABLE_TAGS="$REACHABLE_TAGS $tag"
+          else
+            echo "❌ Tag $tag is NOT reachable from main (commit: $TAG_COMMIT)"
+          fi
+        done
+        
+        echo "reachable_tags=$REACHABLE_TAGS" >> $GITHUB_OUTPUT
+        
+        # Find the latest reachable tag
+        if [ -n "$REACHABLE_TAGS" ]; then
+          LATEST_TAG=$(echo $REACHABLE_TAGS | tr ' ' '\n' | sort -V | tail -1)
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "🏷️ Latest reachable tag: $LATEST_TAG"
+          
+          # Extract version
+          VERSION=${LATEST_TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "No version tags reachable from main"
+          echo "latest_tag=" >> $GITHUB_OUTPUT
+          echo "version=" >> $GITHUB_OUTPUT
+        fi
     
-    - name: Extract changelog for this version
+    - name: Check if this is a new release
+      id: check-release
+      run: |
+        LATEST_TAG="${{ steps.find-tags.outputs.latest_tag }}"
+        
+        if [ -z "$LATEST_TAG" ]; then
+          echo "No tags found, skipping release"
+          echo "should_release=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Check if we already created a release for this tag
+        if gh release view "$LATEST_TAG" >/dev/null 2>&1; then
+          echo "Release for $LATEST_TAG already exists, skipping"
+          echo "should_release=false" >> $GITHUB_OUTPUT
+        else
+          echo "🚀 New tag $LATEST_TAG detected, should create release"
+          echo "should_release=true" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Install git-cliff for changelog generation
+      if: steps.check-release.outputs.should_release == 'true'
+      run: |
+        echo "📥 Installing git-cliff for changelog generation..."
+        curl -L https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+        sudo mv git-cliff-*/git-cliff /usr/local/bin/
+        git-cliff --version
+    
+    - name: Generate changelog
+      if: steps.check-release.outputs.should_release == 'true'
       id: changelog
       run: |
-        if [ -f "CHANGELOG.md" ]; then
-          echo "📝 Extracting changelog from committed CHANGELOG.md"
-          
-          # Extract the section for this version from CHANGELOG.md
-          # This assumes the changelog was generated locally and committed
-          awk '/^## \[.*\].*/{if(found) exit; if(/\['${{ steps.extract_version.outputs.version }}'\]/) found=1; if(found) print; next} found' CHANGELOG.md > current_changelog.md
-          
-          # If the extraction didn't work well, try a different approach
-          if [ ! -s current_changelog.md ]; then
-            # Extract everything after the first ## heading until the next ##
-            sed -n '/^## \[/,/^## \[/p' CHANGELOG.md | head -n -1 > current_changelog.md
-          fi
-          
-          # If still empty, use the first 30 lines of changelog
-          if [ ! -s current_changelog.md ]; then
-            head -30 CHANGELOG.md > current_changelog.md
-          fi
-          
-          # Read the changelog content
-          CHANGELOG_CONTENT=$(cat current_changelog.md)
-          
-          # Clean up and format for GitHub
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          echo "✅ Changelog extracted successfully"
-          echo "Preview:"
-          echo "--------"
-          head -10 current_changelog.md
-          
+        echo "📝 Generating changelog for v${{ steps.find-tags.outputs.version }}..."
+        
+        # Find the last tag to show range
+        LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.find-tags.outputs.latest_tag }}^ 2>/dev/null || echo "")
+        
+        if [ -n "$LAST_TAG" ]; then
+          echo "📍 Generating changelog for range: $LAST_TAG → ${{ steps.find-tags.outputs.latest_tag }}"
+          COMMIT_COUNT=$(git rev-list --count $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }})
+          echo "📊 Found $COMMIT_COUNT commits since $LAST_TAG"
         else
-          echo "⚠️ No CHANGELOG.md found, generating basic changelog"
-          
-          # Fallback: generate basic changelog from git history
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "📍 No previous tags found - generating changelog for initial release"
+          COMMIT_COUNT=$(git rev-list --count ${{ steps.find-tags.outputs.latest_tag }})
+          echo "📊 Found $COMMIT_COUNT total commits"
+        fi
+        
+        # Generate changelog using git-cliff
+        git-cliff --tag "${{ steps.find-tags.outputs.latest_tag }}" --strip header --strip footer > current_changelog.md
+        
+        # If git-cliff output is empty or too short, create a basic changelog
+        if [ ! -s current_changelog.md ] || [ $(wc -l < current_changelog.md) -lt 3 ]; then
+          echo "⚠️ Git-cliff output was minimal, creating basic changelog"
           
           if [ -n "$LAST_TAG" ]; then
             echo "## What's Changed" > current_changelog.md
             echo "" >> current_changelog.md
-            git log --pretty=format:"- %s" $LAST_TAG..HEAD >> current_changelog.md
+            
+            # Categorize commits
+            echo "### ✨ Features" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- feat" | sed 's/^- feat[:(]/- /' | sed 's/^- feat: /- /' >> current_changelog.md || echo "- No new features" >> current_changelog.md
+            echo "" >> current_changelog.md
+            
+            echo "### 🐛 Bug Fixes" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- fix" | sed 's/^- fix[:(]/- /' | sed 's/^- fix: /- /' >> current_changelog.md || echo "- No bug fixes" >> current_changelog.md
+            echo "" >> current_changelog.md
+            
+            echo "### 📚 Documentation" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -i "^- docs" | sed 's/^- docs[:(]/- /' | sed 's/^- docs: /- /' >> current_changelog.md || echo "- No documentation changes" >> current_changelog.md
+            echo "" >> current_changelog.md
+            
+            echo "### Other Changes" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..${{ steps.find-tags.outputs.latest_tag }} | grep -v -i "^- \(feat\|fix\|docs\)" >> current_changelog.md || echo "- No other changes" >> current_changelog.md
           else
             echo "## Initial Release" > current_changelog.md
             echo "" >> current_changelog.md
-            echo "First release of RunAgent Universal AI Agent Platform" >> current_changelog.md
+            echo "🎉 First release of RunAgent Universal AI Agent Platform!" >> current_changelog.md
+            echo "" >> current_changelog.md
+            echo "### Features" >> current_changelog.md
+            echo "- Universal AI agent platform supporting multiple languages" >> current_changelog.md
+            echo "- Python, JavaScript, Rust, and Go SDKs" >> current_changelog.md
+            echo "- Framework-agnostic agent deployment" >> current_changelog.md
+            echo "- Real-time streaming support" >> current_changelog.md
           fi
-          
-          CHANGELOG_CONTENT=$(cat current_changelog.md)
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+        
+        # Read the changelog content
+        CHANGELOG_CONTENT=$(cat current_changelog.md)
+        
+        # Save changelog content for use in release body
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "✅ Changelog generated successfully"
+        echo "📄 Preview:"
+        echo "----------"
+        head -15 current_changelog.md
+        if [ $(wc -l < current_changelog.md) -gt 15 ]; then
+          echo "... ($(wc -l < current_changelog.md) total lines)"
+        fi
+    
+    - name: Update CHANGELOG.md in repository
+      if: steps.check-release.outputs.should_release == 'true'
+      run: |
+        echo "📝 Updating CHANGELOG.md in repository..."
+        
+        # Create the new changelog entry
+        echo "# Changelog" > CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        echo "## [v${{ steps.find-tags.outputs.version }}] - $(date +%Y-%m-%d)" >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        cat current_changelog.md >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        
+        # Append existing changelog if it exists
+        if [ -f "CHANGELOG.md" ] && [ -s "CHANGELOG.md" ]; then
+          # Skip the header of existing changelog
+          tail -n +2 CHANGELOG.md >> CHANGELOG_NEW.md
+        fi
+        
+        mv CHANGELOG_NEW.md CHANGELOG.md
+        
+        echo "✅ CHANGELOG.md updated"
+    
+    - name: Commit updated CHANGELOG.md
+      if: steps.check-release.outputs.should_release == 'true'
+      run: |
+        echo "💾 Committing updated CHANGELOG.md..."
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # Add and commit the changelog
+        git add CHANGELOG.md
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "docs: update CHANGELOG.md for v${{ steps.find-tags.outputs.version }}"
+          git push origin main
+          echo "✅ CHANGELOG.md committed and pushed"
         fi
     
     - name: Create main GitHub Release
+      if: steps.check-release.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.extract_version.outputs.tag_name }}
-        name: RunAgent v${{ steps.extract_version.outputs.version }}
+        tag_name: ${{ steps.find-tags.outputs.latest_tag }}
+        name: RunAgent v${{ steps.find-tags.outputs.version }}
         body: |
-          # 🚀 RunAgent v${{ steps.extract_version.outputs.version }}
+          # 🚀 RunAgent v${{ steps.find-tags.outputs.version }}
           
-          **Universal AI Agent Platform - All SDKs synchronized at v${{ steps.extract_version.outputs.version }}**
+          **Universal AI Agent Platform - All SDKs synchronized at v${{ steps.find-tags.outputs.version }}**
           
           ## 📦 Installation
           
@@ -95,23 +219,23 @@ jobs:
           
           ### Python
           ```bash
-          pip install runagent==${{ steps.extract_version.outputs.version }}
+          pip install runagent==${{ steps.find-tags.outputs.version }}
           ```
           
           ### JavaScript/TypeScript
           ```bash
-          npm install runagent@${{ steps.extract_version.outputs.version }}
+          npm install runagent@${{ steps.find-tags.outputs.version }}
           ```
           
           ### Rust
           ```toml
           [dependencies]
-          runagent = "${{ steps.extract_version.outputs.version }}"
+          runagent = "${{ steps.find-tags.outputs.version }}"
           ```
           
           ### Go
           ```bash
-          go get github.com/runagent-dev/runagent/runagent-go@${{ steps.extract_version.outputs.tag_name }}
+          go get github.com/runagent-dev/runagent/runagent-go@${{ steps.find-tags.outputs.latest_tag }}
           ```
           
           ## 📋 Changes in this Release
@@ -120,10 +244,10 @@ jobs:
           
           ## 🔗 Package Links
           
-          - 🐍 [PyPI Package](https://pypi.org/project/runagent/${{ steps.extract_version.outputs.version }}/)
-          - 📦 [npm Package](https://www.npmjs.com/package/runagent/v/${{ steps.extract_version.outputs.version }})
-          - 🦀 [crates.io Package](https://crates.io/crates/runagent/${{ steps.extract_version.outputs.version }})
-          - 🐹 [Go Module](https://pkg.go.dev/github.com/runagent-dev/runagent/runagent-go@${{ steps.extract_version.outputs.tag_name }})
+          - 🐍 [PyPI Package](https://pypi.org/project/runagent/${{ steps.find-tags.outputs.version }}/) (Publishing...)
+          - 📦 [npm Package](https://www.npmjs.com/package/runagent/v/${{ steps.find-tags.outputs.version }}) (Publishing...)
+          - 🦀 [crates.io Package](https://crates.io/crates/runagent/${{ steps.find-tags.outputs.version }}) (Publishing...)
+          - 🐹 [Go Module](https://pkg.go.dev/github.com/runagent-dev/runagent/runagent-go@${{ steps.find-tags.outputs.latest_tag }}) ✅
           
           ## 📚 Documentation
           
@@ -133,11 +257,11 @@ jobs:
           
           ---
           
-          **Full Changelog**: https://github.com/runagent-dev/runagent/compare/v${{ steps.extract_version.outputs.version }}
+          **Note**: Individual SDK status will be updated below as packages are published.
         draft: false
         prerelease: false
         generate_release_notes: false
         files: |
           CHANGELOG.md
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
