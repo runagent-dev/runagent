@@ -197,6 +197,7 @@ def delete(agent_id, yes):
 @click.option("--letta", is_flag=True, help="Use Letta framework")
 @click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
 @click.option("--openai", is_flag=True, help="Use OpenAI framework")
+@click.option("--n8n", is_flag=True, help="Use N8N workflows")
 @click.argument(
     "path",
     type=click.Path(
@@ -222,6 +223,7 @@ def init(
     letta,
     llamaindex,
     openai,
+    n8n,
     path
 ):
     """Initialize a new RunAgent project"""
@@ -240,6 +242,7 @@ def init(
             "letta": letta,
             "llamaindex": llamaindex,
             "openai": openai,
+            "n8n": n8n
         }
         total_flags = sum(flag for flag in framework_dict.values())
         if total_flags > 1:
@@ -300,6 +303,7 @@ def init(
         console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
         console.print(f"   Template: [yellow]{template}[/yellow]")
 
+        print(">>", framework, ">>", template)
         # Initialize project
         success = sdk.init_project(
             folder_path=project_path,
@@ -720,9 +724,9 @@ def deploy(folder, agent_id, local, framework, config):
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
 @click.option("--replace", help="Replace existing agent with this agent ID")
 @click.option("--no-animation", is_flag=True, help="Skip startup animation")
-@click.option("--animation-style", 
-              type=click.Choice(["field", "ascii", "minimal", "quick"]), 
-              default="field", 
+@click.option("--animation-style",
+              type=click.Choice(["field", "ascii", "minimal", "quick"]),
+              default="field",
               help="Animation style")
 @click.argument(
     "path",
@@ -900,7 +904,7 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         raise click.UsageError(
             "Must specify either --agent-id or both --host and --port."
         )
-    
+
     # If using host/port, both must be provided
     if host_port_provided and (host is None or port is None):
         raise click.UsageError(

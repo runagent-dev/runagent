@@ -77,7 +77,7 @@ class TemplateManager:
                 raise
             return None
 
-    def init_project(
+    def init_template(
         self, folder_path: Path, framework: str, template: str, overwrite: bool = False
     ) -> bool:
         """

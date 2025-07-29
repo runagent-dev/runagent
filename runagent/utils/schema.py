@@ -1,8 +1,10 @@
 # Pydantic schema for runagent.config.json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+import typing as t
+# from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field, validator
+from .enums import FrameworkType
 
 
 class TemplateSource(BaseModel):
@@ -13,13 +15,26 @@ class TemplateSource(BaseModel):
     path: str = Field(..., description="Path to template in repository")
 
 
-class EntryPoint(BaseModel):
-    """Entrypoint configuration"""
+class PythonicEntryPoint(BaseModel):
+    """Configuration for a Python-based entrypoint."""
 
-    file: str = Field(..., description="Entrypoint file")
-    module: str = Field(..., description="Entrypoint module name")
+    file: str = Field(..., description="Path to the Python file containing the entrypoint")
+    module: str = Field(..., description="Python module name for the entrypoint")
+    tag: str = Field(..., description="Unique tag identifying this entrypoint")
+    extractor: t.Optional[t.Dict[str, str]] = Field(
+        default={},
+        description="Optional mapping of output fields to JSONPath expressions for extracting data from the response"
+    )
+
+
+class WebHookEntryPoint(BaseModel):
+    """Configuration for a webhook-based entrypoint."""
+
+    webhook_url: str = Field(..., description="Webhook URL for the entrypoint")
+    method: str = Field(..., description="HTTP method to use for the webhook")
     tag: str = Field(..., description="Entrypoint tag")
-    extractor: Optional[Dict[str, str]] = Field(
+    timeout: int = Field(30, description="Timeout in seconds for the webhook request")
+    extractor: t.Optional[t.Dict[str, str]] = Field(
         default={},
         description="JSONPath expression to extract data from the response"
     )
@@ -28,7 +43,9 @@ class EntryPoint(BaseModel):
 class AgentArchitecture(BaseModel):
     """Agent architecture configuration"""
 
-    entrypoints: List[EntryPoint] = Field(
+    entrypoints: t.Union[
+        t.List[PythonicEntryPoint], t.List[WebHookEntryPoint]
+    ] = Field(
         ..., description="List of entrypoints"
     )
 
@@ -46,17 +63,17 @@ class RunAgentConfig(BaseModel):
 
     agent_name: str = Field(..., description="Name of the agent")
     description: str = Field(..., description="Description of the agent")
-    framework: str = Field(..., description="Framework used (langchain, etc)")
+    framework: FrameworkType = Field(..., description="Framework used (langchain, etc)")
     template: str = Field(..., description="Template name")
     version: str = Field(..., description="Agent version")
     created_at: datetime = Field(..., description="Creation timestamp")
-    template_source: Optional[TemplateSource] = Field(
+    template_source: t.Optional[TemplateSource] = Field(
         ..., description="Template source details"
     )
     agent_architecture: AgentArchitecture = Field(
         ..., description="Agent architecture details"
     )
-    env_vars: Optional[Dict[str, str]] = Field(
+    env_vars: t.Optional[t.Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
     )
 
@@ -64,10 +81,10 @@ class RunAgentConfig(BaseModel):
 class AgentInputArgs(BaseModel):
     """Request model for agent execution"""
 
-    input_args: List[Any] = Field(
+    input_args: t.List[t.Any] = Field(
         default={}, description="Input data for agent invocation"
     )
-    input_kwargs: Dict[str, Any] = Field(
+    input_kwargs: t.Dict[str, t.Any] = Field(
         default={}, description="Input data for agent invocation"
     )
 
@@ -83,7 +100,7 @@ class WebSocketAgentRequest(BaseModel):
     action: WebSocketActionType
     agent_id: str
     input_data: AgentInputArgs
-    stream_config: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    stream_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict)
 
 
 # Pydantic Models
@@ -99,9 +116,9 @@ class AgentRunResponse(BaseModel):
     """Response model for agent execution"""
 
     success: bool
-    output_data: Optional[Any] = None
-    error: Optional[str] = None
-    execution_time: Optional[float] = None
+    output_data: t.Optional[t.Any] = None
+    error: t.Optional[str] = None
+    execution_time: t.Optional[float] = None
     agent_id: str
 
 
@@ -112,7 +129,7 @@ class CapacityInfo(BaseModel):
     max_capacity: int
     remaining_slots: int
     is_full: bool
-    agents: List[Dict[str, Any]]
+    agents: t.List[t.Dict[str, t.Any]]
 
 
 class AgentInfo(BaseModel):
@@ -122,8 +139,8 @@ class AgentInfo(BaseModel):
     version: str
     host: str
     port: int
-    config: Dict[str, Any]
-    endpoints: Dict[str, str]
+    config: t.Dict[str, t.Any]
+    endpoints: t.Dict[str, str]
 
 
 # Message types for different agentic framework responses
@@ -143,11 +160,11 @@ class SafeMessage(BaseModel):
     id: str
     type: MessageType
     timestamp: str
-    data: Any
-    metadata: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    data: t.Any
+    metadata: t.Optional[t.Dict[str, t.Any]] = None
+    error: t.Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> t.Dict[str, t.Any]:
         return {
             "id": self.id,
             "type": self.type.value,
