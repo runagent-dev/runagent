@@ -82,8 +82,8 @@ jobs:
       if: steps.check-release.outputs.should_release == 'true'
       run: |
         echo "📥 Installing git-cliff for changelog generation..."
-        curl -L https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz | tar -xz
-        sudo mv git-cliff-*/git-cliff /usr/local/bin/
+        curl -L https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-0.24.2-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+        sudo mv git-cliff-0.24.2/git-cliff /usr/local/bin/
         git-cliff --version
     
     - name: Generate changelog
@@ -164,7 +164,7 @@ jobs:
       if: steps.check-release.outputs.should_release == 'true'
       run: |
         echo "📝 Updating CHANGELOG.md in repository..."
-        
+
         # Create the new changelog entry
         echo "# Changelog" > CHANGELOG_NEW.md
         echo "" >> CHANGELOG_NEW.md
