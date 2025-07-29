@@ -1,4 +1,3 @@
-# runagent/sdk/server/local_server.py
 import json
 import os
 import subprocess
@@ -59,7 +58,7 @@ class LocalServer:
             self.config = SDKConfig()
             self.middleware_sync = MiddlewareSyncService(self.config)
         except Exception as e:
-            console.print(f"⚠️ [yellow]Could not initialize middleware sync: {e}[/yellow]")
+            console.print(f"[yellow]Could not initialize middleware sync: {e}[/yellow]")
             self.middleware_sync = None
 
         self.agent_config = get_agent_config(agent_path)
@@ -82,9 +81,6 @@ class LocalServer:
         # Handle agent setup and sync to middleware
         self._ensure_agent_in_database()
         
-        # REMOVED: Don't sync during __init__ - sync during server start instead
-        # self._sync_agent_to_middleware()  # REMOVED THIS LINE
-
         self.websocket_handler = AgentWebSocketHandler(self.db_service, self.middleware_sync)
         self.start_time = time.time()
         self._setup_logging()
@@ -108,7 +104,7 @@ class LocalServer:
         try:
             # Prepare agent data for sync
             agent_data = {
-                "local_agent_id": self.agent_id,  # CRITICAL: Use the correct agent ID
+                "local_agent_id": self.agent_id,  
                 "name": self.agent_name,
                 "framework": self.agent_framework,
                 "version": self.agent_version,
@@ -120,10 +116,9 @@ class LocalServer:
                 "sync_timestamp": datetime.utcnow().isoformat()
             }
 
-            console.print(f"🔄 [cyan]Syncing agent {self.agent_id} to middleware...[/cyan]")
-            console.print(f"🔍 [dim]Agent data: {agent_data['name']} ({agent_data['framework']})[/dim]")
+            console.print(f"[cyan]Syncing agent {self.agent_id} to middleware...[/cyan]")
+            console.print(f"[dim]Agent data: {agent_data['name']} ({agent_data['framework']})[/dim]")
             
-            # CRITICAL: Wait for sync to complete
             sync_result = await self.middleware_sync.sync_agent_startup(self.agent_id, agent_data)
             
             if sync_result:
@@ -131,7 +126,7 @@ class LocalServer:
                 self.agent_synced_to_middleware = True
                 return True
             else:
-                console.print(f"⚠️ [yellow]Agent sync failed - logs will be local only[/yellow]")
+                console.print(f"[yellow]Agent sync failed - logs will be local only[/yellow]")
                 self.agent_synced_to_middleware = False
                 return False
 
@@ -142,6 +137,7 @@ class LocalServer:
 
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
         """ENHANCED - Create endpoint handler with invocation tracking and middleware sync"""
+
         async def run_agent(request: AgentRunRequest):
             """Run a deployed agent with full invocation tracking and middleware sync"""
             
@@ -187,7 +183,7 @@ class LocalServer:
                         }
                     })
                 except Exception as e:
-                    console.print(f"⚠️ [yellow]Middleware sync start failed: {e}[/yellow]")
+                    console.print(f"[yellow]Middleware sync start failed: {e}[/yellow]")
 
             start_time = time.time()
             execution_success = False
@@ -195,7 +191,7 @@ class LocalServer:
             result_data = None
 
             try:
-                console.print(f"🚀 Running agent: [cyan]{agent_id}[/cyan] (invocation: {invocation_id[:8]}...)")
+                console.print(f"Running agent: [cyan]{agent_id}[/cyan] (invocation: {invocation_id}...)")
 
                 result_data = await runner(
                     *request.input_data.input_args, **request.input_data.input_kwargs
@@ -246,7 +242,7 @@ class LocalServer:
                             }
                         )
                     except Exception as e:
-                        console.print(f"⚠️ [yellow]Failed to sync completion to middleware: {e}[/yellow]")
+                        console.print(f"[yellow]Failed to sync completion to middleware: {e}[/yellow]")
 
                 # Record in original agent_runs table for backward compatibility
                 self.db_service.record_agent_run(
@@ -259,7 +255,7 @@ class LocalServer:
 
                 console.print(
                     f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
-                    f"{execution_time:.2f}s (invocation: {invocation_id[:8]}...)"
+                    f"{execution_time:.2f}s (invocation: {invocation_id}...)"
                 )
 
                 return AgentRunResponse(
@@ -400,8 +396,8 @@ class LocalServer:
             raise Exception(f"Agent {agent_id} not found in local database")
 
         # Display existing agent information
-        console.print(f"🔍 [yellow]Found agent by ID: {agent_id}[/yellow]")
-        console.print(f"📋 [cyan]Agent Details:[/cyan]")
+        console.print(f"[yellow]Found agent by ID: {agent_id}[/yellow]")
+        console.print(f"[cyan]Agent Details:[/cyan]")
         console.print(f"   • Agent ID: [bold magenta]{agent['agent_id']}[/bold magenta]")
         console.print(f"   • Path: [blue]{agent['agent_path']}[/blue]")
         console.print(f"   • Host: [blue]{agent['host']}[/blue]")
@@ -463,8 +459,8 @@ class LocalServer:
             existing_host = existing_agent['host']
             existing_port = existing_agent['port']
             
-            console.print(f"🔍 [yellow]Found existing agent for path: {agent_path}[/yellow]")
-            console.print(f"📋 [cyan]Agent Details:[/cyan]")
+            console.print(f"[yellow]Found existing agent for path: {agent_path}[/yellow]")
+            console.print(f"[cyan]Agent Details:[/cyan]")
             console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
             console.print(f"   • Host: [blue]{existing_host}[/blue]")
             console.print(f"   • Port: [blue]{existing_port}[/blue]")
@@ -490,7 +486,7 @@ class LocalServer:
                 )
             else:
                 # Port is in use - need to allocate a new one and update the database
-                console.print(f"\n⚠️ [yellow]Port {existing_port} is already in use - allocating new port[/yellow]")
+                console.print(f"\n[yellow]Port {existing_port} is already in use - allocating new port[/yellow]")
                 
                 # Get currently used ports to avoid conflicts
                 used_ports = PortManager.get_used_ports_from_db(db_service)
@@ -499,7 +495,7 @@ class LocalServer:
                 if port and PortManager.is_port_available(host, port):
                     new_host = host
                     new_port = port
-                    console.print(f"🎯 Using preferred address: [blue]{new_host}:{new_port}[/blue]")
+                    console.print(f"Using preferred address: [blue]{new_host}:{new_port}[/blue]")
                 else:
                     new_host, new_port = PortManager.allocate_unique_address(used_ports)
                 
@@ -805,24 +801,21 @@ class LocalServer:
                 console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
                 if sync_success:
                     console.print("   Status: ✅ ENABLED & SYNCED")
-                    console.print("   📊 Local logs will sync to middleware")
-                    console.print("   📡 Agent registered in middleware")
                 else:
                     console.print("   Status: ⚠️ ENABLED BUT SYNC FAILED")
-                    console.print("   📊 Local logs will be stored locally only")
-                    console.print("   💡 Check network connection and agent permissions")
+                    console.print("Local logs will be stored locally only")
             else:
-                console.print("🔄 [yellow]Middleware Sync Status:[/yellow]")
+                console.print("[yellow]Middleware Sync Status:[/yellow]")
                 console.print("   Status: ❌ DISABLED")
                 console.print("   💡 Configure API key to enable sync")
                 
                 if hasattr(self, 'agent_logger'):
                     self.agent_logger.warning("Middleware sync disabled - logs stored locally only")
 
-            # Print server info
-            console.print(
-                f"🌐 Server URL: [bold blue]http://{self.host}:{self.port}[/bold blue]"
-            )
+            # # Print server info
+            # console.print(
+            #     f"🌐 Server URL: [bold blue]http://{self.host}:{self.port}[/bold blue]"
+            # )
 
             # Print available endpoints
             console.print("\n📋 Available endpoints:")
@@ -835,7 +828,7 @@ class LocalServer:
                     f"   • [cyan]{route_methods}  {route_path}[/cyan] - {route_description}"
                 )
 
-            console.print("\n💡 [yellow]Use Ctrl+C to stop the server[/yellow]")
+            console.print("[yellow]Use Ctrl+C to stop the server[/yellow]")
 
             # Print debug status
             debug_color = "green" if debug else "red"
@@ -879,15 +872,15 @@ class LocalServer:
             if "Address already in use" in error_msg:
                 console.print(f"💥 [red]Port {self.port} is already in use![/red]")
                 console.print(
-                    f"💡 Try using a different port: "
+                    f"Try using a different port: "
                     f"[cyan]runagent serve --port {self.port + 1}[/cyan]"
                 )
-                console.print("💡 Or stop the existing server and try again")
+                console.print("Or stop the existing server and try again")
                 
                 if hasattr(self, 'agent_logger'):
                     self.agent_logger.error(f"Port {self.port} already in use")
             else:
-                console.print(f"💥 [red]Network error: {error_msg}[/red]")
+                console.print(f"[red]Network error: {error_msg}[/red]")
                 if hasattr(self, 'agent_logger'):
                     self.agent_logger.error(f"Network error: {error_msg}")
             raise

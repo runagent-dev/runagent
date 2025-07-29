@@ -1,5 +1,3 @@
-# runagent/utils/logs.py - FIXED with sync checking
-
 import logging
 import asyncio
 from datetime import datetime
@@ -24,10 +22,7 @@ class DatabaseLogHandler(logging.Handler):
         
         # NEW: Callback to check if agent is synced to middleware
         self.sync_check_callback = sync_check_callback
-        
-        # DEBUG: Print the agent ID being used
-        print(f"🔍 DatabaseLogHandler initialized with agent_id: {self.agent_id}")
-        
+                
     def emit(self, record):
         """Handle log emission to both local database and middleware - FIXED VERSION"""
         try:
@@ -68,12 +63,10 @@ class DatabaseLogHandler(logging.Handler):
             print(f"Log handler error: {e}")
     
     def _should_sync_to_middleware(self) -> bool:
-        """Check if we should sync to middleware - FIXED VERSION"""
-        # Check 1: Is middleware sync enabled?
+        """Check if we should sync to middleware"""
         if not self.sync_enabled:
             return False
         
-        # Check 2: Is agent synced to middleware?
         if self.sync_check_callback:
             try:
                 agent_synced = self.sync_check_callback()
@@ -87,13 +80,13 @@ class DatabaseLogHandler(logging.Handler):
         return True
     
     def _flush_logs_to_middleware(self):
-        """Send buffered logs to middleware - FIXED VERSION"""
+        """Send buffered logs to middleware"""
         if not self.log_buffer:
             return
             
         # Double-check sync conditions
         if not self._should_sync_to_middleware():
-            print(f"🔍 Skipping middleware sync - agent not ready (buffer: {len(self.log_buffer)} logs)")
+            print(f"Skipping middleware sync - agent not ready (buffer: {len(self.log_buffer)} logs)")
             # Keep logs in buffer for later
             return
             

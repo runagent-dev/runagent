@@ -1,19 +1,19 @@
-# runagent/sdk/deployment/middleware_sync.py - FIX THE GLOBAL VARIABLE BUG
 
 import json
 import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from rich.console import Console
+from runagent.sdk.rest_client import RestClient
+from runagent.sdk.config import SDKConfig
+
 
 console = Console()
 
-# ⭐ FIX: Initialize global variable at module level
 _global_middleware_sync = None
 
 
 class MiddlewareSyncService:
-    """Service to sync local agent data with middleware - FIXED VERSION"""
     
     def __init__(self, config):
         self.config = config
@@ -30,7 +30,6 @@ class MiddlewareSyncService:
         
         # Only initialize RestClient if we have an API key
         try:
-            from runagent.sdk.rest_client import RestClient
             self.rest_client = RestClient(
                 base_url=config.base_url,
                 api_key=self.api_key
@@ -39,17 +38,17 @@ class MiddlewareSyncService:
             # Test authentication
             self.auth_validated = self._test_authentication()
             if self.auth_validated:
-                console.print("[green]✅ API key validated - middleware sync enabled[/green]")
+                console.print("[green]API key validated - middleware sync enabled[/green]")
                 self.sync_enabled = True
                 self.enabled = True
             else:
-                console.print("[yellow]⚠️ API key invalid - middleware sync disabled[/yellow]")
+                console.print("[yellow] API key invalid - middleware sync disabled[/yellow]")
                 self.sync_enabled = False
                 self.enabled = False
                 self.rest_client = None
                 
         except Exception as e:
-            console.print(f"⚠️ [yellow]Could not initialize middleware sync: {e}[/yellow]")
+            console.print(f"[red]Could not initialize middleware sync: {e}[/red]")
             self.sync_enabled = False
             self.enabled = False
             self.rest_client = None
@@ -107,11 +106,11 @@ class MiddlewareSyncService:
             response = await self._make_async_request("POST", "/local-agents", sync_data)
             
             if response.get("success"):
-                console.print(f"✅ [green]Agent synced successfully to middleware[/green]")
-                console.print(f"🔍 [dim]Project ID: {response.get('project_id', 'Unknown')}[/dim]")
+                console.print(f"[green]Agent synced successfully to middleware[/green]")
+                console.print(f"[dim]Project ID: {response.get('project_id', 'Unknown')}[/dim]")
                 return True
             else:
-                console.print(f"⚠️ [yellow]Agent sync failed: {response.get('error', 'Unknown error')}[/yellow]")
+                console.print(f"[red]Agent sync failed: {response.get('error', 'Unknown error')}[/red]")
                 # Don't disable sync completely - might be temporary
                 return False
                 
@@ -119,15 +118,13 @@ class MiddlewareSyncService:
             console.print(f"❌ [red]Agent sync error: {str(e)}[/red]")
             return False
 
-    async def sync_agent_logs(self, logs_data: List[Dict[str, Any]]) -> bool:
-        """Sync multiple agent logs to middleware - FIXED VERSION"""
-        
+    async def sync_agent_logs(self, logs_data: List[Dict[str, Any]]) -> bool:        
         # CRITICAL: Don't try to sync if not enabled
         if not self.is_sync_enabled() or not logs_data:
             return False
             
         try:
-            console.print(f"📋 [dim]Syncing {len(logs_data)} logs to middleware...[/dim]")
+            console.print(f"[dim]Syncing {len(logs_data)} logs to middleware...[/dim]")
             
             # Prepare logs for middleware
             middleware_logs = []
@@ -150,10 +147,10 @@ class MiddlewareSyncService:
             )
             
             if response.get("success"):
-                console.print(f"📋 [dim]Successfully synced {len(logs_data)} logs to middleware[/dim]")
+                console.print(f"[dim]Successfully synced {len(logs_data)} logs to middleware[/dim]")
                 return True
             else:
-                console.print(f"⚠️ [yellow]Log sync failed: {response.get('error')}[/yellow]")
+                console.print(f"[yellow]Log sync failed: {response.get('error')}[/yellow]")
                 return False
                 
         except Exception as e:
@@ -166,7 +163,7 @@ class MiddlewareSyncService:
             return None
             
         try:
-            console.print(f"🚀 [dim]Syncing invocation start to middleware...[/dim]")
+            console.print(f"[dim]Syncing invocation start to middleware...[/dim]")
             
             middleware_data = {
                 "local_agent_id": invocation_data["agent_id"],
@@ -182,10 +179,10 @@ class MiddlewareSyncService:
             
             if response.get("success"):
                 middleware_invocation_id = response.get("invocation_id")
-                console.print(f"📊 [dim]Invocation synced to middleware: {middleware_invocation_id[:8]}...[/dim]")
+                console.print(f"[dim]Invocation synced to middleware: {middleware_invocation_id[:8]}...[/dim]")
                 return middleware_invocation_id
             else:
-                console.print(f"⚠️ [yellow]Invocation sync failed: {response.get('error')}[/yellow]")
+                console.print(f"[yellow]Invocation sync failed: {response.get('error')}[/yellow]")
                 return None
                 
         except Exception as e:
@@ -214,14 +211,14 @@ class MiddlewareSyncService:
             )
             
             if response.get("success"):
-                console.print(f"📊 [dim]Invocation completion synced to middleware[/dim]")
+                console.print(f"[dim]Invocation completion synced to middleware[/dim]")
                 return True
             else:
-                console.print(f"⚠️ [yellow]Invocation completion sync failed: {response.get('error')}[/yellow]")
+                console.print(f"[yellow]Invocation completion sync failed: {response.get('error')}[/yellow]")
                 return False
                 
         except Exception as e:
-            console.print(f"❌ [red]Invocation completion sync error: {str(e)}[/red]")
+            console.print(f"[red]Invocation completion sync error: {str(e)}[/red]")
             return False
 
     def get_sync_status(self) -> Dict[str, Any]:
@@ -309,16 +306,15 @@ class MiddlewareSyncService:
 
 
 def get_middleware_sync() -> Optional[MiddlewareSyncService]:
-    """Get the global middleware sync instance - FIXED with proper global variable"""
+    """Get the global middleware sync instance"""
     global _global_middleware_sync
     
     if _global_middleware_sync is None:
         try:
-            from runagent.sdk.config import SDKConfig
             config = SDKConfig()
             _global_middleware_sync = MiddlewareSyncService(config)
         except Exception as e:
-            console.print(f"⚠️ [yellow]Could not initialize middleware sync: {e}[/yellow]")
+            console.print(f"yellow]Could not initialize middleware sync: {e}[/yellow]")
             _global_middleware_sync = None
     
     return _global_middleware_sync

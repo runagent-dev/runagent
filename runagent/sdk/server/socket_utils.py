@@ -7,15 +7,7 @@ from runagent.utils.serializer import CoreSerializer
 from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest
 from typing import Callable, Dict, Any
 from runagent.utils.schema import MessageType, SafeMessage
-
-# Import middleware sync with error handling
-try:
-    from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-except ImportError:
-    # Fallback function if middleware sync is not available
-    def get_middleware_sync():
-        return None
-
+from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 console = Console()
 
 
@@ -34,7 +26,7 @@ class AgentWebSocketHandler:
         connection_id = f"{agent_id}_{int(time.time())}"
 
         try:
-            console.print(f"🔌 WebSocket connected for agent: [cyan]{agent_id}[/cyan]")
+            console.print(f" WebSocket connected for agent: [cyan]{agent_id}[/cyan]")
             
             # Wait for client request
             raw_message = await websocket.receive_text()
@@ -58,7 +50,7 @@ class AgentWebSocketHandler:
                 await self._send_error(websocket, f"Unknown action: {ws_request.action}")
                     
         except WebSocketDisconnect:
-            console.print(f"🔌 WebSocket disconnected for agent: [cyan]{agent_id}[/cyan]")
+            console.print(f"WebSocket disconnected for agent: [cyan]{agent_id}[/cyan]")
             self._cleanup_stream(connection_id)
         except Exception as e:
             console.print(f"💥 WebSocket error for agent {agent_id}: [red]{str(e)}[/red]")
@@ -80,7 +72,7 @@ class AgentWebSocketHandler:
         middleware_invocation_id = None  # NEW: Track middleware invocation
 
         try:
-            console.print(f"🔌 WebSocket connected for agent: [cyan]{agent_id}[/cyan] (with tracking)")
+            console.print(f"WebSocket connected for agent: [cyan]{agent_id}[/cyan] (with tracking)")
             
             # Wait for client request
             raw_message = await websocket.receive_text()
@@ -140,7 +132,7 @@ class AgentWebSocketHandler:
                 await self._send_error(websocket, f"Unknown action: {ws_request.action}")
                     
         except WebSocketDisconnect:
-            console.print(f"🔌 WebSocket disconnected for agent: [cyan]{agent_id}[/cyan]")
+            console.print(f"WebSocket disconnected for agent: [cyan]{agent_id}[/cyan]")
             if invocation_id:
                 # Mark local invocation as completed with disconnect
                 db_service.complete_invocation(
@@ -156,7 +148,7 @@ class AgentWebSocketHandler:
                         {"error_detail": "WebSocket disconnected by client"}
                     )
                 except Exception as e:
-                    console.print(f"⚠️ [yellow]Failed to sync disconnect to middleware: {e}[/yellow]")
+                    console.print(f" [yellow]Failed to sync disconnect to middleware: {e}[/yellow]")
             
             self._cleanup_stream(connection_id)
         except Exception as e:
@@ -176,7 +168,7 @@ class AgentWebSocketHandler:
                         {"error_detail": f"WebSocket error: {str(e)}"}
                     )
                 except Exception as sync_error:
-                    console.print(f"⚠️ [yellow]Failed to sync error to middleware: {sync_error}[/yellow]")
+                    console.print(f"[yellow]Failed to sync error to middleware: {sync_error}[/yellow]")
             
             await self._send_error(websocket, f"Server error: {str(e)}")
             self._cleanup_stream(connection_id)
@@ -193,9 +185,9 @@ class AgentWebSocketHandler:
                 "input_kwargs": list(request.input_data.input_kwargs.keys())
             })
             
-            console.print(f"🚀 Starting stream for agent: [cyan]{request.agent_id}[/cyan]")
-            console.print(f"🔍 Input args: [cyan]{request.input_data.input_args}[/cyan]")
-            console.print(f"🔍 Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
+            console.print(f"Starting stream for agent: [cyan]{request.agent_id}[/cyan]")
+            console.print(f"Input args: [cyan]{request.input_data.input_args}[/cyan]")
+            console.print(f"Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
             
             # Track active stream
             self.active_streams[connection_id] = {
@@ -300,12 +292,12 @@ class AgentWebSocketHandler:
                 "input_kwargs": list(request.input_data.input_kwargs.keys())
             })
             
-            console.print(f"🚀 Starting tracked stream for agent: [cyan]{request.agent_id}[/cyan] (invocation: {invocation_id[:8]}...)")
+            console.print(f"Starting tracked stream for agent: [cyan]{request.agent_id}[/cyan] (invocation: {invocation_id}...)")
             if middleware_invocation_id:
-                console.print(f"📡 [dim]Middleware invocation: {middleware_invocation_id[:8]}...[/dim]")
+                console.print(f"[dim]Middleware invocation: {middleware_invocation_id}...[/dim]")
             
-            console.print(f"🔍 Input args: [cyan]{request.input_data.input_args}[/cyan]")
-            console.print(f"🔍 Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
+            console.print(f"Input args: [cyan]{request.input_data.input_args}[/cyan]")
+            console.print(f"Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
             
             # Track active stream
             self.active_streams[connection_id] = {

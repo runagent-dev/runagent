@@ -536,7 +536,7 @@ class RestClient:
     def start_agent(self, agent_id: str, config: Dict = None) -> Dict:
         """Start/deploy an uploaded agent on the middleware server"""
         try:
-            console.print(f"🚀 Starting agent: [bold magenta]{agent_id}[/bold magenta]")
+            console.print(f"Starting agent: [bold magenta]{agent_id}[/bold magenta]")
 
             payload = config or {}
 
