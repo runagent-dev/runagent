@@ -441,11 +441,12 @@ git commit -m "chore: bump version to v$VERSION
 
 # # Create new tag
 git tag -a "v$VERSION" -m "Release v$VERSION
+RunAgent Universal Release v$VERSION"
+
 echo "✅ Tag v$VERSION created successfully!"
 
 generate_changelog
 
-RunAgent Universal Release v$VERSION"
 
 
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
