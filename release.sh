@@ -337,61 +337,62 @@ CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev
 echo "⬆️  Pushing to $CURRENT_BRANCH with tag..."
 
 # Ask about tag pushing strategy if not on main
-if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$CURRENT_BRANCH" != "master" ]]; then
-    echo ""
-    echo "🤔 Tag pushing strategy:"
-    echo "  1. Push tag now (workflows won't run until tag reaches main)"
-    echo "  2. Don't push tag yet (push manually after merging to main)"
-    echo ""
-    read -p "Choose option (1/2): " -n 1 -r
-    echo
+# if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$CURRENT_BRANCH" != "master" ]]; then
+    # echo ""
+    # echo "🤔 Tag pushing strategy:"
+    # echo "  1. Push tag now (workflows won't run until tag reaches main)"
+    # echo "  2. Don't push tag yet (push manually after merging to main)"
+    # echo ""
+    # read -p "Choose option (1/2): " -n 1 -r
+    # echo
     
-    if [[ $REPLY == "2" ]]; then
-        # Push branch but not tag
-        if ! git push origin "$CURRENT_BRANCH"; then
-            echo "❌ Failed to push branch. You may need to set upstream:"
-            echo "    git push -u origin $CURRENT_BRANCH"
-            exit 1
-        fi
-        
-        echo "⏸️  Tag v$VERSION created locally but not pushed"
-        echo ""
-        echo "📋 Next steps:"
-        echo "  1. Create PR and merge this branch to main"
-        echo "  2. After merging, run: git checkout main && git pull && git push origin v$VERSION"
-        echo "  3. This will trigger the release workflows"
-        echo ""
-        echo "🏷️  Tag: v$VERSION (local only, on $CURRENT_BRANCH)"
-        exit 0
-    fi
-fi
+    # if [[ $REPLY == "1" ]]; then
+    #     # Push branch but not tag
+    #     if ! git push origin "$CURRENT_BRANCH"; then
+    #         echo "❌ Failed to push branch. You may need to set upstream:"
+    #         echo "    git push -u origin $CURRENT_BRANCH"
+    #         exit 1
+    #     fi
+    
+echo "⏸️  Tag v$VERSION created locally but not pushed"
+echo ""
+echo "📋 Next steps:"
+echo "  1. Push changes to remote branch"
+echo "  2. Create PR and merge this branch to main"
+echo "  3. After merging, run: git checkout main && git pull && git push origin v$VERSION"
+echo "  4. This will trigger the release workflows"
+echo ""
+echo "🏷️  Tag: v$VERSION (local only, on $CURRENT_BRANCH)"
+#         exit 0
+#     fi
+# fi
 
-# Push branch and tag
-if ! git push origin "$CURRENT_BRANCH"; then
-    echo "❌ Failed to push branch. You may need to set upstream:"
-    echo "    git push -u origin $CURRENT_BRANCH"
-    exit 1
-fi
+# # Push branch and tag
+# if ! git push origin "$CURRENT_BRANCH"; then
+#     echo "❌ Failed to push branch. You may need to set upstream:"
+#     echo "    git push -u origin $CURRENT_BRANCH"
+#     exit 1
+# fi
 
-if ! git push origin "v$VERSION"; then
-    echo "❌ Failed to push tag"
-    exit 1
-fi
+# if ! git push origin "v$VERSION"; then
+#     echo "❌ Failed to push tag"
+#     exit 1
+# fi
 
 echo ""
-echo "✅ Version v$VERSION tagged and pushed!"
+echo "✅ Version v$VERSION tagged!"
 echo ""
 echo "🎯 What happens next:"
 if [[ "$CURRENT_BRANCH" == "main" ]] || [[ "$CURRENT_BRANCH" == "master" ]]; then
     echo "  ✅ Tag is on main branch - workflows will run immediately:"
     echo "     - Generate changelog and create GitHub release"
     echo "     - Test and publish all SDK packages"
-else
-    echo "  ⏳ Tag is on '$CURRENT_BRANCH' - workflows will run when tag reaches main:"
-    echo "     - Create PR to merge '$CURRENT_BRANCH' → main"
-    echo "     - After merge, workflows will detect tag and run automatically"
-fi
-echo ""
+# else
+#     echo "  ⏳ Tag is on '$CURRENT_BRANCH' - workflows will run when tag reaches main:"
+#     echo "     - Create PR to merge '$CURRENT_BRANCH' → main"
+#     echo "     - After merge, workflows will detect tag and run automatically"
+# fi
+# echo ""
 echo "📊 Monitor progress:"
 echo "  - Actions: https://github.com/runagent-dev/runagent/actions"
 echo "  - Releases: https://github.com/runagent-dev/runagent/releases"
