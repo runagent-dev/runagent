@@ -414,11 +414,8 @@ handle_existing_tag() {
         fi
         
         echo "Moving tag $tag_name to current commit..."
-        git tag -f -a "$tag_name" -m "Release $tag_name (moved)
+        git tag -f -a "$tag_name" -m "Release $tag_name (moved)"
 
-RunAgent Universal Release $tag_name
-
-All SDKs updated to version $version"
         return 0
     fi
     
