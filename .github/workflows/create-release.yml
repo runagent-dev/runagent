@@ -1,0 +1,143 @@
+# .github/workflows/create-release.yml
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.2.3
+
+jobs:
+  create-main-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for changelog
+    
+    - name: Extract version from tag
+      id: extract_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+    
+    - name: Extract changelog for this version
+      id: changelog
+      run: |
+        if [ -f "CHANGELOG.md" ]; then
+          echo "📝 Extracting changelog from committed CHANGELOG.md"
+          
+          # Extract the section for this version from CHANGELOG.md
+          # This assumes the changelog was generated locally and committed
+          awk '/^## \[.*\].*/{if(found) exit; if(/\['${{ steps.extract_version.outputs.version }}'\]/) found=1; if(found) print; next} found' CHANGELOG.md > current_changelog.md
+          
+          # If the extraction didn't work well, try a different approach
+          if [ ! -s current_changelog.md ]; then
+            # Extract everything after the first ## heading until the next ##
+            sed -n '/^## \[/,/^## \[/p' CHANGELOG.md | head -n -1 > current_changelog.md
+          fi
+          
+          # If still empty, use the first 30 lines of changelog
+          if [ ! -s current_changelog.md ]; then
+            head -30 CHANGELOG.md > current_changelog.md
+          fi
+          
+          # Read the changelog content
+          CHANGELOG_CONTENT=$(cat current_changelog.md)
+          
+          # Clean up and format for GitHub
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "✅ Changelog extracted successfully"
+          echo "Preview:"
+          echo "--------"
+          head -10 current_changelog.md
+          
+        else
+          echo "⚠️ No CHANGELOG.md found, generating basic changelog"
+          
+          # Fallback: generate basic changelog from git history
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$LAST_TAG" ]; then
+            echo "## What's Changed" > current_changelog.md
+            echo "" >> current_changelog.md
+            git log --pretty=format:"- %s" $LAST_TAG..HEAD >> current_changelog.md
+          else
+            echo "## Initial Release" > current_changelog.md
+            echo "" >> current_changelog.md
+            echo "First release of RunAgent Universal AI Agent Platform" >> current_changelog.md
+          fi
+          
+          CHANGELOG_CONTENT=$(cat current_changelog.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Create main GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.extract_version.outputs.tag_name }}
+        name: RunAgent v${{ steps.extract_version.outputs.version }}
+        body: |
+          # 🚀 RunAgent v${{ steps.extract_version.outputs.version }}
+          
+          **Universal AI Agent Platform - All SDKs synchronized at v${{ steps.extract_version.outputs.version }}**
+          
+          ## 📦 Installation
+          
+          Choose your preferred language:
+          
+          ### Python
+          ```bash
+          pip install runagent==${{ steps.extract_version.outputs.version }}
+          ```
+          
+          ### JavaScript/TypeScript
+          ```bash
+          npm install runagent@${{ steps.extract_version.outputs.version }}
+          ```
+          
+          ### Rust
+          ```toml
+          [dependencies]
+          runagent = "${{ steps.extract_version.outputs.version }}"
+          ```
+          
+          ### Go
+          ```bash
+          go get github.com/runagent-dev/runagent/runagent-go@${{ steps.extract_version.outputs.tag_name }}
+          ```
+          
+          ## 📋 Changes in this Release
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ## 🔗 Package Links
+          
+          - 🐍 [PyPI Package](https://pypi.org/project/runagent/${{ steps.extract_version.outputs.version }}/)
+          - 📦 [npm Package](https://www.npmjs.com/package/runagent/v/${{ steps.extract_version.outputs.version }})
+          - 🦀 [crates.io Package](https://crates.io/crates/runagent/${{ steps.extract_version.outputs.version }})
+          - 🐹 [Go Module](https://pkg.go.dev/github.com/runagent-dev/runagent/runagent-go@${{ steps.extract_version.outputs.tag_name }})
+          
+          ## 📚 Documentation
+          
+          - 📖 [Documentation](https://docs.run-agent.ai)
+          - 🚀 [Quick Start Guide](https://docs.run-agent.ai/get-started/quickstart)
+          - 💬 [Discord Community](https://discord.gg/runagent)
+          
+          ---
+          
+          **Full Changelog**: https://github.com/runagent-dev/runagent/compare/v${{ steps.extract_version.outputs.version }}
+        draft: false
+        prerelease: false
+        generate_release_notes: false
+        files: |
+          CHANGELOG.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }

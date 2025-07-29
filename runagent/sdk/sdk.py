@@ -171,7 +171,7 @@ class RunAgentSDK:
             ValidationError: If parameters are invalid
             FileExistsError: If folder exists and overwrite is False
         """
-        return self.templates.init_project(
+        return self.templates.init_template(
             folder_path=folder_path, framework=framework, template=template, overwrite=overwrite
         )
 

@@ -1,13 +1,10 @@
-import os
-import importlib
 import json
-import sys
 import typing as t
 from pathlib import Path
-
 from runagent.constants import AGENT_CONFIG_FILE_NAME
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import RunAgentConfig
+from .enums import FrameworkType
 
 
 def get_agent_config(folder_path: Path) -> t.Optional[dict]:
@@ -109,7 +106,7 @@ def detect_framework(folder_path: Path) -> str:
     config = get_agent_config(folder_path)
     framework = config.framework
 
-    return framework
+    return framework.value
 
 
 def validate_agent(
@@ -131,6 +128,13 @@ def validate_agent(
             "error_msgs": [f"Agent Folder not found: {folder}"],
         }
 
+    config = get_agent_config(folder_path)
+
+    is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
+
+
+def validate_pythonic_agent(config, dynamic_loading, folder_path):
+
     validation_details = {
         "valid": False,
         "folder_exists": True,
@@ -145,61 +149,51 @@ def validate_agent(
     unwanted_files = [".env"]
 
     # Check for runagent.config.json and validate schema
-    try:
-        config = get_agent_config(folder_path)
-        validation_details["files_found"].append(AGENT_CONFIG_FILE_NAME)
-        validation_details["success_msgs"].append(
-            f"Found and validated {AGENT_CONFIG_FILE_NAME}"
-        )
+    # try:
 
-        # Validate each entrypoint dynamically
-        for entrypoint in config.agent_architecture.entrypoints:
-            entrypoint_file = folder_path / entrypoint.file
-            module_name = entrypoint.module
+    # Validate each entrypoint dynamically
+    for entrypoint in config.agent_architecture.entrypoints:
+        entrypoint_file = folder_path / entrypoint.file
+        module_name = entrypoint.module
 
-            if not entrypoint_file.exists():
-                validation_details["error_msgs"].append(
-                    f"Entrypoint file not found: {entrypoint_file}"
+        if not entrypoint_file.exists():
+            validation_details["error_msgs"].append(
+                f"Entrypoint file not found: {entrypoint_file}"
+            )
+            validation_details["missing_files"].append(entrypoint.file)
+            validation_details["valid"] = False
+            continue
+
+        if dynamic_loading:
+            try:
+                importer = PackageImporter()
+                importer.resolve_import(entrypoint_file, module_name)
+                validation_details["success_msgs"].append(
+                    f"Found {module_name} reference in {entrypoint_file}"
                 )
-                validation_details["missing_files"].append(entrypoint.file)
+            except Exception as e:
+                validation_details["error_msgs"].append(str(e))
                 validation_details["valid"] = False
-                continue
-
-            if dynamic_loading:
-                try:
-                    importer = PackageImporter()
-                    importer.resolve_import(entrypoint_file, module_name)
+        else:
+            try:
+                content = entrypoint_file.read_text()
+                if module_name in content:
                     validation_details["success_msgs"].append(
                         f"Found {module_name} reference in {entrypoint_file}"
                     )
-                except Exception as e:
-                    validation_details["error_msgs"].append(str(e))
-                    validation_details["valid"] = False
-            else:
-                try:
-                    content = entrypoint_file.read_text()
-                    if module_name in content:
-                        validation_details["success_msgs"].append(
-                            f"Found {module_name} reference in {entrypoint_file}"
-                        )
-                    else:
-                        validation_details["error_msgs"].append(
-                            f"Module {module_name} not found in {entrypoint_file}"
-                        )
-                        validation_details["missing_files"].append(
-                            f"{module_name} module reference"
-                        )
-                        validation_details["valid"] = False
-                except Exception as e:
+                else:
                     validation_details["error_msgs"].append(
-                        f"Failed to read {entrypoint_file}: {str(e)}"
+                        f"Module {module_name} not found in {entrypoint_file}"
+                    )
+                    validation_details["missing_files"].append(
+                        f"{module_name} module reference"
                     )
                     validation_details["valid"] = False
-
-    except ValueError as e:
-        validation_details["error_msgs"].append(str(e))
-        validation_details["missing_files"].append("valid runagent.config.json")
-        validation_details["valid"] = False
+            except Exception as e:
+                validation_details["error_msgs"].append(
+                    f"Failed to read {entrypoint_file}: {str(e)}"
+                )
+                validation_details["valid"] = False
 
     # Check for unwanted files
     for unwanted_file in unwanted_files:

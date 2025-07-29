@@ -27,6 +27,9 @@ from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 from runagent.utils.port import PortManager
 from runagent.utils.serializer import CoreSerializer
 
+from runagent.utils.port import PortManager
+from runagent.utils.agent import detect_framework, get_agent_config
+
 console = Console()
 
 
@@ -53,7 +56,7 @@ class LocalServer:
 
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
-        self.agent_framework = self.agent_config.framework
+        self.agent_framework = self.agent_config.framework.value
         self.agent_architecture = self.agent_config.agent_architecture  
 
         # Install dependencies if requirements.txt exists
@@ -177,10 +180,6 @@ class LocalServer:
         Returns:
             LocalServer instance
         """
-        import uuid
-        from runagent.utils.port import PortManager
-        from runagent.utils.agent import detect_framework, get_agent_config
-
         db_service = DBService()
         agent_path = agent_path.resolve()
 

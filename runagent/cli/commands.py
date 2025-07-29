@@ -303,6 +303,7 @@ def init(
         console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
         console.print(f"   Template: [yellow]{template}[/yellow]")
 
+        print(">>", framework, ">>", template)
         # Initialize project
         success = sdk.init_project(
             folder_path=project_path,

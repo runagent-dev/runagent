@@ -4,6 +4,7 @@ import typing as t
 # from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field, validator
+from .enums import FrameworkType
 
 
 class TemplateSource(BaseModel):
@@ -62,7 +63,7 @@ class RunAgentConfig(BaseModel):
 
     agent_name: str = Field(..., description="Name of the agent")
     description: str = Field(..., description="Description of the agent")
-    framework: str = Field(..., description="Framework used (langchain, etc)")
+    framework: FrameworkType = Field(..., description="Framework used (langchain, etc)")
     template: str = Field(..., description="Template name")
     version: str = Field(..., description="Agent version")
     created_at: datetime = Field(..., description="Creation timestamp")
