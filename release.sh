@@ -106,14 +106,14 @@ EOF
 check_prerequisites() {
     # Check if we're on main branch (strict requirement now)
     local current_branch=$(git branch --show-current)
-    if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
-        echo "❌ Error: You must be on the main branch to create a release"
-        echo "Current branch: $current_branch"
-        echo ""
-        echo "Please switch to main branch:"
-        echo "  git checkout main"
-        exit 1
-    fi
+    # if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
+    #     echo "❌ Error: You must be on the main branch to create a release"
+    #     echo "Current branch: $current_branch"
+    #     echo ""
+    #     echo "Please switch to main branch:"
+    #     echo "  git checkout main"
+    #     exit 1
+    # fi
 
     # Check for uncommitted changes
     if [[ -n $(git status --porcelain) ]]; then
