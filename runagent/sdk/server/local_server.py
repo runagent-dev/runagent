@@ -31,6 +31,9 @@ from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
 from runagent.sdk.config import SDKConfig
 
+from runagent.utils.port import PortManager
+from runagent.utils.agent import detect_framework, get_agent_config
+
 console = Console()
 
 
@@ -64,8 +67,9 @@ class LocalServer:
         self.agent_config = get_agent_config(agent_path)
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
-        self.agent_framework = self.agent_config.framework
-        self.agent_architecture = self.agent_config.agent_architecture
+
+        self.agent_framework = self.agent_config.framework.value
+        self.agent_architecture = self.agent_config.agent_architecture  
 
         # Install dependencies if requirements.txt exists
         self._install_dependencies()
@@ -437,10 +441,6 @@ class LocalServer:
         Returns:
             LocalServer instance
         """
-        import uuid
-        from runagent.utils.port import PortManager
-        from runagent.utils.agent import detect_framework, get_agent_config
-
         db_service = DBService()
         agent_path = agent_path.resolve()
 

@@ -11,12 +11,10 @@ import (
 
 func main() {
 	// Create client
-	agentClient, err := client.NewWithAddress(
-		"f285ecb8-a2fc-4b9c-840d-1795386b84cd", // agentID
-		"autogen_invoke",                       // entrypointTag
-		true,                                   // local
-		"localhost",                            // host
-		8453,                                   // port
+	agentClient, err := client.New(
+		"<agent_id>",     // agentID
+		"autogen_invoke", // entrypointTag
+		true,             // local
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)

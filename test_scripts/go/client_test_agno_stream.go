@@ -14,12 +14,10 @@ func main() {
 	fmt.Println("=== Agno Assistant Streaming Example ===")
 
 	// Create client for streaming entrypoint
-	agentClient, err := client.NewWithAddress(
-		"47d63228-cc58-43d9-a512-d3583f8bf019", // agentID
-		"agno_stream",                          // entrypoint tag
-		true,                                   // local
-		"localhost",                            // host
-		8450,                                   // port
+	agentClient, err := client.New(
+		"<agent_id>",  // agentID
+		"agno_stream", // entrypoint tag
+		true,          // local
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
