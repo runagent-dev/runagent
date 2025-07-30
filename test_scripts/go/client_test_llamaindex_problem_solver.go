@@ -10,12 +10,10 @@ import (
 )
 
 func main() {
-	agentClient, err := client.NewWithAddress(
-		"07b5ebc6-1669-41a6-b63d-2f892d6ae834",
-		"math_run",
-		true,
-		"localhost",
-		8452,
+	agentClient, err := client.New(
+		"<agent_id>", // agentID
+		"math_run",   // entrypoint tag
+		true,         // local
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
