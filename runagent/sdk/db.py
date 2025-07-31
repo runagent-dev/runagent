@@ -62,6 +62,9 @@ class Agent(Base):
     invocations = relationship(
         "AgentInvocation", back_populates="agent", cascade="all, delete-orphan"
     )
+    agent_logs = relationship(
+        "AgentLog", back_populates="agent", cascade="all, delete-orphan"
+    )
 
     # Indexes
     __table_args__ = (Index("idx_agents_status", "status"),)
@@ -132,6 +135,31 @@ class AgentInvocation(Base):
         Index("idx_invocations_request_timestamp", "request_timestamp"),
         Index("idx_invocations_status", "status"),
         Index("idx_invocations_agent_status", "agent_id", "status"),  # Composite index
+    )
+
+
+class AgentLog(Base):
+    """Agent log model for storing detailed logs"""
+
+    __tablename__ = "agent_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(
+        String, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=False
+    )
+    log_level = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=func.current_timestamp())
+    execution_id = Column(String, nullable=True)
+
+    # Relationship
+    agent = relationship("Agent", back_populates="agent_logs")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_agent_logs_agent_id", "agent_id"),
+        Index("idx_agent_logs_created_at", "created_at"),
+        Index("idx_agent_logs_level", "log_level"),
     )
 
 class DBManager:
@@ -1763,4 +1791,86 @@ class DBService:
                 }
 
 
+    def record_agent_log(
+        self,
+        agent_id: str,
+        log_level: str,
+        message: str,
+        execution_id: str = None
+    ) -> int:
+        """Record an agent log entry"""
+        with self.db_manager.get_session() as session:
+            try:
+                # Create new log record
+                log_entry = AgentLog(
+                    agent_id=agent_id,
+                    log_level=log_level.upper(),
+                    message=message,
+                    execution_id=execution_id,
+                    created_at=func.current_timestamp()
+                )
 
+                session.add(log_entry)
+                session.flush()  # Get the ID
+                log_id = log_entry.id
+                session.commit()
+                return log_id
+            except Exception as e:
+                session.rollback()
+                console.print(f"Error recording agent log: {e}")
+                return -1
+
+    def get_agent_logs(
+        self, 
+        agent_id: str, 
+        limit: int = 100,
+        log_level: str = None,
+        execution_id: str = None
+    ) -> List[Dict]:
+        """Get agent logs with optional filtering"""
+        with self.db_manager.get_session() as session:
+            try:
+                query = session.query(AgentLog).filter(
+                    AgentLog.agent_id == agent_id
+                )
+                
+                if log_level:
+                    query = query.filter(AgentLog.log_level == log_level.upper())
+                
+                if execution_id:
+                    query = query.filter(AgentLog.execution_id == execution_id)
+                
+                logs = query.order_by(desc(AgentLog.created_at)).limit(limit).all()
+
+                return [
+                    {
+                        "id": log.id,
+                        "agent_id": log.agent_id,
+                        "log_level": log.log_level,
+                        "message": log.message,
+                        "execution_id": log.execution_id,
+                        "created_at": log.created_at.isoformat() if log.created_at else None,
+                    }
+                    for log in logs
+                ]
+            except Exception as e:
+                console.print(f"Error getting agent logs: {e}")
+                return []
+
+    def cleanup_old_logs(self, days_old: int = 7) -> int:
+        """Clean up old log records (logs are more ephemeral than runs)"""
+        with self.db_manager.get_session() as session:
+            try:
+                cutoff_date = datetime.now() - timedelta(days=days_old)
+                deleted_count = (
+                    session.query(AgentLog)
+                    .filter(AgentLog.created_at < cutoff_date)
+                    .delete()
+                )
+                session.commit()
+                console.print(f"🧹 [green]Cleaned up {deleted_count} old log entries[/green]")
+                return deleted_count
+            except Exception as e:
+                session.rollback()
+                console.print(f"Error cleaning up old logs: {e}")
+                return 0

@@ -63,7 +63,7 @@ class RunAgentSDK:
             # Non-fatal warning for template connectivity
             pass
 
-    # Configuration Methods
+    #remove validate parameter
     def configure(
         self,
         api_key: t.Optional[str] = None,
@@ -85,7 +85,7 @@ class RunAgentSDK:
             AuthenticationError: If authentication fails
         """
         return self.config.setup(
-            api_key=api_key, base_url=base_url, save=save, validate_auth=True
+            api_key=api_key, base_url=base_url, save=save
         )
 
     def configure_basic(
@@ -106,7 +106,7 @@ class RunAgentSDK:
             True if configuration is successful
         """
         return self.config.setup(
-            api_key=api_key, base_url=base_url, save=save, validate_auth=False
+            api_key=api_key, base_url=base_url, save=save
         )
 
     def is_configured(self) -> bool:

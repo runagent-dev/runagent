@@ -91,6 +91,7 @@ class SDKConfig:
         api_key: t.Optional[str] = None,
         base_url: t.Optional[str] = None,
         save: bool = True,
+        validate_auth: bool = True,  # NEW: Add option to skip validation
     ) -> bool:
         """
         Setup and validate configuration.
@@ -99,6 +100,7 @@ class SDKConfig:
             api_key: API key for authentication
             base_url: Base URL for the service
             save: Whether to save to config file
+            validate_auth: Whether to validate authentication (can be disabled for testing)
 
         Returns:
             True if setup is successful
@@ -119,9 +121,10 @@ class SDKConfig:
         if not self._config.get("api_key"):
             raise ValidationError("API key is required")
 
-        # Test authentication
-        if not self._test_authentication():
-            raise AuthenticationError("Authentication failed with provided credentials")
+        # Test authentication if requested
+        if validate_auth:
+            if not self._test_authentication():
+                raise AuthenticationError("Authentication failed with provided credentials")
 
         # Save if requested
         if save:
@@ -132,15 +135,33 @@ class SDKConfig:
     def _test_authentication(self) -> bool:
         """Test authentication with current configuration"""
         try:
-            from .http import EndpointHandler
+            from .rest_client import RestClient
 
-            handler = EndpointHandler(
+            client = RestClient(
                 api_key=self._config.get("api_key"),
                 base_url=self._config.get("base_url"),
             )
-            response = handler.validate_api_key()
-            return response.get("status") == "success"
-        except Exception:
+            
+            # Use the new auth validation endpoint
+            response = client.http.get("/auth/validate", timeout=10)
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                
+                # Store user info for later display
+                if user_data.get("status") == "success" and user_data.get("user"):
+                    self._config.update({
+                        "user_email": user_data["user"].get("email"),
+                        "user_id": user_data["user"].get("id"),
+                        "user_tier": user_data["user"].get("tier", "free")
+                    })
+                
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Authentication test failed: {e}")
             return False
 
     def is_configured(self) -> bool:
@@ -159,9 +180,9 @@ class SDKConfig:
             "api_key_set": bool(self._config.get("api_key")),
             "base_url": self._config.get("base_url"),
             "user_info": {
-                k: v
-                for k, v in self._config.items()
-                if k not in ["api_key", "base_url"]
+                "email": self._config.get("user_email"),
+                "user_id": self._config.get("user_id"),
+                "tier": self._config.get("user_tier")
             },
             "config_file": str(self.config_file),
             "config_file_exists": self.config_file.exists(),

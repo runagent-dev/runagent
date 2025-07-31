@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing ag2 Agent with Rust SDK");
     
     // Replace with the actual agent ID from `runagent serve`
-    let agent_id = "b78cef0b-b57e-455d-a61e-6dc36e6e2ca9";
+    let agent_id = "145dcae4-4c14-4c8b-bd11-cd6f40fb20ae";
     
     // Test: Non-streaming execution
     println!("\n🚀 Testing Non-Streaming Execution");
@@ -47,7 +47,7 @@ use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let agent_id = "ca7a82a2-70c4-4ded-b7e3-17d0a13f94cd";
+    let agent_id = "145dcae4-4c14-4c8b-bd11-cd6f40fb20ae";
     
     println!("🌊 ag2 Streaming Test");
     let client = RunAgentClient::new(agent_id, "ag2_stream", true).await?;

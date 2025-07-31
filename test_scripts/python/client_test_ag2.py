@@ -18,16 +18,16 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="ca7a82a2-70c4-4ded-b7e3-17d0a13f94cd",
-    entrypoint_tag="ag2_invoke",
+    agent_id="338d629e-53b4-46cb-a6d9-9db1b5b5c5c8",
+    entrypoint_tag="ag2_stream",
     local=True
     )
 
-print(ra.run(message="The solar sytem has 2 planets.", max_turns=3))
+# print(ra.run(message="The water is blue.", max_turns=3))
 
-# for chunk in ra.run(
-#     message="The solar sytem has 2 planets.",
-#     max_turns=3
-# ):
-#     print(f"{chunk['sender']}: {chunk['content']}")
-#     print("-------")
+for chunk in ra.run(
+    message="Man breathe oxygen.",
+    max_turns=3
+):
+    print(f"{chunk['sender']}: {chunk['content']}")
+    print("-------")
