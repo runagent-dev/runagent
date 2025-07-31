@@ -10,13 +10,10 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Minimal Streaming Example ===")
-
-	// Create client for streaming entrypoint
 	agentClient, err := client.New(
-		"<agent_id>",     // agentID
-		"minimal_stream", // streaming entrypoint tag
-		true,             // local
+		"<agent_id>",  // agentID
+		"math_stream", // entrypoint tag
+		true,          // local
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -26,18 +23,16 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Run streaming
-	fmt.Println("Starting stream...")
+	// Start streaming
 	stream, err := agentClient.RunStream(ctx, map[string]interface{}{
-		"role":    "user",
-		"message": "Analyze the benefits of remote work for software teams",
+		"math_query": "What is 2 * 2?",
 	})
 	if err != nil {
 		log.Fatalf("Failed to start stream: %v", err)
 	}
 	defer stream.Close()
 
-	// Read from stream
+	// Read stream
 	for {
 		data, hasMore, err := stream.Next(ctx)
 		if err != nil {
