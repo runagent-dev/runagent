@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project's latest version.
 
-## [0.1.18] - 2025-07-29
+## [0.1.19] - 2025-07-29
 
 ### Bug Fixes
 
