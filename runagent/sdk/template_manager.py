@@ -8,7 +8,8 @@ from pathlib import Path
 from ..constants import TEMPLATE_BRANCH, TEMPLATE_PREPATH, TEMPLATE_REPO_URL
 from .exceptions import ValidationError
 from .template_downloader import TemplateDownloader
-from ..utils.agent import get_agent_config
+from runagent.utils.agent import get_agent_config
+from runagent.utils.enums import Framework
 
 
 class TemplateManager:
@@ -31,7 +32,7 @@ class TemplateManager:
             return False
 
     def list_available(
-        self, framework_filter: t.Optional[str] = None
+        self, framework_filter: t.Optional[Framework] = None
     ) -> t.Dict[str, t.List[str]]:
         """
         List available templates.
@@ -78,7 +79,7 @@ class TemplateManager:
             return None
 
     def init_template(
-        self, folder_path: Path, framework: str, template: str, overwrite: bool = False
+        self, folder_path: Path, framework: Framework, template: str, overwrite: bool = False
     ) -> bool:
         """
         Initialize a new project from template.
@@ -101,13 +102,13 @@ class TemplateManager:
 
         if framework not in available_templates:
             raise ValidationError(
-                f"Framework '{framework}' not available. "
+                f"Framework '{framework.value}' not available. "
                 f"Available: {list(available_templates.keys())}"
             )
 
         if template not in available_templates[framework]:
             raise ValidationError(
-                f"Template '{template}' not available for {framework}. "
+                f"Template '{template}' not available for {framework.value}. "
                 f"Available: {available_templates[framework]}"
             )
 
@@ -156,6 +157,7 @@ class TemplateManager:
 
         existing_config.agent_name = folder_path.name
         existing_config.created_at = time.strftime("%Y-%m-%d %H:%M:%S")
+        existing_config.framework = existing_config.framework.value
 
         config_content = existing_config.model_dump(
             exclude={"agent_architecture"}

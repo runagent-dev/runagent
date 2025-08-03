@@ -4,7 +4,8 @@ from pathlib import Path
 from runagent.constants import AGENT_CONFIG_FILE_NAME
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import RunAgentConfig
-from .enums import FrameworkType
+from dotenv import dotenv_values
+from .enums import Framework
 
 
 def get_agent_config(folder_path: Path) -> t.Optional[dict]:
@@ -80,7 +81,6 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
     env_path = folder_path / ".env"
     if env_path.exists():
         try:
-            from dotenv import dotenv_values
 
             env_vars = dotenv_values(env_path)
 
@@ -93,7 +93,7 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
     return RunAgentConfig(**config_data)
 
 
-def detect_framework(folder_path: Path) -> str:
+def detect_framework(folder_path: Path) -> Framework:
     """
     Detect framework from agent's runagent.config.json file.
 
@@ -106,7 +106,7 @@ def detect_framework(folder_path: Path) -> str:
     config = get_agent_config(folder_path)
     framework = config.framework
 
-    return framework.value
+    return framework
 
 
 def validate_agent(
@@ -127,10 +127,29 @@ def validate_agent(
             "valid": False,
             "error_msgs": [f"Agent Folder not found: {folder}"],
         }
+    try:
+        config = get_agent_config(folder_path)
+    except Exception as e:
+        return False, {
+            "valid": False,
+            "error_msgs": [f"Missing Config File: {str(e)}"]
+        }
 
-    config = get_agent_config(folder_path)
+    if config.framework.is_pythonic():
+        is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
 
-    is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
+    elif config.framework.is_webhook():
+        is_valid, details = validate_webhook_agent(config, dynamic_loading, folder_path)
+
+    else:
+        is_valid = False
+        details = {}
+
+    return is_valid, details
+
+
+def validate_webhook_agent(config, dynamic_loading, folder_path):
+    return True, dict()
 
 
 def validate_pythonic_agent(config, dynamic_loading, folder_path):

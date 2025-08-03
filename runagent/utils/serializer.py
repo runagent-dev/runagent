@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Union
 from dataclasses import asdict
 from runagent.utils.schema import SafeMessage
 
+
 class CoreSerializer:
     """Core serialization logic that can be used independently"""
 

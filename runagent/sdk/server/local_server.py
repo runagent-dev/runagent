@@ -184,11 +184,7 @@ class LocalServer:
         agent_path = agent_path.resolve()
 
         # Get agent config to determine framework
-        try:
-            agent_config = get_agent_config(agent_path)
-            framework = agent_config.framework
-        except Exception as e:
-            framework = detect_framework(agent_path)
+        framework = detect_framework(agent_path).value
 
         # Check if an agent from this path already exists
         existing_agent = db_service.get_agent_by_path(str(agent_path))

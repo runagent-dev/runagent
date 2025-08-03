@@ -4,7 +4,8 @@ CLI commands that use the restructured SDK internally.
 import os
 import json
 import uuid
-
+import functools
+import inspect
 from pathlib import Path
 
 import click
@@ -21,7 +22,7 @@ from runagent.client.client import RunAgentClient
 from runagent.sdk.server.local_server import LocalServer
 from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
-
+from runagent.utils.enums import Framework
 console = Console()
 
 
@@ -182,22 +183,57 @@ def delete(agent_id, yes):
 
 
 
+def framework_options(func):
+    """
+    Decorator that dynamically adds framework options to a Click command
+    """
+    # Get all selectable frameworks (excluding DEFAULT)
+    selectable_frameworks = Framework.get_selectable_frameworks()
+    
+    # Add framework options in reverse order (Click applies decorators bottom-up)
+    for framework in reversed(selectable_frameworks):
+        option_name = f"--{framework.value}"
+        help_text = f"Use {framework.value} framework"
+        func = click.option(option_name, is_flag=True, help=help_text)(func)
+    
+    return func
+
+
+def extract_framework_kwargs(kwargs):
+    """
+    Extract framework arguments from kwargs and return the selected framework
+    """
+    framework_flags = {}
+    remaining_kwargs = {}
+    
+    # Get all framework values for comparison
+    framework_values = {fw.value for fw in Framework.get_selectable_frameworks()}
+    
+    # Separate framework flags from other kwargs
+    for key, value in kwargs.items():
+        if key in framework_values:
+            framework_flags[key] = value
+        else:
+            remaining_kwargs[key] = value
+    
+    # Check for mutually exclusive framework flags
+    active_frameworks = [name for name, flag in framework_flags.items() if flag]
+    
+    if len(active_frameworks) > 1:
+        frameworks_str = ", ".join(f"--{fw}" for fw in active_frameworks)
+        raise click.UsageError(f"Only one framework can be specified: {frameworks_str}")
+    
+    # Return selected framework or default
+    selected_framework_str = active_frameworks[0] if active_frameworks else Framework.DEFAULT.value
+    
+    return selected_framework_str, remaining_kwargs
 
 
 @click.command()
 @click.option("--template", default="default", help="Template variant (basic, advanced, default)")
 @click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
-@click.option("--ag2", is_flag=True, help="Use AG2 framework")
-@click.option("--agno", is_flag=True, help="Use AGNO framework")
-@click.option("--autogen", is_flag=True, help="Use Autogen framework")
-@click.option("--crewai", is_flag=True, help="Use CrewAI framework")
-@click.option("--langchain", is_flag=True, help="Use LangChain framework")
-@click.option("--langgraph", is_flag=True, help="Use LangGraph framework")
-@click.option("--letta", is_flag=True, help="Use Letta framework")
-@click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
-@click.option("--openai", is_flag=True, help="Use OpenAI framework")
-@click.option("--n8n", is_flag=True, help="Use N8N workflows")
+@framework_options  # This decorator adds all framework options dynamically
 @click.argument(
     "path",
     type=click.Path(
@@ -210,68 +246,47 @@ def delete(agent_id, yes):
     default=".",
     required=False,  # Make path optional
 )
-def init(
-    template,
-    interactive,
-    overwrite,
-    ag2,
-    agno,
-    autogen,
-    crewai,
-    langchain,
-    langgraph,
-    letta,
-    llamaindex,
-    openai,
-    n8n,
-    path
-):
+def init(**kwargs):
     """Initialize a new RunAgent project"""
+    
+    # Extract framework selection and other arguments
+    framework_str, clean_kwargs = extract_framework_kwargs(kwargs)
+    framework = Framework.from_value(framework_str)
+    
+    # Get the standard arguments
+    template = clean_kwargs.get('template', 'default')
+    interactive = clean_kwargs.get('interactive', False)
+    overwrite = clean_kwargs.get('overwrite', False)
+    path = clean_kwargs.get('path', Path('.'))
 
     try:
         sdk = RunAgent()
-
-        # Check for mutually exclusive framework flags
-        framework_dict = {
-            "ag2": ag2,
-            "agno": agno,
-            "autogen": autogen,
-            "crewai": crewai,
-            "langchain": langchain,
-            "langgraph": langgraph,
-            "letta": letta,
-            "llamaindex": llamaindex,
-            "openai": openai,
-            "n8n": n8n
-        }
-        total_flags = sum(flag for flag in framework_dict.values())
-        if total_flags > 1:
-            frameworks_str = ", ".join(f"--{fw}" for fw in framework_dict)
-            raise click.UsageError(f"Only one framework can be specified: {frameworks_str}")
-
-        framework = (
-            [name for name, flag in framework_dict.items() if flag] or ["default"]
-        )[0]
         
         if interactive:
-            if framework == "default":
+            if framework_str == Framework.DEFAULT.value:
                 console.print("🎯 [bold]Available frameworks:[/bold]")
-                for i, fw in enumerate(framework_dict.keys(), 1):    # need to start from 1
-                    console.print(f"  {i}. {fw}")
+                selectable_frameworks = Framework.get_selectable_frameworks()
+                
+                for i, fw in enumerate(selectable_frameworks, 1):
+                    console.print(f"  {i}. {fw.value}")
 
                 choice = click.prompt(
-                    "Select framework", type=click.IntRange(1, len(framework_dict)), default=1
+                    "Select framework", 
+                    type=click.IntRange(1, len(selectable_frameworks)), 
+                    default=1
                 )
-                # framework = framework_dict[choice - 1]
-                framework = [
-                    fw_name for i, fw_name in enumerate(framework_dict) if i == (choice-1)
-                ][0]
+                framework_str = selectable_frameworks[choice - 1].value
 
+            framework = Framework.from_value(framework_str)
             if template == "default":
                 templates = sdk.list_templates(framework)
-                template_list = templates.get(framework, ["default"])
+                template_list = templates.get(framework)
 
-                console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
+                if not template_list:
+                    console.print(f"No templates available for {framework.value}")
+                    raise click.ClickException("No templates available")
+
+                console.print(f"\n🧱 [bold]Available templates for {framework.value}:[/bold]")
                 for i, tmpl in enumerate(template_list, 1):
                     console.print(f"  {i}. {tmpl}")
 
@@ -298,12 +313,10 @@ def init(
 
         # Show configuration
         console.print(f"\n🚀 [bold]Initializing project:[/bold]")
-
         console.print(f"   Path: [cyan]{relative_project_path}[/cyan]")
-        console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
+        console.print(f"   Framework: [magenta]{framework.value if framework else 'None'}[/magenta]")
         console.print(f"   Template: [yellow]{template}[/yellow]")
 
-        print(">>", framework, ">>", template)
         # Initialize project
         success = sdk.init_project(
             folder_path=project_path,
@@ -341,6 +354,7 @@ def init(
             raise
         console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
+
 
 @click.command()
 @click.option(
@@ -474,6 +488,7 @@ def deploy_local(folder, framework, replace, port, host):
         console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
         console.print(f"📁 Source: [cyan]{folder}[/cyan]")
 
+        framework = framework or detect_framework(folder)
         if replace:
             # Replace existing agent
             result = sdk.db_service.replace_agent(
@@ -482,7 +497,7 @@ def deploy_local(folder, framework, replace, port, host):
                 agent_path=folder,
                 host=host,
                 port=port,
-                framework=framework or detect_framework(folder),
+                framework=framework.value
             )
         else:
             # Add new agent with auto port allocation
@@ -491,7 +506,7 @@ def deploy_local(folder, framework, replace, port, host):
             result = sdk.db_service.add_agent_with_auto_port(
                 agent_id=agent_id,
                 agent_path=folder,
-                framework=framework or detect_framework(folder),
+                framework=framework.value,
                 status="deployed",
                 preferred_host=host,
                 preferred_port=port,
@@ -515,7 +530,7 @@ def deploy_local(folder, framework, replace, port, host):
             capacity_info = sdk.db_service.get_database_capacity_info()
 
             console.print(
-                f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
+                f"📊 Capacity: [cyan]{capacity_info.get('current_count', 1)}/5[/cyan] slots used"
             )
 
             console.print(f"\n💡 [bold]Next steps:[/bold]")
@@ -797,7 +812,7 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 agent_path=str(path),
                 host=allocated_host,
                 port=allocated_port,  # Ensure port is not None
-                framework=detect_framework(path),
+                framework=detect_framework(path).value,
             )
             
             if not result["success"]:

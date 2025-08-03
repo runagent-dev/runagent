@@ -47,15 +47,15 @@ except OSError as e:
     ) from e
 
 
-# Framework Enums
-class Framework(str, Enum):
-    LANGGRAPH = "langgraph"
-    LANGCHAIN = "langchain"
-    LLAMAINDEX = "llamaindex"
-    CREWAI = "crewai"
-    AUTOGEN = "autogen"
+# # Framework Enums
+# class Framework(str, Enum):
+#     LANGGRAPH = "langgraph"
+#     LANGCHAIN = "langchain"
+#     LLAMAINDEX = "llamaindex"
+#     CREWAI = "crewai"
+#     AUTOGEN = "autogen"
 
 
-class TemplateVariant(str, Enum):
-    BASIC = "basic"
-    ADVANCED = "advanced"
+# class TemplateVariant(str, Enum):
+#     BASIC = "basic"
+#     ADVANCED = "advanced"

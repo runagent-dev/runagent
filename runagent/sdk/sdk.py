@@ -16,7 +16,7 @@ from .db import DBService
 from .deployment import RemoteDeployment
 from .exceptions import AuthenticationError, ValidationError
 from .template_manager import TemplateManager
-
+from runagent.utils.enums import Framework
 
 class RunAgentSDK:
     """
@@ -119,7 +119,7 @@ class RunAgentSDK:
 
     # Template Methods
     def list_templates(
-        self, framework: t.Optional[str] = None
+        self, framework: t.Optional[Framework] = None
     ) -> t.Dict[str, t.List[str]]:
         """
         List available project templates.
@@ -151,7 +151,7 @@ class RunAgentSDK:
     def init_project(
         self,
         folder_path: Path,
-        framework: str = "default",
+        framework: Framework = Framework.DEFAULT,
         template: str = "default",
         overwrite: bool = False,
     ) -> bool:
@@ -395,18 +395,6 @@ class RunAgentSDK:
             suggestions.append("Check environment variables (.env file)")
 
         return suggestions
-
-    def detect_framework(self, folder: str) -> str:
-        """
-        Auto-detect the framework used in an agent project.
-
-        Args:
-            folder: Path to agent folder
-
-        Returns:
-            Detected framework name
-        """
-        return detect_framework(folder)
 
     # Database and Server Management
     def cleanup_local_database(self, days_old: int = 30) -> t.Dict[str, t.Any]:

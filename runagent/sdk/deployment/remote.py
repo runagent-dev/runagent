@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..exceptions import AuthenticationError, ValidationError
 from ..rest_client import RestClient
+from runagent.utils.agent import detect_framework
 
 
 class RemoteDeployment:
@@ -45,9 +46,9 @@ class RemoteDeployment:
 
         # Auto-detect framework if not provided
         if not framework:
-            framework = self._detect_framework(folder_path)
+            framework = detect_framework(folder_path)
 
-        metadata = {"framework": framework}
+        metadata = {"framework": framework.value}
 
         return self.client.deploy_agent(folder_path=str(folder_path), metadata=metadata)
 
@@ -70,9 +71,9 @@ class RemoteDeployment:
 
         # Auto-detect framework if not provided
         if not framework:
-            framework = self._detect_framework(folder_path)
+            framework = detect_framework(folder_path)
 
-        metadata = {"framework": framework}
+        metadata = {"framework": framework.value}
 
         return self.client.upload_agent(folder_path=str(folder_path), metadata=metadata)
 
@@ -108,36 +109,3 @@ class RemoteDeployment:
         # This would need to be implemented in RestClient
         # For now, return a placeholder
         return {"success": False, "error": "Remote agent deletion not yet implemented"}
-
-    def _detect_framework(self, folder_path: Path) -> str:
-        """Auto-detect framework from project files"""
-        # Same logic as LocalDeployment
-        framework_keywords = {
-            "langgraph": ["langgraph", "StateGraph", "Graph"],
-            "langchain": ["langchain", "ConversationChain", "AgentExecutor"],
-            "llamaindex": ["llama_index", "VectorStoreIndex", "QueryEngine"],
-        }
-
-        for file_to_check in ["main.py", "agent.py"]:
-            file_path = folder_path / file_to_check
-            if file_path.exists():
-                try:
-                    content = file_path.read_text().lower()
-                    for framework, keywords in framework_keywords.items():
-                        if any(keyword.lower() in content for keyword in keywords):
-                            return framework
-                except:
-                    continue
-
-        # Check requirements.txt
-        req_file = folder_path / "requirements.txt"
-        if req_file.exists():
-            try:
-                content = req_file.read_text().lower()
-                for framework, keywords in framework_keywords.items():
-                    if any(keyword.lower() in content for keyword in keywords):
-                        return framework
-            except:
-                pass
-
-        return "unknown"

@@ -9,6 +9,7 @@ from pathlib import Path
 import git
 from git import Repo
 from runagent.utils.agent import validate_agent
+from runagent.utils.enums import Framework
 
 
 class TemplateDownloadError(Exception):
@@ -23,7 +24,7 @@ class TemplateDownloader:
         '''
         Initialize template downloader
 
-        Args:
+        Args:       
             repo_url: Git repository URL
             branch: Branch to download from
         '''
@@ -31,7 +32,7 @@ class TemplateDownloader:
         self.branch = branch
 
     def download_template(
-        self, prepath: str, framework: str, template: str, target_folder: str
+        self, prepath: str, framework: Framework, template: str, target_folder: str
     ) -> None:
         """
         Download template contents to target folder
@@ -45,7 +46,7 @@ class TemplateDownloader:
         Raises:
             TemplateDownloadError: If download fails
         """
-        template_path = f"{prepath}/{framework}/{template}"
+        template_path = f"{prepath}/{framework.value}/{template}"
 
         # Create target directory
         target_dir = Path(target_folder)
@@ -166,11 +167,9 @@ class TemplateDownloader:
 
                 # Scan for framework directories
                 for framework_dir in prepath_dir.iterdir():
-                    if framework_dir.is_dir() and not framework_dir.name.startswith(
-                        "."
-                    ):
-                        framework_name = framework_dir.name
-                        templates[framework_name] = []
+                    if framework_dir.is_dir() and not framework_dir.name.startswith("."):
+                        framework = Framework(framework_dir.name)
+                        templates[framework] = []
 
                         # Scan for template directories
                         for template_dir in framework_dir.iterdir():
@@ -179,8 +178,8 @@ class TemplateDownloader:
                                 and not template_dir.name.startswith(".")
                             ):
                                 # Verify this is a valid template (has main.py)
-                                if validate_agent(template_dir):
-                                    templates[framework_name].append(template_dir.name)
+                                if validate_agent(template_dir)[0]:
+                                    templates[framework].append(template_dir.name)
 
                 return templates
 
