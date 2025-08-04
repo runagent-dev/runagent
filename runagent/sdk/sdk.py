@@ -130,6 +130,7 @@ class RunAgentSDK:
         Returns:
             Dictionary mapping framework names to template lists
         """
+        print(">>", framework)
         return self.templates.list_available(framework_filter=framework)
 
     def get_template_info(
