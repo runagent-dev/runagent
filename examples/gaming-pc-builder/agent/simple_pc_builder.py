@@ -6,9 +6,20 @@ import requests
 from typing import Dict, List
 import time
 import re
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (optional)
+load_dotenv()
 
 # Tavily API configuration
-TAVILY_API_KEY = "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"  # Replace with your actual API key
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+
+# Optional: Add error handling
+if not TAVILY_API_KEY:
+    raise ValueError("TAVILY_API_KEY environment variable is not set")
+
+print(f"API Key loaded: {'✓' if TAVILY_API_KEY else '✗'}")
 
 # Global conversation memory
 conversation_memory = []
