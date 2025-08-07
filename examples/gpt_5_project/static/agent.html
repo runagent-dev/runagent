@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .agent-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .agent-details {
+            display: flex;
+            gap: 30px;
+            font-size: 0.9rem;
+        }
+
+        .status-badge {
+            background: #28a745;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 60vh;
+        }
+
+        .input-panel {
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+            background: #f8f9fa;
+        }
+
+        .output-panel {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-section {
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .output-header h3 {
+            color: #2c3e50;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .streaming-indicator {
+            display: none;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .streaming-indicator.active {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .output {
+            flex: 1;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #2c3e50;
+            max-height: 400px;
+        }
+
+        .output::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .output::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .output::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 3px;
+        }
+
+        .output.welcome {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .output.streaming {
+            border-left: 3px solid #007bff;
+            background: #f8fbff;
+        }
+
+        .execution-mode {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-button {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .mode-button.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .examples-section {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .examples-section h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .example-item {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .example-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-panel {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .agent-details {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="agentName">Loading Agent...</h1>
+            <p id="agentDescription">Connecting to your AI agent...</p>
+            
+            <div class="agent-info">
+                <div class="agent-details">
+                    <div><strong>Agent ID:</strong> <span id="agentId">-</span></div>
+                    <div><strong>Framework:</strong> <span id="framework">-</span></div>
+                    <div><strong>Session:</strong> <span id="sessionId">-</span></div>
+                </div>
+                <div class="status-badge" id="statusBadge">
+                    <span class="loading-spinner"></span> Connecting
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="input-panel">
+                <div class="form-section">
+                    <h3>🎯 Execution Mode</h3>
+                    <div class="execution-mode">
+                        <div class="mode-button active" data-mode="standard" onclick="setMode('standard')">
+                            ⚡ Standard
+                        </div>
+                        <div class="mode-button" data-mode="streaming" onclick="setMode('streaming')">
+                            🌊 Streaming
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>📝 Input Fields</h3>
+                    <div id="dynamicInputs">
+                        <!-- Dynamic input fields will be generated here -->
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="runAgent()" id="runButton">
+                        <span id="runButtonText">Run Agent</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearOutput()">
+                        Clear Output
+                    </button>
+                </div>
+
+                <div class="examples-section" id="examplesSection" style="display: none;">
+                    <h4>💡 Example Inputs</h4>
+                    <div id="examplesList">
+                        <!-- Examples will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="output-panel">
+                <div class="output-header">
+                    <h3>📤 Agent Response</h3>
+                    <div class="streaming-indicator" id="streamingIndicator">
+                        <div class="loading-spinner"></div>
+                        <span>Processing...</span>
+                    </div>
+                </div>
+                
+                <div class="output welcome" id="output">
+                    👋 Welcome to your AI agent interface!
+                    
+Configure the input fields and click "Run Agent" to get started.
+
+Your agent will process the input and provide intelligent responses based on its capabilities.
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Powered by <strong>RunAgent</strong> | 
+            <a href="/" target="_blank">Create Another Agent</a>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'standard';
+        let isProcessing = false;
+        let agentInfo = null;
+        let agentId = null;
+
+        // Get agent ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlAgentId = urlParams.get('agent');
+        
+        // Try to extract from path as well (e.g., /agent/123)
+        const pathMatch = window.location.pathname.match(/\/agent\/([^\/]+)/);
+        agentId = urlAgentId || (pathMatch ? pathMatch[1] : null);
+
+        if (!agentId) {
+            // Try to get from fragment
+            const fragment = window.location.hash.substring(1);
+            agentId = fragment || 'demo-agent-123';
+        }
+
+        document.getElementById('agentId').textContent = agentId;
+
+        // Initialize the page
+        window.addEventListener('DOMContentLoaded', initializePage);
+
+        async function initializePage() {
+            try {
+                // Fetch agent information
+                const response = await fetch(`http://localhost:8000/agent/${agentId}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    agentInfo = data.agent_info;
+                    
+                    // Update UI with agent info
+                    updateAgentInfo(data);
+                    generateInputFields(agentInfo.input_fields);
+                    generateExamples(agentInfo);
+                    
+                    document.getElementById('statusBadge').innerHTML = '✅ Ready';
+                    document.getElementById('statusBadge').style.background = '#28a745';
+                } else {
+                    throw new Error('Agent not found');
+                }
+            } catch (error) {
+                console.error('Error loading agent:', error);
+                // Use demo data for development
+                useDemoData();
+            }
+        }
+
+        function useDemoData() {
+            // Demo agent info for development
+            agentInfo = {
+                agent_name: 'Weather Agent',
+                description: 'A helpful weather assistant that provides weather information for any city.',
+                framework: 'langgraph',
+                main_functionality: 'Weather forecasting and climate information',
+                input_fields: ['city', 'country', 'query']
+            };
+            
+            updateAgentInfo({
+                agent_info: agentInfo,
+                session_id: 'demo-session',
+                status: 'demo'
+            });
+            
+            generateInputFields(agentInfo.input_fields);
+            generateExamples(agentInfo);
+            
+            document.getElementById('statusBadge').innerHTML = '🔧 Demo Mode';
+            document.getElementById('statusBadge').style.background = '#ffc107';
+        }
+
+        function updateAgentInfo(data) {
+            const info = data.agent_info;
+            
+            document.getElementById('agentName').textContent = info.agent_name;
+            document.getElementById('agentDescription').textContent = info.description;
+            document.getElementById('framework').textContent = info.framework.toUpperCase();
+            document.getElementById('sessionId').textContent = data.session_id.substring(0, 8) + '...';
+            
+            // Update page title
+            document.title = `${info.agent_name} - Agent Interface`;
+        }
+
+        function generateInputFields(inputFields) {
+            const container = document.getElementById('dynamicInputs');
+            container.innerHTML = '';
+
+            inputFields.forEach(field => {
+                const group = document.createElement('div');
+                group.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.textContent = formatFieldName(field);
+                label.setAttribute('for', field);
+
+                let input;
+                if (field.toLowerCase().includes('query') || field.toLowerCase().includes('message') || field.toLowerCase().includes('description')) {
+                    input = document.createElement('textarea');
+                    input.className = 'form-control';
+                    input.rows = 3;
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-control';
+                }
+
+                input.id = field;
+                input.name = field;
+                input.placeholder = getPlaceholder(field);
+
+                group.appendChild(label);
+                group.appendChild(input);
+                container.appendChild(group);
+            });
+        }
+
+        function formatFieldName(fieldName) {
+            return fieldName
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function getPlaceholder(field) {
+            const placeholders = {
+                'city': 'Enter city name (e.g., London)',
+                'country': 'Enter country (e.g., UK)',
+                'query': 'What would you like to know?',
+                'message': 'Enter your message here...',
+                'topic': 'Enter topic of interest',
+                'task': 'Describe the task you want to accomplish',
+                'prompt': 'Enter your prompt...',
+                'text': 'Enter text to process',
+                'question': 'Ask your question',
+                'input': 'Enter your input'
+            };
+            
+            return placeholders[field.toLowerCase()] || `Enter ${formatFieldName(field).toLowerCase()}`;
+        }
+
+        function generateExamples(info) {
+            const examplesSection = document.getElementById('examplesSection');
+            const examplesList = document.getElementById('examplesList');
+            
+            const examples = getExamplesForAgent(info);
+            
+            if (examples.length > 0) {
+                examplesList.innerHTML = '';
+                examples.forEach(example => {
+                    const item = document.createElement('div');
+                    item.className = 'example-item';
+                    item.textContent = example.description;
+                    item.onclick = () => loadExample(example);
+                    examplesList.appendChild(item);
+                });
+                examplesSection.style.display = 'block';
+            }
+        }
+
+        function getExamplesForAgent(info) {
+            const agentType = info.main_functionality.toLowerCase();
+            
+            if (agentType.includes('weather')) {
+                return [
+                    {
+                        description: 'Get weather for London, UK',
+                        values: { city: 'London', country: 'UK', query: 'What is the current weather?' }
+                    },
+                    {
+                        description: 'Weekly forecast for Tokyo',
+                        values: { city: 'Tokyo', country: 'Japan', query: 'Show me the 7-day weather forecast' }
+                    }
+                ];
+            } else if (agentType.includes('research')) {
+                return [
+                    {
+                        description: 'Research AI trends',
+                        values: { query: 'Research the latest trends in artificial intelligence for 2024' }
+                    },
+                    {
+                        description: 'Summarize recent developments',
+                        values: { query: 'Summarize recent developments in renewable energy technology' }
+                    }
+                ];
+            } else if (agentType.includes('math')) {
+                return [
+                    {
+                        description: 'Calculate complex equation',
+                        values: { query: 'What is the derivative of x^3 + 2x^2 - 5x + 3?' }
+                    },
+                    {
+                        description: 'Solve word problem',
+                        values: { query: 'If a train travels 120 miles in 2 hours, what is its average speed?' }
+                    }
+                ];
+            } else {
+                return [
+                    {
+                        description: 'General assistance',
+                        values: { query: 'Help me understand your capabilities' }
+                    },
+                    {
+                        description: 'Example task',
+                        values: { query: 'Show me what you can do' }
+                    }
+                ];
+            }
+        }
+
+        function loadExample(example) {
+            Object.keys(example.values).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.value = example.values[key];
+                }
+            });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            
+            document.querySelectorAll('.mode-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        }
+
+        function collectInputValues() {
+            const values = {};
+            const inputs = document.querySelectorAll('#dynamicInputs input, #dynamicInputs textarea');
+            
+            inputs.forEach(input => {
+                if (input.value.trim()) {
+                    values[input.name] = input.value.trim();
+                }
+            });
+            
+            return values;
+        }
+
+        async function runAgent() {
+            if (isProcessing) return;
+
+            const inputValues = collectInputValues();
+            
+            if (Object.keys(inputValues).length === 0) {
+                alert('Please provide at least one input value.');
+                return;
+            }
+
+            isProcessing = true;
+            const runButton = document.getElementById('runButton');
+            const runButtonText = document.getElementById('runButtonText');
+            const output = document.getElementById('output');
+            const streamingIndicator = document.getElementById('streamingIndicator');
+
+            // Update UI for processing
+            runButton.disabled = true;
+            runButtonText.textContent = currentMode === 'streaming' ? 'Streaming...' : 'Processing...';
+            
+            if (currentMode === 'streaming') {
+                streamingIndicator.classList.add('active');
+                output.className = 'output streaming';
+                output.textContent = '';
+            } else {
+                output.className = 'output';
+                output.textContent = 'Processing your request...';
+            }
+
+            try {
+                if (currentMode === 'streaming') {
+                    await runStreamingAgent(inputValues);
+                } else {
+                    await runStandardAgent(inputValues);
+                }
+            } catch (error) {
+                output.textContent = `❌ Error: ${error.message}`;
+                output.className = 'output';
+            } finally {
+                isProcessing = false;
+                runButton.disabled = false;
+                runButtonText.textContent = 'Run Agent';
+                streamingIndicator.classList.remove('active');
+            }
+        }
+
+        async function runStandardAgent(inputValues) {
+            // For demo purposes, simulate agent execution
+            const output = document.getElementById('output');
+            
+            // Simulate processing delay
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Generate mock response based on agent type
+            let response = generateMockResponse(agentInfo, inputValues);
+            
+            output.textContent = response;
+            output.className = 'output';
+        }
+
+        async function runStreamingAgent(inputValues) {
+            const output = document.getElementById('output');
+            
+            // Generate mock streaming response
+            const response = generateMockResponse(agentInfo, inputValues);
+            const words = response.split(' ');
+            
+            for (let i = 0; i < words.length; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                output.textContent += words[i] + ' ';
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        function generateMockResponse(info, inputs) {
+            const agentName = info.agent_name;
+            const functionality = info.main_functionality;
+            
+            if (functionality.toLowerCase().includes('weather')) {
+                const city = inputs.city || 'Unknown City';
+                const country = inputs.country || 'Unknown Country';
+                return `🌤️ Weather Report for ${city}, ${country}
+
+Current Conditions:
+• Temperature: 22°C (72°F)
+• Conditions: Partly cloudy
+• Humidity: 65%
+• Wind: 15 km/h NW
+• Pressure: 1013 hPa
+
+7-Day Forecast:
+📅 Today: Partly cloudy, High 24°C, Low 16°C
+📅 Tomorrow: Sunny, High 26°C, Low 18°C
+📅 Wed: Light rain, High 20°C, Low 14°C
+📅 Thu: Cloudy, High 19°C, Low 13°C
+📅 Fri: Sunny, High 25°C, Low 17°C
+📅 Sat: Partly cloudy, High 23°C, Low 16°C
+📅 Sun: Thunderstorms, High 21°C, Low 15°C
+
+🌡️ Weather data provided by ${agentName}`;
+            } else if (functionality.toLowerCase().includes('research')) {
+                return `📚 Research Summary
+
+I've analyzed your query: "${inputs.query || inputs.message || 'research request'}"
+
+Key Findings:
+• Trend 1: Increasing adoption of AI technologies across industries
+• Trend 2: Focus on ethical AI development and responsible deployment
+• Trend 3: Integration of AI with traditional business processes
+
+Recommendations:
+1. Stay updated with latest developments
+2. Consider practical applications for your use case
+3. Evaluate potential risks and benefits
+
+Sources analyzed: 15 academic papers, 8 industry reports, 12 news articles
+
+📊 Research completed by ${agentName}`;
+            } else if (functionality.toLowerCase().includes('math')) {
+                return `🔢 Mathematical Analysis
+
+Problem: ${inputs.query || inputs.message || 'mathematical query'}
+
+Solution:
+Step 1: Identify the mathematical operation required
+Step 2: Apply appropriate formulas and methods
+Step 3: Calculate the result with precision
+
+Result: 42 (The answer to everything! 😉)
+
+Explanation:
+This is a demonstration response from your math agent.
+In a real implementation, this would show actual calculations,
+step-by-step solutions, and detailed mathematical explanations.
+
+✅ Calculation completed by ${agentName}`;
+            } else {
+                return `🤖 ${agentName} Response
+
+Thank you for your input! I've processed your request:
+
+Input received:
+${Object.entries(inputs).map(([key, value]) => `• ${formatFieldName(key)}: ${value}`).join('\n')}
+
+Analysis:
+Based on my capabilities focused on "${functionality}", I can help you with various tasks related to this domain.
+
+This is a demonstration response showing how your agent would process and respond to user inputs. In a real deployment, this would connect to your actual RunAgent server and provide genuine AI-powered responses.
+
+🚀 Powered by ${agentName} | Framework: ${info.framework.toUpperCase()}`;
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = '👋 Output cleared. Ready for new request.';
+            document.getElementById('output').className = 'output welcome';
+        }
+
+        // Auto-focus first input when page loads
+        setTimeout(() => {
+            const firstInput = document.querySelector('#dynamicInputs input, #dynamicInputs textarea');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 500);
+    </script>
+</body>
+</html>
