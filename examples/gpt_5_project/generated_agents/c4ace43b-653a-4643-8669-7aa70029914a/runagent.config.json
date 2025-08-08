@@ -1,0 +1,29 @@
+{
+  "agent_name": "LlamaIndex Math Solver",
+  "description": "A math solver that uses LlamaIndex to retrieve relevant math explanations, worked examples, and reference notes from a curated document store, then composes step-by-step solutions for user-provided problems. It can handle algebra, calculus, and basic applied math by combining retrieved knowledge with on-the-fly symbolic reasoning.",
+  "framework": "llamaindex",
+  "template": "custom",
+  "version": "1.0.0",
+  "created_at": "2025-08-07 23:40:04",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "agent_run",
+        "tag": "main"
+      },
+      {
+        "file": "agent.py",
+        "module": "agent_run_stream",
+        "tag": "main_stream"
+      }
+    ]
+  },
+  "input_fields": [
+    "math_problem_text",
+    "preferred_solution_style",
+    "desired_detail_level",
+    "reference_documents_ids",
+    "output_format"
+  ]
+}

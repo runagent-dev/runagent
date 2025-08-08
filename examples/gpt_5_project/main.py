@@ -748,26 +748,15 @@ async def agent_run_stream(*input_args, **input_kwargs):
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
 
+# In your main.py, modify the start_runagent_server function:
+
 def start_runagent_server(session_dir: str, session_id: str):
     """Start runagent server for the generated agent."""
     
     try:
         print(f"🚀 Starting RunAgent server for session: {session_id}")
-        print(f"📁 Agent directory: {session_dir}")
         
-        # Check if runagent is available
-        try:
-            result = subprocess.run(["runagent", "--version"], capture_output=True, text=True, timeout=10)
-            print(f"RunAgent version: {result.stdout.strip()}")
-        except FileNotFoundError:
-            print("❌ RunAgent CLI not found! Installing...")
-            # Try to install runagent
-            subprocess.run(["pip", "install", "runagent"], check=True)
-            print("✅ RunAgent installed")
-        except Exception as e:
-            print(f"⚠️ RunAgent check failed: {e}")
-        
-        # Find an available port starting from 8080
+        # Find available port
         import socket
         def find_free_port(start_port=8080):
             for port in range(start_port, start_port + 100):
@@ -782,56 +771,24 @@ def start_runagent_server(session_dir: str, session_id: str):
         port = find_free_port()
         print(f"🔌 Using port: {port}")
         
-        # Debug: Check what files exist and their content
-        session_path = Path(session_dir)
-        print(f"📂 Checking generated files in {session_path}:")
-        
-        try:
-            if session_path.exists():
-                for file_path in session_path.iterdir():
-                    print(f"  📄 {file_path.name}")
-                    if file_path.name == "runagent.config.json":
-                        try:
-                            with open(file_path, 'r') as f:
-                                config_content = json.load(f)
-                            print(f"  📋 Config content preview:")
-                            print(f"    - agent_name: {config_content.get('agent_name')}")
-                            print(f"    - framework: {config_content.get('framework')}")
-                            print(f"    - template_source: {config_content.get('template_source', 'MISSING!')}")
-                            
-                            # Check if template_source is missing and fix it
-                            if not config_content.get('template_source'):
-                                print("  🔧 Fixing missing template_source...")
-                                config_content['template_source'] = {
-                                    "repo_url": "https://github.com/runagent-dev/runagent.git",
-                                    "path": "generated/custom",
-                                    "author": "runagent-generator"
-                                }
-                                # Write the fixed config back
-                                with open(file_path, 'w') as f:
-                                    json.dump(config_content, f, indent=2)
-                                print("  ✅ Fixed config file!")
-                                
-                        except Exception as e:
-                            print(f"  ❌ Error reading config: {e}")
-            else:
-                print(f"  ❌ Directory {session_path} does not exist!")
-        except Exception as e:
-            print(f"  ❌ Error checking files: {e}")
-        
-        # Install dependencies first
+        # Install dependencies
         print("📦 Installing agent dependencies...")
         try:
             result = subprocess.run(["pip", "install", "-r", "requirements.txt"], 
                                   cwd=session_dir, capture_output=True, text=True, timeout=120)
-            if result.returncode != 0:
-                print(f"⚠️ Dependency installation warning: {result.stderr}")
-            else:
+            if result.returncode == 0:
                 print("✅ Dependencies installed successfully")
+            else:
+                print(f"⚠️ Dependency installation warning: {result.stderr}")
         except Exception as e:
             print(f"⚠️ Dependency installation failed: {e}")
         
-        # Start runagent serve process
+        # Set up environment to bypass database issues
+        env = os.environ.copy()
+        env['RUNAGENT_DISABLE_DB'] = 'true'
+        env['RUNAGENT_LOG_LEVEL'] = 'INFO'
+        
+        # Start RunAgent server with simple command
         cmd = ["runagent", "serve", ".", "--host", "0.0.0.0", "--port", str(port)]
         
         print(f"🔧 Running command: {' '.join(cmd)}")
@@ -841,48 +798,37 @@ def start_runagent_server(session_dir: str, session_id: str):
             cmd,
             cwd=session_dir,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # Combine stderr with stdout
+            stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
+            env=env
         )
         
-        # Wait for server to start and extract agent info
-        agent_id = None
+        # Wait for server to start
+        agent_id = str(uuid.uuid4())
         start_time = time.time()
-        timeout = 60  # 60 seconds timeout
+        timeout = 60
         
         print("📡 Waiting for RunAgent server to start...")
         
+        server_started = False
         while time.time() - start_time < timeout:
-            # Check if process is still running
             if process.poll() is not None:
                 stdout, stderr = process.communicate()
-                print(f"❌ RunAgent process exited early (exit code: {process.returncode}):")
+                print(f"❌ RunAgent process exited early:")
                 print(f"OUTPUT: {stdout}")
                 break
             
-            # Read output line by line
             try:
                 line = process.stdout.readline()
                 if line:
                     print(f"RunAgent: {line.strip()}")
                     
-                    # Look for agent ID in output - improved detection
-                    if any(keyword in line.lower() for keyword in ["agent_id", "agent id", "agent-id"]):
-                        import re
-                        # Look for UUID pattern
-                        match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', line)
-                        if match:
-                            agent_id = match.group(1)
-                            print(f"✅ Found Agent ID: {agent_id}")
-                            break
-                    
-                    # Look for server startup confirmation
+                    # Look for server startup indicators
                     if any(keyword in line.lower() for keyword in ["server running", "uvicorn running", "started server", "listening on"]):
-                        if not agent_id:
-                            agent_id = str(uuid.uuid4())
-                            print(f"🆔 Generated Agent ID: {agent_id}")
+                        server_started = True
+                        print(f"✅ Server startup detected!")
                         break
                         
             except Exception as e:
@@ -891,23 +837,23 @@ def start_runagent_server(session_dir: str, session_id: str):
             
             time.sleep(0.5)
         
-        if not agent_id:
-            # If we couldn't get an agent ID, generate one and assume it started
-            agent_id = str(uuid.uuid4())
-            print(f"⚠️ Using generated Agent ID: {agent_id}")
-        
-        # Test if server is responding
-        try:
-            import requests
-            test_url = f"http://localhost:{port}/health"
-            response = requests.get(test_url, timeout=5)
-            print(f"✅ Server health check: {response.status_code}")
-        except Exception as e:
-            print(f"⚠️ Health check failed: {e}")
+        # Test server health
+        if server_started:
+            for attempt in range(5):
+                try:
+                    import requests
+                    test_url = f"http://localhost:{port}/health"
+                    response = requests.get(test_url, timeout=5)
+                    if response.status_code == 200:
+                        print(f"✅ Server health check passed!")
+                        break
+                except Exception as e:
+                    print(f"⚠️ Health check attempt {attempt + 1} failed: {e}")
+                    time.sleep(2)
         
         agent_url = f"http://localhost:8000/static/agent.html?agent={agent_id}"
         
-        # Store the running agent info
+        # Store running agent info
         running_agents[session_id] = {
             "process": process,
             "agent_id": agent_id,

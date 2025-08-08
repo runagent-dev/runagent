@@ -178,6 +178,16 @@
             transform: translateY(-1px);
         }
 
+        .btn-test {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-test:hover {
+            background: #138496;
+            transform: translateY(-1px);
+        }
+
         .output-header {
             display: flex;
             justify-content: space-between;
@@ -256,6 +266,18 @@
         .output.streaming {
             border-left: 3px solid #007bff;
             background: #f8fbff;
+        }
+
+        .output.error {
+            border-left: 3px solid #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .output.success {
+            border-left: 3px solid #28a745;
+            background: #d4edda;
+            color: #155724;
         }
 
         .execution-mode {
@@ -371,7 +393,7 @@
                 <div class="agent-details">
                     <div><strong>Agent ID:</strong> <span id="agentId">-</span></div>
                     <div><strong>Framework:</strong> <span id="framework">-</span></div>
-                    <div><strong>Session:</strong> <span id="sessionId">-</span></div>
+                    <div><strong>RunAgent Port:</strong> <span id="runagentPort">-</span></div>
                 </div>
                 <div class="status-badge" id="statusBadge">
                     <span class="loading-spinner"></span> Connecting
@@ -404,6 +426,9 @@
                     <button class="btn btn-primary" onclick="runAgent()" id="runButton">
                         <span id="runButtonText">Run Agent</span>
                     </button>
+                    <button class="btn btn-test" onclick="testConnection()" id="testButton">
+                        🔍 Test Connection
+                    </button>
                     <button class="btn btn-secondary" onclick="clearOutput()">
                         Clear Output
                     </button>
@@ -432,6 +457,8 @@
 Configure the input fields and click "Run Agent" to get started.
 
 Your agent will process the input and provide intelligent responses based on its capabilities.
+
+🔍 Click "Test Connection" to verify RunAgent server is running.
                 </div>
             </div>
         </div>
@@ -447,6 +474,7 @@ Your agent will process the input and provide intelligent responses based on its
         let isProcessing = false;
         let agentInfo = null;
         let agentId = null;
+        let runagentUrl = null;
 
         // Get agent ID from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -469,20 +497,31 @@ Your agent will process the input and provide intelligent responses based on its
 
         async function initializePage() {
             try {
-                // Fetch agent information
+                // Fetch agent information from GPT-5 generator
                 const response = await fetch(`http://localhost:8000/agent/${agentId}`);
                 
                 if (response.ok) {
                     const data = await response.json();
                     agentInfo = data.agent_info;
+                    runagentUrl = agentInfo.runagent_url || `http://localhost:${agentInfo.port}`;
+                    
+                    console.log('Agent Info:', agentInfo);
+                    console.log('RunAgent URL:', runagentUrl);
                     
                     // Update UI with agent info
                     updateAgentInfo(data);
                     generateInputFields(agentInfo.input_fields);
                     generateExamples(agentInfo);
                     
-                    document.getElementById('statusBadge').innerHTML = '✅ Ready';
-                    document.getElementById('statusBadge').style.background = '#28a745';
+                    // Test connection immediately
+                    const connected = await testConnection(false);
+                    if (connected) {
+                        document.getElementById('statusBadge').innerHTML = '✅ Ready';
+                        document.getElementById('statusBadge').style.background = '#28a745';
+                    } else {
+                        document.getElementById('statusBadge').innerHTML = '❌ Server Down';
+                        document.getElementById('statusBadge').style.background = '#dc3545';
+                    }
                 } else {
                     throw new Error('Agent not found');
                 }
@@ -496,12 +535,15 @@ Your agent will process the input and provide intelligent responses based on its
         function useDemoData() {
             // Demo agent info for development
             agentInfo = {
-                agent_name: 'Weather Agent',
-                description: 'A helpful weather assistant that provides weather information for any city.',
-                framework: 'langgraph',
-                main_functionality: 'Weather forecasting and climate information',
-                input_fields: ['city', 'country', 'query']
+                agent_name: 'Math Agent',
+                description: 'A helpful math assistant that solves mathematical problems.',
+                framework: 'llamaindex',
+                main_functionality: 'Mathematical calculations and problem solving',
+                input_fields: ['problem_text', 'desired_level_of_detail'],
+                port: 8080
             };
+            
+            runagentUrl = `http://localhost:${agentInfo.port}`;
             
             updateAgentInfo({
                 agent_info: agentInfo,
@@ -522,7 +564,7 @@ Your agent will process the input and provide intelligent responses based on its
             document.getElementById('agentName').textContent = info.agent_name;
             document.getElementById('agentDescription').textContent = info.description;
             document.getElementById('framework').textContent = info.framework.toUpperCase();
-            document.getElementById('sessionId').textContent = data.session_id.substring(0, 8) + '...';
+            document.getElementById('runagentPort').textContent = info.port || '8080';
             
             // Update page title
             document.title = `${info.agent_name} - Agent Interface`;
@@ -541,7 +583,11 @@ Your agent will process the input and provide intelligent responses based on its
                 label.setAttribute('for', field);
 
                 let input;
-                if (field.toLowerCase().includes('query') || field.toLowerCase().includes('message') || field.toLowerCase().includes('description')) {
+                if (field.toLowerCase().includes('query') || 
+                    field.toLowerCase().includes('message') || 
+                    field.toLowerCase().includes('description') ||
+                    field.toLowerCase().includes('text') ||
+                    field.toLowerCase().includes('problem')) {
                     input = document.createElement('textarea');
                     input.className = 'form-control';
                     input.rows = 3;
@@ -569,8 +615,8 @@ Your agent will process the input and provide intelligent responses based on its
 
         function getPlaceholder(field) {
             const placeholders = {
-                'city': 'Enter city name (e.g., London)',
-                'country': 'Enter country (e.g., UK)',
+                'problem_text': 'Enter your math problem (e.g., what is 2+2?)',
+                'desired_level_of_detail': 'Enter desired level of detail',
                 'query': 'What would you like to know?',
                 'message': 'Enter your message here...',
                 'topic': 'Enter topic of interest',
@@ -606,37 +652,15 @@ Your agent will process the input and provide intelligent responses based on its
         function getExamplesForAgent(info) {
             const agentType = info.main_functionality.toLowerCase();
             
-            if (agentType.includes('weather')) {
-                return [
-                    {
-                        description: 'Get weather for London, UK',
-                        values: { city: 'London', country: 'UK', query: 'What is the current weather?' }
-                    },
-                    {
-                        description: 'Weekly forecast for Tokyo',
-                        values: { city: 'Tokyo', country: 'Japan', query: 'Show me the 7-day weather forecast' }
-                    }
-                ];
-            } else if (agentType.includes('research')) {
-                return [
-                    {
-                        description: 'Research AI trends',
-                        values: { query: 'Research the latest trends in artificial intelligence for 2024' }
-                    },
-                    {
-                        description: 'Summarize recent developments',
-                        values: { query: 'Summarize recent developments in renewable energy technology' }
-                    }
-                ];
-            } else if (agentType.includes('math')) {
+            if (agentType.includes('math')) {
                 return [
                     {
                         description: 'Calculate complex equation',
-                        values: { query: 'What is the derivative of x^3 + 2x^2 - 5x + 3?' }
+                        values: { problem_text: 'What is the derivative of x^3 + 2x^2 - 5x + 3?' }
                     },
                     {
                         description: 'Solve word problem',
-                        values: { query: 'If a train travels 120 miles in 2 hours, what is its average speed?' }
+                        values: { problem_text: 'If a train travels 120 miles in 2 hours, what is its average speed?' }
                     }
                 ];
             } else {
@@ -685,6 +709,43 @@ Your agent will process the input and provide intelligent responses based on its
             return values;
         }
 
+        async function testConnection(showAlert = true) {
+            if (!runagentUrl) {
+                if (showAlert) alert('❌ No RunAgent URL configured');
+                return false;
+            }
+            
+            try {
+                console.log('🔍 Testing connection to:', runagentUrl);
+                
+                // Test health endpoint
+                const healthResponse = await fetch(`${runagentUrl}/health`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (healthResponse.ok) {
+                    const healthData = await healthResponse.text();
+                    console.log('✅ Health check passed:', healthData);
+                    
+                    if (showAlert) {
+                        alert('✅ RunAgent server is reachable!\n\nHealth check passed successfully.');
+                    }
+                    return true;
+                } else {
+                    throw new Error(`Health check failed: ${healthResponse.status}`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Connection test failed:', error);
+                
+                if (showAlert) {
+                    alert(`❌ Cannot reach RunAgent server: ${error.message}\n\nURL: ${runagentUrl}\n\nMake sure the server is running.`);
+                }
+                return false;
+            }
+        }
+
         async function runAgent() {
             if (isProcessing) return;
 
@@ -692,6 +753,11 @@ Your agent will process the input and provide intelligent responses based on its
             
             if (Object.keys(inputValues).length === 0) {
                 alert('Please provide at least one input value.');
+                return;
+            }
+
+            if (!runagentUrl) {
+                alert('❌ RunAgent server URL not configured');
                 return;
             }
 
@@ -711,7 +777,7 @@ Your agent will process the input and provide intelligent responses based on its
                 output.textContent = '';
             } else {
                 output.className = 'output';
-                output.textContent = 'Processing your request...';
+                output.textContent = 'Connecting to RunAgent server...';
             }
 
             try {
@@ -722,7 +788,7 @@ Your agent will process the input and provide intelligent responses based on its
                 }
             } catch (error) {
                 output.textContent = `❌ Error: ${error.message}`;
-                output.className = 'output';
+                output.className = 'output error';
             } finally {
                 isProcessing = false;
                 runButton.disabled = false;
@@ -732,109 +798,120 @@ Your agent will process the input and provide intelligent responses based on its
         }
 
         async function runStandardAgent(inputValues) {
-            // For demo purposes, simulate agent execution
             const output = document.getElementById('output');
             
-            // Simulate processing delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Generate mock response based on agent type
-            let response = generateMockResponse(agentInfo, inputValues);
-            
-            output.textContent = response;
-            output.className = 'output';
+            try {
+                console.log('🔗 Connecting to RunAgent server:', runagentUrl);
+                console.log('📝 Sending input:', inputValues);
+                
+                output.textContent = 'Sending request to agent...';
+                
+                // Make actual API call to RunAgent server
+                const response = await fetch(`${runagentUrl}/agents/main/run`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(inputValues)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with ${response.status}: ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ Real agent response:', result);
+                
+                // Display the REAL response from your agent
+                if (typeof result === 'string') {
+                    output.textContent = result;
+                } else if (result.content) {
+                    output.textContent = result.content;
+                } else if (result.result) {
+                    output.textContent = result.result;
+                } else {
+                    output.textContent = JSON.stringify(result, null, 2);
+                }
+                
+                output.className = 'output success';
+                
+            } catch (error) {
+                console.error('❌ RunAgent connection failed:', error);
+                
+                output.textContent = `❌ Failed to connect to RunAgent server: ${error.message}
+
+🔧 Debug Info:
+- Agent ID: ${agentId}
+- RunAgent URL: ${runagentUrl}
+- Input sent: ${JSON.stringify(inputValues, null, 2)}
+
+💡 Check:
+1. Is RunAgent server running?
+2. Is the port correct?
+3. Are there any CORS issues?
+
+🔍 Check browser console for more details.`;
+                output.className = 'output error';
+            }
         }
 
         async function runStreamingAgent(inputValues) {
             const output = document.getElementById('output');
             
-            // Generate mock streaming response
-            const response = generateMockResponse(agentInfo, inputValues);
-            const words = response.split(' ');
-            
-            for (let i = 0; i < words.length; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                output.textContent += words[i] + ' ';
-                output.scrollTop = output.scrollHeight;
-            }
-        }
+            try {
+                console.log('🌊 Starting stream to:', runagentUrl);
+                
+                output.textContent = 'Starting stream...';
+                output.className = 'output streaming';
+                
+                // Use fetch with streaming for RunAgent
+                const response = await fetch(`${runagentUrl}/agents/main/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(inputValues)
+                });
 
-        function generateMockResponse(info, inputs) {
-            const agentName = info.agent_name;
-            const functionality = info.main_functionality;
-            
-            if (functionality.toLowerCase().includes('weather')) {
-                const city = inputs.city || 'Unknown City';
-                const country = inputs.country || 'Unknown Country';
-                return `🌤️ Weather Report for ${city}, ${country}
+                if (!response.ok) {
+                    throw new Error(`Stream failed: ${response.status}`);
+                }
 
-Current Conditions:
-• Temperature: 22°C (72°F)
-• Conditions: Partly cloudy
-• Humidity: 65%
-• Wind: 15 km/h NW
-• Pressure: 1013 hPa
-
-7-Day Forecast:
-📅 Today: Partly cloudy, High 24°C, Low 16°C
-📅 Tomorrow: Sunny, High 26°C, Low 18°C
-📅 Wed: Light rain, High 20°C, Low 14°C
-📅 Thu: Cloudy, High 19°C, Low 13°C
-📅 Fri: Sunny, High 25°C, Low 17°C
-📅 Sat: Partly cloudy, High 23°C, Low 16°C
-📅 Sun: Thunderstorms, High 21°C, Low 15°C
-
-🌡️ Weather data provided by ${agentName}`;
-            } else if (functionality.toLowerCase().includes('research')) {
-                return `📚 Research Summary
-
-I've analyzed your query: "${inputs.query || inputs.message || 'research request'}"
-
-Key Findings:
-• Trend 1: Increasing adoption of AI technologies across industries
-• Trend 2: Focus on ethical AI development and responsible deployment
-• Trend 3: Integration of AI with traditional business processes
-
-Recommendations:
-1. Stay updated with latest developments
-2. Consider practical applications for your use case
-3. Evaluate potential risks and benefits
-
-Sources analyzed: 15 academic papers, 8 industry reports, 12 news articles
-
-📊 Research completed by ${agentName}`;
-            } else if (functionality.toLowerCase().includes('math')) {
-                return `🔢 Mathematical Analysis
-
-Problem: ${inputs.query || inputs.message || 'mathematical query'}
-
-Solution:
-Step 1: Identify the mathematical operation required
-Step 2: Apply appropriate formulas and methods
-Step 3: Calculate the result with precision
-
-Result: 42 (The answer to everything! 😉)
-
-Explanation:
-This is a demonstration response from your math agent.
-In a real implementation, this would show actual calculations,
-step-by-step solutions, and detailed mathematical explanations.
-
-✅ Calculation completed by ${agentName}`;
-            } else {
-                return `🤖 ${agentName} Response
-
-Thank you for your input! I've processed your request:
-
-Input received:
-${Object.entries(inputs).map(([key, value]) => `• ${formatFieldName(key)}: ${value}`).join('\n')}
-
-Analysis:
-Based on my capabilities focused on "${functionality}", I can help you with various tasks related to this domain.
-
-This is a demonstration response showing how your agent would process and respond to user inputs. In a real deployment, this would connect to your actual RunAgent server and provide genuine AI-powered responses.
-
-🚀 Powered by ${agentName} | Framework: ${info.framework.toUpperCase()}`;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                output.textContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        output.textContent += '\n\n✅ Stream completed';
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                const content = data.content || data.delta || data.chunk || JSON.stringify(data);
+                                output.textContent += content;
+                                output.scrollTop = output.scrollHeight;
+                            } catch (e) {
+                                // Skip malformed JSON
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('❌ Streaming failed:', error);
+                output.textContent = `❌ Streaming failed: ${error.message}`;
+                output.className = 'output error';
             }
         }
 

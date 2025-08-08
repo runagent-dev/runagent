@@ -1,0 +1,34 @@
+{
+  "agent_name": "LlamaIndexMathSolver",
+  "description": "A math solver that uses LlamaIndex to parse problems, retrieve relevant knowledge or worked examples from a document corpus, and generate step-by-step solutions. It can handle algebra, calculus, and numeric problem solving while citing sources and applying retrieved examples to improve solution accuracy.",
+  "framework": "llamaindex",
+  "template": "custom",
+  "version": "1.0.0",
+  "created_at": "2025-08-07 23:48:19",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "generated/custom/llamaindex",
+    "author": "runagent-generator"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "agent_run",
+        "tag": "main"
+      },
+      {
+        "file": "agent.py",
+        "module": "agent_run_stream",
+        "tag": "main_stream"
+      }
+    ]
+  },
+  "input_fields": [
+    "problem_text",
+    "desired_solution_format",
+    "supporting_documents (optional)",
+    "precision_or_tolerance (optional)",
+    "show_steps (boolean)"
+  ]
+}
