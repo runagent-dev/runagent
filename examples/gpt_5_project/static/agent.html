@@ -63,12 +63,21 @@
         }
 
         .status-badge {
-            background: #28a745;
+            background: #dc3545;
             color: white;
             padding: 5px 12px;
             border-radius: 15px;
             font-size: 0.8rem;
             font-weight: 500;
+        }
+
+        .status-badge.ready {
+            background: #28a745;
+        }
+
+        .status-badge.connecting {
+            background: #ffc107;
+            color: black;
         }
 
         .main-content {
@@ -304,70 +313,6 @@
             color: white;
         }
 
-        .examples-section {
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 20px;
-        }
-
-        .examples-section h4 {
-            color: #495057;
-            margin-bottom: 10px;
-            font-size: 0.9rem;
-        }
-
-        .example-item {
-            background: #f8f9fa;
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
-        }
-
-        .example-item:hover {
-            background: #e9ecef;
-            border-color: #667eea;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .footer a {
-            color: #667eea;
-            text-decoration: none;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .input-panel {
-                border-right: none;
-                border-bottom: 1px solid #e9ecef;
-            }
-            
-            .header h1 {
-                font-size: 1.5rem;
-            }
-            
-            .agent-details {
-                flex-direction: column;
-                gap: 10px;
-            }
-        }
-
         .loading-spinner {
             display: inline-block;
             width: 12px;
@@ -395,7 +340,7 @@
                     <div><strong>Framework:</strong> <span id="framework">-</span></div>
                     <div><strong>RunAgent Port:</strong> <span id="runagentPort">-</span></div>
                 </div>
-                <div class="status-badge" id="statusBadge">
+                <div class="status-badge connecting" id="statusBadge">
                     <span class="loading-spinner"></span> Connecting
                 </div>
             </div>
@@ -433,13 +378,6 @@
                         Clear Output
                     </button>
                 </div>
-
-                <div class="examples-section" id="examplesSection" style="display: none;">
-                    <h4>💡 Example Inputs</h4>
-                    <div id="examplesList">
-                        <!-- Examples will be populated dynamically -->
-                    </div>
-                </div>
             </div>
 
             <div class="output-panel">
@@ -456,16 +394,9 @@
                     
 Configure the input fields and click "Run Agent" to get started.
 
-Your agent will process the input and provide intelligent responses based on its capabilities.
-
 🔍 Click "Test Connection" to verify RunAgent server is running.
                 </div>
             </div>
-        </div>
-
-        <div class="footer">
-            Powered by <strong>RunAgent</strong> | 
-            <a href="/" target="_blank">Create Another Agent</a>
         </div>
     </div>
 
@@ -475,6 +406,7 @@ Your agent will process the input and provide intelligent responses based on its
         let agentInfo = null;
         let agentId = null;
         let runagentUrl = null;
+        let runagentPort = null;
 
         // Get agent ID from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -487,87 +419,83 @@ Your agent will process the input and provide intelligent responses based on its
         if (!agentId) {
             // Try to get from fragment
             const fragment = window.location.hash.substring(1);
-            agentId = fragment || 'demo-agent-123';
+            agentId = fragment;
         }
 
-        document.getElementById('agentId').textContent = agentId;
+        if (agentId) {
+            document.getElementById('agentId').textContent = agentId;
+        }
 
         // Initialize the page
         window.addEventListener('DOMContentLoaded', initializePage);
 
         async function initializePage() {
+            if (!agentId) {
+                showError("No agent ID provided in URL. Please check the URL format: ?agent=your_agent_id");
+                return;
+            }
+
             try {
-                // Fetch agent information from GPT-5 generator
+                console.log('🔍 Fetching agent info for ID:', agentId);
+                
+                // Fetch agent information from the GPT-5 generator backend
                 const response = await fetch(`http://localhost:8000/agent/${agentId}`);
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    agentInfo = data.agent_info;
-                    runagentUrl = agentInfo.runagent_url || `http://localhost:${agentInfo.port}`;
-                    
-                    console.log('Agent Info:', agentInfo);
-                    console.log('RunAgent URL:', runagentUrl);
-                    
-                    // Update UI with agent info
-                    updateAgentInfo(data);
-                    generateInputFields(agentInfo.input_fields);
-                    generateExamples(agentInfo);
-                    
-                    // Test connection immediately
-                    const connected = await testConnection(false);
-                    if (connected) {
-                        document.getElementById('statusBadge').innerHTML = '✅ Ready';
-                        document.getElementById('statusBadge').style.background = '#28a745';
-                    } else {
-                        document.getElementById('statusBadge').innerHTML = '❌ Server Down';
-                        document.getElementById('statusBadge').style.background = '#dc3545';
-                    }
-                } else {
-                    throw new Error('Agent not found');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch agent info: ${response.status} ${response.statusText}`);
                 }
+                
+                const data = await response.json();
+                console.log('📋 Agent data received:', data);
+                
+                agentInfo = data.agent_info;
+                runagentPort = agentInfo.port;
+                runagentUrl = agentInfo.runagent_url || `http://localhost:${runagentPort}`;
+                
+                console.log('🌐 RunAgent URL:', runagentUrl);
+                
+                // Update UI with agent info
+                updateAgentInfo(data);
+                
+                // Generate input fields based on agent's input fields
+                if (agentInfo.input_fields && agentInfo.input_fields.length > 0) {
+                    generateInputFields(agentInfo.input_fields);
+                } else {
+                    // Default fallback if no input fields specified
+                    generateInputFields(['message']);
+                }
+                
+                // Test connection immediately
+                const connected = await testConnection(false);
+                updateConnectionStatus(connected);
+                
             } catch (error) {
-                console.error('Error loading agent:', error);
-                // Use demo data for development
-                useDemoData();
+                console.error('❌ Error loading agent:', error);
+                showError(`Failed to load agent: ${error.message}`);
             }
-        }
-
-        function useDemoData() {
-            // Demo agent info for development
-            agentInfo = {
-                agent_name: 'Math Agent',
-                description: 'A helpful math assistant that solves mathematical problems.',
-                framework: 'llamaindex',
-                main_functionality: 'Mathematical calculations and problem solving',
-                input_fields: ['problem_text', 'desired_level_of_detail'],
-                port: 8080
-            };
-            
-            runagentUrl = `http://localhost:${agentInfo.port}`;
-            
-            updateAgentInfo({
-                agent_info: agentInfo,
-                session_id: 'demo-session',
-                status: 'demo'
-            });
-            
-            generateInputFields(agentInfo.input_fields);
-            generateExamples(agentInfo);
-            
-            document.getElementById('statusBadge').innerHTML = '🔧 Demo Mode';
-            document.getElementById('statusBadge').style.background = '#ffc107';
         }
 
         function updateAgentInfo(data) {
             const info = data.agent_info;
             
-            document.getElementById('agentName').textContent = info.agent_name;
-            document.getElementById('agentDescription').textContent = info.description;
-            document.getElementById('framework').textContent = info.framework.toUpperCase();
-            document.getElementById('runagentPort').textContent = info.port || '8080';
+            document.getElementById('agentName').textContent = info.agent_name || 'Unknown Agent';
+            document.getElementById('agentDescription').textContent = info.description || 'AI Agent';
+            document.getElementById('framework').textContent = (info.framework || 'custom').toUpperCase();
+            document.getElementById('runagentPort').textContent = info.port || 'Unknown';
             
             // Update page title
-            document.title = `${info.agent_name} - Agent Interface`;
+            document.title = `${info.agent_name || 'Agent'} - RunAgent Interface`;
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusBadge = document.getElementById('statusBadge');
+            if (connected) {
+                statusBadge.innerHTML = '✅ Ready';
+                statusBadge.className = 'status-badge ready';
+            } else {
+                statusBadge.innerHTML = '❌ Server Down';
+                statusBadge.className = 'status-badge';
+            }
         }
 
         function generateInputFields(inputFields) {
@@ -587,7 +515,9 @@ Your agent will process the input and provide intelligent responses based on its
                     field.toLowerCase().includes('message') || 
                     field.toLowerCase().includes('description') ||
                     field.toLowerCase().includes('text') ||
-                    field.toLowerCase().includes('problem')) {
+                    field.toLowerCase().includes('problem') ||
+                    field.toLowerCase().includes('prompt') ||
+                    field.toLowerCase().includes('task')) {
                     input = document.createElement('textarea');
                     input.className = 'form-control';
                     input.rows = 3;
@@ -615,75 +545,20 @@ Your agent will process the input and provide intelligent responses based on its
 
         function getPlaceholder(field) {
             const placeholders = {
-                'problem_text': 'Enter your math problem (e.g., what is 2+2?)',
-                'desired_level_of_detail': 'Enter desired level of detail',
-                'query': 'What would you like to know?',
                 'message': 'Enter your message here...',
-                'topic': 'Enter topic of interest',
-                'task': 'Describe the task you want to accomplish',
+                'query': 'What would you like to know?',
                 'prompt': 'Enter your prompt...',
+                'task': 'Describe the task...',
+                'topic': 'Enter topic of interest',
+                'problem_text': 'Enter your problem...',
+                'math_query': 'Enter math problem...',
+                'user_msg': 'Your message...',
                 'text': 'Enter text to process',
                 'question': 'Ask your question',
                 'input': 'Enter your input'
             };
             
             return placeholders[field.toLowerCase()] || `Enter ${formatFieldName(field).toLowerCase()}`;
-        }
-
-        function generateExamples(info) {
-            const examplesSection = document.getElementById('examplesSection');
-            const examplesList = document.getElementById('examplesList');
-            
-            const examples = getExamplesForAgent(info);
-            
-            if (examples.length > 0) {
-                examplesList.innerHTML = '';
-                examples.forEach(example => {
-                    const item = document.createElement('div');
-                    item.className = 'example-item';
-                    item.textContent = example.description;
-                    item.onclick = () => loadExample(example);
-                    examplesList.appendChild(item);
-                });
-                examplesSection.style.display = 'block';
-            }
-        }
-
-        function getExamplesForAgent(info) {
-            const agentType = info.main_functionality.toLowerCase();
-            
-            if (agentType.includes('math')) {
-                return [
-                    {
-                        description: 'Calculate complex equation',
-                        values: { problem_text: 'What is the derivative of x^3 + 2x^2 - 5x + 3?' }
-                    },
-                    {
-                        description: 'Solve word problem',
-                        values: { problem_text: 'If a train travels 120 miles in 2 hours, what is its average speed?' }
-                    }
-                ];
-            } else {
-                return [
-                    {
-                        description: 'General assistance',
-                        values: { query: 'Help me understand your capabilities' }
-                    },
-                    {
-                        description: 'Example task',
-                        values: { query: 'Show me what you can do' }
-                    }
-                ];
-            }
-        }
-
-        function loadExample(example) {
-            Object.keys(example.values).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) {
-                    element.value = example.values[key];
-                }
-            });
         }
 
         function setMode(mode) {
@@ -718,23 +593,35 @@ Your agent will process the input and provide intelligent responses based on its
             try {
                 console.log('🔍 Testing connection to:', runagentUrl);
                 
-                // Test health endpoint
-                const healthResponse = await fetch(`${runagentUrl}/health`, {
-                    method: 'GET',
-                    timeout: 5000
-                });
+                // Test multiple endpoints to verify server is working
+                const endpoints = ['/health', '/docs', '/'];
+                let connected = false;
                 
-                if (healthResponse.ok) {
-                    const healthData = await healthResponse.text();
-                    console.log('✅ Health check passed:', healthData);
-                    
-                    if (showAlert) {
-                        alert('✅ RunAgent server is reachable!\n\nHealth check passed successfully.');
+                for (const endpoint of endpoints) {
+                    try {
+                        const testUrl = `${runagentUrl}${endpoint}`;
+                        console.log('Testing endpoint:', testUrl);
+                        
+                        const response = await fetch(testUrl, {
+                            method: 'GET',
+                            timeout: 5000
+                        });
+                        
+                        if (response.ok) {
+                            console.log(`✅ ${endpoint} endpoint responded: ${response.status}`);
+                            connected = true;
+                            break;
+                        }
+                    } catch (endpointError) {
+                        console.log(`❌ ${endpoint} failed:`, endpointError.message);
                     }
-                    return true;
-                } else {
-                    throw new Error(`Health check failed: ${healthResponse.status}`);
                 }
+                
+                if (connected && showAlert) {
+                    alert('✅ RunAgent server is reachable!\n\nConnection test passed successfully.');
+                }
+                
+                return connected;
                 
             } catch (error) {
                 console.error('❌ Connection test failed:', error);
@@ -787,7 +674,8 @@ Your agent will process the input and provide intelligent responses based on its
                     await runStandardAgent(inputValues);
                 }
             } catch (error) {
-                output.textContent = `❌ Error: ${error.message}`;
+                console.error('❌ Agent execution error:', error);
+                output.textContent = `❌ Error: ${error.message}\n\nCheck console for details.`;
                 output.className = 'output error';
             } finally {
                 isProcessing = false;
@@ -806,8 +694,23 @@ Your agent will process the input and provide intelligent responses based on its
                 
                 output.textContent = 'Sending request to agent...';
                 
-                // Make actual API call to RunAgent server
-                const response = await fetch(`${runagentUrl}/agents/main/run`, {
+                // Discover available entrypoints first
+                const entrypoints = await discoverEntrypoints();
+                console.log('📋 Available entrypoints:', entrypoints);
+                
+                // Find the appropriate entrypoint for standard execution
+                const entrypoint = findStandardEntrypoint(entrypoints);
+                if (!entrypoint) {
+                    throw new Error('No suitable standard entrypoint found. Available: ' + entrypoints.join(', '));
+                }
+                
+                console.log('🎯 Using entrypoint:', entrypoint);
+                
+                // Make the API call to RunAgent server
+                const apiUrl = `${runagentUrl}/agents/${entrypoint}/run`;
+                console.log('📡 API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -817,6 +720,7 @@ Your agent will process the input and provide intelligent responses based on its
 
                 if (!response.ok) {
                     const errorText = await response.text();
+                    console.error('❌ API Error Response:', errorText);
                     throw new Error(`Server responded with ${response.status}: ${errorText}`);
                 }
 
@@ -824,35 +728,26 @@ Your agent will process the input and provide intelligent responses based on its
                 console.log('✅ Real agent response:', result);
                 
                 // Display the REAL response from your agent
+                let displayText = '';
+                
                 if (typeof result === 'string') {
-                    output.textContent = result;
+                    displayText = result;
                 } else if (result.content) {
-                    output.textContent = result.content;
+                    displayText = result.content;
                 } else if (result.result) {
-                    output.textContent = result.result;
+                    displayText = result.result;
+                } else if (result.response) {
+                    displayText = result.response;
                 } else {
-                    output.textContent = JSON.stringify(result, null, 2);
+                    displayText = JSON.stringify(result, null, 2);
                 }
                 
+                output.textContent = displayText;
                 output.className = 'output success';
                 
             } catch (error) {
-                console.error('❌ RunAgent connection failed:', error);
-                
-                output.textContent = `❌ Failed to connect to RunAgent server: ${error.message}
-
-🔧 Debug Info:
-- Agent ID: ${agentId}
-- RunAgent URL: ${runagentUrl}
-- Input sent: ${JSON.stringify(inputValues, null, 2)}
-
-💡 Check:
-1. Is RunAgent server running?
-2. Is the port correct?
-3. Are there any CORS issues?
-
-🔍 Check browser console for more details.`;
-                output.className = 'output error';
+                console.error('❌ RunAgent execution failed:', error);
+                throw error; // Re-throw to be handled by the main error handler
             }
         }
 
@@ -865,8 +760,22 @@ Your agent will process the input and provide intelligent responses based on its
                 output.textContent = 'Starting stream...';
                 output.className = 'output streaming';
                 
-                // Use fetch with streaming for RunAgent
-                const response = await fetch(`${runagentUrl}/agents/main/stream`, {
+                // Discover available entrypoints
+                const entrypoints = await discoverEntrypoints();
+                console.log('📋 Available entrypoints:', entrypoints);
+                
+                // Find streaming entrypoint
+                const entrypoint = findStreamingEntrypoint(entrypoints);
+                if (!entrypoint) {
+                    throw new Error('No streaming entrypoint found. Available: ' + entrypoints.join(', '));
+                }
+                
+                console.log('🎯 Using streaming entrypoint:', entrypoint);
+                
+                const streamUrl = `${runagentUrl}/agents/${entrypoint}/stream`;
+                console.log('📡 Stream URL:', streamUrl);
+                
+                const response = await fetch(streamUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -875,7 +784,8 @@ Your agent will process the input and provide intelligent responses based on its
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Stream failed: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`Stream failed: ${response.status} - ${errorText}`);
                 }
 
                 const reader = response.body.getReader();
@@ -891,18 +801,36 @@ Your agent will process the input and provide intelligent responses based on its
                         break;
                     }
                     
-                    const chunk = decoder.decode(value);
+                    const chunk = decoder.decode(value, { stream: true });
+                    console.log('📦 Raw chunk:', chunk);
+                    
+                    // Handle different streaming formats
                     const lines = chunk.split('\n');
                     
                     for (const line of lines) {
-                        if (line.startsWith('data: ')) {
+                        if (line.trim()) {
                             try {
-                                const data = JSON.parse(line.slice(6));
-                                const content = data.content || data.delta || data.chunk || JSON.stringify(data);
-                                output.textContent += content;
+                                // Try to parse as SSE format
+                                if (line.startsWith('data: ')) {
+                                    const data = JSON.parse(line.slice(6));
+                                    const content = extractStreamContent(data);
+                                    if (content) {
+                                        output.textContent += content;
+                                        output.scrollTop = output.scrollHeight;
+                                    }
+                                } else {
+                                    // Try to parse as direct JSON
+                                    const data = JSON.parse(line);
+                                    const content = extractStreamContent(data);
+                                    if (content) {
+                                        output.textContent += content;
+                                        output.scrollTop = output.scrollHeight;
+                                    }
+                                }
+                            } catch (parseError) {
+                                // If not JSON, treat as raw text
+                                output.textContent += line;
                                 output.scrollTop = output.scrollHeight;
-                            } catch (e) {
-                                // Skip malformed JSON
                             }
                         }
                     }
@@ -910,9 +838,89 @@ Your agent will process the input and provide intelligent responses based on its
                 
             } catch (error) {
                 console.error('❌ Streaming failed:', error);
-                output.textContent = `❌ Streaming failed: ${error.message}`;
-                output.className = 'output error';
+                throw error;
             }
+        }
+
+        function extractStreamContent(data) {
+            // Handle different streaming response formats
+            if (typeof data === 'string') return data;
+            if (data.content) return data.content;
+            if (data.delta) return data.delta;
+            if (data.chunk) return data.chunk;
+            if (data.text) return data.text;
+            if (data.message) return data.message;
+            
+            // For complex objects, try to extract meaningful content
+            if (typeof data === 'object') {
+                return JSON.stringify(data) + '\n';
+            }
+            
+            return data;
+        }
+
+        async function discoverEntrypoints() {
+            try {
+                // Try to get entrypoints from the docs endpoint
+                const docsUrl = `${runagentUrl}/docs`;
+                const response = await fetch(docsUrl);
+                
+                if (response.ok) {
+                    const docsHtml = await response.text();
+                    // Extract entrypoint names from OpenAPI docs
+                    const entrypointMatches = docsHtml.match(/\/agents\/([^\/]+)\/(run|stream)/g);
+                    if (entrypointMatches) {
+                        const entrypoints = [...new Set(entrypointMatches.map(match => {
+                            const parts = match.split('/');
+                            return parts[2]; // Extract entrypoint name
+                        }))];
+                        return entrypoints;
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not discover entrypoints from docs:', error);
+            }
+            
+            // Fallback: try common entrypoint names based on framework
+            const framework = agentInfo?.framework?.toLowerCase();
+            const commonEntrypoints = [
+                'main', 'generic', 'basic', 'invoke', 'run',
+                ...(framework ? [`${framework}_invoke`, `${framework}_run`] : [])
+            ];
+            
+            return commonEntrypoints;
+        }
+
+        function findStandardEntrypoint(entrypoints) {
+            // Prefer non-streaming entrypoints
+            const standardPatterns = ['main', 'generic', 'basic', 'invoke', 'run'];
+            
+            for (const pattern of standardPatterns) {
+                for (const entrypoint of entrypoints) {
+                    if (entrypoint.toLowerCase().includes(pattern) && 
+                        !entrypoint.toLowerCase().includes('stream')) {
+                        return entrypoint;
+                    }
+                }
+            }
+            
+            // Return first non-streaming entrypoint
+            return entrypoints.find(ep => !ep.toLowerCase().includes('stream'));
+        }
+
+        function findStreamingEntrypoint(entrypoints) {
+            // Look for streaming entrypoints (should end with _stream)
+            return entrypoints.find(ep => ep.toLowerCase().includes('stream'));
+        }
+
+        function showError(message) {
+            const output = document.getElementById('output');
+            output.textContent = `❌ Error: ${message}`;
+            output.className = 'output error';
+            
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.innerHTML = '❌ Error';
+            statusBadge.className = 'status-badge';
         }
 
         function clearOutput() {
@@ -926,7 +934,7 @@ Your agent will process the input and provide intelligent responses based on its
             if (firstInput) {
                 firstInput.focus();
             }
-        }, 500);
+        }, 1000);
     </script>
 </body>
 </html>

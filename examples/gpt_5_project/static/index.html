@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RunAgent Generator - AI Agent Builder</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -382,6 +382,16 @@
                 margin-top: 20px;
             }
         }
+
+        /* Simple Mermaid styling - just make it visible */
+        .mermaid {
+            max-width: 100%;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -457,16 +467,16 @@
         </div>
 
         <div class="examples">
-            <div class="example-chip" onclick="sendExample('I want a weather agent in LangGraph with TypeScript backend')">
+            <div class="example-chip" onclick="sendExample('I want a weather agent in LangGraph')">
                 🌤️ Weather Agent
             </div>
-            <div class="example-chip" onclick="sendExample('Create a research assistant using Letta that can search and summarize')">
+            <div class="example-chip" onclick="sendExample('Create a research assistant using Letta')">
                 🔍 Research Assistant  
             </div>
-            <div class="example-chip" onclick="sendExample('Build a math solver with LlamaIndex for complex calculations')">
+            <div class="example-chip" onclick="sendExample('Build a math solver with LlamaIndex')">
                 🔢 Math Solver
             </div>
-            <div class="example-chip" onclick="sendExample('Make a content writer agent in Agno for blog posts')">
+            <div class="example-chip" onclick="sendExample('Make a content writer agent in Agno')">
                 ✍️ Content Writer
             </div>
         </div>
@@ -481,7 +491,7 @@
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
 
-        // Initialize mermaid
+        // Initialize mermaid - keep it simple
         mermaid.initialize({ 
             startOnLoad: true,
             theme: 'default',
@@ -575,57 +585,25 @@
         function updateDiagram(mermaidCode) {
             const diagramElement = document.getElementById('mermaid-diagram');
             
-            try {
-                // Clear previous diagram
-                diagramElement.innerHTML = '';
-                
-                // Clean the mermaid code
-                const cleanCode = mermaidCode
-                    .replace(/```mermaid/g, '')
-                    .replace(/```/g, '')
-                    .replace(/^mermaid\s*/gm, '')
-                    .trim();
-                
-                // Validate basic mermaid syntax
-                if (!cleanCode.includes('graph') && !cleanCode.includes('flowchart')) {
-                    throw new Error('Invalid mermaid syntax');
-                }
-                
-                // Create new diagram
-                const div = document.createElement('div');
-                div.className = 'mermaid';
-                div.textContent = cleanCode;
-                diagramElement.appendChild(div);
-                
-                // Re-initialize mermaid with error handling
-                mermaid.init(undefined, div).then(() => {
-                    console.log('Mermaid diagram rendered successfully');
-                }).catch((error) => {
-                    console.error('Mermaid rendering error:', error);
-                    diagramElement.innerHTML = `
-                        <div style="text-align: center; color: #6c757d; padding: 40px;">
-                            <p>📊 Workflow diagram generated</p>
-                            <p style="font-size: 0.9em; margin-top: 10px;">
-                                <em>Diagram rendering temporarily unavailable</em>
-                            </p>
-                        </div>
-                    `;
-                });
-                
-                document.getElementById('diagramSection').style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error processing diagram:', error);
-                diagramElement.innerHTML = `
-                    <div style="text-align: center; color: #6c757d; padding: 40px;">
-                        <p>📊 Workflow diagram generated</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">
-                            <em>Visual rendering temporarily unavailable</em>
-                        </p>
-                    </div>
-                `;
-                document.getElementById('diagramSection').style.display = 'block';
-            }
+            // Clear previous diagram
+            diagramElement.innerHTML = '';
+            
+            // Clean the mermaid code
+            const cleanCode = mermaidCode
+                .replace(/```mermaid/g, '')
+                .replace(/```/g, '')
+                .trim();
+            
+            // Create new diagram
+            const div = document.createElement('div');
+            div.className = 'mermaid';
+            div.textContent = cleanCode;
+            diagramElement.appendChild(div);
+            
+            // Re-initialize mermaid
+            mermaid.init(undefined, div);
+            
+            document.getElementById('diagramSection').style.display = 'block';
         }
 
         function showAgentResult(agentId, agentUrl) {

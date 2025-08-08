@@ -157,72 +157,230 @@ def analyze_user_request(message: str) -> dict:
         }
 
 def generate_mermaid_diagram(agent_info: dict) -> str:
-    """Generate Mermaid diagram for the agent workflow."""
+    """Generate dynamic Mermaid diagram using GPT-5 with improved validation."""
     
-    # Instead of relying on GPT-5 (which is inconsistent), 
-    # generate a reliable diagram based on the framework
-    framework = agent_info['framework']
-    agent_name = agent_info['agent_name'].replace(' ', '')
+    prompt = f"""
+    Create a valid Mermaid flowchart diagram for an AI agent with these specifications:
+    
+    Agent Name: {agent_info['agent_name']}
+    Framework: {agent_info['framework']}
+    Description: {agent_info['description']}
+    Main Functionality: {agent_info['main_functionality']}
+    Input Fields: {agent_info['input_fields']}
+    
+    IMPORTANT REQUIREMENTS:
+    1. Start with "graph TD" (Top Down layout)
+    2. Use simple node IDs (A, B, C, etc.)
+    3. Use only basic shapes: rectangles [text], diamonds {{text}}, and circles ((text))
+    4. Use only --> arrows
+    5. Keep node text short (under 20 characters)
+    6. Maximum 8-10 nodes total
+    7. No special characters in node text except spaces and basic punctuation
+    
+    Create a workflow showing:
+    - Input processing (start with user input)
+    - Framework-specific processing steps for {agent_info['framework']}
+    - Main functionality: {agent_info['main_functionality']}
+    - Output generation
+    
+    EXAMPLE FORMAT:
+    graph TD
+        A[User Input] --> B[Parse Query]
+        B --> C[{agent_info['framework']} Processing]
+        C --> D[Generate Response]
+        D --> E[Return Result]
+    
+    Return ONLY the Mermaid code. No explanations, no markdown blocks, no extra text.
+    """
     
     try:
-        if framework == "llamaindex":
-            return f"""graph TD
-    A[User Input] --> B[Parse Query]
-    B --> C[{agent_name}]
-    C --> D[LlamaIndex Processing]
-    D --> E[Retrieve Examples]
-    D --> F[Calculate Solution]
-    E --> G[Generate Explanation]
-    F --> G
-    G --> H[Return Result]"""
+        print("🎨 Generating Mermaid diagram with GPT-5...")
         
-        elif framework == "langgraph":
-            return f"""graph TD
-    A[User Input] --> B[{agent_name}]
-    B --> C[Problem Analysis]
-    C --> D[Solution Planning]
-    D --> E[Step Execution]
-    E --> F[Validation]
-    F --> G[Generate Response]
-    G --> H[Return Result]"""
+        # Use GPT-5 for dynamic diagram generation
+        response = openai_client.responses.create(
+            model="gpt-5-mini",
+            input=prompt,
+            reasoning={"effort": "minimal"}  # Keep it simple
+        )
         
-        elif framework == "letta":
-            return f"""graph TD
-    A[User Input] --> B[{agent_name}]
-    B --> C[Memory Retrieval]
-    C --> D[Context Processing]
-    D --> E[Tool Execution]
-    E --> F[Response Generation]
-    F --> G[Memory Update]
-    G --> H[Return Result]"""
+        # Extract the Mermaid code from GPT-5 response
+        mermaid_code = response.output[1].content[0].text.strip()
         
-        elif framework == "agno":
-            return f"""graph TD
-    A[User Input] --> B[{agent_name}]
-    B --> C[Request Analysis]
-    C --> D[Processing]
-    D --> E[Response Generation]
-    E --> F[Return Result]"""
+        print(f"🔍 Raw GPT-5 output: {mermaid_code}")
         
-        else:
-            return f"""graph TD
-    A[User Input] --> B[{agent_name}]
-    B --> C[Process Request]
-    C --> D[Generate Response]
-    D --> E[Return Result]"""
-            
+        # Clean up the response more thoroughly
+        mermaid_code = mermaid_code.replace('```mermaid', '').replace('```', '').strip()
+        
+        # Remove any leading/trailing whitespace from each line
+        lines = [line.strip() for line in mermaid_code.split('\n') if line.strip()]
+        mermaid_code = '\n    '.join(lines)
+        
+        # Ensure it starts with a valid Mermaid declaration
+        if not mermaid_code.startswith(('graph TD', 'graph LR', 'flowchart TD', 'flowchart LR')):
+            mermaid_code = f"graph TD\n    {mermaid_code}"
+        
+        # Basic validation - check for required elements
+        if '-->' not in mermaid_code:
+            raise Exception("Generated diagram missing arrows (-->)")
+        
+        # Validate node format - should have at least some nodes
+        import re
+        nodes = re.findall(r'[A-Z]\d*\[.*?\]', mermaid_code)
+        if len(nodes) < 2:
+            raise Exception(f"Generated diagram has too few nodes: {len(nodes)}")
+        
+        print(f"✅ Generated valid Mermaid diagram with {len(nodes)} nodes")
+        print(f"📋 Final Mermaid code:\n{mermaid_code}")
+        
+        return mermaid_code
+        
     except Exception as e:
-        print(f"Error generating diagram: {e}")
-        # Fallback to ultra-simple diagram
-        return f"""graph TD
-    A[Input] --> B[{agent_name}]
-    B --> C[Output]"""
+        print(f"❌ Error generating Mermaid diagram: {e}")
 
+def validate_mermaid_syntax(mermaid_code: str) -> tuple[bool, str]:
+    """Validate Mermaid syntax before sending to frontend."""
+    
+    try:
+        # Basic syntax checks
+        if not mermaid_code.strip():
+            return False, "Empty diagram code"
+        
+        if not any(mermaid_code.startswith(prefix) for prefix in ['graph TD', 'graph LR', 'flowchart TD', 'flowchart LR']):
+            return False, "Missing graph declaration"
+        
+        if '-->' not in mermaid_code:
+            return False, "No arrows found in diagram"
+        
+        # Check for balanced brackets
+        open_brackets = mermaid_code.count('[') + mermaid_code.count('{') + mermaid_code.count('(')
+        close_brackets = mermaid_code.count(']') + mermaid_code.count('}') + mermaid_code.count(')')
+        
+        if open_brackets != close_brackets:
+            return False, f"Unbalanced brackets: {open_brackets} open, {close_brackets} close"
+        
+        # Check for valid node IDs
+        import re
+        node_pattern = r'[A-Z]\d*(?:\[.*?\]|\{.*?\}|\(.*?\))?'
+        nodes = re.findall(node_pattern, mermaid_code)
+        
+        if len(nodes) < 2:
+            return False, f"Too few nodes found: {len(nodes)}"
+        
+        return True, "Valid Mermaid syntax"
+        
+    except Exception as e:
+        return False, f"Validation error: {str(e)}"
+
+
+def generate_custom_framework_files(agent_info: dict, session_dir: Path):
+    """Generate custom framework files with proper required fields."""
+    
+    agent_code = f'''"""
+{agent_info['agent_name']} - {agent_info['description']}
+Generated by RunAgent Generator - Custom Framework
+"""
+
+def main(*input_args, **input_kwargs):
+    """Main entry point for custom agent"""
+    
+    # Extract input from various sources
+    user_input = ""
+    for field in {agent_info['input_fields']}:
+        if input_kwargs.get(field):
+            user_input = str(input_kwargs[field])
+            break
+    
+    if not user_input and input_args:
+        user_input = str(input_args[0])
+    
+    if not user_input:
+        user_input = "Hello, how can I help you?"
+    
+    # Simple response for custom framework
+    response = f"""
+    Hello! I'm {agent_info['agent_name']}.
+    
+    {agent_info['description']}
+    
+    You asked: {{user_input}}
+    
+    My main functionality is: {agent_info['main_functionality']}
+    
+    This is a custom framework implementation. You can modify this code to add your specific logic.
+    """
+    
+    return response
+
+def main_stream(*input_args, **input_kwargs):
+    """Streaming entry point for custom agent"""
+    
+    # Get the main response
+    response = main(*input_args, **input_kwargs)
+    
+    # Simulate streaming by yielding words
+    words = response.split()
+    for i, word in enumerate(words):
+        if i == 0:
+            yield word
+        else:
+            yield f" {{word}}"
+        
+        # Add small delay for demonstration
+        import time
+        time.sleep(0.01)
+'''
+    
+    with open(session_dir / "agent.py", "w") as f:
+        f.write(agent_code)
+    
+    # Generate minimal requirements
+    with open(session_dir / "requirements.txt", "w") as f:
+        f.write("# No additional requirements for custom framework\n")
+    
+    # Generate config with ALL required fields
+    config = {
+        "agent_name": agent_info['agent_name'],
+        "description": agent_info['description'],
+        "framework": "custom",
+        "template": "custom",
+        "version": "1.0.0",
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "template_source": {
+            "repo_url": "https://github.com/runagent-dev/runagent.git",
+            "path": "templates/custom/basic",
+            "author": "runagent-generator",
+            "version": "1.0.0"
+        },
+        "agent_architecture": {
+            "entrypoints": [
+                {
+                    "file": "agent.py",
+                    "module": "main",
+                    "tag": "main"
+                },
+                {
+                    "file": "agent.py",
+                    "module": "main_stream",
+                    "tag": "main_stream"
+                }
+            ]
+        },
+        "input_fields": agent_info['input_fields'],
+        "env_vars": {
+            "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+        }
+    }
+    
+    with open(session_dir / "runagent.config.json", "w") as f:
+        json.dump(config, f, indent=2)
+    
+    print(f"✅ Generated custom framework config with required fields")
+        
 def generate_agent_files(agent_info: dict, session_id: str) -> bool:
     """Generate agent files based on template and user requirements."""
     
     framework = agent_info['framework']
-    template_type = agent_info['template_type']
+    template_type = agent_info.get('template_type', 'basic')
     
     # Create session directory
     session_dir = Path(f"generated_agents/{session_id}")
@@ -234,15 +392,19 @@ OPENAI_API_KEY={os.getenv('OPENAI_API_KEY', 'your_openai_api_key_here')}
 
 # Letta Configuration (if using Letta)
 LETTA_SERVER_URL=http://localhost:8283
+
+# RunAgent Configuration
+RUNAGENT_DISABLE_DB=true
+RUNAGENT_NO_DATABASE=true
+RUNAGENT_LOG_LEVEL=INFO
 """
     
     with open(session_dir / ".env", "w") as f:
         f.write(env_content)
     
-    # Get template info
-    template_info = TEMPLATES.get(framework, {}).get(template_type, {})
-    
     try:
+        print(f"🔧 Generating {framework} agent files...")
+        
         if framework == "langgraph":
             generate_langgraph_files(agent_info, session_dir)
         elif framework == "letta":
@@ -251,14 +413,56 @@ LETTA_SERVER_URL=http://localhost:8283
             generate_agno_files(agent_info, session_dir)
         elif framework == "llamaindex":
             generate_llamaindex_files(agent_info, session_dir)
+        else:
+            # Default/custom framework
+            generate_custom_framework_files(agent_info, session_dir)
         
+        # Verify the config file was created and is valid
+        config_file = session_dir / "runagent.config.json"
+        if not config_file.exists():
+            raise Exception("Config file was not created")
+        
+        # Validate the config file
+        with open(config_file, "r") as f:
+            config = json.load(f)
+        
+        # Check for required fields
+        required_fields = ["agent_name", "description", "framework", "template_source", "agent_architecture"]
+        missing_fields = []
+        
+        for field in required_fields:
+            if field not in config:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            raise Exception(f"Config missing required fields: {missing_fields}")
+        
+        # Validate template_source structure
+        if not isinstance(config.get("template_source"), dict):
+            raise Exception("template_source must be a dictionary")
+        
+        template_source = config["template_source"]
+        required_template_fields = ["repo_url", "path", "author", "version"]
+        missing_template_fields = []
+        
+        for field in required_template_fields:
+            if field not in template_source:
+                missing_template_fields.append(field)
+        
+        if missing_template_fields:
+            raise Exception(f"template_source missing required fields: {missing_template_fields}")
+        
+        print(f"✅ Successfully generated and validated {framework} agent")
         return True
+        
     except Exception as e:
-        print(f"Error generating files: {e}")
+        print(f"❌ Error generating {framework} files: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def generate_langgraph_files(agent_info: dict, session_dir: Path):
-    """Generate LangGraph agent files."""
+    """Generate LangGraph agent files with proper database avoidance."""
     
     # Generate main agent file
     agent_code = f'''"""
@@ -310,13 +514,22 @@ def create_workflow():
 # Create workflow
 app = create_workflow()
 
-def run(*input_args, **input_kwargs):
-    """Main entry point for RunAgent"""
+def main(*input_args, **input_kwargs):
+    """Main entry point for RunAgent (standard)"""
     
     # Extract query and input data
     query = input_kwargs.get("query", "")
     if not query and input_args:
         query = str(input_args[0])
+    
+    # Handle different input field names
+    for field in {agent_info['input_fields']}:
+        if field in input_kwargs:
+            query = str(input_kwargs[field])
+            break
+    
+    if not query:
+        query = "Hello, how can I help you?"
     
     # Run the workflow
     result = app.invoke({{
@@ -327,19 +540,31 @@ def run(*input_args, **input_kwargs):
     
     return result["result"]
 
-def run_stream(*input_args, **input_kwargs):
+def main_stream(*input_args, **input_kwargs):
     """Streaming entry point"""
     query = input_kwargs.get("query", "")
     if not query and input_args:
         query = str(input_args[0])
     
-    # Stream the workflow
-    for chunk in app.stream({{
-        "query": query,
-        "input_data": input_kwargs,
-        "result": ""
-    }}):
-        yield chunk
+    # Handle different input field names
+    for field in {agent_info['input_fields']}:
+        if field in input_kwargs:
+            query = str(input_kwargs[field])
+            break
+    
+    if not query:
+        query = "Hello, how can I help you?"
+    
+    # Stream the workflow execution
+    try:
+        for chunk in app.stream({{
+            "query": query,
+            "input_data": input_kwargs,
+            "result": ""
+        }}):
+            yield str(chunk)
+    except Exception as e:
+        yield f"Error: {{str(e)}}"
 '''
     
     # Write agent file
@@ -373,12 +598,12 @@ langchain-openai>=0.0.5
             "entrypoints": [
                 {
                     "file": "agent.py",
-                    "module": "run",
+                    "module": "main",
                     "tag": "main"
                 },
                 {
                     "file": "agent.py", 
-                    "module": "run_stream",
+                    "module": "main_stream",
                     "tag": "main_stream"
                 }
             ]
@@ -389,20 +614,7 @@ langchain-openai>=0.0.5
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
     
-    # Debug: Print the generated config
-    print(f"✅ Generated config for {framework}:")
-    print(json.dumps(config, indent=2))
-    
-    # Debug: Print the generated config
-    print(f"✅ Generated config for {framework}:")
-    print(json.dumps(config, indent=2))
-    
-    # Debug: Print the generated config
-    print(f"✅ Generated config for {framework}:")
-    print(json.dumps(config, indent=2))
-    
-    # Debug: Print the generated config
-    print(f"✅ Generated config for {framework}:")
+    print(f"✅ Generated LangGraph config:")
     print(json.dumps(config, indent=2))
 
 def generate_letta_files(agent_info: dict, session_dir: Path):
@@ -880,11 +1092,11 @@ async def chat_endpoint(request: ChatRequest):
     """Main chat endpoint for agent generation."""
     
     session_id = request.session_id or str(uuid.uuid4())
-    message = request.message.lower().strip()
+    message = request.message.strip()
     
     # Debug logging
-    print(f"DEBUG: Received message: '{request.message}' (processed: '{message}')")
-    print(f"DEBUG: Session ID: {session_id}")
+    print(f"🔍 Received message: '{request.message}' (processed: '{message}')")
+    print(f"🆔 Session ID: {session_id}")
     
     # Get or create session
     if session_id not in sessions:
@@ -896,13 +1108,14 @@ async def chat_endpoint(request: ChatRequest):
         }
     
     session = sessions[session_id]
-    print(f"DEBUG: Current stage: {session['stage']}")
+    print(f"📊 Current stage: {session['stage']}")
     
     session["messages"].append({"role": "user", "content": request.message})
     
     try:
         # Stage 1: Understanding the request
         if session["stage"] == "understanding":
+            print("🧠 Analyzing user request with GPT-5...")
             agent_info = analyze_user_request(request.message)
             session["agent_info"] = agent_info
             session["stage"] = "planning"
@@ -916,7 +1129,32 @@ async def chat_endpoint(request: ChatRequest):
 
 Let me create a workflow diagram for this agent..."""
 
-            mermaid_diagram = generate_mermaid_diagram(agent_info)
+            print("🎨 Generating dynamic Mermaid diagram with GPT-5...")
+            try:
+                mermaid_diagram = generate_mermaid_diagram(agent_info)
+                
+                # Validate the generated diagram
+                is_valid, validation_message = validate_mermaid_syntax(mermaid_diagram)
+                if not is_valid:
+                    print(f"⚠️ Generated diagram validation failed: {validation_message}")
+                    print(f"🔧 Attempting to fix diagram...")
+                    
+                    # Try simple fixes
+                    if "Missing graph declaration" in validation_message:
+                        mermaid_diagram = f"graph TD\n    {mermaid_diagram}"
+                    
+                    # Re-validate
+                    is_valid, _ = validate_mermaid_syntax(mermaid_diagram)
+                
+                if is_valid:
+                    print("✅ Mermaid diagram generated and validated successfully")
+                else:
+                    print("❌ Could not generate valid Mermaid diagram")
+                    
+            except Exception as e:
+                print(f"❌ Mermaid generation failed: {e}")
+                # Don't fail the entire request - the frontend will show the error
+                mermaid_diagram = None
             
             return ChatResponse(
                 response=description,
@@ -926,24 +1164,28 @@ Let me create a workflow diagram for this agent..."""
                 mermaid_diagram=mermaid_diagram
             )
         
-        # Handle user feedback/modifications
+        # Stage 2: Planning - handle user feedback/modifications
         elif session["stage"] == "planning":
-            if any(phrase in message for phrase in ["go for it", "generate", "create it", "build it", "make it", "proceed", "continue", "yes", "start"]):
-                print(f"DEBUG: Starting agent generation for session {session_id}")
+            if any(phrase in message.lower() for phrase in ["go for it", "generate", "create it", "build it", "make it", "proceed", "continue", "yes", "start"]):
+                print(f"🚀 Starting agent generation for session {session_id}")
                 
                 # Generate agent files
+                print("📁 Generating agent files...")
                 success = generate_agent_files(session["agent_info"], session_id)
                 
-                if success:
-                    print(f"DEBUG: Files generated successfully for session {session_id}")
-                    session["files_generated"] = True
-                    session["stage"] = "starting"
-                    
-                    # Start RunAgent server immediately in background
-                    session_dir_path = Path(f"generated_agents/{session_id}")
-                    
-                    def start_agent():
-                        print(f"🚀 Background task: Starting agent for session {session_id}")
+                if not success:
+                    raise Exception("Failed to generate agent files")
+                
+                print(f"✅ Files generated successfully for session {session_id}")
+                session["files_generated"] = True
+                session["stage"] = "starting"
+                
+                # Start RunAgent server immediately in background
+                session_dir_path = Path(f"generated_agents/{session_id}")
+                
+                def start_agent():
+                    print(f"🚀 Background task: Starting agent for session {session_id}")
+                    try:
                         agent_id, agent_url, port = start_runagent_server(str(session_dir_path), session_id)
                         
                         if agent_id and agent_url:
@@ -965,13 +1207,17 @@ Let me create a workflow diagram for this agent..."""
                             session["stage"] = "error"
                             session["error"] = "Failed to start RunAgent server"
                             print(f"❌ Failed to start agent for session {session_id}")
-                    
-                    # Start the agent server in background
-                    print(f"DEBUG: Starting background thread for session {session_id}")
-                    threading.Thread(target=start_agent, daemon=True).start()
-                    
-                    return ChatResponse(
-                        response=f"""✅ Agent files generated successfully! Now starting the RunAgent server...
+                    except Exception as e:
+                        print(f"❌ Error in background agent start: {e}")
+                        session["stage"] = "error"
+                        session["error"] = str(e)
+                
+                # Start the agent server in background
+                print(f"🔄 Starting background thread for session {session_id}")
+                threading.Thread(target=start_agent, daemon=True).start()
+                
+                return ChatResponse(
+                    response=f"""✅ Agent files generated successfully! Now starting the RunAgent server...
 
 🔄 Starting your **{session["agent_info"]["agent_name"]}** agent server...
 
@@ -980,16 +1226,10 @@ This involves:
 2. Starting RunAgent server on available port
 3. Initializing your agent
 
-⏳ Please wait 30-60 seconds, then **send any message** (like "status") to check if it's ready.""",
-                        session_id=session_id,
-                        stage="starting"
-                    )
-                else:
-                    return ChatResponse(
-                        response="❌ Error generating agent files. Please try again.",
-                        session_id=session_id,
-                        stage="error"
-                    )
+⏳ Please wait 30-90 seconds, then **send any message** (like "status") to check if it's ready.""",
+                    session_id=session_id,
+                    stage="starting"
+                )
             else:
                 # Handle modifications
                 return ChatResponse(
@@ -1002,7 +1242,7 @@ This involves:
         
         # Stage 3: Check agent status or continue if starting
         elif session["stage"] == "starting":
-            print(f"DEBUG: Checking status for starting session {session_id}")
+            print(f"📊 Checking status for starting session {session_id}")
             
             # Check if agent has been started in the background
             if session.get("agent_id") and session.get("agent_url"):
@@ -1022,7 +1262,7 @@ This involves:
 
 **RunAgent Server:** `http://localhost:{runagent_port}`
 
-Your {session["agent_info"]["framework"]} agent is running and will provide real mathematical computations!
+Your {session["agent_info"]["framework"]} agent is running and ready to process real requests!
 
 The agent interface connects directly to your RunAgent server for authentic responses.""",
                     session_id=session_id,
@@ -1031,8 +1271,10 @@ The agent interface connects directly to your RunAgent server for authentic resp
                     agent_url=agent_url
                 )
             elif session.get("stage") == "error":
+                error_msg = session.get("error", "Unknown error occurred")
+                print(f"❌ Error in session {session_id}: {error_msg}")
                 return ChatResponse(
-                    response=f"❌ Error starting agent: {session.get('error', 'Unknown error')}",
+                    response=f"❌ Error starting agent: {error_msg}\n\nPlease try again or check the server logs.",
                     session_id=session_id,
                     stage="error"
                 )
@@ -1042,13 +1284,13 @@ The agent interface connects directly to your RunAgent server for authentic resp
                     response="""⏳ Still starting your agent server... 
 
 The process includes:
-- Installing dependencies (this can take time)
+- Installing dependencies (this can take time for first install)
 - Initializing the RunAgent framework
-- Starting the server
+- Starting the server and verifying connectivity
 
 Please wait a bit longer and send another message to check status.
 
-If it takes more than 2-3 minutes, there might be an issue with dependencies.""",
+If it takes more than 3-4 minutes, there might be an issue with dependencies or port conflicts.""",
                     session_id=session_id,
                     stage="starting"
                 )
@@ -1070,7 +1312,7 @@ If it takes more than 2-3 minutes, there might be an issue with dependencies."""
 
 **RunAgent Server:** `http://localhost:{runagent_port}` 
 
-Your {session["agent_info"]["framework"]} agent is running and will provide real mathematical computations! 
+Your {session["agent_info"]["framework"]} agent is running and will provide real responses based on your framework choice!
 
 The agent interface connects directly to your RunAgent server for authentic responses.""",
                     session_id=session_id,
@@ -1084,6 +1326,13 @@ The agent interface connects directly to your RunAgent server for authentic resp
                     session_id=session_id,
                     stage="starting"
                 )
+            elif session["stage"] == "error":
+                error_msg = session.get("error", "Unknown error")
+                return ChatResponse(
+                    response=f"❌ Error: {error_msg}\n\nYou can try starting over by describing a new agent.",
+                    session_id=session_id,
+                    stage="error"
+                )
             else:
                 return ChatResponse(
                     response=f"Your agent status: {session.get('stage', 'unknown')}. How can I help you?",
@@ -1092,58 +1341,42 @@ The agent interface connects directly to your RunAgent server for authentic resp
                 )
     
     except Exception as e:
-        print(f"Error in chat endpoint: {e}")
+        print(f"❌ Error in chat endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        
         return ChatResponse(
-            response=f"Sorry, I encountered an error: {str(e)}",
+            response=f"Sorry, I encountered an error: {str(e)}\n\nPlease check the server logs and try again.",
             session_id=session_id,
             stage="error"
         )
 
-@app.get("/agent/{agent_id}")
-async def get_agent_info(agent_id: str):
-    """Get agent information for the UI."""
+@app.get("/debug/agent-logs/{agent_id}")
+async def get_agent_logs(agent_id: str):
+    """Get logs for a specific agent to help with debugging."""
     
-    # Check in running_agents first (for real agents)
+    # Check in running_agents first
     if agent_id in running_agents:
         agent_data = running_agents[agent_id]
-        return {
-            "agent_id": agent_id,
-            "agent_info": {
-                **agent_data["agent_info"],
-                "runagent_url": agent_data.get("runagent_url"),
-                "port": agent_data.get("port")
-            },
-            "session_id": agent_data["session_id"],
-            "status": agent_data["status"]
-        }
+        if "process" in agent_data and agent_data["process"]:
+            process = agent_data["process"]
+            return {
+                "agent_id": agent_id,
+                "status": "running" if process.poll() is None else "stopped",
+                "port": agent_data.get("port"),
+                "session_id": agent_data.get("session_id")
+            }
     
-    # Fallback: Find session with this agent_id
+    # Find session with this agent_id
     for session_id, session in sessions.items():
         if session.get("agent_id") == agent_id:
-            # Also check if we have running agent info
-            if session_id in running_agents:
-                agent_data = running_agents[session_id]
-                return {
-                    "agent_id": agent_id,
-                    "agent_info": {
-                        **session["agent_info"],
-                        "runagent_url": agent_data.get("runagent_url"),
-                        "port": agent_data.get("port")
-                    },
-                    "session_id": session_id,
-                    "status": "active"
-                }
-            else:
-                return {
-                    "agent_id": agent_id,
-                    "agent_info": {
-                        **session["agent_info"],
-                        "runagent_url": f"http://localhost:{session.get('runagent_port', 8080)}",
-                        "port": session.get("runagent_port", 8080)
-                    },
-                    "session_id": session_id,
-                    "status": "active"
-                }
+            return {
+                "agent_id": agent_id,
+                "session_id": session_id,
+                "stage": session.get("stage"),
+                "agent_info": session.get("agent_info"),
+                "error": session.get("error")
+            }
     
     raise HTTPException(status_code=404, detail="Agent not found")
 
