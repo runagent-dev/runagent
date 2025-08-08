@@ -581,7 +581,7 @@ langchain-openai>=0.0.5
     with open(session_dir / "requirements.txt", "w") as f:
         f.write(requirements)
     
-    # Generate runagent.config.json
+    # Generate runagent.config.json with ALL required fields
     config = {
         "agent_name": agent_info['agent_name'],
         "description": agent_info['description'],
@@ -592,7 +592,8 @@ langchain-openai>=0.0.5
         "template_source": {
             "repo_url": "https://github.com/runagent-dev/runagent.git",
             "path": "generated/custom",
-            "author": "runagent-generator"
+            "author": "runagent-generator",
+            "version": "1.0.0"
         },
         "agent_architecture": {
             "entrypoints": [
@@ -608,14 +609,16 @@ langchain-openai>=0.0.5
                 }
             ]
         },
-        "input_fields": agent_info['input_fields']
+        "input_fields": agent_info['input_fields'],
+        "env_vars": {
+            "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+        }
     }
     
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
     
-    print(f"✅ Generated LangGraph config:")
-    print(json.dumps(config, indent=2))
+    print(f"✅ Generated LangGraph config with all required fields:")
 
 def generate_letta_files(agent_info: dict, session_dir: Path):
     """Generate Letta agent files."""
@@ -725,7 +728,11 @@ def letta_run_stream(*input_args, **input_kwargs):
     with open(session_dir / "agent.py", "w") as f:
         f.write(agent_code)
     
-    # Generate config
+    # Generate requirements
+    with open(session_dir / "requirements.txt", "w") as f:
+        f.write("letta-client>=0.1.0\npython-dotenv>=1.0.0\n")
+    
+    # Generate config with ALL required fields
     config = {
         "agent_name": agent_info['agent_name'],
         "description": agent_info['description'],
@@ -736,7 +743,8 @@ def letta_run_stream(*input_args, **input_kwargs):
         "template_source": {
             "repo_url": "https://github.com/runagent-dev/runagent.git",
             "path": "generated/custom",
-            "author": "runagent-generator"
+            "author": "runagent-generator",
+            "version": "1.0.0"
         },
         "agent_architecture": {
             "entrypoints": [
@@ -761,7 +769,8 @@ def letta_run_stream(*input_args, **input_kwargs):
     
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
-
+    
+    print(f"✅ Generated Letta config with all required fields")
 def generate_agno_files(agent_info: dict, session_dir: Path):
     """Generate Agno agent files."""
     
@@ -819,6 +828,9 @@ def agent_run_stream(*input_args, **input_kwargs):
     if not prompt and input_args:
         prompt = str(input_args[0])
     
+    if not prompt:
+        prompt = "Hello, how can I help you?"
+    
     full_prompt = f"""
     {agent_info['description']}
     
@@ -831,9 +843,6 @@ def agent_run_stream(*input_args, **input_kwargs):
         yield {{
             "content": chunk.content if hasattr(chunk, 'content') else str(chunk)
         }}
-
-# Keep original functions for backward compatibility  
-agent_run_stream = partial(agent.run, stream=True)
 '''
     
     with open(session_dir / "agent.py", "w") as f:
@@ -843,7 +852,7 @@ agent_run_stream = partial(agent.run, stream=True)
     with open(session_dir / "requirements.txt", "w") as f:
         f.write("agno>=1.7.2\n")
     
-    # Generate config
+    # Generate config with ALL required fields
     config = {
         "agent_name": agent_info['agent_name'],
         "description": agent_info['description'],
@@ -851,6 +860,12 @@ agent_run_stream = partial(agent.run, stream=True)
         "template": "custom",
         "version": "1.0.0",
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "template_source": {
+            "repo_url": "https://github.com/runagent-dev/runagent.git",
+            "path": "generated/custom",
+            "author": "runagent-generator",
+            "version": "1.0.0"
+        },
         "agent_architecture": {
             "entrypoints": [
                 {
@@ -867,27 +882,38 @@ agent_run_stream = partial(agent.run, stream=True)
                 }
             ]
         },
-        "input_fields": agent_info['input_fields']
+        "input_fields": agent_info['input_fields'],
+        "env_vars": {
+            "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+        }
     }
     
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
+    
+    print(f"✅ Generated Agno config with all required fields")
 
 def generate_llamaindex_files(agent_info: dict, session_dir: Path):
     """Generate LlamaIndex agent files."""
     
     agent_code = f'''from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import AgentStream
 from llama_index.core.agent.workflow import FunctionAgent
 
-# Initialize LLM
-llm = OpenAI(model="gpt-4o-mini", temperature=0.3)
 
-# Create the agent
+# Define a simple calculator tool
+def multiply(a: float, b: float) -> float:
+    """Useful for multiplying two numbers."""
+    return a * b
+
+
+# Create an agent workflow with our calculator tool
 agent = FunctionAgent(
-    tools=[],  # Add tools as needed
-    llm=llm,
-    system_prompt="{agent_info['description']} Focus on: {agent_info['main_functionality']}"
+    tools=[multiply],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="{agent_info['description']} Focus on: {agent_info['main_functionality']}",
 )
+
 
 async def agent_run(*input_args, **input_kwargs):
     """Main agent function"""
@@ -920,9 +946,15 @@ async def agent_run_stream(*input_args, **input_kwargs):
     if not user_input and input_args:
         user_input = str(input_args[0])
     
+    if not user_input:
+        user_input = "Hello, how can I help you?"
+    
     handler = agent.run(user_msg=user_input)
     async for event in handler.stream_events():
-        yield event
+        if isinstance(event, AgentStream):
+            yield event
+        else:
+            yield str(event)
 '''
     
     with open(session_dir / "agent.py", "w") as f:
@@ -930,9 +962,9 @@ async def agent_run_stream(*input_args, **input_kwargs):
     
     # Generate requirements
     with open(session_dir / "requirements.txt", "w") as f:
-        f.write("llama-index>=0.12.48\n")
+        f.write("llama-index>=0.12.48\nllama-index-llms-openai>=0.3.0\n")
     
-    # Generate config
+    # Generate config with ALL required fields (including template_source)
     config = {
         "agent_name": agent_info['agent_name'],
         "description": agent_info['description'],
@@ -940,6 +972,12 @@ async def agent_run_stream(*input_args, **input_kwargs):
         "template": "custom",
         "version": "1.0.0",
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "template_source": {
+            "repo_url": "https://github.com/runagent-dev/runagent.git",
+            "path": "generated/custom",
+            "author": "runagent-generator",
+            "version": "1.0.0"
+        },
         "agent_architecture": {
             "entrypoints": [
                 {
@@ -954,34 +992,23 @@ async def agent_run_stream(*input_args, **input_kwargs):
                 }
             ]
         },
-        "input_fields": agent_info['input_fields']
+        "input_fields": agent_info['input_fields'],
+        "env_vars": {
+            "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+        }
     }
     
     with open(session_dir / "runagent.config.json", "w") as f:
         json.dump(config, f, indent=2)
-
-# In your main.py, modify the start_runagent_server function:
+    
+    print(f"✅ Generated LlamaIndex config with all required fields")
 
 def start_runagent_server(session_dir: str, session_id: str):
-    """Start runagent server for the generated agent."""
+    """Start runagent server - use only the RunAgent server ID"""
     
     try:
         print(f"🚀 Starting RunAgent server for session: {session_id}")
-        
-        # Find available port
-        import socket
-        def find_free_port(start_port=8080):
-            for port in range(start_port, start_port + 100):
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    try:
-                        s.bind(('localhost', port))
-                        return port
-                    except OSError:
-                        continue
-            raise Exception("No free ports available")
-        
-        port = find_free_port()
-        print(f"🔌 Using port: {port}")
+        print(f"📂 Working directory: {session_dir}")
         
         # Install dependencies
         print("📦 Installing agent dependencies...")
@@ -991,20 +1018,19 @@ def start_runagent_server(session_dir: str, session_id: str):
             if result.returncode == 0:
                 print("✅ Dependencies installed successfully")
             else:
-                print(f"⚠️ Dependency installation warning: {result.stderr}")
+                print(f"⚠️ Dependency installation: {result.stderr}")
         except Exception as e:
             print(f"⚠️ Dependency installation failed: {e}")
         
-        # Set up environment to bypass database issues
+        # Set up environment
         env = os.environ.copy()
         env['RUNAGENT_DISABLE_DB'] = 'true'
         env['RUNAGENT_LOG_LEVEL'] = 'INFO'
         
-        # Start RunAgent server with simple command
-        cmd = ["runagent", "serve", ".", "--host", "0.0.0.0", "--port", str(port)]
+        # Start RunAgent server
+        cmd = ["runagent", "serve", "."]
         
         print(f"🔧 Running command: {' '.join(cmd)}")
-        print(f"📂 Working directory: {session_dir}")
         
         process = subprocess.Popen(
             cmd,
@@ -1017,69 +1043,90 @@ def start_runagent_server(session_dir: str, session_id: str):
             env=env
         )
         
-        # Wait for server to start
-        agent_id = str(uuid.uuid4())
-        start_time = time.time()
-        timeout = 60
-        
+        # Wait and extract port info
         print("📡 Waiting for RunAgent server to start...")
         
-        server_started = False
-        while time.time() - start_time < timeout:
-            if process.poll() is not None:
-                stdout, stderr = process.communicate()
-                print(f"❌ RunAgent process exited early:")
-                print(f"OUTPUT: {stdout}")
-                break
-            
+        detected_port = None
+        runagent_agent_id = None
+        
+        # Read first few lines to get the port and agent ID
+        for i in range(50):
             try:
                 line = process.stdout.readline()
                 if line:
                     print(f"RunAgent: {line.strip()}")
                     
-                    # Look for server startup indicators
-                    if any(keyword in line.lower() for keyword in ["server running", "uvicorn running", "started server", "listening on"]):
-                        server_started = True
-                        print(f"✅ Server startup detected!")
+                    # Extract port from output
+                    if "Allocated address:" in line and "127.0.0.1:" in line:
+                        try:
+                            port_part = line.split("127.0.0.1:")[-1].strip()
+                            detected_port = int(port_part)
+                            print(f"🔌 Detected Port: {detected_port}")
+                        except:
+                            pass
+                    
+                    # Extract agent ID from output
+                    if "New agent created with ID:" in line:
+                        try:
+                            runagent_agent_id = line.split("ID:")[-1].strip()
+                            print(f"🆔 Detected RunAgent Agent ID: {runagent_agent_id}")
+                        except:
+                            pass
+                    
+                    # Stop reading once we have both pieces of info
+                    if detected_port and runagent_agent_id:
                         break
                         
+                else:
+                    time.sleep(0.1)
+                    
             except Exception as e:
-                print(f"Error reading output: {e}")
-                pass
+                print(f"Error reading line: {e}")
+                break
+        
+        # Default values if not detected
+        if not detected_port:
+            detected_port = 8450
+            print(f"🔌 Using default port: {detected_port}")
             
-            time.sleep(0.5)
+        if not runagent_agent_id:
+            runagent_agent_id = str(uuid.uuid4())
+            print(f"🆔 Generated fallback Agent ID: {runagent_agent_id}")
         
-        # Test server health
-        if server_started:
-            for attempt in range(5):
-                try:
-                    import requests
-                    test_url = f"http://localhost:{port}/health"
-                    response = requests.get(test_url, timeout=5)
-                    if response.status_code == 200:
-                        print(f"✅ Server health check passed!")
-                        break
-                except Exception as e:
-                    print(f"⚠️ Health check attempt {attempt + 1} failed: {e}")
-                    time.sleep(2)
+        # Wait for server to fully initialize
+        print("⏳ Waiting for server to fully initialize...")
+        time.sleep(3)
         
-        agent_url = f"http://localhost:8000/static/agent.html?agent={agent_id}"
+        # Use the ACTUAL RunAgent agent ID for everything
+        agent_url = f"http://localhost:8000/static/agent.html?agent={runagent_agent_id}"
         
-        # Store running agent info
-        running_agents[session_id] = {
+        # Get session info
+        session = sessions.get(session_id, {})
+        agent_info = session.get("agent_info", {})
+        
+        # Store completion time in session
+        session["completion_time"] = time.time()
+        session["runagent_port"] = detected_port
+        session["agent_id"] = runagent_agent_id  # Use the actual RunAgent ID
+        
+        # Store agent info using the REAL agent ID
+        running_agents[runagent_agent_id] = {
             "process": process,
-            "agent_id": agent_id,
+            "agent_id": runagent_agent_id,  # Same ID everywhere
             "agent_url": agent_url,
-            "port": port,
-            "runagent_url": f"http://localhost:{port}"
+            "port": detected_port,
+            "runagent_url": f"http://localhost:{detected_port}",
+            "session_id": session_id,
+            "status": "active",
+            "agent_info": agent_info
         }
         
         print(f"🎉 RunAgent server started successfully!")
-        print(f"🔗 Agent ID: {agent_id}")
-        print(f"🌐 RunAgent URL: http://localhost:{port}")
+        print(f"🔗 Agent ID: {runagent_agent_id}")
+        print(f"🌐 RunAgent URL: http://localhost:{detected_port}")
         print(f"🖥️  UI URL: {agent_url}")
         
-        return agent_id, agent_url, port
+        return runagent_agent_id, agent_url, detected_port
         
     except Exception as e:
         print(f"❌ Error starting agent server: {e}")
@@ -1439,6 +1486,68 @@ async def test_runagent_connection(agent_id: str):
         "base_url": base_url,
         "endpoints": results
     }
+
+@app.get("/agent/{agent_id}")
+async def get_agent_info(agent_id: str):
+    """Get agent information - simplified to use only RunAgent IDs"""
+    try:
+        print(f"🔍 Looking for RunAgent agent ID: {agent_id}")
+        
+        # Check in running_agents (should be the RunAgent server ID)
+        if agent_id in running_agents:
+            agent_data = running_agents[agent_id]
+            agent_info = agent_data.get("agent_info", {})
+            port = agent_data.get("port", 8450)
+            
+            print(f"✅ Found RunAgent agent: {agent_info.get('agent_name', 'Unknown')} on port {port}")
+            
+            return {
+                "agent_info": {
+                    "agent_name": agent_info.get("agent_name", "Unknown Agent"),
+                    "description": agent_info.get("description", "AI Agent"),
+                    "framework": agent_info.get("framework", "custom"),
+                    "input_fields": agent_info.get("input_fields", ["message"]),
+                    "main_functionality": agent_info.get("main_functionality", "General assistance"),
+                    "port": port,
+                    "runagent_url": f"http://localhost:{port}",
+                    "runagent_agent_id": agent_id,  # Same as the lookup ID
+                    "status": "ready"
+                }
+            }
+        
+        # Check sessions as fallback
+        for session_id, session in sessions.items():
+            if session.get("agent_id") == agent_id:
+                agent_info = session.get("agent_info", {})
+                port = session.get("runagent_port", 8450)
+                
+                print(f"✅ Found in session: {agent_info.get('agent_name', 'Unknown')} on port {port}")
+                
+                return {
+                    "agent_info": {
+                        "agent_name": agent_info.get("agent_name", "Unknown Agent"),
+                        "description": agent_info.get("description", "AI Agent"),
+                        "framework": agent_info.get("framework", "custom"),
+                        "input_fields": agent_info.get("input_fields", ["message"]),
+                        "main_functionality": agent_info.get("main_functionality", "General assistance"),
+                        "port": port,
+                        "runagent_url": f"http://localhost:{port}",
+                        "runagent_agent_id": agent_id,
+                        "status": "ready"
+                    }
+                }
+        
+        # Not found
+        print(f"❌ RunAgent agent {agent_id} not found")
+        print(f"Available RunAgent agents: {list(running_agents.keys())}")
+        
+        raise HTTPException(status_code=404, detail=f"RunAgent agent {agent_id} not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting agent info: {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.get("/debug/clear-sessions")
 async def clear_sessions():
