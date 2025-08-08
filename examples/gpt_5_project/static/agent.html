@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Debug Agent Interface</title>
+    <title>Python SDK Agent Interface</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -24,7 +24,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            background: linear-gradient(135deg, #3776ab 0%, #306998 100%);
             color: white;
             padding: 20px 30px;
             text-align: center;
@@ -54,7 +54,7 @@
         }
 
         .status-badge {
-            background: #28a745;
+            background: #3776ab;
             color: white;
             padding: 4px 10px;
             border-radius: 12px;
@@ -65,7 +65,7 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 20px;
             padding: 20px;
             min-height: 70vh;
@@ -112,8 +112,8 @@
 
         .form-control:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+            border-color: #3776ab;
+            box-shadow: 0 0 0 2px rgba(55, 118, 171, 0.1);
         }
 
         .form-control.textarea {
@@ -123,20 +123,22 @@
         }
 
         .btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 6px;
-            font-size: 12px;
+            border-radius: 8px;
+            font-size: 14px;
             cursor: pointer;
-            margin: 4px;
+            margin: 5px;
             transition: all 0.3s ease;
+            font-weight: 500;
         }
 
-        .btn-primary { background: #667eea; color: white; }
+        .btn-primary { background: #3776ab; color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #212529; }
         .btn-info { background: #17a2b8; color: white; }
         .btn-secondary { background: #6c757d; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
 
         .btn:hover:not(:disabled) {
             transform: translateY(-1px);
@@ -155,7 +157,7 @@
             border-radius: 10px;
             padding: 15px;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1.4;
             white-space: pre-wrap;
             color: #2c3e50;
@@ -168,31 +170,15 @@
         .output.success { border-left: 4px solid #28a745; background: #d4edda; color: #155724; }
         .output.info { border-left: 4px solid #17a2b8; background: #d1ecf1; color: #0c5460; }
 
-        .endpoint-test {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            margin: 4px 0;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            background: white;
-            font-family: monospace;
-            font-size: 11px;
-        }
-
-        .endpoint-test.success { background: #d4edda; border-color: #c3e6cb; }
-        .endpoint-test.error { background: #f8d7da; border-color: #f5c6cb; }
-
         .loading-spinner {
             display: inline-block;
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
+            border-top: 2px solid #3776ab;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 6px;
+            margin-right: 8px;
         }
 
         @keyframes spin {
@@ -207,7 +193,7 @@
         }
 
         .tab {
-            padding: 8px 12px;
+            padding: 8px 16px;
             border: 1px solid #dee2e6;
             border-radius: 6px 6px 0 0;
             background: #e9ecef;
@@ -229,17 +215,40 @@
             display: block;
         }
 
+        .download-link {
+            display: inline-block;
+            background: #3776ab;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 12px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .download-link:hover {
+            background: #306998;
+            transform: translateY(-1px);
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 11px;
+            margin: 10px 0;
+        }
+
         @media (max-width: 1200px) {
             .main-content {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: 1fr;
             }
         }
 
         @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
             .container {
                 margin: 10px;
                 border-radius: 15px;
@@ -250,8 +259,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 id="agentName">🔧 Enhanced Debug Agent Interface</h1>
-            <p id="agentDescription">Advanced debugging and testing tools</p>
+            <h1 id="agentName">🐍 Python SDK Agent Interface</h1>
+            <p id="agentDescription">Advanced Python SDK testing for AI agents</p>
             
             <div class="agent-info">
                 <div class="info-item">
@@ -266,112 +275,124 @@
                 <div class="info-item">
                     <strong>Status:</strong> <span id="connectionStatus">Connecting...</span>
                 </div>
-                <div class="status-badge" id="statusBadge">🔍 Debugging Mode</div>
+                <div class="status-badge" id="statusBadge">🐍 Python SDK Mode</div>
             </div>
         </div>
 
         <div class="main-content">
-            <!-- Input Panel -->
+            <!-- Input & Testing Panel -->
             <div class="panel">
-                <h3>📝 Agent Input & Testing</h3>
+                <h3>🧪 Python SDK Testing</h3>
                 
                 <div class="tabs">
-                    <div class="tab active" onclick="switchTab('input-tab')">Input</div>
-                    <div class="tab" onclick="switchTab('advanced-tab')">Advanced</div>
+                    <div class="tab active" onclick="switchTab('test-tab')">Test Agent</div>
+                    <div class="tab" onclick="switchTab('run-tab')">Run Script</div>
+                    <div class="tab" onclick="switchTab('download-tab')">Download</div>
                 </div>
                 
-                <div id="input-tab" class="tab-content active">
+                <div id="test-tab" class="tab-content active">
                     <div id="dynamicInputs">
-                        <!-- Dynamic input fields -->
+                        <!-- Dynamic input fields will be generated here -->
                     </div>
                     
                     <div class="form-group">
-                        <button class="btn btn-success" onclick="runAgentTest()" id="runButton">
-                            ▶️ Test Agent
+                        <label>Test Message:</label>
+                        <textarea class="form-control textarea" id="testMessage" placeholder="Enter your test message..." rows="3">Hello, how can you help me?</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="runPythonSDKTest()" id="testButton">
+                            🚀 Test with Python SDK
                         </button>
-                        <button class="btn btn-warning" onclick="discoverEndpoints()">
-                            🔍 Discover Endpoints
+                        <button class="btn btn-info" onclick="loadAgentInfo()">
+                            🔄 Refresh Info
                         </button>
-                        <button class="btn btn-info" onclick="testAllEndpoints()">
-                            🧪 Test All
+                        <button class="btn btn-warning" onclick="testWithCLI()">
+                            📋 Show CLI Command
                         </button>
                     </div>
                 </div>
                 
-                <div id="advanced-tab" class="tab-content">
+                <div id="run-tab" class="tab-content">
                     <div class="form-group">
-                        <label>Custom Endpoint:</label>
-                        <input type="text" class="form-control" id="customEndpoint" placeholder="/custom/endpoint">
+                        <label>Python Commands:</label>
+                        <div class="code-block" id="pythonCommands">cd generated_agents/{session_id}
+python3 agent_test.py {agent_id} localhost {port} "test message"</div>
                     </div>
+                    
                     <div class="form-group">
-                        <label>HTTP Method:</label>
-                        <select class="form-control" id="httpMethod">
-                            <option value="POST">POST</option>
-                            <option value="GET">GET</option>
-                            <option value="PUT">PUT</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <button class="btn btn-info" onclick="testCustomEndpoint()">🔧 Test Custom</button>
-                        <button class="btn btn-secondary" onclick="loadAgentFiles()">📁 Load Files</button>
+                        <button class="btn btn-primary" onclick="downloadPythonSDK()">
+                            📥 Download Python SDK
+                        </button>
+                        <button class="btn btn-secondary" onclick="showPythonInstructions()">
+                            📋 Show Instructions
+                        </button>
                     </div>
                 </div>
                 
-                <div class="output" id="testOutput">Ready for testing...</div>
+                <div id="download-tab" class="tab-content">
+                    <div class="form-group">
+                        <p>Download the complete Python SDK for this agent:</p>
+                        <a href="#" id="downloadLink" class="download-link" onclick="downloadPythonSDK()">
+                            📥 Download agent_test.py
+                        </a>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Usage:</label>
+                        <div class="output info">1. Download the Python file
+2. Install RunAgent: pip install runagent
+3. Run: python3 agent_test.py [agent_id] [host] [port] [message]</div>
+                    </div>
+                </div>
+                
+                <div class="output" id="testOutput">Ready for Python SDK testing...</div>
             </div>
 
-            <!-- Endpoint Discovery Panel -->
+            <!-- Results & Debug Panel -->
             <div class="panel">
-                <h3>🌐 Endpoint Discovery & Status</h3>
-                
-                <div class="form-group">
-                    <button class="btn btn-primary" onclick="fullDiagnostic()" id="diagnosticButton">
-                        🩺 Full Diagnostic
-                    </button>
-                    <button class="btn btn-info" onclick="checkServerHealth()">
-                        ❤️ Health Check
-                    </button>
-                </div>
-                
-                <div id="endpointResults">
-                    <!-- Endpoint test results -->
-                </div>
-                
-                <div class="output info" id="discoveryOutput">Click "Full Diagnostic" to start endpoint discovery...</div>
-            </div>
-
-            <!-- Debug Information Panel -->
-            <div class="panel">
-                <h3>🔍 Debug Information & Logs</h3>
+                <h3>📊 Results & Debug Information</h3>
                 
                 <div class="tabs">
-                    <div class="tab active" onclick="switchTab('logs-tab')">Logs</div>
-                    <div class="tab" onclick="switchTab('files-tab')">Files</div>
-                    <div class="tab" onclick="switchTab('config-tab')">Config</div>
+                    <div class="tab active" onclick="switchTab('results-tab')">Results</div>
+                    <div class="tab" onclick="switchTab('debug-tab')">Debug</div>
+                    <div class="tab" onclick="switchTab('logs-tab')">Logs</div>
                 </div>
                 
-                <div id="logs-tab" class="tab-content active">
+                <div id="results-tab" class="tab-content active">
                     <div class="form-group">
-                        <button class="btn btn-secondary" onclick="clearDebugLog()">🗑️ Clear Logs</button>
-                        <button class="btn btn-info" onclick="exportDebugLog()">📄 Export</button>
+                        <button class="btn btn-info" onclick="showLastResult()">
+                            📋 Show Last Result
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearResults()">
+                            🗑️ Clear Results
+                        </button>
                     </div>
-                    <div class="output" id="debugOutput">Debug logs will appear here...</div>
+                    <div class="output" id="resultsOutput">Test results will appear here...</div>
                 </div>
                 
-                <div id="files-tab" class="tab-content">
+                <div id="debug-tab" class="tab-content">
                     <div class="form-group">
-                        <button class="btn btn-info" onclick="loadAgentFiles()">📁 Load Files</button>
-                        <button class="btn btn-warning" onclick="validateConfig()">✅ Validate Config</button>
+                        <button class="btn btn-warning" onclick="debugConnection()">
+                            🔍 Debug Connection
+                        </button>
+                        <button class="btn btn-info" onclick="checkAgentStatus()">
+                            ❤️ Check Status
+                        </button>
                     </div>
-                    <div class="output" id="filesOutput">Click "Load Files" to see generated files...</div>
+                    <div class="output" id="debugOutput">Debug information will appear here...</div>
                 </div>
                 
-                <div id="config-tab" class="tab-content">
+                <div id="logs-tab" class="tab-content">
                     <div class="form-group">
-                        <button class="btn btn-info" onclick="loadSDKConfig()">🔧 Load SDK</button>
-                        <button class="btn btn-warning" onclick="testSDKFunctions()">🧪 Test SDK</button>
+                        <button class="btn btn-secondary" onclick="clearLogs()">
+                            🗑️ Clear Logs
+                        </button>
+                        <button class="btn btn-info" onclick="exportLogs()">
+                            📄 Export Logs
+                        </button>
                     </div>
-                    <div class="output" id="configOutput">Click "Load SDK" to see configuration...</div>
+                    <div class="output" id="logsOutput">Activity logs will appear here...</div>
                 </div>
             </div>
         </div>
@@ -380,8 +401,7 @@
     <script>
         let agentInfo = null;
         let runagentUrl = null;
-        let discoveredEndpoints = [];
-        let workingEndpoints = [];
+        let lastTestResult = null;
 
         // Get agent ID from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -396,17 +416,17 @@
 
         async function initializePage() {
             if (!agentId) {
-                updateDebugLog("❌ No agent ID provided in URL");
+                log("❌ No agent ID provided in URL");
                 return;
             }
 
             await loadAgentInfo();
-            await setTimeout(() => fullDiagnostic(), 1000);
+            log("🚀 Python SDK Agent Interface initialized");
         }
 
         async function loadAgentInfo() {
             try {
-                updateDebugLog('🔍 Loading agent information...');
+                log('🔍 Loading agent information...');
                 
                 const response = await fetch(`http://localhost:8000/agent/${agentId}`);
                 
@@ -418,28 +438,49 @@
                 agentInfo = data.agent_info;
                 runagentUrl = agentInfo.runagent_url;
                 
-                updateDebugLog(`✅ Agent info loaded successfully`);
-                updateDebugLog(`🌐 RunAgent URL: ${runagentUrl}`);
+                log(`✅ Agent info loaded successfully`);
+                log(`🌐 RunAgent URL: ${runagentUrl}`);
                 
                 // Update UI
-                document.getElementById('agentName').textContent = `🔧 Debug: ${agentInfo.agent_name}`;
+                document.getElementById('agentName').textContent = `🐍 Python SDK: ${agentInfo.agent_name}`;
                 document.getElementById('agentDescription').textContent = agentInfo.description;
                 document.getElementById('framework').textContent = agentInfo.framework?.toUpperCase();
                 document.getElementById('runagentPort').textContent = agentInfo.port;
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').style.color = '#28a745';
+                
+                // Set download link
+                document.getElementById('downloadLink').href = `http://localhost:8000/agent/${agentId}/sdk`;
+                
+                // Update command examples
+                updateCommandExamples();
                 
                 // Generate input fields
                 generateInputFields();
                 
             } catch (error) {
-                updateDebugLog(`❌ Error loading agent info: ${error.message}`);
+                log(`❌ Error loading agent info: ${error.message}`);
                 document.getElementById('connectionStatus').textContent = 'Connection Failed';
                 document.getElementById('connectionStatus').style.color = '#dc3545';
+            }
+        }
+
+        function updateCommandExamples() {
+            if (agentInfo) {
+                const commands = `cd generated_agents/${agentInfo.session_id || 'session_id'}
+python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
+                document.getElementById('pythonCommands').textContent = commands;
             }
         }
 
         function generateInputFields() {
             const container = document.getElementById('dynamicInputs');
             container.innerHTML = '';
+
+            if (!agentInfo || !agentInfo.input_fields) {
+                log("⚠️ No input fields defined for this agent");
+                return;
+            }
 
             const inputFields = agentInfo.input_fields || ['query'];
             const inputTypes = agentInfo.input_types || {};
@@ -459,7 +500,7 @@
                 if (fieldType === 'textarea') {
                     input = document.createElement('textarea');
                     input.className = 'form-control textarea';
-                    input.rows = 3;
+                    input.rows = 2;
                 } else {
                     input = document.createElement('input');
                     input.className = 'form-control';
@@ -482,564 +523,225 @@
                 container.appendChild(group);
             });
 
-            updateDebugLog(`✅ Generated ${inputFields.length} input fields`);
+            log(`✅ Generated ${inputFields.length} input fields for Python SDK`);
         }
 
-        async function fullDiagnostic() {
-            const diagnosticButton = document.getElementById('diagnosticButton');
-            const originalText = diagnosticButton.innerHTML;
+        async function runPythonSDKTest() {
+            const testButton = document.getElementById('testButton');
+            const originalText = testButton.innerHTML;
             
-            diagnosticButton.disabled = true;
-            diagnosticButton.innerHTML = '<span class="loading-spinner"></span>Running Diagnostic...';
-            
-            updateDebugLog('🩺 Starting full diagnostic...');
-            updateDiscoveryLog('🔍 Full Diagnostic Started\n' + '='.repeat(50));
-            
-            try {
-                // Step 1: Test basic connectivity
-                await testBasicConnectivity();
-                
-                // Step 2: Discover available endpoints
-                await discoverEndpoints();
-                
-                // Step 3: Test discovered endpoints
-                await testAllEndpoints();
-                
-                // Step 4: Check agent files
-                await loadAgentFiles();
-                
-                // Step 5: Test SDK configuration
-                await loadSDKConfig();
-                
-                updateDebugLog('✅ Full diagnostic completed');
-                updateDiscoveryLog('\n✅ DIAGNOSTIC COMPLETED');
-                
-            } catch (error) {
-                updateDebugLog(`❌ Diagnostic failed: ${error.message}`);
-                updateDiscoveryLog(`\n❌ DIAGNOSTIC FAILED: ${error.message}`);
-            } finally {
-                diagnosticButton.disabled = false;
-                diagnosticButton.innerHTML = originalText;
-            }
-        }
-
-        async function testBasicConnectivity() {
-            updateDiscoveryLog('\n🔗 Testing Basic Connectivity...');
-            
-            const tests = [
-                { name: 'Base URL', url: runagentUrl },
-                { name: 'Root Path', url: `${runagentUrl}/` },
-                { name: 'Health Check', url: `${runagentUrl}/health` },
-                { name: 'Docs', url: `${runagentUrl}/docs` },
-                { name: 'OpenAPI', url: `${runagentUrl}/openapi.json` }
-            ];
-            
-            for (const test of tests) {
-                try {
-                    const response = await fetch(test.url, { 
-                        method: 'GET',
-                        timeout: 5000 
-                    });
-                    
-                    const status = response.status;
-                    const statusText = response.ok ? '✅' : '❌';
-                    updateDiscoveryLog(`  ${statusText} ${test.name}: ${status}`);
-                    
-                    if (response.ok && test.name === 'Base URL') {
-                        document.getElementById('connectionStatus').textContent = 'Connected';
-                        document.getElementById('connectionStatus').style.color = '#28a745';
-                    }
-                    
-                } catch (error) {
-                    updateDiscoveryLog(`  ❌ ${test.name}: ${error.message}`);
-                }
-            }
-        }
-
-        async function discoverEndpoints() {
-            updateDiscoveryLog('\n🔍 Discovering Endpoints...');
-            discoveredEndpoints = [];
-            
-            // Try to get OpenAPI documentation
-            try {
-                const docsResponse = await fetch(`${runagentUrl}/docs`);
-                if (docsResponse.ok) {
-                    const docsText = await docsResponse.text();
-                    
-                    // Extract endpoints from HTML
-                    const endpointMatches = docsText.match(/\/[a-zA-Z0-9_\/\-\{\}]+/g);
-                    if (endpointMatches) {
-                        const uniqueEndpoints = [...new Set(endpointMatches)];
-                        discoveredEndpoints.push(...uniqueEndpoints);
-                        updateDiscoveryLog(`  📋 Found ${uniqueEndpoints.length} endpoints from docs`);
-                    }
-                }
-            } catch (error) {
-                updateDiscoveryLog(`  ⚠️ Could not fetch docs: ${error.message}`);
-            }
-            
-            // Try common RunAgent endpoint patterns
-            const commonEndpoints = [
-                '/',
-                '/health',
-                '/run',
-                '/invoke',
-                '/agents',
-                '/agents/main/run',
-                '/agents/main/invoke',
-                '/agents/main_stream/run',
-                '/agents/main_stream/stream',
-                '/api/run',
-                '/api/invoke',
-                '/v1/run',
-                '/v1/invoke'
-            ];
-            
-            for (const endpoint of commonEndpoints) {
-                if (!discoveredEndpoints.includes(endpoint)) {
-                    discoveredEndpoints.push(endpoint);
-                }
-            }
-            
-            updateDiscoveryLog(`  🎯 Total endpoints to test: ${discoveredEndpoints.length}`);
-            updateDebugLog(`🔍 Discovered ${discoveredEndpoints.length} potential endpoints`);
-        }
-
-        async function testAllEndpoints() {
-            updateDiscoveryLog('\n🧪 Testing All Endpoints...');
-            workingEndpoints = [];
-            const endpointResults = document.getElementById('endpointResults');
-            endpointResults.innerHTML = '';
-            
-            const testData = collectInputValues();
-            
-            for (const endpoint of discoveredEndpoints) {
-                const resultDiv = document.createElement('div');
-                resultDiv.className = 'endpoint-test';
-                resultDiv.innerHTML = `<span>${endpoint}</span><span>Testing...</span>`;
-                endpointResults.appendChild(resultDiv);
-                
-                try {
-                    // Test GET first
-                    let response = await fetch(`${runagentUrl}${endpoint}`, { 
-                        method: 'GET',
-                        timeout: 3000 
-                    });
-                    
-                    let method = 'GET';
-                    let success = response.ok;
-                    
-                    // If GET fails, try POST with data
-                    if (!success && (endpoint.includes('run') || endpoint.includes('invoke'))) {
-                        response = await fetch(`${runagentUrl}${endpoint}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(testData),
-                            timeout: 5000
-                        });
-                        method = 'POST';
-                        success = response.ok;
-                    }
-                    
-                    const statusText = `${method} ${response.status}`;
-                    
-                    if (success) {
-                        resultDiv.className = 'endpoint-test success';
-                        resultDiv.innerHTML = `<span>${endpoint}</span><span>✅ ${statusText}</span>`;
-                        workingEndpoints.push({ endpoint, method, status: response.status });
-                        updateDiscoveryLog(`  ✅ ${endpoint}: ${statusText}`);
-                    } else {
-                        resultDiv.className = 'endpoint-test error';
-                        resultDiv.innerHTML = `<span>${endpoint}</span><span>❌ ${statusText}</span>`;
-                        updateDiscoveryLog(`  ❌ ${endpoint}: ${statusText}`);
-                    }
-                    
-                } catch (error) {
-                    resultDiv.className = 'endpoint-test error';
-                    resultDiv.innerHTML = `<span>${endpoint}</span><span>❌ Error</span>`;
-                    updateDiscoveryLog(`  ❌ ${endpoint}: ${error.message}`);
-                }
-                
-                // Small delay to avoid overwhelming the server
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            updateDiscoveryLog(`\n🎯 Working endpoints: ${workingEndpoints.length}`);
-            updateDebugLog(`✅ Found ${workingEndpoints.length} working endpoints`);
-        }
-
-        async function runAgentTest() {
-            const runButton = document.getElementById('runButton');
-            const originalText = runButton.innerHTML;
-            
-            runButton.disabled = true;
-            runButton.innerHTML = '<span class="loading-spinner"></span>Testing...';
+            testButton.disabled = true;
+            testButton.innerHTML = '<span class="loading-spinner"></span>Testing with Python SDK...';
             
             const testOutput = document.getElementById('testOutput');
-            testOutput.textContent = '🚀 Running agent test...\n';
-            
-            const inputValues = collectInputValues();
-            updateDebugLog(`🧪 Testing agent with input: ${JSON.stringify(inputValues, null, 2)}`);
+            testOutput.textContent = '🐍 Running Python SDK test...\n';
+            testOutput.className = 'output';
             
             try {
-                // If we have working endpoints, try them first
-                if (workingEndpoints.length > 0) {
-                    updateDebugLog('🎯 Using discovered working endpoints...');
-                    
-                    for (const endpointInfo of workingEndpoints) {
-                        if (endpointInfo.endpoint.includes('run') || endpointInfo.endpoint.includes('invoke')) {
-                            try {
-                                const response = await fetch(`${runagentUrl}${endpointInfo.endpoint}`, {
-                                    method: endpointInfo.method,
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(inputValues)
-                                });
-                                
-                                if (response.ok) {
-                                    const result = await response.text();
-                                    testOutput.className = 'output success';
-                                    testOutput.textContent = `✅ SUCCESS with ${endpointInfo.endpoint}\n\nResponse:\n${result}`;
-                                    updateDebugLog(`✅ Agent test successful with ${endpointInfo.endpoint}`);
-                                    return;
-                                }
-                            } catch (error) {
-                                updateDebugLog(`❌ ${endpointInfo.endpoint} failed: ${error.message}`);
-                            }
-                        }
-                    }
+                const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, how can you help me?';
+                
+                log(`🧪 Starting Python SDK test with message: "${testMessage}"`);
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?test_message=${encodeURIComponent(testMessage)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
-                // Fallback: try all common patterns
-                const fallbackEndpoints = [
-                    '/agents/main/run',
-                    '/agents/main/invoke',
-                    '/run',
-                    '/invoke',
-                    '/api/run',
-                    '/api/invoke'
-                ];
-                
-                updateDebugLog('🔄 Trying fallback endpoints...');
-                
-                for (const endpoint of fallbackEndpoints) {
-                    try {
-                        const response = await fetch(`${runagentUrl}${endpoint}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(inputValues)
-                        });
-                        
-                        if (response.ok) {
-                            const result = await response.text();
-                            testOutput.className = 'output success';
-                            testOutput.textContent = `✅ SUCCESS with ${endpoint}\n\nResponse:\n${result}`;
-                            updateDebugLog(`✅ Agent test successful with ${endpoint}`);
-                            return;
-                        } else {
-                            updateDebugLog(`❌ ${endpoint}: HTTP ${response.status}`);
-                        }
-                    } catch (error) {
-                        updateDebugLog(`❌ ${endpoint}: ${error.message}`);
-                    }
-                }
-                
-                throw new Error('All endpoints failed - see debug logs for details');
-                
-            } catch (error) {
-                testOutput.className = 'output error';
-                testOutput.textContent = `❌ Test Failed: ${error.message}\n\nCheck the debug logs for detailed information.`;
-                updateDebugLog(`❌ Agent test failed: ${error.message}`);
-            } finally {
-                runButton.disabled = false;
-                runButton.innerHTML = originalText;
-            }
-        }
 
-        async function testCustomEndpoint() {
-            const endpoint = document.getElementById('customEndpoint').value;
-            const method = document.getElementById('httpMethod').value;
-            
-            if (!endpoint) {
-                alert('Please enter a custom endpoint');
-                return;
-            }
-            
-            const inputValues = collectInputValues();
-            updateDebugLog(`🔧 Testing custom endpoint: ${method} ${endpoint}`);
-            
-            try {
-                const options = {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' }
-                };
+                const result = await response.json();
+                lastTestResult = result;
                 
-                if (method !== 'GET') {
-                    options.body = JSON.stringify(inputValues);
-                }
-                
-                const response = await fetch(`${runagentUrl}${endpoint}`, options);
-                const result = await response.text();
-                
-                const testOutput = document.getElementById('testOutput');
-                if (response.ok) {
+                if (result.success) {
                     testOutput.className = 'output success';
-                    testOutput.textContent = `✅ Custom endpoint SUCCESS\nEndpoint: ${method} ${endpoint}\nStatus: ${response.status}\n\nResponse:\n${result}`;
-                    updateDebugLog(`✅ Custom endpoint successful: ${method} ${endpoint}`);
+                    testOutput.textContent = `✅ Python SDK Test Successful!\n\n${result.test_stdout}`;
+                    log(`✅ Python SDK test successful`);
+                    
+                    // Show in results tab
+                    const resultsOutput = document.getElementById('resultsOutput');
+                    resultsOutput.className = 'output success';
+                    resultsOutput.textContent = `✅ SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\nSDK: ${result.sdk_type}\n\nOutput:\n${result.test_stdout}`;
+                    
                 } else {
                     testOutput.className = 'output error';
-                    testOutput.textContent = `❌ Custom endpoint FAILED\nEndpoint: ${method} ${endpoint}\nStatus: ${response.status}\n\nResponse:\n${result}`;
-                    updateDebugLog(`❌ Custom endpoint failed: ${method} ${endpoint} - ${response.status}`);
+                    let errorMsg = `❌ Python SDK Test Failed\n\n`;
+                    if (result.error) errorMsg += `Error: ${result.error}\n\n`;
+                    if (result.test_stderr) errorMsg += `Stderr: ${result.test_stderr}\n\n`;
+                    if (result.test_stdout) errorMsg += `Stdout: ${result.test_stdout}`;
+                    
+                    testOutput.textContent = errorMsg;
+                    log(`❌ Python SDK test failed: ${result.error}`);
+                    
+                    // Show in debug tab
+                    const debugOutput = document.getElementById('debugOutput');
+                    debugOutput.className = 'output error';
+                    debugOutput.textContent = errorMsg;
                 }
                 
             } catch (error) {
-                const testOutput = document.getElementById('testOutput');
                 testOutput.className = 'output error';
-                testOutput.textContent = `❌ Custom endpoint ERROR\nEndpoint: ${method} ${endpoint}\nError: ${error.message}`;
-                updateDebugLog(`❌ Custom endpoint error: ${error.message}`);
+                testOutput.textContent = `❌ Test Error: ${error.message}\n\nCheck that the agent is running and the RunAgent Python SDK is installed.`;
+                log(`❌ Python SDK test error: ${error.message}`);
+            } finally {
+                testButton.disabled = false;
+                testButton.innerHTML = originalText;
             }
         }
 
-        async function checkServerHealth() {
-            updateDebugLog('❤️ Checking server health...');
-            
-            const healthEndpoints = [
-                '/health',
-                '/status',
-                '/ping',
-                '/'
-            ];
-            
-            for (const endpoint of healthEndpoints) {
-                try {
-                    const response = await fetch(`${runagentUrl}${endpoint}`);
-                    if (response.ok) {
-                        const result = await response.text();
-                        updateDiscoveryLog(`✅ Health check successful: ${endpoint}\n${result}`);
-                        updateDebugLog(`✅ Server is healthy via ${endpoint}`);
-                        return;
-                    }
-                } catch (error) {
-                    updateDebugLog(`❌ Health check failed for ${endpoint}: ${error.message}`);
+        async function downloadPythonSDK() {
+            try {
+                log("📥 Downloading Python SDK...");
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/sdk`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
+                
+                const pythonCode = await response.text();
+                
+                // Create and download file
+                const blob = new Blob([pythonCode], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `agent_test_${agentId}.py`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                log("✅ Python SDK downloaded successfully");
+                
+            } catch (error) {
+                log(`❌ Download failed: ${error.message}`);
+                alert(`Download failed: ${error.message}`);
             }
-            
-            updateDiscoveryLog('❌ No health endpoints responding');
-            updateDebugLog('❌ Server health check failed');
         }
 
-        async function loadAgentFiles() {
-            updateDebugLog('📁 Loading agent files...');
+        function testWithCLI() {
+            const command = `python3 agent_test.py ${agentId} localhost ${agentInfo?.port || '8450'} "${document.getElementById('testMessage').value || 'Hello'}"`;
+            
+            const debugOutput = document.getElementById('debugOutput');
+            debugOutput.className = 'output info';
+            debugOutput.textContent = `CLI Command:\n\n${command}\n\nRun this command in the generated_agents directory to test your agent directly.`;
+            
+            // Switch to debug tab
+            switchTab('debug-tab');
+            document.querySelector('[onclick="switchTab(\'debug-tab\')"]').classList.add('active');
+        }
+
+        function showPythonInstructions() {
+            const instructions = `Python SDK Instructions:
+
+1. Download the Python SDK file
+2. Install RunAgent: pip install runagent
+3. Navigate to the directory with the Python file
+4. Run: python3 agent_test.py ${agentId} localhost ${agentInfo?.port || '8450'} "your test message"
+
+The Python script will:
+- Use the RunAgent Python SDK
+- Test multiple entrypoint tags
+- Handle different input types
+- Provide detailed error information
+- Support both sync and streaming modes
+- Return structured JSON results
+
+Dependencies:
+- Python 3.7+
+- runagent package
+- Standard library modules (json, sys, time)`;
+
+            const debugOutput = document.getElementById('debugOutput');
+            debugOutput.className = 'output info';
+            debugOutput.textContent = instructions;
+            
+            // Switch to debug tab
+            switchTab('debug-tab');
+            document.querySelector('[onclick="switchTab(\'debug-tab\')"]').classList.add('active');
+            
+            log("📋 Python instructions displayed");
+        }
+
+        async function debugConnection() {
+            const debugOutput = document.getElementById('debugOutput');
+            debugOutput.className = 'output info';
+            debugOutput.textContent = '🔍 Running connection diagnostics...\n';
             
             try {
-                const response = await fetch(`http://localhost:8000/debug/agent-files/${agentId}`);
+                // Test basic connectivity
+                const baseUrl = runagentUrl || `http://localhost:${agentInfo?.port || 8450}`;
                 
+                debugOutput.textContent += `Testing base URL: ${baseUrl}\n`;
+                
+                const response = await fetch(baseUrl + '/docs');
                 if (response.ok) {
-                    const data = await response.json();
-                    const filesOutput = document.getElementById('filesOutput');
-                    
-                    let output = `Agent Files Status:\n${'='.repeat(30)}\n`;
-                    output += `Session ID: ${data.session_id}\n`;
-                    output += `Directory: ${data.session_dir}\n\n`;
-                    
-                    Object.entries(data.files).forEach(([filename, info]) => {
-                        if (info.exists) {
-                            output += `✅ ${filename}\n`;
-                            if (info.size) output += `   Size: ${info.size} bytes\n`;
-                            if (info.content_preview) {
-                                output += `   Preview:\n${info.content_preview}\n\n`;
-                            }
-                            if (info.error) output += `   ⚠️ Error: ${info.error}\n\n`;
-                        } else {
-                            output += `❌ ${filename} (missing)\n`;
-                        }
-                    });
-                    
-                    filesOutput.textContent = output;
-                    updateDebugLog('✅ Agent files loaded successfully');
+                    debugOutput.textContent += '✅ Base connection successful\n';
+                    debugOutput.textContent += `Status: ${response.status}\n`;
                 } else {
-                    throw new Error(`HTTP ${response.status}`);
+                    debugOutput.textContent += `❌ Connection failed: ${response.status}\n`;
                 }
                 
+                debugOutput.textContent += '\nAgent Info:\n';
+                debugOutput.textContent += `- Name: ${agentInfo?.agent_name || 'Unknown'}\n`;
+                debugOutput.textContent += `- Framework: ${agentInfo?.framework || 'Unknown'}\n`;
+                debugOutput.textContent += `- Port: ${agentInfo?.port || 'Unknown'}\n`;
+                debugOutput.textContent += `- Input Fields: ${agentInfo?.input_fields?.join(', ') || 'None'}\n`;
+                debugOutput.textContent += `- SDK Type: Python\n`;
+                debugOutput.textContent += `- SDK Available: ${agentInfo?.sdk_available || false}\n`;
+                
             } catch (error) {
-                document.getElementById('filesOutput').textContent = `❌ Failed to load files: ${error.message}`;
-                updateDebugLog(`❌ Failed to load agent files: ${error.message}`);
+                debugOutput.textContent += `❌ Debug failed: ${error.message}\n`;
             }
         }
 
-        async function validateConfig() {
-            updateDebugLog('✅ Validating agent configuration...');
-            
+        async function checkAgentStatus() {
             try {
-                const response = await fetch(`http://localhost:8000/debug/agent-files/${agentId}`);
+                const response = await fetch(`http://localhost:8000/agent/${agentId}`);
+                const data = await response.json();
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    const configInfo = data.files['runagent.config.json'];
-                    
-                    if (configInfo && configInfo.exists && configInfo.content_preview) {
-                        try {
-                            const config = JSON.parse(configInfo.content_preview);
-                            
-                            let validation = 'Configuration Validation:\n' + '='.repeat(30) + '\n';
-                            
-                            // Check required fields
-                            const requiredFields = ['agent_name', 'description', 'framework', 'agent_architecture'];
-                            const missingFields = requiredFields.filter(field => !config[field]);
-                            
-                            if (missingFields.length === 0) {
-                                validation += '✅ All required fields present\n';
-                            } else {
-                                validation += `❌ Missing required fields: ${missingFields.join(', ')}\n`;
-                            }
-                            
-                            // Check entrypoints
-                            if (config.agent_architecture && config.agent_architecture.entrypoints) {
-                                validation += `✅ Entrypoints: ${config.agent_architecture.entrypoints.length} defined\n`;
-                                config.agent_architecture.entrypoints.forEach(ep => {
-                                    validation += `   - ${ep.tag} (${ep.module})\n`;
-                                });
-                            } else {
-                                validation += '❌ No entrypoints defined\n';
-                            }
-                            
-                            // Check input fields
-                            if (config.input_fields && config.input_fields.length > 0) {
-                                validation += `✅ Input fields: ${config.input_fields.join(', ')}\n`;
-                            } else {
-                                validation += '⚠️ No input fields defined\n';
-                            }
-                            
-                            document.getElementById('filesOutput').textContent = validation;
-                            updateDebugLog('✅ Configuration validated');
-                            
-                        } catch (parseError) {
-                            document.getElementById('filesOutput').textContent = `❌ Invalid JSON configuration: ${parseError.message}`;
-                            updateDebugLog(`❌ Configuration parsing failed: ${parseError.message}`);
-                        }
-                    } else {
-                        document.getElementById('filesOutput').textContent = '❌ Configuration file not found';
-                        updateDebugLog('❌ Configuration file not found');
-                    }
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                const debugOutput = document.getElementById('debugOutput');
+                debugOutput.className = 'output success';
+                debugOutput.textContent = `Agent Status Check:\n\n${JSON.stringify(data, null, 2)}`;
                 
+                log("✅ Agent status check completed");
             } catch (error) {
-                document.getElementById('filesOutput').textContent = `❌ Validation failed: ${error.message}`;
-                updateDebugLog(`❌ Configuration validation failed: ${error.message}`);
+                log(`❌ Status check failed: ${error.message}`);
             }
         }
 
-        async function loadSDKConfig() {
-            updateDebugLog('🔧 Loading SDK configuration...');
-            
-            try {
-                const response = await fetch(`http://localhost:8000/agent/${agentId}/sdk-config`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const configOutput = document.getElementById('configOutput');
-                    
-                    let output = `SDK Configuration:\n${'='.repeat(20)}\n`;
-                    output += `Agent ID: ${data.agent_id}\n`;
-                    output += `File Path: ${data.file_path}\n\n`;
-                    output += `SDK Content Preview:\n${'-'.repeat(20)}\n`;
-                    output += data.sdk_content.substring(0, 1000);
-                    if (data.sdk_content.length > 1000) {
-                        output += '\n... (truncated)';
-                    }
-                    
-                    configOutput.textContent = output;
-                    updateDebugLog('✅ SDK configuration loaded successfully');
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-            } catch (error) {
-                document.getElementById('configOutput').textContent = `❌ Failed to load SDK: ${error.message}`;
-                updateDebugLog(`❌ Failed to load SDK configuration: ${error.message}`);
+        function showLastResult() {
+            if (lastTestResult) {
+                const resultsOutput = document.getElementById('resultsOutput');
+                resultsOutput.className = lastTestResult.success ? 'output success' : 'output error';
+                resultsOutput.textContent = JSON.stringify(lastTestResult, null, 2);
+            } else {
+                const resultsOutput = document.getElementById('resultsOutput');
+                resultsOutput.className = 'output';
+                resultsOutput.textContent = 'No test results available yet. Run a test first.';
             }
         }
 
-        async function testSDKFunctions() {
-            updateDebugLog('🧪 Testing SDK functions...');
-            
-            try {
-                // Try to load SDK dynamically
-                const sdkResponse = await fetch(`http://localhost:8000/agent/${agentId}/sdk`);
-                
-                if (sdkResponse.ok) {
-                    const sdkCode = await sdkResponse.text();
-                    
-                    // Create and execute script
-                    const script = document.createElement('script');
-                    script.textContent = sdkCode;
-                    document.head.appendChild(script);
-                    
-                    // Test SDK functions
-                    setTimeout(() => {
-                        let testResult = 'SDK Function Test Results:\n' + '='.repeat(30) + '\n';
-                        
-                        if (typeof window.getAgentConfig === 'function') {
-                            testResult += '✅ getAgentConfig() - Available\n';
-                            try {
-                                const config = window.getAgentConfig();
-                                testResult += `   Agent: ${config.agentName}\n`;
-                                testResult += `   Framework: ${config.framework}\n`;
-                                testResult += `   Input Fields: ${config.inputFields.length}\n`;
-                            } catch (e) {
-                                testResult += `   ❌ Error calling function: ${e.message}\n`;
-                            }
-                        } else {
-                            testResult += '❌ getAgentConfig() - Not available\n';
-                        }
-                        
-                        if (typeof window.testAgent === 'function') {
-                            testResult += '✅ testAgent() - Available\n';
-                        } else {
-                            testResult += '❌ testAgent() - Not available\n';
-                        }
-                        
-                        if (typeof window.testAgentStream === 'function') {
-                            testResult += '✅ testAgentStream() - Available\n';
-                        } else {
-                            testResult += '❌ testAgentStream() - Not available\n';
-                        }
-                        
-                        document.getElementById('configOutput').textContent = testResult;
-                        updateDebugLog('✅ SDK function test completed');
-                    }, 500);
-                    
-                } else {
-                    throw new Error(`HTTP ${sdkResponse.status}`);
-                }
-                
-            } catch (error) {
-                document.getElementById('configOutput').textContent = `❌ SDK test failed: ${error.message}`;
-                updateDebugLog(`❌ SDK function test failed: ${error.message}`);
-            }
+        function clearResults() {
+            document.getElementById('resultsOutput').textContent = 'Test results cleared.';
+            document.getElementById('resultsOutput').className = 'output';
+            lastTestResult = null;
         }
 
-        function collectInputValues() {
-            const values = {};
-            const inputs = document.querySelectorAll('#dynamicInputs input, #dynamicInputs textarea');
-            
-            inputs.forEach(input => {
-                if (input.type === 'checkbox') {
-                    values[input.name] = input.checked;
-                } else if (input.type === 'number') {
-                    values[input.name] = input.value ? parseFloat(input.value) : null;
-                } else if (input.value && input.value.trim()) {
-                    values[input.name] = input.value.trim();
-                }
-            });
-            
-            // If no values, provide a default test input
-            if (Object.keys(values).length === 0) {
-                values.query = 'Hello, this is a test message';
-            }
-            
-            return values;
+        function clearLogs() {
+            document.getElementById('logsOutput').textContent = 'Logs cleared.\n';
+        }
+
+        function exportLogs() {
+            const content = document.getElementById('logsOutput').textContent;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `python-sdk-logs-${agentId}-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function switchTab(tabId) {
@@ -1060,34 +762,11 @@
             event.target.classList.add('active');
         }
 
-        function updateDebugLog(message) {
-            const debugOutput = document.getElementById('debugOutput');
+        function log(message) {
+            const logsOutput = document.getElementById('logsOutput');
             const timestamp = new Date().toLocaleTimeString();
-            debugOutput.textContent += `[${timestamp}] ${message}\n`;
-            debugOutput.scrollTop = debugOutput.scrollHeight;
-        }
-
-        function updateDiscoveryLog(message) {
-            const discoveryOutput = document.getElementById('discoveryOutput');
-            discoveryOutput.textContent += message + '\n';
-            discoveryOutput.scrollTop = discoveryOutput.scrollHeight;
-        }
-
-        function clearDebugLog() {
-            document.getElementById('debugOutput').textContent = 'Debug logs cleared.\n';
-        }
-
-        function exportDebugLog() {
-            const content = document.getElementById('debugOutput').textContent;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `debug-log-${agentId}-${Date.now()}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            logsOutput.textContent += `[${timestamp}] ${message}\n`;
+            logsOutput.scrollTop = logsOutput.scrollHeight;
         }
 
         // Auto-refresh agent info every 30 seconds

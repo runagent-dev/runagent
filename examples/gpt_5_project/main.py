@@ -119,273 +119,81 @@ def analyze_user_request(message: str) -> dict:
             "entrypoint_tags": ["main", "main_stream"],
             "backend_language": "python"
         }
-
-def generate_typescript_sdk_test(agent_info: dict, session_dir: Path):
-    """Generate TypeScript SDK test file with GPT-5"""
+def generate_python_sdk_test(agent_info: dict, session_dir: Path):
+    """Generate Python SDK test file with GPT-5 - no fallback, pure generation"""
     
+    # Create a very specific prompt for GPT-5
     prompt = f"""
-    Generate a TypeScript/JavaScript SDK test file for this AI agent using the provided template as reference:
+    Create a Python script to test this AI agent using the RunAgent Python SDK.
     
-    Agent Name: {agent_info['agent_name']}
-    Framework: {agent_info['framework']}
-    Description: {agent_info['description']}
-    Input Fields: {agent_info['input_fields']}
-    Input Types: {agent_info['input_types']}
-    Input Descriptions: {agent_info['input_descriptions']}
-    Expected Output: {agent_info['expected_output_format']}
-    Example Inputs: {agent_info['example_inputs']}
-    Entrypoint Tags: {agent_info['entrypoint_tags']}
+    EXACT COMMAND LINE INTERFACE REQUIRED:
+    python3 agent_test.py <agent_id> <host> <port> <test_message>
     
-    Create a complete TypeScript/JavaScript file that:
-    1. Exports a function `getAgentConfig()` that returns configuration for the dynamic UI
-    2. Exports a function `testAgent(agentId, host, port, inputValues, entrypointTag)` that tests the agent
-    3. Exports a function `testAgentStream(agentId, host, port, inputValues, entrypointTag)` for streaming
-    4. Includes proper error handling and endpoint discovery
-    5. Uses HTTP fetch fallback since RunAgent TypeScript SDK may not be available
-    6. Provides detailed logging and debugging information
-    7. Validates inputs and formats outputs appropriately
+    MANDATORY REQUIREMENTS:
+    1. Use sys.argv for arguments (NO argparse or click)
+    2. Check len(sys.argv) == 5 exactly
+    3. agent_id = sys.argv[1], host = sys.argv[2], port = int(sys.argv[3]), test_message = sys.argv[4]
+    4. Import: from runagent import RunAgentClient
+    5. Exit with sys.exit(0) for success, sys.exit(1) for failure
     
-    The getAgentConfig() should return an object with:
-    - agentName: string
-    - description: string  
-    - framework: string
-    - inputFields: array of field configurations with name, type, description, required, placeholder
-    - entrypoints: array of entrypoint configurations with tag, description, streaming
-    - exampleInputs: array of example input objects
+    AGENT CONFIGURATION:
+    - Name: {agent_info['agent_name']}
+    - Framework: {agent_info['framework']}
+    - Primary Input Field: {agent_info['input_fields'][0] if agent_info['input_fields'] else 'query'}
+    - All Input Fields: {agent_info['input_fields']}
+    - Input Types: {agent_info['input_types']}
+    - Entrypoint Tags to Try: {agent_info['entrypoint_tags']}
     
-    Make the input fields specific to this agent type. For example:
-    - Weather agent: location, units, forecast_days
-    - Math solver: expression, show_steps, precision
-    - Research agent: topic, depth, max_sources, include_citations
-    - Content writer: topic, style, tone, word_count, format
+    IMPLEMENTATION DETAILS:
+    1. Create input dictionary mapping test_message to the primary input field
+    2. Add default values for other input fields based on their types
+    3. Try each entrypoint tag in sequence until one succeeds
+    4. For each tag, create RunAgentClient(agent_id=agent_id, entrypoint_tag=tag, local=True)
+    5. Call client.run(**input_dict) and print the result
+    6. Print clear success/failure messages
+    7. Include timing information
     
-    Use appropriate input types:
-    - "string" for text inputs
-    - "number" for numeric inputs
-    - "boolean" for checkboxes  
-    - "textarea" for longer text inputs
+    OUTPUT FORMAT:
+    Print testing progress, show which entrypoint works, display the agent response clearly.
     
-    Make the testAgent function robust with multiple endpoint fallbacks and detailed error reporting.
-    Include the window attachment code at the end for browser compatibility.
-    
-    Focus on making this agent-specific and functional. Return only the JavaScript code.
+    Generate a complete, working Python script that follows this exact interface.
     """
     
     try:
         response = openai_client.responses.create(
             model="gpt-5-mini",
             input=prompt,
-            reasoning={"effort": "minimal"}
+            reasoning={"effort": "high"}  # Use more effort for better generation
         )
         
-        sdk_code = response.output[1].content[0].text
+        python_code = response.output[1].content[0].text
         
-        # Clean up the code
-        sdk_code = sdk_code.replace('```typescript', '').replace('```javascript', '').replace('```', '').strip()
+        # Clean up the generated code
+        python_code = python_code.replace('```python', '').replace('```', '').strip()
         
-        # Ensure it includes browser compatibility
-        if 'window.testAgent' not in sdk_code:
-            sdk_code += '''
-
-// Browser compatibility - attach functions to window
-if (typeof window !== 'undefined') {
-    window.testAgent = testAgent;
-    window.testAgentStream = testAgentStream; 
-    window.getAgentConfig = getAgentConfig;
-    console.log('✅ SDK functions attached to window');
-}'''
+        # Ensure proper imports are at the top
+        if not python_code.startswith(('import', 'from')):
+            python_code = 'import sys\nfrom runagent import RunAgentClient\nimport json\nimport time\n\n' + python_code
         
-        # Write to file
-        with open(session_dir / "sdk_test.js", "w") as f:
-            f.write(sdk_code)
+        # Write the generated script to file
+        with open(session_dir / "agent_test.py", "w") as f:
+            f.write(python_code)
         
-        print(f"✅ Generated TypeScript SDK test file for {agent_info['agent_name']}")
+        # Make it executable
+        import stat
+        script_path = session_dir / "agent_test.py"
+        script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
+        
+        print(f"✅ Generated Python SDK test script for {agent_info['agent_name']}")
+        print(f"📁 Script location: {script_path}")
         return True
         
     except Exception as e:
-        print(f"❌ Error generating TypeScript SDK test: {e}")
-        
-        # Enhanced fallback SDK code
-        fallback_code = f'''// Generated SDK test for {agent_info['agent_name']}
-// Framework: {agent_info['framework']}
+        print(f"❌ Error generating Python SDK test: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-export function getAgentConfig() {{
-    return {{
-        agentName: "{agent_info['agent_name']}",
-        description: "{agent_info['description']}",
-        framework: "{agent_info['framework']}",
-        inputFields: [
-            {',\\n            '.join([
-                '{{\\n                name: "{}",\\n                type: "{}",\\n                description: "{}",\\n                required: true,\\n                placeholder: "{}"\\n            }}'.format(
-                    field,
-                    agent_info['input_types'].get(field, "string"),
-                    agent_info['input_descriptions'].get(field, f"Enter {field}"),
-                    f"Enter {field}..."
-                ) for field in agent_info['input_fields']
-            ])}
-        ],
-        entrypoints: [
-            {',\\n            '.join([
-                '{{\\n                tag: "{}",\\n                description: "{}",\\n                streaming: {}\\n            }}'.format(
-                    tag,
-                    f"{'Streaming' if 'stream' in tag else 'Synchronous'} endpoint for {agent_info['framework']}",
-                    'true' if 'stream' in tag else 'false'
-                ) for tag in agent_info['entrypoint_tags']
-            ])}
-        ],
-        exampleInputs: {json.dumps(agent_info['example_inputs'], indent=12)}
-    }};
-}}
-
-export async function testAgent(agentId, host, port, inputValues, entrypointTag = "main") {{
-    try {{
-        console.log('🧪 Testing {agent_info['agent_name']} agent...');
-        console.log('📝 Input values:', inputValues);
-        console.log('🎯 Using entrypoint:', entrypointTag);
-        
-        const baseUrl = `http://${{host}}:${{port}}`;
-        const endpointsToTry = [
-            `/agents/${{entrypointTag}}/run`,
-            `/agents/${{entrypointTag}}/invoke`,
-            `/run`,
-            `/invoke`,
-            `/${{entrypointTag}}`
-        ];
-        
-        let lastError = null;
-        
-        for (const endpoint of endpointsToTry) {{
-            try {{
-                const url = `${{baseUrl}}${{endpoint}}`;
-                console.log(`🔗 Trying: ${{endpoint}}`);
-                
-                const response = await fetch(url, {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify(inputValues)
-                }});
-                
-                if (response.ok) {{
-                    const result = await response.text();
-                    console.log('✅ SUCCESS with:', endpoint);
-                    
-                    return {{
-                        success: true,
-                        result: result,
-                        endpoint: endpoint,
-                        method: 'http_direct',
-                        statusCode: response.status,
-                        inputValues: inputValues
-                    }};
-                }} else {{
-                    const errorText = await response.text().catch(() => 'No error details');
-                    lastError = `HTTP ${{response.status}}: ${{errorText}}`;
-                    console.log(`❌ ${{endpoint}} failed: ${{response.status}}`);
-                }}
-                
-            }} catch (error) {{
-                lastError = error.message;
-                console.log(`❌ ${{endpoint}} error:`, error.message);
-                continue;
-            }}
-        }}
-        
-        throw new Error(`All endpoints failed. Last error: ${{lastError}}`);
-        
-    }} catch (error) {{
-        console.error('❌ Agent test failed:', error);
-        return {{
-            success: false,
-            error: error.message,
-            method: 'failed',
-            inputValues: inputValues
-        }};
-    }}
-}}
-
-export async function testAgentStream(agentId, host, port, inputValues, entrypointTag = "main_stream") {{
-    try {{
-        console.log('🌊 Testing {agent_info['agent_name']} agent streaming...');
-        
-        const baseUrl = `http://${{host}}:${{port}}`;
-        const endpointsToTry = [
-            `/agents/${{entrypointTag}}/stream`,
-            `/agents/${{entrypointTag}}/run`,
-            `/stream`,
-            `/${{entrypointTag}}`
-        ];
-        
-        for (const endpoint of endpointsToTry) {{
-            try {{
-                const url = `${{baseUrl}}${{endpoint}}`;
-                console.log(`🔗 Trying streaming: ${{endpoint}}`);
-                
-                const response = await fetch(url, {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify(inputValues)
-                }});
-                
-                if (response.ok) {{
-                    let result = '';
-                    
-                    if (response.body) {{
-                        const reader = response.body.getReader();
-                        const decoder = new TextDecoder();
-                        
-                        while (true) {{
-                            const {{ done, value }} = await reader.read();
-                            if (done) break;
-                            result += decoder.decode(value);
-                        }}
-                    }} else {{
-                        result = await response.text();
-                    }}
-                    
-                    return {{
-                        success: true,
-                        result: result,
-                        endpoint: endpoint,
-                        method: 'http_stream',
-                        streaming: true,
-                        inputValues: inputValues
-                    }};
-                }}
-                
-            }} catch (error) {{
-                console.log(`❌ ${{endpoint}} streaming error:`, error.message);
-                continue;
-            }}
-        }}
-        
-        throw new Error('All streaming endpoints failed');
-        
-    }} catch (error) {{
-        console.error('❌ Streaming test failed:', error);
-        return {{
-            success: false,
-            error: error.message,
-            method: 'failed',
-            streaming: false,
-            inputValues: inputValues
-        }};
-    }}
-}}
-
-// Browser compatibility
-if (typeof window !== 'undefined') {{
-    window.testAgent = testAgent;
-    window.testAgentStream = testAgentStream;
-    window.getAgentConfig = getAgentConfig;
-    console.log('✅ {agent_info['agent_name']} SDK functions loaded');
-}}
-'''
-        
-        with open(session_dir / "sdk_test.js", "w") as f:
-            f.write(fallback_code)
-        
-        print(f"✅ Generated fallback SDK for {agent_info['agent_name']}")
-        return True
 
 def generate_mermaid_diagram(agent_info: dict) -> str:
     """Generate dynamic Mermaid diagram using GPT-5"""
@@ -433,70 +241,6 @@ def generate_mermaid_diagram(agent_info: dict) -> str:
         print(f"❌ Error generating Mermaid diagram: {e}")
         return f"graph TD\n    A[User Input] --> B[{agent_info['framework']} Processing]\n    B --> C[Generate Response]\n    C --> D[Return Result]"
 
-def generate_agent_files(agent_info: dict, session_id: str) -> bool:
-    """Generate agent files based on template and user requirements."""
-    
-    framework = agent_info['framework']
-    
-    # Create session directory
-    session_dir = Path(f"generated_agents/{session_id}")
-    session_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create .env file
-    env_content = f"""# OpenAI API Key
-OPENAI_API_KEY={os.getenv('OPENAI_API_KEY', 'your_openai_api_key_here')}
-
-# Letta Configuration (if using Letta)
-LETTA_SERVER_URL=http://localhost:8283
-
-# RunAgent Configuration
-RUNAGENT_DISABLE_DB=true
-RUNAGENT_NO_DATABASE=true
-RUNAGENT_LOG_LEVEL=INFO
-"""
-    
-    with open(session_dir / ".env", "w") as f:
-        f.write(env_content)
-    
-    try:
-        print(f"🔧 Generating {framework} agent files...")
-        
-        if framework == "langgraph":
-            generate_langgraph_files(agent_info, session_dir)
-        elif framework == "letta":
-            generate_letta_files(agent_info, session_dir)
-        elif framework == "agno":
-            generate_agno_files(agent_info, session_dir)
-        elif framework == "llamaindex":
-            generate_llamaindex_files(agent_info, session_dir)
-        else:
-            generate_custom_framework_files(agent_info, session_dir)
-        
-        # Generate TypeScript SDK test file
-        generate_typescript_sdk_test(agent_info, session_dir)
-        
-        # Validate config file
-        config_file = session_dir / "runagent.config.json"
-        if not config_file.exists():
-            raise Exception("Config file was not created")
-        
-        with open(config_file, "r") as f:
-            config = json.load(f)
-        
-        required_fields = ["agent_name", "description", "framework", "template_source", "agent_architecture"]
-        missing_fields = [field for field in required_fields if field not in config]
-        
-        if missing_fields:
-            raise Exception(f"Config missing required fields: {missing_fields}")
-        
-        print(f"✅ Successfully generated and validated {framework} agent")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error generating {framework} files: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
 
 def generate_langgraph_files(agent_info: dict, session_dir: Path):
     """Generate LangGraph agent files with proper input handling."""
@@ -1485,6 +1229,7 @@ Your {session["agent_info"]["framework"]} agent is running with dynamic inputs a
             stage="error"
         )
 
+
 @app.get("/agent/{agent_id}")
 async def get_agent_info(agent_id: str):
     """Get comprehensive agent information including SDK configuration"""
@@ -1517,11 +1262,11 @@ async def get_agent_info(agent_id: str):
         agent_info = agent_data.get("agent_info", {})
         port = agent_data.get("port", 8450)
         
-        # Check if SDK file exists
+        # Check if Python SDK file exists
         sdk_available = False
         sdk_url = None
         if session_id:
-            sdk_file = Path(f"generated_agents/{session_id}/sdk_test.js")
+            sdk_file = Path(f"generated_agents/{session_id}/agent_test.py")
             if sdk_file.exists():
                 sdk_available = True
                 sdk_url = f"http://localhost:8000/agent/{agent_id}/sdk"
@@ -1544,6 +1289,7 @@ async def get_agent_info(agent_id: str):
                 "status": "ready",
                 "sdk_available": sdk_available,
                 "sdk_url": sdk_url,
+                "sdk_type": "python",
                 "session_id": session_id
             }
         }
@@ -1555,8 +1301,8 @@ async def get_agent_info(agent_id: str):
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.get("/agent/{agent_id}/sdk")
-async def serve_agent_sdk(agent_id: str):
-    """Serve the generated SDK JavaScript file for dynamic loading"""
+async def serve_agent_python_sdk(agent_id: str):
+    """Serve the generated Python SDK file"""
     try:
         # Find the session directory
         session_id = None
@@ -1568,24 +1314,28 @@ async def serve_agent_sdk(agent_id: str):
         if not session_id:
             raise HTTPException(status_code=404, detail="Agent session not found")
         
-        sdk_file = Path(f"generated_agents/{session_id}/sdk_test.js")
-        if not sdk_file.exists():
-            raise HTTPException(status_code=404, detail="SDK file not found")
+        python_file = Path(f"generated_agents/{session_id}/agent_test.py")
+        if not python_file.exists():
+            raise HTTPException(status_code=404, detail="Python SDK file not found")
         
-        # Read and return the SDK file with proper content type
-        with open(sdk_file, "r") as f:
-            sdk_content = f.read()
+        # Read and return the Python file
+        with open(python_file, "r") as f:
+            python_content = f.read()
         
         return Response(
-            content=sdk_content,
-            media_type="application/javascript",
-            headers={"Cache-Control": "no-cache"}
+            content=python_content,
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Content-Disposition": f"attachment; filename=agent_test_{agent_id}.py"
+            }
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error serving SDK: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error serving Python SDK: {str(e)}")
+
 
 @app.get("/agent/{agent_id}/sdk-config")
 async def get_agent_sdk_config(agent_id: str):
@@ -1783,6 +1533,70 @@ async def clear_sessions():
     running_agents.clear()
     
     return {"message": "All sessions and agents cleared", "status": "success"}
+
+@app.get("/agent/{agent_id}/run-test")
+async def run_python_sdk_test(agent_id: str, test_message: str = "Hello, how can you help me?"):
+    """Run the Python SDK test"""
+    try:
+        # Find the session directory
+        session_id = None
+        for sid, session in sessions.items():
+            if session.get("agent_id") == agent_id:
+                session_id = sid
+                break
+        
+        if not session_id:
+            raise HTTPException(status_code=404, detail="Agent session not found")
+        
+        session_dir = Path(f"generated_agents/{session_id}")
+        python_file = session_dir / "agent_test.py"
+        
+        if not python_file.exists():
+            raise HTTPException(status_code=404, detail="Python SDK file not found")
+        
+        # Get agent info
+        session = sessions[session_id]
+        agent_info = session.get("agent_info", {})
+        port = session.get("runagent_port", 8450)
+        
+        # Prepare environment
+        env = os.environ.copy()
+        env['PYTHONPATH'] = str(Path.cwd())  # Add current directory to Python path
+        
+        # Run the test
+        test_result = subprocess.run(
+            ["python3", "agent_test.py", agent_id, "localhost", str(port), test_message],
+            cwd=session_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env
+        )
+        
+        return {
+            "success": test_result.returncode == 0,
+            "test_stdout": test_result.stdout,
+            "test_stderr": test_result.stderr,
+            "agent_info": {
+                "name": agent_info.get("agent_name", "Unknown"),
+                "framework": agent_info.get("framework", "unknown"),
+                "port": port
+            },
+            "sdk_type": "python"
+        }
+        
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Test timeout",
+            "sdk_type": "python"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Test failed: {str(e)}",
+            "sdk_type": "python"
+        }
 
 if __name__ == "__main__":
     import uvicorn
