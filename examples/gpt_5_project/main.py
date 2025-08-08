@@ -1681,8 +1681,14 @@ async def clear_sessions():
     return {"message": "All sessions and agents cleared", "status": "success"}
 
 @app.get("/agent/{agent_id}/run-test")
-async def run_python_sdk_test(agent_id: str, test_message: str = "Hello, how can you help me?"):
-    """Run the Python SDK test"""
+async def run_python_sdk_test(
+    agent_id: str, 
+    test_message: str = "Hello, how can you help me?",
+    input_data: str = None,
+    streaming: bool = False,
+    entrypoint_tag: str = None
+):
+    """Run the Python SDK test with dynamic input data and streaming support"""
     try:
         # Find the session directory
         session_id = None
@@ -1705,43 +1711,244 @@ async def run_python_sdk_test(agent_id: str, test_message: str = "Hello, how can
         agent_info = session.get("agent_info", {})
         port = session.get("runagent_port", 8450)
         
+        # Parse input data if provided
+        dynamic_inputs = {}
+        if input_data:
+            try:
+                dynamic_inputs = json.loads(input_data)
+                print(f"📋 Using dynamic inputs: {dynamic_inputs}")
+            except json.JSONDecodeError:
+                print(f"⚠️ Failed to parse input_data, using test_message only")
+        
         # Prepare environment
         env = os.environ.copy()
-        env['PYTHONPATH'] = str(Path.cwd())  # Add current directory to Python path
+        env['PYTHONPATH'] = str(Path.cwd())
         
-        # Run the test
+        # Create a temporary script that handles dynamic inputs and proper content extraction
+        temp_script_content = f'''import sys
+import json
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
+def enhanced_main():
+    if len(sys.argv) < 5:
+        print("Usage: python3 enhanced_test.py <agent_id> <host> <port> <test_message> [streaming] [entrypoint]")
+        sys.exit(1)
+    
+    agent_id = sys.argv[1]
+    host = sys.argv[2] 
+    port = int(sys.argv[3])
+    test_message = sys.argv[4]
+    streaming_mode = sys.argv[5] if len(sys.argv) > 5 else "false"
+    target_entrypoint = sys.argv[6] if len(sys.argv) > 6 else None
+    
+    print(f"🧪 Enhanced Testing Agent: {{agent_id}}")
+    print(f"🔌 Connection: {{host}}:{{port}}")
+    print(f"📝 Test Message: {{test_message}}")
+    print(f"🌊 Streaming Mode: {{streaming_mode}}")
+    if target_entrypoint:
+        print(f"🎯 Target Entrypoint: {{target_entrypoint}}")
+    
+    # Use dynamic inputs if available
+    dynamic_inputs = {json.dumps(dynamic_inputs)}
+    
+    from runagent import RunAgentClient
+    import time
+    
+    # Determine entrypoints to test
+    all_entrypoints = {agent_info['entrypoint_tags']}
+    
+    if target_entrypoint:
+        entrypoints_to_test = [target_entrypoint]
+    elif streaming_mode.lower() == "true":
+        entrypoints_to_test = [tag for tag in all_entrypoints if "stream" in tag.lower()]
+        if not entrypoints_to_test:
+            entrypoints_to_test = all_entrypoints
+    else:
+        # For non-streaming, prefer non-stream entrypoints
+        entrypoints_to_test = [tag for tag in all_entrypoints if "stream" not in tag.lower()]
+        if not entrypoints_to_test:
+            entrypoints_to_test = all_entrypoints
+    
+    print(f"🎯 Testing entrypoints: {{entrypoints_to_test}}")
+    print("=" * 60)
+    
+    # Prepare input data
+    if dynamic_inputs:
+        input_data = dynamic_inputs.copy()
+        print(f"📋 Using dynamic inputs: {{json.dumps(input_data, indent=2)}}")
+    else:
+        # Fallback to test message mapping
+        primary_field = "{agent_info['input_fields'][0] if agent_info['input_fields'] else 'query'}"
+        input_data = {{primary_field: test_message}}
+        print(f"📋 Using fallback input: {{json.dumps(input_data, indent=2)}}")
+    
+    # Test each entrypoint
+    for i, tag in enumerate(entrypoints_to_test, 1):
+        try:
+            print(f"\\n🎯 Attempt {{i}}/{{len(entrypoints_to_test)}}: Testing '{{tag}}'")
+            start_time = time.time()
+            
+            ra = RunAgentClient(
+                agent_id=agent_id,
+                entrypoint_tag=tag,
+                local=True
+            )
+            
+            print(f"✅ RunAgentClient created successfully")
+            
+            if "stream" in tag.lower() or streaming_mode.lower() == "true":
+                print("📡 Testing streaming mode:")
+                print("-" * 40)
+                chunk_count = 0
+                accumulated_content = ""
+                
+                for chunk in ra.run(**input_data):
+                    chunk_count += 1
+                    
+                    # Extract content from chunk if it's a dict
+                    if isinstance(chunk, dict):
+                        content = chunk.get('content', '')
+                        if content:
+                            print(content, end="", flush=True)
+                            accumulated_content += content
+                    else:
+                        print(chunk, end="", flush=True)
+                        accumulated_content += str(chunk)
+                    
+                    if chunk_count > 200:  # Prevent infinite loops
+                        print("\\n... [truncated after 200 chunks]")
+                        break
+                
+                print(f"\\n-" * 40)
+                print(f"📊 Received {{chunk_count}} chunks")
+                print(f"📏 Total content length: {{len(accumulated_content)}} characters")
+                
+            else:
+                print("🔄 Testing synchronous mode:")
+                result = ra.run(**input_data)
+                
+                print(f"📤 Result Type: {{type(result)}}")
+                
+                # Handle different result types
+                if isinstance(result, dict):
+                    if 'content' in result:
+                        content = result['content']
+                        if hasattr(content, '__iter__') and not isinstance(content, str):
+                            # If content is a generator or iterator, consume it
+                            try:
+                                if hasattr(content, '__next__'):
+                                    print("🔄 Consuming generator/iterator result:")
+                                    consumed_content = ""
+                                    chunk_count = 0
+                                    for chunk in content:
+                                        if isinstance(chunk, dict) and 'content' in chunk:
+                                            consumed_content += chunk['content']
+                                        else:
+                                            consumed_content += str(chunk)
+                                        chunk_count += 1
+                                        if chunk_count > 100:
+                                            consumed_content += "... [truncated]"
+                                            break
+                                    print(f"📤 Consumed Content:\\n{{consumed_content}}")
+                                else:
+                                    print(f"📤 Content: {{content}}")
+                            except Exception as e:
+                                print(f"⚠️ Error consuming iterator: {{e}}")
+                                print(f"📤 Raw Content: {{content}}")
+                        else:
+                            print(f"📤 Content:\\n{{content}}")
+                    else:
+                        print(f"📤 Full Result:")
+                        result_str = json.dumps(result, indent=2, default=str)
+                        print(result_str[:2000] + "..." if len(result_str) > 2000 else result_str)
+                else:
+                    result_str = str(result)
+                    print(f"📤 Result Content:")
+                    print(result_str[:2000] + "..." if len(result_str) > 2000 else result_str)
+            
+            elapsed = time.time() - start_time
+            print(f"\\n⏱️  Execution Time: {{elapsed:.2f}} seconds")
+            print(f"🎉 SUCCESS! Agent responded via entrypoint '{{tag}}'")
+            sys.exit(0)
+            
+        except Exception as e:
+            print(f"❌ Failed with entrypoint '{{tag}}': {{str(e)}}")
+            if i < len(entrypoints_to_test):
+                print("🔄 Trying next entrypoint...")
+            continue
+    
+    print(f"\\n💥 All {{len(entrypoints_to_test)}} entrypoints failed!")
+    sys.exit(1)
+
+if __name__ == "__main__":
+    enhanced_main()
+'''
+        
+        # Write the enhanced test script
+        temp_script = session_dir / "enhanced_test.py"
+        with open(temp_script, "w") as f:
+            f.write(temp_script_content)
+        
+        # Prepare command arguments
+        cmd_args = [
+            "python3", "enhanced_test.py", 
+            agent_id, "localhost", str(port), test_message
+        ]
+        
+        if streaming:
+            cmd_args.append("true")
+            if entrypoint_tag:
+                cmd_args.append(entrypoint_tag)
+        
+        print(f"🚀 Running command: {' '.join(cmd_args)}")
+        
+        # Run the enhanced test
         test_result = subprocess.run(
-            ["python3", "agent_test.py", agent_id, "localhost", str(port), test_message],
+            cmd_args,
             cwd=session_dir,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,  # Increased timeout for streaming
             env=env
         )
         
+        # Clean up temp script
+        if temp_script.exists():
+            temp_script.unlink()
+        
+        success = test_result.returncode == 0
+        
         return {
-            "success": test_result.returncode == 0,
+            "success": success,
             "test_stdout": test_result.stdout,
             "test_stderr": test_result.stderr,
             "agent_info": {
                 "name": agent_info.get("agent_name", "Unknown"),
                 "framework": agent_info.get("framework", "unknown"),
-                "port": port
+                "port": port,
+                "input_fields": agent_info.get("input_fields", []),
+                "entrypoint_tags": agent_info.get("entrypoint_tags", [])
             },
-            "sdk_type": "python"
+            "sdk_type": "python",
+            "streaming_mode": streaming,
+            "dynamic_inputs_used": bool(dynamic_inputs),
+            "inputs_received": dynamic_inputs if dynamic_inputs else {"test_message": test_message}
         }
         
     except subprocess.TimeoutExpired:
         return {
             "success": False,
-            "error": "Test timeout",
-            "sdk_type": "python"
+            "error": "Test timeout (120s exceeded)",
+            "sdk_type": "python",
+            "streaming_mode": streaming
         }
     except Exception as e:
         return {
             "success": False,
             "error": f"Test failed: {str(e)}",
-            "sdk_type": "python"
+            "sdk_type": "python",
+            "streaming_mode": streaming
         }
 
 if __name__ == "__main__":

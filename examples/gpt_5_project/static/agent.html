@@ -304,12 +304,20 @@
                         <button class="btn btn-success" onclick="runPythonSDKTest()" id="testButton">
                             🚀 Test with Python SDK
                         </button>
-                        <button class="btn btn-info" onclick="loadAgentInfo()">
+                        <button class="btn btn-info" onclick="testStreaming()" id="streamButton">
+                            📡 Test Streaming
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadAgentInfo()">
                             🔄 Refresh Info
                         </button>
                         <button class="btn btn-warning" onclick="testWithCLI()">
                             📋 Show CLI Command
                         </button>
+                    </div>
+                    <div class="form-group">
+                        <div class="output info" id="inputPreview" style="font-size: 11px; max-height: 100px; overflow-y: auto;">
+                            Click "🔄 Refresh Info" to see current input values...
+                        </div>
                     </div>
                 </div>
                 
@@ -595,11 +603,20 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
             testOutput.className = 'output';
             
             try {
+                // Collect dynamic input field values
+                const inputData = getInputData();
                 const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, how can you help me?';
                 
-                log(`🧪 Starting Python SDK test with message: "${testMessage}"`);
+                log(`🧪 Starting Python SDK test with inputs: ${JSON.stringify(inputData)}`);
+                log(`📝 Test message: "${testMessage}"`);
                 
-                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?test_message=${encodeURIComponent(testMessage)}`);
+                // Send both the collected input data and test message
+                const params = new URLSearchParams({
+                    test_message: testMessage,
+                    input_data: JSON.stringify(inputData)
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -616,7 +633,7 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                     // Show in results tab
                     const resultsOutput = document.getElementById('resultsOutput');
                     resultsOutput.className = 'output success';
-                    resultsOutput.textContent = `✅ SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\nSDK: ${result.sdk_type}\n\nOutput:\n${result.test_stdout}`;
+                    resultsOutput.textContent = `✅ SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\nSDK: ${result.sdk_type}\n\nInputs Used:\n${JSON.stringify(inputData, null, 2)}\n\nOutput:\n${result.test_stdout}`;
                     
                 } else {
                     testOutput.className = 'output error';
@@ -643,6 +660,103 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                 testButton.innerHTML = originalText;
             }
         }
+
+
+        async function testStreaming() {
+            const testOutput = document.getElementById('testOutput');
+            testOutput.className = 'output info';
+            testOutput.textContent = '📡 Testing streaming mode...\n';
+            
+            try {
+                const inputData = getInputData();
+                log(`🌊 Starting streaming test with inputs: ${JSON.stringify(inputData)}`);
+                
+                // Find streaming entrypoint
+                const streamingTag = agentInfo?.entrypoint_tags?.find(tag => tag.includes('stream')) || 'main_stream';
+                
+                const params = new URLSearchParams({
+                    test_message: document.getElementById('testMessage').value.trim() || 'Hello, streaming test',
+                    input_data: JSON.stringify(inputData),
+                    streaming: 'true',
+                    entrypoint_tag: streamingTag
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    testOutput.className = 'output success';
+                    testOutput.textContent = `✅ Streaming Test Successful!\n\nUsed entrypoint: ${streamingTag}\nInputs: ${JSON.stringify(inputData, null, 2)}\n\nStreaming Output:\n${result.test_stdout}`;
+                    log(`✅ Streaming test successful with ${streamingTag}`);
+                } else {
+                    testOutput.className = 'output error';
+                    testOutput.textContent = `❌ Streaming Test Failed\n\nError: ${result.error || 'Unknown error'}\nStderr: ${result.test_stderr || 'None'}\nStdout: ${result.test_stdout || 'None'}`;
+                    log(`❌ Streaming test failed`);
+                }
+                
+            } catch (error) {
+                testOutput.className = 'output error';
+                testOutput.textContent = `❌ Streaming Test Error: ${error.message}`;
+                log(`❌ Streaming test error: ${error.message}`);
+            }
+        }
+
+        function getInputData() {
+            /**
+             * Collect input data from dynamic form fields
+             */
+            const inputData = {};
+            
+            if (!agentInfo?.input_fields) {
+                return { query: document.getElementById('testMessage').value.trim() || 'Hello' };
+            }
+            
+            agentInfo.input_fields.forEach(field => {
+                const element = document.getElementById(field);
+                if (element) {
+                    const fieldType = agentInfo.input_types?.[field] || 'string';
+                    
+                    if (fieldType === 'boolean') {
+                        inputData[field] = element.checked;
+                    } else if (fieldType === 'number' || fieldType === 'integer') {
+                        inputData[field] = element.value ? Number(element.value) : 1;
+                    } else if (fieldType.includes('array') || fieldType.includes('list')) {
+                        // Handle array fields - split by commas or newlines
+                        const rawValue = element.value.trim();
+                        if (rawValue) {
+                            inputData[field] = rawValue.includes('\n') 
+                                ? rawValue.split('\n').map(s => s.trim()).filter(s => s)
+                                : [rawValue];
+                        } else {
+                            inputData[field] = [];
+                        }
+                    } else {
+                        inputData[field] = element.value.trim() || '';
+                    }
+                }
+            });
+            
+            // If no dynamic inputs were filled, use test message for primary field
+            const primaryField = agentInfo.input_fields[0];
+            const testMessage = document.getElementById('testMessage').value.trim();
+            
+            if (testMessage && (!inputData[primaryField] || inputData[primaryField] === '' || Array.isArray(inputData[primaryField]) && inputData[primaryField].length === 0)) {
+                if (agentInfo.input_types?.[primaryField]?.includes('array')) {
+                    inputData[primaryField] = [testMessage];
+                } else {
+                    inputData[primaryField] = testMessage;
+                }
+            }
+            
+            return inputData;
+        }
+        
+
 
         async function downloadPythonSDK() {
             try {
