@@ -120,80 +120,135 @@ def analyze_user_request(message: str) -> dict:
             "backend_language": "python"
         }
 def generate_python_sdk_test(agent_info: dict, session_dir: Path):
-    """Generate Python SDK test file with GPT-5 - no fallback, pure generation"""
+    """Generate Python SDK test file with explicit template to avoid constructor issues"""
     
-    # Create a very specific prompt for GPT-5
-    prompt = f"""
-    Create a Python script to test this AI agent using the RunAgent Python SDK.
-    
-    EXACT COMMAND LINE INTERFACE REQUIRED:
-    python3 agent_test.py <agent_id> <host> <port> <test_message>
-    
-    MANDATORY REQUIREMENTS:
-    1. Use sys.argv for arguments (NO argparse or click)
-    2. Check len(sys.argv) == 5 exactly
-    3. agent_id = sys.argv[1], host = sys.argv[2], port = int(sys.argv[3]), test_message = sys.argv[4]
-    4. Import: from runagent import RunAgentClient
-    5. Exit with sys.exit(0) for success, sys.exit(1) for failure
-    
-    AGENT CONFIGURATION:
-    - Name: {agent_info['agent_name']}
-    - Framework: {agent_info['framework']}
-    - Primary Input Field: {agent_info['input_fields'][0] if agent_info['input_fields'] else 'query'}
-    - All Input Fields: {agent_info['input_fields']}
-    - Input Types: {agent_info['input_types']}
-    - Entrypoint Tags to Try: {agent_info['entrypoint_tags']}
-    
-    IMPLEMENTATION DETAILS:
-    1. Create input dictionary mapping test_message to the primary input field
-    2. Add default values for other input fields based on their types
-    3. Try each entrypoint tag in sequence until one succeeds
-    4. For each tag, create RunAgentClient(agent_id=agent_id, entrypoint_tag=tag, local=True)
-    5. Call client.run(**input_dict) and print the result
-    6. Print clear success/failure messages
-    7. Include timing information
-    
-    OUTPUT FORMAT:
-    Print testing progress, show which entrypoint works, display the agent response clearly.
-    
-    Generate a complete, working Python script that follows this exact interface.
-    """
-    
-    try:
-        response = openai_client.responses.create(
-            model="gpt-5-mini",
-            input=prompt,
-            reasoning={"effort": "high"}  # Use more effort for better generation
-        )
-        
-        python_code = response.output[1].content[0].text
-        
-        # Clean up the generated code
-        python_code = python_code.replace('```python', '').replace('```', '').strip()
-        
-        # Ensure proper imports are at the top
-        if not python_code.startswith(('import', 'from')):
-            python_code = 'import sys\nfrom runagent import RunAgentClient\nimport json\nimport time\n\n' + python_code
-        
-        # Write the generated script to file
-        with open(session_dir / "agent_test.py", "w") as f:
-            f.write(python_code)
-        
-        # Make it executable
-        import stat
-        script_path = session_dir / "agent_test.py"
-        script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
-        
-        print(f"✅ Generated Python SDK test script for {agent_info['agent_name']}")
-        print(f"📁 Script location: {script_path}")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error generating Python SDK test: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    # Always use the fallback to ensure working code
+    return generate_fallback_sdk_test(agent_info, session_dir)
 
+def generate_fallback_sdk_test(agent_info: dict, session_dir: Path):
+    """Generate a robust fallback SDK test script that always works"""
+    
+    primary_field = agent_info['input_fields'][0] if agent_info['input_fields'] else 'query'
+    
+    # Create input preparation logic
+    input_assignments = [f'    input_data["{primary_field}"] = test_message']
+    
+    # Add other fields with appropriate defaults
+    for field in agent_info['input_fields'][1:]:
+        field_type = agent_info['input_types'].get(field, 'string')
+        if field_type in ['number', 'integer']:
+            default_value = '1'
+        elif field_type == 'boolean':
+            default_value = 'True'
+        elif field_type in ['array', 'list']:
+            default_value = '[]'
+        else:
+            default_value = f'"short"' if 'length' in field else f'"default"'
+        
+        input_assignments.append(f'    input_data["{field}"] = {default_value}')
+    
+    input_prep = '\n'.join(input_assignments)
+    
+    fallback_script = f'''import sys
+import time
+import json
+from runagent import RunAgentClient
+
+def main():
+    if len(sys.argv) != 5:
+        print("Usage: python3 agent_test.py <agent_id> <host> <port> <test_message>")
+        print("Example: python3 agent_test.py abc123 localhost 8450 'Hello'")
+        sys.exit(1)
+    
+    agent_id = sys.argv[1]
+    host = sys.argv[2] 
+    port = int(sys.argv[3])
+    test_message = sys.argv[4]
+    
+    print(f"🧪 Testing Agent: {{agent_id}}")
+    print(f"🔌 Connection: {{host}}:{{port}}")
+    print(f"📝 Test Message: {{test_message}}")
+    print(f"🎯 Framework: {agent_info['framework']}")
+    print("=" * 60)
+    
+    # Prepare input data based on agent configuration
+    input_data = {{}}
+{input_prep}
+    
+    print(f"📋 Prepared inputs for agent: {{json.dumps(input_data, indent=2)}}")
+    print(f"🔗 Connecting to RunAgent service at {{host}}:{{port}} ...")
+    
+    # Test each entrypoint tag in order
+    entrypoints = {agent_info['entrypoint_tags']}
+    
+    for i, tag in enumerate(entrypoints, 1):
+        try:
+            print(f"\\n🎯 Attempt {{i}}/{{len(entrypoints)}}: Testing entrypoint '{{tag}}'")
+            start_time = time.time()
+            
+            # Create RunAgentClient with explicit parameters
+            ra = RunAgentClient(
+                agent_id=agent_id,
+                entrypoint_tag=tag,
+                local=True
+            )
+            
+            print(f"✅ RunAgentClient created successfully")
+            
+            # Test the agent
+            if "stream" in tag.lower():
+                print("📡 Testing streaming mode:")
+                print("-" * 40)
+                chunk_count = 0
+                for chunk in ra.run(**input_data):
+                    print(chunk, end="", flush=True)
+                    chunk_count += 1
+                print(f"\\n-" * 40)
+                print(f"📊 Received {{chunk_count}} chunks")
+            else:
+                print("🔄 Testing synchronous mode:")
+                result = ra.run(**input_data)
+                print(f"📤 Result Type: {{type(result)}}")
+                print(f"📤 Result Content:")
+                if isinstance(result, dict):
+                    print(json.dumps(result, indent=2))
+                else:
+                    print(str(result)[:500] + "..." if len(str(result)) > 500 else str(result))
+            
+            elapsed = time.time() - start_time
+            print(f"\\n⏱️  Execution Time: {{elapsed:.2f}} seconds")
+            print(f"🎉 SUCCESS! Agent responded via entrypoint '{{tag}}'")
+            sys.exit(0)
+            
+        except Exception as e:
+            print(f"❌ Failed with entrypoint '{{tag}}': {{str(e)}}")
+            if i < len(entrypoints):
+                print("🔄 Trying next entrypoint...")
+            continue
+    
+    print(f"\\n💥 All {{len(entrypoints)}} entrypoints failed!")
+    print("🔍 Troubleshooting tips:")
+    print("   - Verify the agent is running at the specified host:port")
+    print("   - Check that agent_id is correct")
+    print("   - Ensure RunAgent SDK is installed: pip install runagent")
+    print("   - Try different entrypoint tags manually")
+    sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+'''
+    
+    with open(session_dir / "agent_test.py", "w") as f:
+        f.write(fallback_script)
+    
+    # Make it executable
+    import stat
+    script_path = session_dir / "agent_test.py"
+    script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
+    
+    print(f"✅ Generated robust Python SDK test script for {agent_info['agent_name']}")
+    print(f"📁 Script location: {script_path}")
+    return True
 
 def generate_mermaid_diagram(agent_info: dict) -> str:
     """Generate dynamic Mermaid diagram using GPT-5"""
@@ -995,6 +1050,97 @@ def start_runagent_server(session_dir: str, session_id: str):
         import traceback
         traceback.print_exc()
         return None, None, None
+
+def generate_agent_files(agent_info: dict, session_id: str):
+    """Generate agent files based on framework and create Python SDK test"""
+    
+    try:
+        # Create session directory
+        session_dir = Path(f"generated_agents/{session_id}")
+        session_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"📁 Creating agent files in: {session_dir}")
+        print(f"🎯 Framework: {agent_info['framework']}")
+        
+        # Generate framework-specific files
+        framework = agent_info['framework'].lower()
+        
+        if framework == 'langgraph':
+            generate_langgraph_files(agent_info, session_dir)
+        elif framework == 'letta':
+            generate_letta_files(agent_info, session_dir)
+        elif framework == 'agno':
+            generate_agno_files(agent_info, session_dir)
+        elif framework == 'llamaindex':
+            generate_llamaindex_files(agent_info, session_dir)
+        else:
+            # Default to custom framework
+            generate_custom_framework_files(agent_info, session_dir)
+        
+        # Generate Python SDK test file
+        print("🐍 Generating Python SDK test script...")
+        sdk_success = generate_python_sdk_test(agent_info, session_dir)
+        
+        if not sdk_success:
+            print("⚠️ Python SDK generation had issues, but continuing...")
+        
+        # Generate .env file with basic setup
+        env_content = """# Environment variables for the agent
+OPENAI_API_KEY=${OPENAI_API_KEY}
+RUNAGENT_LOG_LEVEL=INFO
+RUNAGENT_DISABLE_DB=true
+"""
+        
+        with open(session_dir / ".env", "w") as f:
+            f.write(env_content)
+        
+        # Generate README
+        readme_content = f"""# {agent_info['agent_name']}
+
+{agent_info['description']}
+
+## Framework
+{agent_info['framework']}
+
+## Usage
+
+### Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### Run with RunAgent
+```bash
+runagent serve .
+```
+
+### Test with Python SDK
+```bash
+python3 agent_test.py <agent_id> localhost <port> "your test message"
+```
+
+## Input Fields
+{', '.join(agent_info['input_fields'])}
+
+## Entrypoints
+{', '.join(agent_info['entrypoint_tags'])}
+"""
+        
+        with open(session_dir / "README.md", "w") as f:
+            f.write(readme_content)
+        
+        print(f"✅ Agent files generated successfully!")
+        print(f"📋 Files created:")
+        for file_path in session_dir.glob("*"):
+            print(f"   - {file_path.name}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error generating agent files: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):

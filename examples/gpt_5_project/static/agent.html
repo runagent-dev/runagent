@@ -473,6 +473,7 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
             }
         }
 
+
         function generateInputFields() {
             const container = document.getElementById('dynamicInputs');
             container.innerHTML = '';
@@ -486,18 +487,22 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
             const inputTypes = agentInfo.input_types || {};
             const inputDescriptions = agentInfo.input_descriptions || {};
 
-            inputFields.forEach(field => {
+            inputFields.forEach((field, index) => {
                 const group = document.createElement('div');
                 group.className = 'form-group';
 
                 const label = document.createElement('label');
                 const fieldType = inputTypes[field] || 'string';
                 const description = inputDescriptions[field] || `Enter ${field}`;
+                const isRequired = index === 0; // First field is always required
                 
-                label.textContent = `${field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} (${fieldType})`;
+                label.textContent = `${field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} (${fieldType})${isRequired ? ' *' : ''}`;
+                if (isRequired) {
+                    label.style.fontWeight = 'bold';
+                }
 
                 let input;
-                if (fieldType === 'textarea') {
+                if (fieldType === 'textarea' || description.length > 50) {
                     input = document.createElement('textarea');
                     input.className = 'form-control textarea';
                     input.rows = 2;
@@ -505,18 +510,35 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                     input = document.createElement('input');
                     input.className = 'form-control';
                     
-                    if (fieldType === 'number') {
-                        input.type = 'number';
-                    } else if (fieldType === 'boolean') {
-                        input.type = 'checkbox';
-                    } else {
-                        input.type = 'text';
+                    switch (fieldType) {
+                        case 'number':
+                        case 'integer':
+                            input.type = 'number';
+                            input.value = '1';
+                            break;
+                        case 'boolean':
+                            input.type = 'checkbox';
+                            input.checked = false;
+                            break;
+                        case 'email':
+                            input.type = 'email';
+                            break;
+                        case 'url':
+                            input.type = 'url';
+                            break;
+                        default:
+                            input.type = 'text';
                     }
                 }
 
                 input.id = field;
                 input.name = field;
                 input.placeholder = description;
+                
+                // Set default values for non-primary fields
+                if (index > 0 && fieldType === 'string' && !input.value) {
+                    input.value = `default_${field}`;
+                }
 
                 group.appendChild(label);
                 group.appendChild(input);
@@ -524,6 +546,41 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
             });
 
             log(`✅ Generated ${inputFields.length} input fields for Python SDK`);
+        }
+
+        function getInputData() {
+            /**
+            * Collect input data from dynamic form fields
+            */
+            const inputData = {};
+            
+            if (!agentInfo?.input_fields) {
+                return { query: document.getElementById('testMessage').value.trim() || 'Hello' };
+            }
+            
+            agentInfo.input_fields.forEach(field => {
+                const element = document.getElementById(field);
+                if (element) {
+                    const fieldType = agentInfo.input_types?.[field] || 'string';
+                    
+                    if (fieldType === 'boolean') {
+                        inputData[field] = element.checked;
+                    } else if (fieldType === 'number' || fieldType === 'integer') {
+                        inputData[field] = element.value ? Number(element.value) : 1;
+                    } else {
+                        inputData[field] = element.value.trim() || `default_${field}`;
+                    }
+                }
+            });
+            
+            // If primary field is empty, use test message
+            const primaryField = agentInfo.input_fields[0];
+            const testMessage = document.getElementById('testMessage').value.trim();
+            if (testMessage && (!inputData[primaryField] || inputData[primaryField].startsWith('default_'))) {
+                inputData[primaryField] = testMessage;
+            }
+            
+            return inputData;
         }
 
         async function runPythonSDKTest() {
