@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python SDK Agent Interface</title>
+    <title>Agent Interface</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -138,7 +138,6 @@
         .btn-warning { background: #ffc107; color: #212529; }
         .btn-info { background: #17a2b8; color: white; }
         .btn-secondary { background: #6c757d; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
 
         .btn:hover:not(:disabled) {
             transform: translateY(-1px);
@@ -215,33 +214,6 @@
             display: block;
         }
 
-        .download-link {
-            display: inline-block;
-            background: #3776ab;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 12px;
-            margin: 5px;
-            transition: all 0.3s ease;
-        }
-
-        .download-link:hover {
-            background: #306998;
-            transform: translateY(-1px);
-        }
-
-        .code-block {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 12px;
-            border-radius: 6px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 11px;
-            margin: 10px 0;
-        }
-
         @media (max-width: 1200px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -259,8 +231,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 id="agentName">🐍 Python SDK Agent Interface</h1>
-            <p id="agentDescription">Advanced Python SDK testing for AI agents</p>
+            <h1 id="agentName">Agent Interface</h1>
+            <p id="agentDescription">AI Agent Testing Interface</p>
             
             <div class="agent-info">
                 <div class="info-item">
@@ -275,132 +247,75 @@
                 <div class="info-item">
                     <strong>Status:</strong> <span id="connectionStatus">Connecting...</span>
                 </div>
-                <div class="status-badge" id="statusBadge">🐍 Python SDK Mode</div>
+                <div class="status-badge" id="statusBadge">Agent Interface</div>
             </div>
         </div>
 
         <div class="main-content">
             <!-- Input & Testing Panel -->
             <div class="panel">
-                <h3>🧪 Python SDK Testing</h3>
+                <h3>Agent Testing</h3>
                 
-                <div class="tabs">
-                    <div class="tab active" onclick="switchTab('test-tab')">Test Agent</div>
-                    <div class="tab" onclick="switchTab('run-tab')">Run Script</div>
-                    <div class="tab" onclick="switchTab('download-tab')">Download</div>
+                <div id="dynamicInputs">
+                    <!-- Dynamic input fields will be generated here -->
                 </div>
                 
-                <div id="test-tab" class="tab-content active">
-                    <div id="dynamicInputs">
-                        <!-- Dynamic input fields will be generated here -->
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Test Message:</label>
-                        <textarea class="form-control textarea" id="testMessage" placeholder="Enter your test message..." rows="3">Hello, how can you help me?</textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <button class="btn btn-success" onclick="runPythonSDKTest()" id="testButton">
-                            🚀 Test with Python SDK
-                        </button>
-                        <button class="btn btn-info" onclick="testStreaming()" id="streamButton">
-                            📡 Test Streaming
-                        </button>
-                        <button class="btn btn-secondary" onclick="loadAgentInfo()">
-                            🔄 Refresh Info
-                        </button>
-                        <button class="btn btn-warning" onclick="testWithCLI()">
-                            📋 Show CLI Command
-                        </button>
-                    </div>
-                    <div class="form-group">
-                        <div class="output info" id="inputPreview" style="font-size: 11px; max-height: 100px; overflow-y: auto;">
-                            Click "🔄 Refresh Info" to see current input values...
-                        </div>
+                <div class="form-group">
+                    <label>Test Message:</label>
+                    <textarea class="form-control textarea" id="testMessage" placeholder="Enter your test message..." rows="3">Hello, how can you help me?</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <button class="btn btn-success" onclick="runTest()" id="testButton">
+                        Test Agent
+                    </button>
+                    <button class="btn btn-info" onclick="testStreaming()" id="streamButton">
+                        Test Streaming
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadAgentInfo()">
+                        Refresh Info
+                    </button>
+                </div>
+                <div class="form-group">
+                    <div class="output info" id="inputPreview" style="font-size: 11px; max-height: 100px; overflow-y: auto;">
+                        Click "Refresh Info" to see current input values...
                     </div>
                 </div>
                 
-                <div id="run-tab" class="tab-content">
-                    <div class="form-group">
-                        <label>Python Commands:</label>
-                        <div class="code-block" id="pythonCommands">cd generated_agents/{session_id}
-python3 agent_test.py {agent_id} localhost {port} "test message"</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <button class="btn btn-primary" onclick="downloadPythonSDK()">
-                            📥 Download Python SDK
-                        </button>
-                        <button class="btn btn-secondary" onclick="showPythonInstructions()">
-                            📋 Show Instructions
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="download-tab" class="tab-content">
-                    <div class="form-group">
-                        <p>Download the complete Python SDK for this agent:</p>
-                        <a href="#" id="downloadLink" class="download-link" onclick="downloadPythonSDK()">
-                            📥 Download agent_test.py
-                        </a>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Usage:</label>
-                        <div class="output info">1. Download the Python file
-2. Install RunAgent: pip install runagent
-3. Run: python3 agent_test.py [agent_id] [host] [port] [message]</div>
-                    </div>
-                </div>
-                
-                <div class="output" id="testOutput">Ready for Python SDK testing...</div>
+                <div class="output" id="testOutput">Ready for agent testing...</div>
             </div>
 
-            <!-- Results & Debug Panel -->
+            <!-- Results Panel -->
             <div class="panel">
-                <h3>📊 Results & Debug Information</h3>
+                <h3>Results & Information</h3>
                 
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('results-tab')">Results</div>
-                    <div class="tab" onclick="switchTab('debug-tab')">Debug</div>
-                    <div class="tab" onclick="switchTab('logs-tab')">Logs</div>
+                    <div class="tab" onclick="switchTab('info-tab')">Agent Info</div>
                 </div>
                 
                 <div id="results-tab" class="tab-content active">
                     <div class="form-group">
                         <button class="btn btn-info" onclick="showLastResult()">
-                            📋 Show Last Result
+                            Show Last Result
                         </button>
                         <button class="btn btn-secondary" onclick="clearResults()">
-                            🗑️ Clear Results
+                            Clear Results
                         </button>
                     </div>
                     <div class="output" id="resultsOutput">Test results will appear here...</div>
                 </div>
                 
-                <div id="debug-tab" class="tab-content">
+                <div id="info-tab" class="tab-content">
                     <div class="form-group">
-                        <button class="btn btn-warning" onclick="debugConnection()">
-                            🔍 Debug Connection
-                        </button>
                         <button class="btn btn-info" onclick="checkAgentStatus()">
-                            ❤️ Check Status
+                            Check Status
+                        </button>
+                        <button class="btn btn-secondary" onclick="showAgentDetails()">
+                            Show Details
                         </button>
                     </div>
-                    <div class="output" id="debugOutput">Debug information will appear here...</div>
-                </div>
-                
-                <div id="logs-tab" class="tab-content">
-                    <div class="form-group">
-                        <button class="btn btn-secondary" onclick="clearLogs()">
-                            🗑️ Clear Logs
-                        </button>
-                        <button class="btn btn-info" onclick="exportLogs()">
-                            📄 Export Logs
-                        </button>
-                    </div>
-                    <div class="output" id="logsOutput">Activity logs will appear here...</div>
+                    <div class="output" id="infoOutput">Agent information will appear here...</div>
                 </div>
             </div>
         </div>
@@ -424,17 +339,17 @@ python3 agent_test.py {agent_id} localhost {port} "test message"</div>
 
         async function initializePage() {
             if (!agentId) {
-                log("❌ No agent ID provided in URL");
+                log("No agent ID provided in URL");
                 return;
             }
 
             await loadAgentInfo();
-            log("🚀 Python SDK Agent Interface initialized");
+            log("Agent Interface initialized");
         }
 
         async function loadAgentInfo() {
             try {
-                log('🔍 Loading agent information...');
+                log('Loading agent information...');
                 
                 const response = await fetch(`http://localhost:8000/agent/${agentId}`);
                 
@@ -446,48 +361,33 @@ python3 agent_test.py {agent_id} localhost {port} "test message"</div>
                 agentInfo = data.agent_info;
                 runagentUrl = agentInfo.runagent_url;
                 
-                log(`✅ Agent info loaded successfully`);
-                log(`🌐 RunAgent URL: ${runagentUrl}`);
+                log(`Agent info loaded successfully`);
+                log(`RunAgent URL: ${runagentUrl}`);
                 
                 // Update UI
-                document.getElementById('agentName').textContent = `🐍 Python SDK: ${agentInfo.agent_name}`;
+                document.getElementById('agentName').textContent = `${agentInfo.agent_name}`;
                 document.getElementById('agentDescription').textContent = agentInfo.description;
                 document.getElementById('framework').textContent = agentInfo.framework?.toUpperCase();
                 document.getElementById('runagentPort').textContent = agentInfo.port;
                 document.getElementById('connectionStatus').textContent = 'Connected';
                 document.getElementById('connectionStatus').style.color = '#28a745';
                 
-                // Set download link
-                document.getElementById('downloadLink').href = `http://localhost:8000/agent/${agentId}/sdk`;
-                
-                // Update command examples
-                updateCommandExamples();
-                
                 // Generate input fields
                 generateInputFields();
                 
             } catch (error) {
-                log(`❌ Error loading agent info: ${error.message}`);
+                log(`Error loading agent info: ${error.message}`);
                 document.getElementById('connectionStatus').textContent = 'Connection Failed';
                 document.getElementById('connectionStatus').style.color = '#dc3545';
             }
         }
-
-        function updateCommandExamples() {
-            if (agentInfo) {
-                const commands = `cd generated_agents/${agentInfo.session_id || 'session_id'}
-python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
-                document.getElementById('pythonCommands').textContent = commands;
-            }
-        }
-
 
         function generateInputFields() {
             const container = document.getElementById('dynamicInputs');
             container.innerHTML = '';
 
             if (!agentInfo || !agentInfo.input_fields) {
-                log("⚠️ No input fields defined for this agent");
+                log("No input fields defined for this agent");
                 return;
             }
 
@@ -502,7 +402,7 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                 const label = document.createElement('label');
                 const fieldType = inputTypes[field] || 'string';
                 const description = inputDescriptions[field] || `Enter ${field}`;
-                const isRequired = index === 0; // First field is always required
+                const isRequired = index === 0;
                 
                 label.textContent = `${field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} (${fieldType})${isRequired ? ' *' : ''}`;
                 if (isRequired) {
@@ -553,163 +453,10 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                 container.appendChild(group);
             });
 
-            log(`✅ Generated ${inputFields.length} input fields for Python SDK`);
+            log(`Generated ${inputFields.length} input fields`);
         }
 
         function getInputData() {
-            /**
-            * Collect input data from dynamic form fields
-            */
-            const inputData = {};
-            
-            if (!agentInfo?.input_fields) {
-                return { query: document.getElementById('testMessage').value.trim() || 'Hello' };
-            }
-            
-            agentInfo.input_fields.forEach(field => {
-                const element = document.getElementById(field);
-                if (element) {
-                    const fieldType = agentInfo.input_types?.[field] || 'string';
-                    
-                    if (fieldType === 'boolean') {
-                        inputData[field] = element.checked;
-                    } else if (fieldType === 'number' || fieldType === 'integer') {
-                        inputData[field] = element.value ? Number(element.value) : 1;
-                    } else {
-                        inputData[field] = element.value.trim() || `default_${field}`;
-                    }
-                }
-            });
-            
-            // If primary field is empty, use test message
-            const primaryField = agentInfo.input_fields[0];
-            const testMessage = document.getElementById('testMessage').value.trim();
-            if (testMessage && (!inputData[primaryField] || inputData[primaryField].startsWith('default_'))) {
-                inputData[primaryField] = testMessage;
-            }
-            
-            return inputData;
-        }
-
-        async function runPythonSDKTest() {
-            const testButton = document.getElementById('testButton');
-            const originalText = testButton.innerHTML;
-            
-            testButton.disabled = true;
-            testButton.innerHTML = '<span class="loading-spinner"></span>Testing with Python SDK...';
-            
-            const testOutput = document.getElementById('testOutput');
-            testOutput.textContent = '🐍 Running Python SDK test...\n';
-            testOutput.className = 'output';
-            
-            try {
-                // Collect dynamic input field values
-                const inputData = getInputData();
-                const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, how can you help me?';
-                
-                log(`🧪 Starting Python SDK test with inputs: ${JSON.stringify(inputData)}`);
-                log(`📝 Test message: "${testMessage}"`);
-                
-                // Send both the collected input data and test message
-                const params = new URLSearchParams({
-                    test_message: testMessage,
-                    input_data: JSON.stringify(inputData)
-                });
-                
-                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                lastTestResult = result;
-                
-                if (result.success) {
-                    testOutput.className = 'output success';
-                    testOutput.textContent = `✅ Python SDK Test Successful!\n\n${result.test_stdout}`;
-                    log(`✅ Python SDK test successful`);
-                    
-                    // Show in results tab
-                    const resultsOutput = document.getElementById('resultsOutput');
-                    resultsOutput.className = 'output success';
-                    resultsOutput.textContent = `✅ SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\nSDK: ${result.sdk_type}\n\nInputs Used:\n${JSON.stringify(inputData, null, 2)}\n\nOutput:\n${result.test_stdout}`;
-                    
-                } else {
-                    testOutput.className = 'output error';
-                    let errorMsg = `❌ Python SDK Test Failed\n\n`;
-                    if (result.error) errorMsg += `Error: ${result.error}\n\n`;
-                    if (result.test_stderr) errorMsg += `Stderr: ${result.test_stderr}\n\n`;
-                    if (result.test_stdout) errorMsg += `Stdout: ${result.test_stdout}`;
-                    
-                    testOutput.textContent = errorMsg;
-                    log(`❌ Python SDK test failed: ${result.error}`);
-                    
-                    // Show in debug tab
-                    const debugOutput = document.getElementById('debugOutput');
-                    debugOutput.className = 'output error';
-                    debugOutput.textContent = errorMsg;
-                }
-                
-            } catch (error) {
-                testOutput.className = 'output error';
-                testOutput.textContent = `❌ Test Error: ${error.message}\n\nCheck that the agent is running and the RunAgent Python SDK is installed.`;
-                log(`❌ Python SDK test error: ${error.message}`);
-            } finally {
-                testButton.disabled = false;
-                testButton.innerHTML = originalText;
-            }
-        }
-
-
-        async function testStreaming() {
-            const testOutput = document.getElementById('testOutput');
-            testOutput.className = 'output info';
-            testOutput.textContent = '📡 Testing streaming mode...\n';
-            
-            try {
-                const inputData = getInputData();
-                log(`🌊 Starting streaming test with inputs: ${JSON.stringify(inputData)}`);
-                
-                // Find streaming entrypoint
-                const streamingTag = agentInfo?.entrypoint_tags?.find(tag => tag.includes('stream')) || 'main_stream';
-                
-                const params = new URLSearchParams({
-                    test_message: document.getElementById('testMessage').value.trim() || 'Hello, streaming test',
-                    input_data: JSON.stringify(inputData),
-                    streaming: 'true',
-                    entrypoint_tag: streamingTag
-                });
-                
-                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    testOutput.className = 'output success';
-                    testOutput.textContent = `✅ Streaming Test Successful!\n\nUsed entrypoint: ${streamingTag}\nInputs: ${JSON.stringify(inputData, null, 2)}\n\nStreaming Output:\n${result.test_stdout}`;
-                    log(`✅ Streaming test successful with ${streamingTag}`);
-                } else {
-                    testOutput.className = 'output error';
-                    testOutput.textContent = `❌ Streaming Test Failed\n\nError: ${result.error || 'Unknown error'}\nStderr: ${result.test_stderr || 'None'}\nStdout: ${result.test_stdout || 'None'}`;
-                    log(`❌ Streaming test failed`);
-                }
-                
-            } catch (error) {
-                testOutput.className = 'output error';
-                testOutput.textContent = `❌ Streaming Test Error: ${error.message}`;
-                log(`❌ Streaming test error: ${error.message}`);
-            }
-        }
-
-        function getInputData() {
-            /**
-             * Collect input data from dynamic form fields
-             */
             const inputData = {};
             
             if (!agentInfo?.input_fields) {
@@ -726,7 +473,6 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
                     } else if (fieldType === 'number' || fieldType === 'integer') {
                         inputData[field] = element.value ? Number(element.value) : 1;
                     } else if (fieldType.includes('array') || fieldType.includes('list')) {
-                        // Handle array fields - split by commas or newlines
                         const rawValue = element.value.trim();
                         if (rawValue) {
                             inputData[field] = rawValue.includes('\n') 
@@ -755,113 +501,116 @@ python3 agent_test.py ${agentId} localhost ${agentInfo.port} "test message"`;
             
             return inputData;
         }
-        
 
-
-        async function downloadPythonSDK() {
+        async function runTest() {
+            const testButton = document.getElementById('testButton');
+            const originalText = testButton.innerHTML;
+            
+            testButton.disabled = true;
+            testButton.innerHTML = '<span class="loading-spinner"></span>Testing...';
+            
+            const testOutput = document.getElementById('testOutput');
+            testOutput.textContent = 'Running agent test...\n';
+            testOutput.className = 'output';
+            
             try {
-                log("📥 Downloading Python SDK...");
+                const inputData = getInputData();
+                const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, how can you help me?';
                 
-                const response = await fetch(`http://localhost:8000/agent/${agentId}/sdk`);
+                log(`Starting agent test with inputs: ${JSON.stringify(inputData)}`);
+                log(`Test message: "${testMessage}"`);
+                
+                const params = new URLSearchParams({
+                    test_message: testMessage,
+                    input_data: JSON.stringify(inputData)
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
+
+                const result = await response.json();
+                lastTestResult = result;
                 
-                const pythonCode = await response.text();
-                
-                // Create and download file
-                const blob = new Blob([pythonCode], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `agent_test_${agentId}.py`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                log("✅ Python SDK downloaded successfully");
+                if (result.success) {
+                    testOutput.className = 'output success';
+                    testOutput.textContent = `Agent Test Successful!\n\n${result.test_stdout}`;
+                    log(`Agent test successful`);
+                    
+                    // Show in results tab
+                    const resultsOutput = document.getElementById('resultsOutput');
+                    resultsOutput.className = 'output success';
+                    resultsOutput.textContent = `SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\n\nInputs Used:\n${JSON.stringify(inputData, null, 2)}\n\nOutput:\n${result.test_stdout}`;
+                    
+                } else {
+                    testOutput.className = 'output error';
+                    let errorMsg = `Agent Test Failed\n\n`;
+                    if (result.error) errorMsg += `Error: ${result.error}\n\n`;
+                    if (result.test_stderr) errorMsg += `Stderr: ${result.test_stderr}\n\n`;
+                    if (result.test_stdout) errorMsg += `Stdout: ${result.test_stdout}`;
+                    
+                    testOutput.textContent = errorMsg;
+                    log(`Agent test failed: ${result.error}`);
+                    
+                    // Show in info tab
+                    const infoOutput = document.getElementById('infoOutput');
+                    infoOutput.className = 'output error';
+                    infoOutput.textContent = errorMsg;
+                }
                 
             } catch (error) {
-                log(`❌ Download failed: ${error.message}`);
-                alert(`Download failed: ${error.message}`);
+                testOutput.className = 'output error';
+                testOutput.textContent = `Test Error: ${error.message}\n\nCheck that the agent is running and accessible.`;
+                log(`Agent test error: ${error.message}`);
+            } finally {
+                testButton.disabled = false;
+                testButton.innerHTML = originalText;
             }
         }
 
-        function testWithCLI() {
-            const command = `python3 agent_test.py ${agentId} localhost ${agentInfo?.port || '8450'} "${document.getElementById('testMessage').value || 'Hello'}"`;
-            
-            const debugOutput = document.getElementById('debugOutput');
-            debugOutput.className = 'output info';
-            debugOutput.textContent = `CLI Command:\n\n${command}\n\nRun this command in the generated_agents directory to test your agent directly.`;
-            
-            // Switch to debug tab
-            switchTab('debug-tab');
-            document.querySelector('[onclick="switchTab(\'debug-tab\')"]').classList.add('active');
-        }
-
-        function showPythonInstructions() {
-            const instructions = `Python SDK Instructions:
-
-1. Download the Python SDK file
-2. Install RunAgent: pip install runagent
-3. Navigate to the directory with the Python file
-4. Run: python3 agent_test.py ${agentId} localhost ${agentInfo?.port || '8450'} "your test message"
-
-The Python script will:
-- Use the RunAgent Python SDK
-- Test multiple entrypoint tags
-- Handle different input types
-- Provide detailed error information
-- Support both sync and streaming modes
-- Return structured JSON results
-
-Dependencies:
-- Python 3.7+
-- runagent package
-- Standard library modules (json, sys, time)`;
-
-            const debugOutput = document.getElementById('debugOutput');
-            debugOutput.className = 'output info';
-            debugOutput.textContent = instructions;
-            
-            // Switch to debug tab
-            switchTab('debug-tab');
-            document.querySelector('[onclick="switchTab(\'debug-tab\')"]').classList.add('active');
-            
-            log("📋 Python instructions displayed");
-        }
-
-        async function debugConnection() {
-            const debugOutput = document.getElementById('debugOutput');
-            debugOutput.className = 'output info';
-            debugOutput.textContent = '🔍 Running connection diagnostics...\n';
+        async function testStreaming() {
+            const testOutput = document.getElementById('testOutput');
+            testOutput.className = 'output info';
+            testOutput.textContent = 'Testing streaming mode...\n';
             
             try {
-                // Test basic connectivity
-                const baseUrl = runagentUrl || `http://localhost:${agentInfo?.port || 8450}`;
+                const inputData = getInputData();
+                log(`Starting streaming test with inputs: ${JSON.stringify(inputData)}`);
                 
-                debugOutput.textContent += `Testing base URL: ${baseUrl}\n`;
+                // Find streaming entrypoint
+                const streamingTag = agentInfo?.entrypoint_tags?.find(tag => tag.includes('stream')) || 'main_stream';
                 
-                const response = await fetch(baseUrl + '/docs');
-                if (response.ok) {
-                    debugOutput.textContent += '✅ Base connection successful\n';
-                    debugOutput.textContent += `Status: ${response.status}\n`;
+                const params = new URLSearchParams({
+                    test_message: document.getElementById('testMessage').value.trim() || 'Hello, streaming test',
+                    input_data: JSON.stringify(inputData),
+                    streaming: 'true',
+                    entrypoint_tag: streamingTag
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    testOutput.className = 'output success';
+                    testOutput.textContent = `Streaming Test Successful!\n\nUsed entrypoint: ${streamingTag}\nInputs: ${JSON.stringify(inputData, null, 2)}\n\nStreaming Output:\n${result.test_stdout}`;
+                    log(`Streaming test successful with ${streamingTag}`);
                 } else {
-                    debugOutput.textContent += `❌ Connection failed: ${response.status}\n`;
+                    testOutput.className = 'output error';
+                    testOutput.textContent = `Streaming Test Failed\n\nError: ${result.error || 'Unknown error'}\nStderr: ${result.test_stderr || 'None'}\nStdout: ${result.test_stdout || 'None'}`;
+                    log(`Streaming test failed`);
                 }
                 
-                debugOutput.textContent += '\nAgent Info:\n';
-                debugOutput.textContent += `- Name: ${agentInfo?.agent_name || 'Unknown'}\n`;
-                debugOutput.textContent += `- Framework: ${agentInfo?.framework || 'Unknown'}\n`;
-                debugOutput.textContent += `- Port: ${agentInfo?.port || 'Unknown'}\n`;
-                debugOutput.textContent += `- Input Fields: ${agentInfo?.input_fields?.join(', ') || 'None'}\n`;
-                debugOutput.textContent += `- SDK Type: Python\n`;
-                debugOutput.textContent += `- SDK Available: ${agentInfo?.sdk_available || false}\n`;
-                
             } catch (error) {
-                debugOutput.textContent += `❌ Debug failed: ${error.message}\n`;
+                testOutput.className = 'output error';
+                testOutput.textContent = `Streaming Test Error: ${error.message}`;
+                log(`Streaming test error: ${error.message}`);
             }
         }
 
@@ -870,13 +619,38 @@ Dependencies:
                 const response = await fetch(`http://localhost:8000/agent/${agentId}`);
                 const data = await response.json();
                 
-                const debugOutput = document.getElementById('debugOutput');
-                debugOutput.className = 'output success';
-                debugOutput.textContent = `Agent Status Check:\n\n${JSON.stringify(data, null, 2)}`;
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output success';
+                infoOutput.textContent = `Agent Status Check:\n\n${JSON.stringify(data, null, 2)}`;
                 
-                log("✅ Agent status check completed");
+                log("Agent status check completed");
             } catch (error) {
-                log(`❌ Status check failed: ${error.message}`);
+                log(`Status check failed: ${error.message}`);
+            }
+        }
+
+        function showAgentDetails() {
+            if (agentInfo) {
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output info';
+                infoOutput.textContent = `Agent Details:
+
+Name: ${agentInfo.agent_name}
+Description: ${agentInfo.description}
+Framework: ${agentInfo.framework}
+Port: ${agentInfo.port}
+Input Fields: ${agentInfo.input_fields?.join(', ') || 'None'}
+Entrypoints: ${agentInfo.entrypoint_tags?.join(', ') || 'None'}
+Expected Output: ${agentInfo.expected_output_format || 'String response'}
+
+Connection Info:
+- Agent ID: ${agentId}
+- RunAgent URL: ${runagentUrl}
+- Status: ${agentInfo.status || 'Active'}`;
+            } else {
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output';
+                infoOutput.textContent = 'No agent information available. Try refreshing.';
             }
         }
 
@@ -898,23 +672,6 @@ Dependencies:
             lastTestResult = null;
         }
 
-        function clearLogs() {
-            document.getElementById('logsOutput').textContent = 'Logs cleared.\n';
-        }
-
-        function exportLogs() {
-            const content = document.getElementById('logsOutput').textContent;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `python-sdk-logs-${agentId}-${Date.now()}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
         function switchTab(tabId) {
             // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -934,22 +691,8 @@ Dependencies:
         }
 
         function log(message) {
-            const logsOutput = document.getElementById('logsOutput');
-            const timestamp = new Date().toLocaleTimeString();
-            logsOutput.textContent += `[${timestamp}] ${message}\n`;
-            logsOutput.scrollTop = logsOutput.scrollHeight;
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
         }
-
-        // Auto-refresh agent info every 30 seconds
-        setInterval(async () => {
-            if (agentId) {
-                try {
-                    await loadAgentInfo();
-                } catch (error) {
-                    // Silent fail for auto-refresh
-                }
-            }
-        }, 30000);
     </script>
 </body>
 </html>
