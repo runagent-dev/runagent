@@ -1607,15 +1607,17 @@ async def debug_test_agent(agent_id: str, test_input: str = "Hello, how can you 
     except Exception as e:
         return {"error": f"Debug test failed: {str(e)}"}
 
-@app.get("/agent/{agent_id}/run-test")
-async def run_enhanced_streaming_test(
+from fastapi.responses import StreamingResponse
+import asyncio
+
+@app.get("/agent/{agent_id}/run-test-stream")
+async def run_streaming_test_live(
     agent_id: str, 
-    test_message: str = "Hello, how can you help me?",
+    test_message: str = "Hello, streaming test",
     input_data: str = None,
-    streaming: bool = False,
     entrypoint_tag: str = None
 ):
-    """Enhanced streaming test with proper buffering and real-time response handling"""
+    """Live streaming test that sends output as it's generated"""
     try:
         # Find the session directory
         session_id = None
@@ -1628,12 +1630,6 @@ async def run_enhanced_streaming_test(
             raise HTTPException(status_code=404, detail="Agent session not found")
         
         session_dir = Path(f"generated_agents/{session_id}")
-        test_file = session_dir / "agent_test.py"
-        
-        if not test_file.exists():
-            raise HTTPException(status_code=404, detail="Test script not found")
-        
-        # Get agent info
         session = sessions[session_id]
         agent_info = session.get("agent_info", {})
         port = session.get("runagent_port", 8450)
@@ -1643,219 +1639,153 @@ async def run_enhanced_streaming_test(
         if input_data:
             try:
                 dynamic_inputs = json.loads(input_data)
-                print(f"Using dynamic inputs: {dynamic_inputs}")
             except json.JSONDecodeError:
-                print(f"Failed to parse input_data, using test_message only")
+                pass
         
-        # Prepare environment for proper buffering
-        env = os.environ.copy()
-        env['PYTHONPATH'] = str(Path.cwd())
-        env['PYTHONUNBUFFERED'] = '1'  # For line buffering
-        env['PYTHONIOENCODING'] = 'utf-8'
-        
-        # Create fixed streaming test script
-        fixed_test_content = f'''import sys
+        # Create the enhanced test script (same as before)
+        temp_script_content = f'''import sys
 import json
 import time
 import os
 
-# Use line buffering instead of unbuffered (which doesn't work with text)
+# Use line buffering for real-time output
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
 sys.path.insert(0, "{str(session_dir)}")
 
-def enhanced_agent_test():
-    if len(sys.argv) < 5:
-        print("Usage: python3 enhanced_test.py <agent_id> <host> <port> <test_message> [streaming] [entrypoint]")
-        sys.exit(1)
+def enhanced_streaming_test():
+    agent_id = "{agent_id}"
+    host = "localhost"
+    port = {port}
+    test_message = "{test_message}"
     
-    agent_id = sys.argv[1]
-    host = sys.argv[2] 
-    port = int(sys.argv[3])
-    test_message = sys.argv[4]
-    streaming_mode = sys.argv[5] if len(sys.argv) > 5 else "false"
-    target_entrypoint = sys.argv[6] if len(sys.argv) > 6 else None
-    
-    print(f"Enhanced Test - Agent: {{agent_id}}")
-    print(f"Connection: {{host}}:{{port}}")
-    print(f"Test Message: {{test_message}}")
-    print(f"Streaming Mode: {{streaming_mode}}")
-    if target_entrypoint:
-        print(f"Target Entrypoint: {{target_entrypoint}}")
+    print(f"🧪 Starting Streaming Test")
+    print(f"🔌 Connection: {{host}}:{{port}}")
+    print(f"📝 Test Message: {{test_message}}")
+    print("=" * 50)
     
     # Dynamic inputs
     dynamic_inputs = {json.dumps(dynamic_inputs)}
     
     from runagent import RunAgentClient
     
-    # Determine entrypoints to test
+    # Find streaming entrypoint
     all_entrypoints = {agent_info['entrypoint_tags']}
+    streaming_tags = [tag for tag in all_entrypoints if "stream" in tag.lower()]
     
-    if target_entrypoint:
-        entrypoints_to_test = [target_entrypoint]
-    elif streaming_mode.lower() == "true":
-        entrypoints_to_test = [tag for tag in all_entrypoints if "stream" in tag.lower()]
-        if not entrypoints_to_test:
-            entrypoints_to_test = all_entrypoints
-    else:
-        entrypoints_to_test = [tag for tag in all_entrypoints if "stream" not in tag.lower()]
-        if not entrypoints_to_test:
-            entrypoints_to_test = all_entrypoints
+    if not streaming_tags:
+        streaming_tags = all_entrypoints
     
-    print(f"Testing entrypoints: {{entrypoints_to_test}}")
-    print("=" * 60)
+    target_tag = "{entrypoint_tag}" if "{entrypoint_tag}" else streaming_tags[0] if streaming_tags else "main_stream"
+    
+    print(f"🎯 Using entrypoint: {{target_tag}}")
+    print("-" * 40)
     
     # Prepare input data
     if dynamic_inputs:
         input_data = dynamic_inputs.copy()
-        print(f"Using dynamic inputs: {{json.dumps(input_data, indent=2)}}")
     else:
         primary_field = "{agent_info['input_fields'][0] if agent_info['input_fields'] else 'query'}"
         input_data = {{primary_field: test_message}}
-        print(f"Using fallback input: {{json.dumps(input_data, indent=2)}}")
     
-    # Test each entrypoint
-    for i, tag in enumerate(entrypoints_to_test, 1):
-        try:
-            print(f"\\nAttempt {{i}}/{{len(entrypoints_to_test)}}: Testing '{{tag}}'")
-            start_time = time.time()
-            
-            ra = RunAgentClient(
-                agent_id=agent_id,
-                entrypoint_tag=tag,
-                local=True
-            )
-            
-            print(f"Client created successfully")
-            
-            if "stream" in tag.lower() or streaming_mode.lower() == "true":
-                print("Testing streaming mode:")
-                print("-" * 40)
-                chunk_count = 0
-                
-                try:
-                    for chunk in ra.run(**input_data):
-                        chunk_count += 1
-                        print(chunk)
-                        
-                        if chunk_count > 100:  # Prevent infinite loops
-                            print("\\n... [truncated after 100 chunks]")
-                            break
-                    
-                except Exception as stream_err:
-                    print(f"\\nStreaming error: {{stream_err}}")
-                    
-                print(f"\\n-" * 40)
-                print(f"Received {{chunk_count}} chunks")
-                
-            else:
-                print("Testing synchronous mode:")
-                result = ra.run(**input_data)
-                
-                print(f"Result Type: {{type(result)}}")
-                
-                if isinstance(result, dict):
-                    if 'content' in result:
-                        content = result['content']
-                        print(f"Content:")
-                        print(content)
-                    else:
-                        print(f"Full Result:")
-                        result_str = json.dumps(result, indent=2, default=str)
-                        display_result = result_str[:2000] + "..." if len(result_str) > 2000 else result_str
-                        print(display_result)
-                else:
-                    result_str = str(result)
-                    print(f"Result Content:")
-                    display_result = result_str[:2000] + "..." if len(result_str) > 2000 else result_str
-                    print(display_result)
-            
-            elapsed = time.time() - start_time
-            print(f"\\nExecution Time: {{elapsed:.2f}} seconds")
-            print(f"SUCCESS! Agent responded via entrypoint '{{tag}}'")
-            sys.exit(0)
-            
-        except Exception as e:
-            print(f"Failed with entrypoint '{{tag}}': {{str(e)}}")
-            if i < len(entrypoints_to_test):
-                print("Trying next entrypoint...")
-            continue
-    
-    print(f"\\nAll {{len(entrypoints_to_test)}} entrypoints failed!")
-    sys.exit(1)
-
-if __name__ == "__main__":
-    enhanced_agent_test()
-'''
-        
-        # Write the fixed test script
-        temp_script = session_dir / "enhanced_test.py"
-        with open(temp_script, "w") as f:
-            f.write(fixed_test_content)
-        
-        # Prepare command arguments
-        cmd_args = [
-            "python3", "enhanced_test.py",
-            agent_id, "localhost", str(port), test_message
-        ]
-        
-        if streaming:
-            cmd_args.append("true")
-            if entrypoint_tag:
-                cmd_args.append(entrypoint_tag)
-        else:
-            cmd_args.append("false")
-        
-        print(f"Running fixed test: {' '.join(cmd_args)}")
-        
-        # Run the test with proper timeout
-        test_result = subprocess.run(
-            cmd_args,
-            cwd=session_dir,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env
+    try:
+        ra = RunAgentClient(
+            agent_id=agent_id,
+            entrypoint_tag=target_tag,
+            local=True
         )
         
-        # Clean up temp script
-        if temp_script.exists():
-            temp_script.unlink()
+        print(f"✅ Client created successfully")
+        print(f"📡 Starting stream...")
+        print("-" * 40)
         
-        success = test_result.returncode == 0
+        chunk_count = 0
+        for chunk in ra.run(**input_data):
+            chunk_count += 1
+            
+            # Handle different chunk types
+            if isinstance(chunk, dict):
+                content = chunk.get('content', '')
+                if content:
+                    print(content, end="", flush=True)
+                else:
+                    print(str(chunk), flush=True)
+            else:
+                print(chunk, end="", flush=True)
+            
+            if chunk_count > 200:  # Prevent infinite loops
+                print("\\n... [truncated after 200 chunks]")
+                break
         
-        return {
-            "success": success,
-            "test_stdout": test_result.stdout,
-            "test_stderr": test_result.stderr,
-            "agent_info": {
-                "name": agent_info.get("agent_name", "Unknown"),
-                "framework": agent_info.get("framework", "unknown"),
-                "port": port,
-                "input_fields": agent_info.get("input_fields", []),
-                "entrypoint_tags": agent_info.get("entrypoint_tags", [])
-            },
-            "streaming_mode": streaming,
-            "dynamic_inputs_used": bool(dynamic_inputs),
-            "inputs_received": dynamic_inputs if dynamic_inputs else {"test_message": test_message}
-        }
+        print(f"\\n-" * 40)
+        print(f"🎉 Stream completed with {{chunk_count}} chunks")
         
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "error": "Test timeout (120s exceeded)",
-            "streaming_mode": streaming
-        }
     except Exception as e:
-        print(f"Test error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": f"Test failed: {str(e)}",
-            "streaming_mode": streaming
-        }
+        print(f"❌ Streaming error: {{str(e)}}")
+
+if __name__ == "__main__":
+    enhanced_streaming_test()
+'''
+        
+        # Write the streaming test script
+        temp_script = session_dir / "streaming_test.py"
+        with open(temp_script, "w") as f:
+            f.write(temp_script_content)
+        
+        async def generate_stream():
+            """Generator function for streaming output"""
+            try:
+                # Prepare environment
+                env = os.environ.copy()
+                env['PYTHONPATH'] = str(Path.cwd())
+                env['PYTHONUNBUFFERED'] = '1'
+                
+                # Start the process
+                process = subprocess.Popen(
+                    ["python3", "streaming_test.py"],
+                    cwd=session_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True,
+                    env=env
+                )
+                
+                # Read output line by line as it's generated
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        # Send as Server-Sent Event format
+                        yield f"data: {json.dumps({'type': 'output', 'content': output.rstrip()})}\n\n"
+                        await asyncio.sleep(0.01)  # Small delay for better streaming effect
+                
+                # Send completion event
+                return_code = process.poll()
+                yield f"data: {json.dumps({'type': 'complete', 'return_code': return_code})}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            finally:
+                # Clean up temp script
+                if temp_script.exists():
+                    temp_script.unlink()
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream",
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Streaming test failed: {str(e)}")
 
 @app.get("/health")
 async def health_check():
