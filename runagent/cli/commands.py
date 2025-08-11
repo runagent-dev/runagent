@@ -1134,7 +1134,7 @@ def status(cleanup_days, agent_id, capacity):
                 table = Table(title="Agents by Deployment Age")
                 table.add_column("#", style="dim", width=3)
                 table.add_column("Status", width=6)
-                table.add_column("Agent ID", style="magenta", width=20)
+                table.add_column("Agent ID", style="magenta", width=36)
                 table.add_column("Framework", style="green", width=12)
                 table.add_column("Deployed At", style="cyan", width=20)
                 table.add_column("Age Note", style="yellow", width=10)
@@ -1154,7 +1154,7 @@ def status(cleanup_days, agent_id, capacity):
                     table.add_row(
                         str(i+1),
                         status_icon,
-                        agent['agent_id'][:18] + "...",
+                        agent['agent_id'],
                         agent['framework'],
                         agent['deployed_at'] or "Unknown",
                         age_label
@@ -1249,7 +1249,7 @@ def status(cleanup_days, agent_id, capacity):
             table = Table(title=f"Local Agents ({len(agents)} total)")
             table.add_column("Status", width=8)
             table.add_column("Files", width=6)
-            table.add_column("Agent ID", style="magenta", width=20)
+            table.add_column("Agent ID", style="magenta", width=36)
             table.add_column("Framework", style="green", width=12)
             table.add_column("Host:Port", style="blue", width=15)
             table.add_column("Runs", style="cyan", width=6)
@@ -1266,7 +1266,7 @@ def status(cleanup_days, agent_id, capacity):
                 table.add_row(
                     status_icon,
                     exists_icon,
-                    agent['agent_id'][:18] + "...",
+                    agent['agent_id'],
                     agent['framework'],
                     f"{agent.get('host', 'N/A')}:{agent.get('port', 'N/A')}",
                     str(agent.get('run_count', 0)),
@@ -1742,7 +1742,7 @@ def logs(agent_id, limit, output_format):
             console.print(f"\n📊 [bold]Agent Log Summary[/bold]")
             
             table = Table(title="Log Counts by Agent")
-            table.add_column("Agent ID", style="magenta", width=20)
+            table.add_column("Agent ID", style="magenta", width=36)
             table.add_column("Framework", style="green", width=12)
             table.add_column("Total Logs", style="cyan", width=10)
             table.add_column("Errors", style="red", width=8)
@@ -1762,7 +1762,7 @@ def logs(agent_id, limit, output_format):
                         last_log_time = "Recent"
                 
                 table.add_row(
-                    agent['agent_id'][:18] + "...",
+                    agent['agent_id'],
                     agent['framework'],
                     str(len(agent_logs)),
                     str(len(error_logs)),
