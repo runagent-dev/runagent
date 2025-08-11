@@ -1,2 +1,0 @@
-llama-index>=0.12.48
-llama-index-llms-openai>=0.3.0
