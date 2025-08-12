@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunAgent Generator - AI Agent Builder</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            color: #1e293b;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 16px 20px;
+            width: calc(100% - 40px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .new-chat-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px;
+        }
+
+        .chat-item {
+            padding: 12px 16px;
+            margin: 4px 0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .chat-item:hover {
+            background: rgba(59, 130, 246, 0.08);
+            border-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .chat-item.active {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: #3b82f6;
+        }
+
+        .chat-item-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e293b;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .chat-item-preview {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        .chat-item-status {
+            font-size: 11px;
+            margin-top: 6px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        .status-understanding { background: #fef3c7; color: #92400e; }
+        .status-planning { background: #dbeafe; color: #1e40af; }
+        .status-generating { background: #fde68a; color: #b45309; }
+        .status-complete { background: #d1fae5; color: #065f46; }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            margin: 20px 20px 20px 0;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            max-height: calc(100vh - 40px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 24px 32px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1e293b;
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: #64748b;
+            margin-bottom: 0;
+        }
+
+        .content-area {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 24px 32px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: fit-content;
+            max-height: 80vh;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            padding: 14px 18px;
+            border-radius: 16px;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            color: #374151;
+        }
+
+        .message.system {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            text-align: center;
+            font-style: italic;
+            color: #1e40af;
+            max-width: 100%;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 14px 18px;
+            border-radius: 16px;
+            border-bottom-left-radius: 6px;
+            max-width: 80px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 14px;
+            resize: none;
+            max-height: 120px;
+            background: white;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .send-button {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        .send-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .preview-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 0;
+            height: fit-content;
+        }
+
+        .stage-indicator {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: 16px;
+        }
+
+        .stage {
+            flex: 1;
+            text-align: center;
+            padding: 10px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            background: white;
+            color: #64748b;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stage.active {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .stage.completed {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-color: #10b981;
+        }
+
+        .description-section {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .description-section h3 {
+            color: #1e293b;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .diagram-section {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            min-height: 300px;
+            max-height: none;
+            overflow: visible;
+        }
+
+        .diagram-section h3 {
+            color: #1e293b;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        #mermaid-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 250px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .agent-result {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .agent-result h3 {
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .agent-info {
+            background: rgba(255,255,255,0.15);
+            padding: 16px;
+            border-radius: 12px;
+            margin: 12px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .agent-url {
+            display: inline-block;
+            background: white;
+            color: #10b981;
+            padding: 12px 24px;
+            border-radius: 24px;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 12px;
+            transition: transform 0.2s ease;
+        }
+
+        .agent-url:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .examples-section {
+            padding: 20px 32px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .examples-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .examples {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .example-chip {
+            background: white;
+            color: #374151;
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #e2e8f0;
+            font-weight: 500;
+        }
+
+        .example-chip:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Scrollbar styling */
+        .chat-messages::-webkit-scrollbar,
+        .chat-list::-webkit-scrollbar,
+        .content-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track,
+        .chat-list::-webkit-scrollbar-track,
+        .content-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb,
+        .chat-list::-webkit-scrollbar-thumb,
+        .content-area::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover,
+        .chat-list::-webkit-scrollbar-thumb:hover,
+        .content-area::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 999;
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin: 20px;
+                border-radius: 16px;
+            }
+            
+            .content-area {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                padding: 20px;
+            }
+            
+            .sidebar-toggle {
+                display: block;
+            }
+            
+            .examples {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .example-chip {
+                width: 100%;
+                max-width: 280px;
+                text-align: center;
+            }
+        }
+
+        /* Mermaid styling */
+        .mermaid {
+            max-width: 100%;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <img src="/static/icon.png" alt="RunAgent" style="width: 32px; height: 32px; border-radius: 8px;">
+                    <h2 style="margin: 0;">RunAgent Generator</h2>
+                </div>
+                <p>Build powerful AI agents with natural language</p>
+            </div>
+            
+            <button class="new-chat-btn" onclick="createNewChat()">
+                New Agent Chat
+            </button>
+            
+            <div class="chat-list" id="chatList">
+                <!-- Chat items will be populated here -->
+            </div>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <div class="sidebar-toggle" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <img src="/static/icon.png" alt="RunAgent" style="width: 40px; height: 40px; border-radius: 10px;">
+                    <div>
+                        <h1>AI Agent Builder</h1>
+                        <p>Describe your agent requirements and we'll build it for you</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- Chat Panel -->
+                <div class="chat-panel">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message assistant">
+                            <strong>Welcome to RunAgent Generator</strong><br><br>
+                            I can help you create custom AI agents using natural language. Just tell me what kind of agent you want!<br><br>
+                            <strong>Examples:</strong><br>
+                            • "I want a weather agent in LangGraph"<br>
+                            • "Create a research assistant using Letta"<br>
+                            • "Build a math solver with LlamaIndex"<br>
+                            • "Make a content writer agent in Agno"
+                        </div>
+                    </div>
+                    
+                    <div class="input-container">
+                        <textarea 
+                            id="chatInput" 
+                            class="chat-input" 
+                            placeholder="Describe the AI agent you want to create..."
+                            rows="1"
+                        ></textarea>
+                        <button id="sendButton" class="send-button">
+                            <span>→</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preview Panel -->
+                <div class="preview-panel">
+                    <div class="stage-indicator">
+                        <div class="stage" id="stage-understanding">Understanding</div>
+                        <div class="stage" id="stage-planning">Planning</div>
+                        <div class="stage" id="stage-generating">Generating</div>
+                        <div class="stage" id="stage-complete">Complete</div>
+                    </div>
+
+                    <div class="description-section" id="descriptionSection" style="display: none;">
+                        <h3>Agent Description</h3>
+                        <div id="agentDescription">
+                            <!-- Agent description will appear here -->
+                        </div>
+                    </div>
+
+                    <div class="diagram-section" id="diagramSection" style="display: none;">
+                        <h3>
+                            <span>Workflow Diagram</span>
+                            <div class="zoom-controls" id="zoomControls">
+                                <button class="zoom-btn" onclick="zoomDiagram(-0.2)" title="Zoom Out">−</button>
+                                <span class="zoom-level" id="zoomLevel">100%</span>
+                                <button class="zoom-btn" onclick="zoomDiagram(0.2)" title="Zoom In">+</button>
+                                <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom" style="margin-left: 8px; font-size: 12px;">⌂</button>
+                            </div>
+                        </h3>
+                        <div class="diagram-container">
+                            <div class="diagram-viewport" id="diagramViewport">
+                                <div id="mermaid-diagram">
+                                    Workflow diagram will appear here...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="agent-result" id="agentResult" style="display: none;">
+                        <h3>Your Agent is Ready</h3>
+                        <div class="agent-info">
+                            <div><strong>Agent ID:</strong> <span id="agentId">-</span></div>
+                            <div style="margin-top: 10px;">
+                                <a href="#" id="agentUrl" class="agent-url" target="_blank">
+                                    Open Agent Interface
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="examples-section">
+                <div class="examples-title">Try these examples to get started</div>
+                <div class="examples">
+                    <div class="example-chip" onclick="sendExample('I want a weather agent in LangGraph')">
+                        Weather Agent
+                    </div>
+                    <div class="example-chip" onclick="sendExample('Create a research assistant using Letta')">
+                        Research Assistant  
+                    </div>
+                    <div class="example-chip" onclick="sendExample('Build a math solver with LlamaIndex')">
+                        Math Solver
+                    </div>
+                    <div class="example-chip" onclick="sendExample('Make a content writer agent in Agno')">
+                        Content Writer
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentChatId = null;
+        let chats = {};
+        let isTyping = false;
+        let currentZoom = 1;
+        let minZoom = 0.3;
+        let maxZoom = 3;
+
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+
+        // Initialize mermaid
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+
+        // Initialize with first chat
+        window.addEventListener('DOMContentLoaded', () => {
+            createNewChat();
+        });
+
+        // Auto-resize textarea
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Send message on Enter
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        function createNewChat() {
+            const chatId = 'chat_' + Date.now();
+            const chat = {
+                id: chatId,
+                title: 'New Agent',
+                messages: [],
+                stage: 'understanding',
+                sessionId: null,
+                lastMessage: 'Start building your AI agent...',
+                agentInfo: null
+            };
+            
+            chats[chatId] = chat;
+            switchToChat(chatId);
+            updateChatList();
+        }
+
+        function switchToChat(chatId) {
+            if (currentChatId === chatId) return;
+            
+            // Save current chat state if exists
+            if (currentChatId && chats[currentChatId]) {
+                saveChatState();
+            }
+            
+            currentChatId = chatId;
+            const chat = chats[chatId];
+            
+            // COMPLETE UI RESET for new chat
+            chatMessages.innerHTML = '';
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            
+            // Reset all preview panels to initial state
+            resetPreviewPanelCompletely();
+            
+            // Reset stage to understanding
+            updateStage('understanding');
+            
+            // Load chat messages
+            if (chat.messages.length === 0) {
+                // Add welcome message for new chat
+                addMessage(`
+                    <strong>Welcome to RunAgent Generator</strong><br><br>
+                    I can help you create custom AI agents using natural language. Just tell me what kind of agent you want!<br><br>
+                    <strong>Examples:</strong><br>
+                    • "I want a weather agent in LangGraph"<br>
+                    • "Create a research assistant using Letta"<br>
+                    • "Build a math solver with LlamaIndex"<br>
+                    • "Make a content writer agent in Agno"
+                `, 'assistant');
+            } else {
+                chat.messages.forEach(msg => {
+                    addMessage(msg.content, msg.type, false);
+                });
+                
+                // Update stage to saved stage
+                updateStage(chat.stage);
+                
+                // Restore agent info if available
+                if (chat.agentInfo) {
+                    if (chat.agentInfo.description) {
+                        updateDescription(chat.agentInfo.description);
+                    }
+                    if (chat.agentInfo.mermaid_diagram) {
+                        updateDiagram(chat.agentInfo.mermaid_diagram);
+                    }
+                    if (chat.stage === 'complete' && chat.agentInfo.agent_id && chat.agentInfo.agent_url) {
+                        showAgentResult(chat.agentInfo.agent_id, chat.agentInfo.agent_url);
+                    }
+                }
+            }
+            
+            updateChatList();
+            
+            // Close sidebar on mobile after selection
+            if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
+        }
+
+        function resetPreviewPanelCompletely() {
+            // Hide all sections
+            document.getElementById('descriptionSection').style.display = 'none';
+            document.getElementById('diagramSection').style.display = 'none';
+            document.getElementById('agentResult').style.display = 'none';
+            
+            // Clear content
+            document.getElementById('agentDescription').innerHTML = '';
+            document.getElementById('mermaid-diagram').innerHTML = 'Workflow diagram will appear here...';
+            document.getElementById('agentId').textContent = '-';
+            document.getElementById('agentUrl').href = '#';
+            
+            // Hide zoom controls and reset zoom
+            document.getElementById('zoomControls').classList.remove('visible');
+            resetZoom();
+            
+            // Reset all stages to initial state
+            document.querySelectorAll('.stage').forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+        }
+
+        function saveChatState() {
+            if (!currentChatId || !chats[currentChatId]) return;
+            
+            const chat = chats[currentChatId];
+            // Messages are already saved when sent, just update other state if needed
+        }
+
+        function updateChatList() {
+            const chatList = document.getElementById('chatList');
+            chatList.innerHTML = '';
+            
+            Object.values(chats).reverse().forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`;
+                chatItem.onclick = () => switchToChat(chat.id);
+                
+                const statusClass = `status-${chat.stage}`;
+                const statusText = chat.stage.charAt(0).toUpperCase() + chat.stage.slice(1);
+                
+                chatItem.innerHTML = `
+                    <div class="chat-item-title">${chat.title}</div>
+                    <div class="chat-item-preview">${chat.lastMessage}</div>
+                    <div class="chat-item-status ${statusClass}">${statusText}</div>
+                `;
+                
+                chatList.appendChild(chatItem);
+            });
+        }
+
+        function updateChatTitle(chatId, title) {
+            if (chats[chatId]) {
+                chats[chatId].title = title;
+                updateChatList();
+            }
+        }
+
+        function sendExample(text) {
+            chatInput.value = text;
+            sendMessage();
+        }
+
+        function addMessage(content, type = 'user', saveToChat = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            if (type === 'assistant') {
+                content = content.replace(
+                    /(https?:\/\/[^\s]+)/g, 
+                    '<a href="$1" target="_blank" style="color: #3b82f6; text-decoration: underline;">$1</a>'
+                );
+            }
+            
+            messageDiv.innerHTML = content.replace(/\n/g, '<br>');
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Save to current chat
+            if (saveToChat && currentChatId && chats[currentChatId]) {
+                chats[currentChatId].messages.push({
+                    content: content,
+                    type: type,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Update last message preview
+                if (type === 'user') {
+                    chats[currentChatId].lastMessage = content.substring(0, 50) + (content.length > 50 ? '...' : '');
+                    
+                    // Try to extract agent name from user message for title
+                    const agentMatch = content.match(/(?:create|build|make|want)\s+(?:a|an)?\s*([^.!?]*?)(?:\s+(?:agent|assistant|bot|tool))?(?:\s+(?:in|using|with)\s+\w+)?/i);
+                    if (agentMatch && agentMatch[1]) {
+                        const potentialTitle = agentMatch[1].trim();
+                        if (potentialTitle.length > 3 && potentialTitle.length < 30) {
+                            updateChatTitle(currentChatId, potentialTitle.charAt(0).toUpperCase() + potentialTitle.slice(1));
+                        }
+                    }
+                }
+                
+                updateChatList();
+            }
+        }
+
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function updateStage(stage) {
+            document.querySelectorAll('.stage').forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+
+            const stages = ['understanding', 'planning', 'generating', 'complete'];
+            const currentIndex = stages.indexOf(stage);
+            
+            for (let i = 0; i < currentIndex; i++) {
+                document.getElementById(`stage-${stages[i]}`).classList.add('completed');
+            }
+            
+            if (currentIndex >= 0) {
+                document.getElementById(`stage-${stage}`).classList.add('active');
+            }
+
+            // Update current chat stage
+            if (currentChatId && chats[currentChatId]) {
+                chats[currentChatId].stage = stage;
+                updateChatList();
+            }
+        }
+
+        function resetPreviewPanel() {
+            document.getElementById('descriptionSection').style.display = 'none';
+            document.getElementById('diagramSection').style.display = 'none';
+            document.getElementById('agentResult').style.display = 'none';
+            document.getElementById('mermaid-diagram').innerHTML = 'Workflow diagram will appear here...';
+            document.getElementById('zoomControls').classList.remove('visible');
+            resetZoom();
+        }
+
+        function updateDescription(description) {
+            document.getElementById('agentDescription').innerHTML = description.replace(/\n/g, '<br>');
+            document.getElementById('descriptionSection').style.display = 'block';
+        }
+
+        function updateDiagram(mermaidCode) {
+            const diagramElement = document.getElementById('mermaid-diagram');
+            
+            diagramElement.innerHTML = '';
+            
+            const cleanCode = mermaidCode
+                .replace(/```mermaid/g, '')
+                .replace(/```/g, '')
+                .trim();
+            
+            const div = document.createElement('div');
+            div.className = 'mermaid';
+            div.textContent = cleanCode;
+            diagramElement.appendChild(div);
+            
+            mermaid.init(undefined, div);
+            
+            document.getElementById('diagramSection').style.display = 'block';
+            
+            // Show zoom controls and reset zoom
+            document.getElementById('zoomControls').classList.add('visible');
+            resetZoom();
+        }
+
+        function zoomDiagram(delta) {
+            const newZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom + delta));
+            if (newZoom !== currentZoom) {
+                currentZoom = newZoom;
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const diagramElement = document.getElementById('mermaid-diagram');
+            const mermaidElement = diagramElement.querySelector('.mermaid');
+            
+            if (mermaidElement) {
+                mermaidElement.style.transform = `scale(${currentZoom})`;
+            }
+            
+            // Update zoom level display
+            document.getElementById('zoomLevel').textContent = `${Math.round(currentZoom * 100)}%`;
+            
+            // Adjust container height based on zoom
+            const viewport = document.getElementById('diagramViewport');
+            if (currentZoom < 1) {
+                viewport.style.maxHeight = '400px';
+            } else if (currentZoom > 1.5) {
+                viewport.style.maxHeight = '600px';
+            } else {
+                viewport.style.maxHeight = '500px';
+            }
+        }
+
+        function showAgentResult(agentId, agentUrl) {
+            document.getElementById('agentId').textContent = agentId;
+            document.getElementById('agentUrl').href = agentUrl;
+            document.getElementById('agentResult').style.display = 'block';
+        }
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message || isTyping || !currentChatId) return;
+
+            addMessage(message, 'user');
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+
+            isTyping = true;
+            sendButton.disabled = true;
+            showTypingIndicator();
+
+            try {
+                const chat = chats[currentChatId];
+                const response = await fetch('http://localhost:8000/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: chat.sessionId
+                    }),
+                });
+
+                const data = await response.json();
+                
+                // Update session ID
+                chat.sessionId = data.session_id;
+
+                hideTypingIndicator();
+                addMessage(data.response, 'assistant');
+
+                updateStage(data.stage);
+
+                // Store agent info
+                if (!chat.agentInfo) {
+                    chat.agentInfo = {};
+                }
+
+                if (data.description) {
+                    chat.agentInfo.description = data.description;
+                    updateDescription(data.description);
+                }
+
+                if (data.mermaid_diagram) {
+                    chat.agentInfo.mermaid_diagram = data.mermaid_diagram;
+                    updateDiagram(data.mermaid_diagram);
+                }
+
+                if (data.stage === 'complete' && data.agent_id && data.agent_url) {
+                    chat.agentInfo.agent_id = data.agent_id;
+                    chat.agentInfo.agent_url = data.agent_url;
+                    showAgentResult(data.agent_id, data.agent_url);
+                    
+                    // Update chat title with agent name if available
+                    if (data.agent_name) {
+                        updateChatTitle(currentChatId, data.agent_name);
+                    }
+                }
+
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage(`Error: ${error.message}`, 'system');
+            } finally {
+                isTyping = false;
+                sendButton.disabled = false;
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const sidebarToggle = document.querySelector('.sidebar-toggle');
+                
+                if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+                    sidebar.classList.remove('open');
+                }
+            }
+        });
+
+        // Initialize first stage
+        setTimeout(() => {
+            updateStage('understanding');
+        }, 500);
+    </script>
+</body>
+</html>

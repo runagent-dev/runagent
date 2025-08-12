@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 30px 40px;
+            position: relative;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .header-text h1 {
+            font-size: 2.2rem;
+            margin-bottom: 4px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            text-transform: capitalize;
+        }
+
+        .header-text p {
+            font-size: 1rem;
+            opacity: 0.85;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        .agent-info {
+            background: rgba(255,255,255,0.08);
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .info-item strong {
+            font-weight: 500;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .info-item span {
+            font-weight: 600;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+
+        .status-badge {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            grid-column: span 2;
+            justify-self: center;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 24px;
+            min-height: 70vh;
+        }
+
+        .panel {
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 20px 20px 0 0;
+        }
+
+        .panel h3 {
+            color: #1e293b;
+            margin-bottom: 20px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.95rem;
+            text-transform: capitalize;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 14px;
+            background: white;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .form-control.textarea {
+            min-height: 70px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 6px 8px 6px 0;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary { 
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8); 
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .btn-success { 
+            background: linear-gradient(135deg, #10b981, #059669); 
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        .btn-warning { 
+            background: linear-gradient(135deg, #f59e0b, #d97706); 
+            color: white;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        .btn-info { 
+            background: linear-gradient(135deg, #06b6d4, #0891b2); 
+            color: white;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        }
+        .btn-secondary { 
+            background: linear-gradient(135deg, #6b7280, #4b5563); 
+            color: white;
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .output {
+            background: #ffffff;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 20px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: #374151;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 12px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .output.error { 
+            border-color: #f87171; 
+            background: #fef2f2; 
+            color: #991b1b; 
+        }
+        .output.success { 
+            border-color: #34d399; 
+            background: #ecfdf5; 
+            color: #065f46; 
+        }
+        .output.info { 
+            border-color: #60a5fa; 
+            background: #eff6ff; 
+            color: #1e40af; 
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: #e5e7eb;
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            color: #6b7280;
+            flex: 1;
+            text-align: center;
+        }
+
+        .tab.active {
+            background: white;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .streaming-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            animation: pulse 1.5s infinite;
+            margin-right: 8px;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        /* Beautiful scrollbar */
+        .output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        .output::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+            border-radius: 4px;
+        }
+
+        .output::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #94a3b8, #64748b);
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 20px;
+            }
+            
+            .header {
+                padding: 24px 20px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .panel {
+                padding: 20px;
+            }
+        }
+
+        /* Helper function to convert snake_case to title case */
+        .title-case {
+            text-transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <img src="/static/icon.png" alt="RunAgent" class="header-icon">
+                <div class="header-text">
+                    <h1 id="agentName" class="title-case">Agent Interface</h1>
+                    <p id="agentDescription">AI Agent Testing Interface</p>
+                </div>
+            </div>
+            
+            <div class="agent-info">
+                <div class="info-item">
+                    <strong>Agent ID</strong> <span id="agentId">-</span>
+                </div>
+                <div class="info-item">
+                    <strong>Framework</strong> <span id="framework">-</span>
+                </div>
+                <div class="info-item">
+                    <strong>Port</strong> <span id="runagentPort">-</span>
+                </div>
+                <div class="info-item">
+                    <strong>Status</strong> <span id="connectionStatus">Connecting...</span>
+                </div>
+                <div class="status-badge" id="statusBadge">Agent Interface</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Input & Testing Panel -->
+            <div class="panel">
+                <h3>Agent Testing</h3>
+                
+                <div id="dynamicInputs">
+                    <!-- Dynamic input fields will be generated here -->
+                </div>
+                
+                <div class="form-group">
+                    <label>Test Message</label>
+                    <textarea class="form-control textarea" id="testMessage" placeholder="Enter your test message..." rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <button class="btn btn-success" onclick="runTest()" id="testButton">
+                        Test Agent
+                    </button>
+                    <button class="btn btn-info" onclick="testStreaming()" id="streamButton">
+                        Live Streaming Test
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadAgentInfo()">
+                        Refresh Info
+                    </button>
+                </div>
+                <div class="form-group">
+                    <div class="output info" id="inputPreview" style="font-size: 12px; max-height: 100px; overflow-y: auto;">
+                        Click "Refresh Info" to see current input values...
+                    </div>
+                </div>
+                
+                <div class="output" id="testOutput">Ready for agent testing...</div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="panel">
+                <h3>Results & Information</h3>
+                
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('results-tab')">Results</div>
+                    <div class="tab" onclick="switchTab('info-tab')">Agent Info</div>
+                </div>
+                
+                <div id="results-tab" class="tab-content active">
+                    <div class="form-group">
+                        <button class="btn btn-info" onclick="showLastResult()">
+                            Show Last Result
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearResults()">
+                            Clear Results
+                        </button>
+                    </div>
+                    <div class="output" id="resultsOutput">Test results will appear here...</div>
+                </div>
+                
+                <div id="info-tab" class="tab-content">
+                    <div class="form-group">
+                        <button class="btn btn-info" onclick="checkAgentStatus()">
+                            Check Status
+                        </button>
+                        <button class="btn btn-secondary" onclick="showAgentDetails()">
+                            Show Details
+                        </button>
+                    </div>
+                    <div class="output" id="infoOutput">Agent information will appear here...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let agentInfo = null;
+        let runagentUrl = null;
+        let lastTestResult = null;
+        let isStreaming = false;
+
+        // Get agent ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const agentId = urlParams.get('agent');
+
+        if (agentId) {
+            document.getElementById('agentId').textContent = agentId;
+        }
+
+        // Initialize the page
+        window.addEventListener('DOMContentLoaded', initializePage);
+
+        // Helper function to convert snake_case to Title Case
+        function formatTitle(text) {
+            return text
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+        }
+
+        // Helper function to format field names
+        function formatFieldName(fieldName) {
+            return fieldName
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, letter => letter.toUpperCase());
+        }
+
+        async function initializePage() {
+            if (!agentId) {
+                log("No agent ID provided in URL");
+                return;
+            }
+
+            await loadAgentInfo();
+            log("Agent Interface initialized");
+        }
+
+        async function loadAgentInfo() {
+            try {
+                log('Loading agent information...');
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                agentInfo = data.agent_info;
+                runagentUrl = agentInfo.runagent_url;
+                
+                log(`Agent info loaded successfully`);
+                log(`RunAgent URL: ${runagentUrl}`);
+                
+                // Update UI with formatted titles
+                const agentName = formatTitle(agentInfo.agent_name);
+                document.getElementById('agentName').textContent = agentName;
+                document.getElementById('agentDescription').textContent = agentInfo.description;
+                document.getElementById('framework').textContent = agentInfo.framework?.toUpperCase();
+                document.getElementById('runagentPort').textContent = agentInfo.port;
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').style.color = '#10b981';
+                
+                // Update status badge
+                document.getElementById('statusBadge').textContent = `${agentName} Active`;
+                
+                // Generate input fields
+                generateInputFields();
+                
+            } catch (error) {
+                log(`Error loading agent info: ${error.message}`);
+                document.getElementById('connectionStatus').textContent = 'Connection Failed';
+                document.getElementById('connectionStatus').style.color = '#ef4444';
+            }
+        }
+
+        function generateInputFields() {
+            const container = document.getElementById('dynamicInputs');
+            container.innerHTML = '';
+
+            if (!agentInfo || !agentInfo.input_fields) {
+                log("No input fields defined for this agent");
+                return;
+            }
+
+            const inputFields = agentInfo.input_fields || ['query'];
+            const inputTypes = agentInfo.input_types || {};
+            const inputDescriptions = agentInfo.input_descriptions || {};
+
+            inputFields.forEach((field, index) => {
+                const group = document.createElement('div');
+                group.className = 'form-group';
+
+                const label = document.createElement('label');
+                const fieldType = inputTypes[field] || 'string';
+                const description = inputDescriptions[field] || `Enter ${field}`;
+                const isRequired = index === 0;
+                
+                // Format the field name nicely
+                const formattedFieldName = formatFieldName(field);
+                label.textContent = `${formattedFieldName}${isRequired ? ' *' : ''}`;
+                if (isRequired) {
+                    label.style.fontWeight = '600';
+                    label.style.color = '#1e293b';
+                }
+
+                let input;
+                if (fieldType === 'textarea' || description.length > 50) {
+                    input = document.createElement('textarea');
+                    input.className = 'form-control textarea';
+                    input.rows = 2;
+                } else {
+                    input = document.createElement('input');
+                    input.className = 'form-control';
+                    
+                    switch (fieldType) {
+                        case 'number':
+                        case 'integer':
+                            input.type = 'number';
+                            input.value = '1';
+                            break;
+                        case 'boolean':
+                            input.type = 'checkbox';
+                            input.checked = false;
+                            break;
+                        case 'email':
+                            input.type = 'email';
+                            break;
+                        case 'url':
+                            input.type = 'url';
+                            break;
+                        default:
+                            input.type = 'text';
+                    }
+                }
+
+                input.id = field;
+                input.name = field;
+                input.placeholder = description;
+                
+                // Set default values for non-primary fields
+                if (index > 0 && fieldType === 'string' && !input.value) {
+                    input.value = `default_${field}`;
+                }
+
+                group.appendChild(label);
+                group.appendChild(input);
+                container.appendChild(group);
+            });
+
+            log(`Generated ${inputFields.length} input fields`);
+        }
+
+        function getInputData() {
+            const inputData = {};
+            
+            if (!agentInfo?.input_fields) {
+                return { query: document.getElementById('testMessage').value.trim() || 'Hello' };
+            }
+            
+            agentInfo.input_fields.forEach(field => {
+                const element = document.getElementById(field);
+                if (element) {
+                    const fieldType = agentInfo.input_types?.[field] || 'string';
+                    
+                    if (fieldType === 'boolean') {
+                        inputData[field] = element.checked;
+                    } else if (fieldType === 'number' || fieldType === 'integer') {
+                        inputData[field] = element.value ? Number(element.value) : 1;
+                    } else if (fieldType.includes('array') || fieldType.includes('list')) {
+                        const rawValue = element.value.trim();
+                        if (rawValue) {
+                            inputData[field] = rawValue.includes('\n') 
+                                ? rawValue.split('\n').map(s => s.trim()).filter(s => s)
+                                : [rawValue];
+                        } else {
+                            inputData[field] = [];
+                        }
+                    } else {
+                        inputData[field] = element.value.trim() || '';
+                    }
+                }
+            });
+            
+            // If no dynamic inputs were filled, use test message for primary field
+            const primaryField = agentInfo.input_fields[0];
+            const testMessage = document.getElementById('testMessage').value.trim();
+            
+            if (testMessage && (!inputData[primaryField] || inputData[primaryField] === '' || Array.isArray(inputData[primaryField]) && inputData[primaryField].length === 0)) {
+                if (agentInfo.input_types?.[primaryField]?.includes('array')) {
+                    inputData[primaryField] = [testMessage];
+                } else {
+                    inputData[primaryField] = testMessage;
+                }
+            }
+            
+            return inputData;
+        }
+
+        async function runTest() {
+            const testButton = document.getElementById('testButton');
+            const originalText = testButton.innerHTML;
+            
+            testButton.disabled = true;
+            testButton.innerHTML = '<span class="loading-spinner"></span>Testing...';
+            
+            const testOutput = document.getElementById('testOutput');
+            testOutput.textContent = 'Running agent test...\n';
+            testOutput.className = 'output';
+            
+            try {
+                const inputData = getInputData();
+                const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, how can you help me?';
+                
+                log(`Starting agent test with inputs: ${JSON.stringify(inputData)}`);
+                log(`Test message: "${testMessage}"`);
+                
+                const params = new URLSearchParams({
+                    test_message: testMessage,
+                    input_data: JSON.stringify(inputData)
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                lastTestResult = result;
+                
+                if (result.success) {
+                    testOutput.className = 'output success';
+                    testOutput.textContent = `Agent Test Successful!\n\n${result.test_stdout}`;
+                    log(`Agent test successful`);
+                    
+                    // Show in results tab
+                    const resultsOutput = document.getElementById('resultsOutput');
+                    resultsOutput.className = 'output success';
+                    resultsOutput.textContent = `SUCCESS\n\nAgent: ${result.agent_info?.name}\nFramework: ${result.agent_info?.framework}\nPort: ${result.agent_info?.port}\n\nInputs Used:\n${JSON.stringify(inputData, null, 2)}\n\nOutput:\n${result.test_stdout}`;
+                    
+                } else {
+                    testOutput.className = 'output error';
+                    let errorMsg = `Agent Test Failed\n\n`;
+                    if (result.error) errorMsg += `Error: ${result.error}\n\n`;
+                    if (result.test_stderr) errorMsg += `Stderr: ${result.test_stderr}\n\n`;
+                    if (result.test_stdout) errorMsg += `Stdout: ${result.test_stdout}`;
+                    
+                    testOutput.textContent = errorMsg;
+                    log(`Agent test failed: ${result.error}`);
+                    
+                    // Show in info tab
+                    const infoOutput = document.getElementById('infoOutput');
+                    infoOutput.className = 'output error';
+                    infoOutput.textContent = errorMsg;
+                }
+                
+            } catch (error) {
+                testOutput.className = 'output error';
+                testOutput.textContent = `Test Error: ${error.message}\n\nCheck that the agent is running and accessible.`;
+                log(`Agent test error: ${error.message}`);
+            } finally {
+                testButton.disabled = false;
+                testButton.innerHTML = originalText;
+            }
+        }
+
+        // New live streaming function
+        async function testStreamingLive() {
+            if (isStreaming) {
+                log("Streaming already in progress");
+                return;
+            }
+
+            const streamButton = document.getElementById('streamButton');
+            const originalText = streamButton.innerHTML;
+            
+            isStreaming = true;
+            streamButton.disabled = true;
+            streamButton.innerHTML = '<span class="streaming-indicator"></span>Live Streaming...';
+            
+            const testOutput = document.getElementById('testOutput');
+            testOutput.className = 'output info';
+            testOutput.textContent = 'Starting live streaming test...\n';
+            
+            try {
+                const inputData = getInputData();
+                const testMessage = document.getElementById('testMessage').value.trim() || 'Hello, streaming test';
+                
+                log(`Starting live streaming test with inputs: ${JSON.stringify(inputData)}`);
+                
+                // Find streaming entrypoint
+                const streamingTag = agentInfo?.entrypoint_tags?.find(tag => tag.includes('stream')) || 'main_stream';
+                
+                const params = new URLSearchParams({
+                    test_message: testMessage,
+                    input_data: JSON.stringify(inputData),
+                    entrypoint_tag: streamingTag
+                });
+                
+                const response = await fetch(`http://localhost:8000/agent/${agentId}/run-test-stream?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                testOutput.textContent = ''; // Clear previous content
+                testOutput.className = 'output info';
+                
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'output') {
+                                    testOutput.textContent += data.content + '\n';
+                                    testOutput.scrollTop = testOutput.scrollHeight;
+                                } else if (data.type === 'complete') {
+                                    testOutput.className = 'output success';
+                                    testOutput.textContent += '\nLive streaming completed successfully!';
+                                    log(`Live streaming completed successfully`);
+                                    return;
+                                } else if (data.type === 'error') {
+                                    testOutput.className = 'output error';
+                                    testOutput.textContent += '\nError: ' + data.content;
+                                    log(`Live streaming error: ${data.content}`);
+                                    return;
+                                }
+                            } catch (e) {
+                                // Skip parsing errors for incomplete JSON
+                            }
+                        }
+                    }
+                }
+                
+                // Handle any remaining buffer content
+                if (buffer && buffer.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(buffer.slice(6));
+                        if (data.type === 'output') {
+                            testOutput.textContent += data.content + '\n';
+                        }
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                }
+                
+            } catch (error) {
+                testOutput.className = 'output error';
+                testOutput.textContent = `Live Streaming Error: ${error.message}`;
+                log(`Live streaming error: ${error.message}`);
+            } finally {
+                isStreaming = false;
+                streamButton.disabled = false;
+                streamButton.innerHTML = originalText;
+            }
+        }
+
+        // Updated testStreaming function to use live streaming
+        async function testStreaming() {
+            await testStreamingLive();
+        }
+
+        async function checkAgentStatus() {
+            try {
+                const response = await fetch(`http://localhost:8000/agent/${agentId}`);
+                const data = await response.json();
+                
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output success';
+                infoOutput.textContent = `Agent Status Check:\n\n${JSON.stringify(data, null, 2)}`;
+                
+                log("Agent status check completed");
+            } catch (error) {
+                log(`Status check failed: ${error.message}`);
+            }
+        }
+
+        function showAgentDetails() {
+            if (agentInfo) {
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output info';
+                const formattedName = formatTitle(agentInfo.agent_name);
+                infoOutput.textContent = `Agent Details:
+
+Name: ${formattedName}
+Description: ${agentInfo.description}
+Framework: ${agentInfo.framework}
+Port: ${agentInfo.port}
+Input Fields: ${agentInfo.input_fields?.map(field => formatFieldName(field)).join(', ') || 'None'}
+Entrypoints: ${agentInfo.entrypoint_tags?.join(', ') || 'None'}
+Expected Output: ${agentInfo.expected_output_format || 'String response'}
+
+Connection Info:
+- Agent ID: ${agentId}
+- RunAgent URL: ${runagentUrl}
+- Status: ${agentInfo.status || 'Active'}`;
+            } else {
+                const infoOutput = document.getElementById('infoOutput');
+                infoOutput.className = 'output';
+                infoOutput.textContent = 'No agent information available. Try refreshing.';
+            }
+        }
+
+        function showLastResult() {
+            if (lastTestResult) {
+                const resultsOutput = document.getElementById('resultsOutput');
+                resultsOutput.className = lastTestResult.success ? 'output success' : 'output error';
+                resultsOutput.textContent = JSON.stringify(lastTestResult, null, 2);
+            } else {
+                const resultsOutput = document.getElementById('resultsOutput');
+                resultsOutput.className = 'output';
+                resultsOutput.textContent = 'No test results available yet. Run a test first.';
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('resultsOutput').textContent = 'Test results cleared.';
+            document.getElementById('resultsOutput').className = 'output';
+            lastTestResult = null;
+        }
+
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function log(message) {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+        }
+    </script>
+</body>
+</html>

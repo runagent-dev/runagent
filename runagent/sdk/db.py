@@ -822,6 +822,10 @@ class DBService:
         framework: str = None,
         status: str = "deployed",
     ) -> Dict:
+        if hasattr(framework, 'value'):
+            framework = framework.value
+        elif framework is not None:
+            framework = str(framework)
         """
         Add a new agent with smart limit enforcement
 
@@ -1533,6 +1537,10 @@ class DBService:
         preferred_host: str = "127.0.0.1",
         preferred_port: int = None,
     ) -> Dict:
+        if hasattr(framework, 'value'):
+            framework = framework.value
+        elif framework is not None:
+            framework = str(framework)
         """
         Add a new agent with automatic port allocation
 

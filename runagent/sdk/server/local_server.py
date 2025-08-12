@@ -537,7 +537,7 @@ class LocalServer:
             result = db_service.add_agent_with_auto_port(
                 agent_id=agent_id,
                 agent_path=str(agent_path),
-                framework=framework,
+                framework=framework.value if hasattr(framework, 'value') else str(framework),
                 status="ready",
                 preferred_host=host,
                 preferred_port=port,  # Will auto-allocate if None or unavailable
