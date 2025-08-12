@@ -4,10 +4,15 @@ RunAgent Generator is an intelligent system that automatically creates custom AI
 
 ## User Interface
 
-| Agent Builder Interface | Agent Testing Interface |
-|:-----------------------:|:-----------------------:|
-| ![Agent Builder UI](image/agent-builder-ui.png) | ![Agent Testing UI](image/agent-ui.png) |
-| Create agents through natural language | Test and interact with generated agents |
+| Agent Builder Interface |
+|:-----------------------:|
+| ![Agent Builder UI](image/agent-builder-ui.png) |
+| Create agents through natural language |
+
+| Agent Testing Interface |
+|:-----------------------:|
+| ![Agent Testing UI](image/agent-ui.png) |
+ | Test and interact with generated agents |
 
 ## Overview
 
