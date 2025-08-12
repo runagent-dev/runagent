@@ -2,25 +2,12 @@
 
 RunAgent Generator is an intelligent system that automatically creates custom AI agents based on natural language descriptions. Using GPT-5 for analysis and code generation, it supports multiple AI frameworks and provides a complete development environment for AI agents.
 
-<table>
-<tr>
-<td width="50%">
+## User Interface
 
-### Agent Builder Interface
-<img src="image/agent-builder-ui.png" alt="Agent Builder UI" width="100%"/>
-
-The main interface for creating agents through natural language descriptions.
-
-</td>
-<td width="50%">
-
-<img src="image/agent-ui.png" alt="Agent Testing UI" width="100%"/>
-
-Interactive testing environment for generated agents with real-time feedback.
-
-</td>
-</tr>
-</table>
+| Agent Builder Interface | Agent Testing Interface |
+|:-----------------------:|:-----------------------:|
+| ![Agent Builder UI](image/agent-builder-ui.png) | ![Agent Testing UI](image/agent-ui.png) |
+| Create agents through natural language | Test and interact with generated agents |
 
 ## Overview
 
