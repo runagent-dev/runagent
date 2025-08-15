@@ -1,3 +1,4 @@
+# runagent/sdk/deployment/middleware_sync.py - FIXED VERSION (no unnecessary validation)
 
 import json
 import asyncio
@@ -18,7 +19,6 @@ class MiddlewareSyncService:
     def __init__(self, config):
         self.config = config
         self.rest_client = None
-        self.auth_validated = False
         
         # Check if we have a valid API key FIRST
         self.api_key = getattr(config, 'api_key', None)
@@ -28,24 +28,23 @@ class MiddlewareSyncService:
             self.enabled = False
             return
         
-        # Only initialize RestClient if we have an API key
+        # Initialize RestClient if we have an API key
         try:
             self.rest_client = RestClient(
                 base_url=config.base_url,
                 api_key=self.api_key
             )
             
-            # Test authentication
-            self.auth_validated = self._test_authentication()
-            if self.auth_validated:
-                console.print("[green]API key validated - middleware sync enabled[/green]")
+            # If authentication was successful during setup, enable sync
+            if hasattr(config, '_config') and config._config.get("auth_validated"):
+                console.print("[dim]Using cached authentication - middleware sync enabled[/dim]")
                 self.sync_enabled = True
                 self.enabled = True
             else:
-                console.print("[yellow] API key invalid - middleware sync disabled[/yellow]")
+                # If no cached auth, assume it's not validated yet
+                console.print("[dim]No cached authentication - middleware sync disabled[/dim]")
                 self.sync_enabled = False
                 self.enabled = False
-                self.rest_client = None
                 
         except Exception as e:
             console.print(f"[red]Could not initialize middleware sync: {e}[/red]")
@@ -53,36 +52,14 @@ class MiddlewareSyncService:
             self.enabled = False
             self.rest_client = None
 
-    def _test_authentication(self) -> bool:
-        """Test authentication before enabling sync"""
-        if not self.rest_client or not self.api_key:
-            return False
-            
-        try:
-            # Test with the auth validation endpoint
-            response = self.rest_client.http.get("/auth/validate", timeout=10)
-            
-            if response.status_code == 200:
-                auth_data = response.json()
-                if auth_data.get("status") == "success":
-                    console.print(f"[dim]Authenticated as: {auth_data.get('user', {}).get('email', 'Unknown')}[/dim]")
-                    return True
-            
-            console.print(f"[yellow]Authentication failed: HTTP {response.status_code}[/yellow]")
-            return False
-            
-        except Exception as e:
-            console.print(f"[dim]Authentication test failed: {str(e)}[/dim]")
-            return False
-    
     def is_sync_enabled(self) -> bool:
         """Public method to check if sync is enabled"""
-        return getattr(self, 'sync_enabled', False) and getattr(self, 'auth_validated', False)
+        return getattr(self, 'sync_enabled', False)
     
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
-        """Sync agent data when local server starts - FIXED VERSION"""
+        """Sync agent data when local server starts"""
         
-        # CRITICAL: Check if sync is enabled FIRST
+        # Check if sync is enabled FIRST
         if not self.is_sync_enabled():
             console.print("[dim]Middleware sync disabled - agent will run in local-only mode[/dim]")
             return False
@@ -111,114 +88,10 @@ class MiddlewareSyncService:
                 return True
             else:
                 console.print(f"[red]Agent sync failed: {response.get('error', 'Unknown error')}[/red]")
-                # Don't disable sync completely - might be temporary
                 return False
                 
         except Exception as e:
             console.print(f"❌ [red]Agent sync error: {str(e)}[/red]")
-            return False
-
-    async def sync_agent_logs(self, logs_data: List[Dict[str, Any]]) -> bool:        
-        # CRITICAL: Don't try to sync if not enabled
-        if not self.is_sync_enabled() or not logs_data:
-            return False
-            
-        try:
-            console.print(f"[dim]Syncing {len(logs_data)} logs to middleware...[/dim]")
-            
-            # Prepare logs for middleware
-            middleware_logs = []
-            for log in logs_data:
-                middleware_log = {
-                    "agent_id": log["agent_id"],
-                    "log_level": log["log_level"],
-                    "message": log["message"],
-                    "execution_id": log.get("execution_id"),
-                    "timestamp": log["timestamp"].isoformat() if hasattr(log["timestamp"], 'isoformat') else str(log["timestamp"]),
-                    "source": "local_server"
-                }
-                middleware_logs.append(middleware_log)
-            
-            # Send logs to middleware
-            response = await self._make_async_request(
-                "POST", 
-                "/agent-logs/bulk", 
-                {"logs": middleware_logs}
-            )
-            
-            if response.get("success"):
-                console.print(f"[dim]Successfully synced {len(logs_data)} logs to middleware[/dim]")
-                return True
-            else:
-                console.print(f"[yellow]Log sync failed: {response.get('error')}[/yellow]")
-                return False
-                
-        except Exception as e:
-            console.print(f"❌ [red]Log sync error: {str(e)}[/red]")
-            return False
-
-    async def sync_invocation_start(self, invocation_data: Dict[str, Any]) -> Optional[str]:
-        """Sync invocation start to middleware and return middleware invocation ID"""
-        if not self.sync_enabled:
-            return None
-            
-        try:
-            console.print(f"[dim]Syncing invocation start to middleware...[/dim]")
-            
-            middleware_data = {
-                "local_agent_id": invocation_data["agent_id"],
-                "input_data": invocation_data["input_data"],
-                "entrypoint_tag": invocation_data.get("entrypoint_tag"),
-                "source": "local",
-                "sdk_type": invocation_data.get("sdk_type", "local_server"),
-                "client_info": invocation_data.get("client_info", {}),
-                "local_timestamp": datetime.utcnow().timestamp()
-            }
-            
-            response = await self._make_async_request("POST", "/local-invocations", middleware_data)
-            
-            if response.get("success"):
-                middleware_invocation_id = response.get("invocation_id")
-                console.print(f"[dim]Invocation synced to middleware: {middleware_invocation_id[:8]}...[/dim]")
-                return middleware_invocation_id
-            else:
-                console.print(f"[yellow]Invocation sync failed: {response.get('error')}[/yellow]")
-                return None
-                
-        except Exception as e:
-            console.print(f"❌ [red]Invocation sync error: {str(e)}[/red]")
-            return None
-
-    async def sync_invocation_complete(self, middleware_invocation_id: str, completion_data: Dict[str, Any]) -> bool:
-        """Sync invocation completion to middleware"""
-        if not self.sync_enabled or not middleware_invocation_id:
-            return False
-            
-        try:
-            console.print(f"✅ [dim]Syncing invocation completion to middleware...[/dim]")
-            
-            update_data = {
-                "output_data": completion_data.get("output_data"),
-                "error_detail": completion_data.get("error_detail"),
-                "execution_time_ms": completion_data.get("execution_time_ms"),
-                "completed_timestamp": datetime.utcnow().timestamp()
-            }
-            
-            response = await self._make_async_request(
-                "PUT", 
-                f"/local-invocations/{middleware_invocation_id}", 
-                update_data
-            )
-            
-            if response.get("success"):
-                console.print(f"[dim]Invocation completion synced to middleware[/dim]")
-                return True
-            else:
-                console.print(f"[yellow]Invocation completion sync failed: {response.get('error')}[/yellow]")
-                return False
-                
-        except Exception as e:
-            console.print(f"[red]Invocation completion sync error: {str(e)}[/red]")
             return False
 
     def get_sync_status(self) -> Dict[str, Any]:
@@ -226,7 +99,7 @@ class MiddlewareSyncService:
         return {
             "sync_enabled": getattr(self, 'sync_enabled', False),
             "api_configured": bool(getattr(self, 'api_key', None)),
-            "auth_validated": getattr(self, 'auth_validated', False),
+            "auth_validated": getattr(self.config, '_config', {}).get("auth_validated", False),
             "base_url": getattr(self.config, 'base_url', None),
             "middleware_available": self._test_middleware_connection() if getattr(self, 'rest_client', None) else False
         }
@@ -236,18 +109,10 @@ class MiddlewareSyncService:
         try:
             result = self._test_middleware_connection()
             
-            if isinstance(result, bool):
-                return {
-                    "success": result,
-                    "error": None if result else "Connection failed"
-                }
-            elif isinstance(result, dict):
-                return result
-            else:
-                return {
-                    "success": False,
-                    "error": "Invalid response format"
-                }
+            return {
+                "success": result,
+                "error": None if result else "Connection failed"
+            }
                 
         except Exception as e:
             return {
@@ -256,7 +121,7 @@ class MiddlewareSyncService:
             }
     
     def _test_middleware_connection(self) -> bool:
-        """Test if middleware is reachable"""
+        """Test if middleware is reachable - SIMPLE HEALTH CHECK ONLY"""
         if not getattr(self, 'rest_client', None):
             return False
             
@@ -267,7 +132,7 @@ class MiddlewareSyncService:
             return False
 
     async def _make_async_request(self, method: str, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Make async HTTP request to middleware - FIXED VERSION"""
+        """Make async HTTP request to middleware"""
         if not getattr(self, 'rest_client', None) or not self.is_sync_enabled():
             return {"success": False, "error": "Middleware sync not available"}
             
@@ -314,18 +179,7 @@ def get_middleware_sync() -> Optional[MiddlewareSyncService]:
             config = SDKConfig()
             _global_middleware_sync = MiddlewareSyncService(config)
         except Exception as e:
-            console.print(f"yellow]Could not initialize middleware sync: {e}[/yellow]")
+            console.print(f"[yellow]Could not initialize middleware sync: {e}[/yellow]")
             _global_middleware_sync = None
     
     return _global_middleware_sync
-
-
-# Create an alias for backwards compatibility
-class MiddlewareSync:
-    """Alias for MiddlewareSyncService for backwards compatibility"""
-    
-    def __init__(self, config):
-        self._service = MiddlewareSyncService(config)
-    
-    def __getattr__(self, name):
-        return getattr(self._service, name)

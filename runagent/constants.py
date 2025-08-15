@@ -1,3 +1,4 @@
+# Option 1: Update runagent/constants.py to match your middleware port
 import os
 from enum import Enum
 from pathlib import Path
@@ -15,19 +16,18 @@ DEFAULT_TEMPLATE = "basic"
 
 # Environment Variables
 ENV_RUNAGENT_API_KEY = "RUNAGENT_API_KEY"
-# ENV_RUNAGENT_BASE_URL = "http://20.244.107.179:8330/"
-ENV_RUNAGENT_BASE_URL = "http://52.237.88.147:8330/"
+# UPDATED: Change default port to match your middleware (8333)
+ENV_RUNAGENT_BASE_URL = "http://52.237.88.147:8333/"
 ENV_LOCAL_CACHE_DIRECTORY = "RUNAGENT_CACHE_DIR"
 ENV_RUNAGENT_LOGGING_LEVEL = "RUNAGENT_LOGGING_LEVEL"
 
 # Local Configuration
 LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
 USER_DATA_FILE_NAME = "user_data.json"
-DEFAULT_BASE_URL = "http://52.237.88.147:8330/"
-# DEFAULT_BASE_URL = "http://52.237.88.147:8330/"
+DEFAULT_BASE_URL = "http://52.237.88.147:8333/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
 
-# Setup cache directory
+# Rest of the file remains the same...
 _cache_dir = os.environ.get(ENV_LOCAL_CACHE_DIRECTORY)
 LOCAL_CACHE_DIRECTORY = str(
     Path(_cache_dir)
@@ -46,7 +46,6 @@ except OSError as e:
         "environment variable."
     ) from e
 
-
 # Framework Enums
 class Framework(str, Enum):
     LANGGRAPH = "langgraph"
@@ -54,7 +53,6 @@ class Framework(str, Enum):
     LLAMAINDEX = "llamaindex"
     CREWAI = "crewai"
     AUTOGEN = "autogen"
-
 
 class TemplateVariant(str, Enum):
     BASIC = "basic"
