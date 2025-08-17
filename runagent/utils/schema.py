@@ -150,6 +150,7 @@ class MessageType(Enum):
     AGENT_THOUGHT = "agent_thought"
     FINAL_RESPONSE = "final_response"
     ERROR = "error"
+    DATA = "data"
     STATUS = "status"
     RAW_DATA = "raw_data"
     STRUCTURED_DATA = "structured_data"

@@ -12,6 +12,7 @@ _global_middleware_sync = None
 
 
 class MiddlewareSyncService:
+    """Middleware sync service - UPDATED for simplified ID structure"""
     
     def __init__(self, config):
         self.config = config
@@ -53,7 +54,7 @@ class MiddlewareSyncService:
         return getattr(self, 'sync_enabled', False)
     
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
-        """Sync agent data when local server starts"""
+        """Sync agent data when local server starts - FIXED for simplified ID structure"""
         if not self.is_sync_enabled():
             console.print("[dim]Middleware sync disabled - agent will run in local-only mode[/dim]")
             return False
@@ -61,8 +62,9 @@ class MiddlewareSyncService:
         try:
             console.print(f"Syncing agent {agent_id} to middleware...")
             
+            # FIXED: Use simplified structure - agent_id becomes the main ID
             sync_data = {
-                "local_agent_id": agent_id,
+                "local_agent_id": agent_id,  # This becomes the main agent ID in middleware
                 "name": agent_data.get("name", "Local Agent"),
                 "framework": agent_data.get("framework", "unknown"),
                 "version": agent_data.get("version", "1.0.0"),
@@ -88,18 +90,29 @@ class MiddlewareSyncService:
             return False
 
     async def sync_invocation_start(self, invocation_data: Dict[str, Any]) -> Optional[str]:
-        """Sync invocation start to middleware"""
+        """Sync invocation start to middleware - FIXED for simplified ID structure"""
         if not self.is_sync_enabled():
             return None
             
         try:
+            # FIXED: Use simplified structure
+            sync_payload = {
+                "agent_id": invocation_data.get("agent_id"),  # Main agent ID (no separate local_agent_id)
+                "local_execution_id": invocation_data.get("local_execution_id"),  # This becomes main execution ID
+                "input_data": invocation_data.get("input_data", {}),
+                "entrypoint_tag": invocation_data.get("entrypoint_tag", ""),
+                "sdk_type": invocation_data.get("sdk_type", "local_server"),
+                "client_info": invocation_data.get("client_info", {})
+            }
+            
             response = await self._make_async_request(
                 "POST", 
                 "/local-agents/invocations", 
-                invocation_data
+                sync_payload
             )
             
             if response.get("success"):
+                # Return the execution ID (which is now the main ID)
                 return response.get("id")
             
         except Exception as e:
@@ -107,15 +120,16 @@ class MiddlewareSyncService:
         
         return None
 
-    async def sync_invocation_complete(self, invocation_id: str, completion_data: Dict[str, Any]) -> bool:
-        """Sync invocation completion to middleware"""
-        if not self.is_sync_enabled() or not invocation_id:
+    async def sync_invocation_complete(self, execution_id: str, completion_data: Dict[str, Any]) -> bool:
+        """Sync invocation completion to middleware - FIXED for simplified ID structure"""
+        if not self.is_sync_enabled() or not execution_id:
             return False
             
         try:
+            # FIXED: Use main execution ID directly (no separate local_execution_id)
             response = await self._make_async_request(
                 "PUT", 
-                f"/local-agents/invocations/{invocation_id}", 
+                f"/local-agents/invocations/{execution_id}",  # execution_id is now the main ID
                 completion_data
             )
             
@@ -158,6 +172,17 @@ class MiddlewareSyncService:
             
         try:
             response = self.rest_client.http.get("/health", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    def _test_supabase_authentication(self) -> bool:
+        """Test Supabase authentication"""
+        if not getattr(self, 'rest_client', None):
+            return False
+            
+        try:
+            response = self.rest_client.http.get("/users/profile", timeout=10)
             return response.status_code == 200
         except Exception:
             return False
