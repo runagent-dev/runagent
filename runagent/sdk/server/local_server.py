@@ -140,23 +140,22 @@ class LocalServer:
             return False
 
 
-
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
         """Create endpoint handler with invocation tracking and middleware sync"""
 
         async def run_agent(request: AgentRunRequest):
             """Run a deployed agent with full invocation tracking and middleware sync"""
             
-            # Start local invocation tracking
+            # Start local invocation tracking 
             invocation_id = self.db_service.start_invocation(
                 agent_id=agent_id,
-                input_data={
+                input_data={  
                     "input_args": request.input_data.input_args,
                     "input_kwargs": request.input_data.input_kwargs
                 },
                 entrypoint_tag=entrypoint_tag,
                 sdk_type="local_server",
-                client_info={
+                client_info={  
                     "server_host": self.host,
                     "server_port": self.port,
                     "agent_name": self.agent_name,
@@ -166,7 +165,7 @@ class LocalServer:
 
             self.log_execution_start(invocation_id, entrypoint_tag)
 
-            # NEW: Sync invocation start to middleware
+            # Sync invocation start to middleware - FIXED: Direct objects
             middleware_invocation_id = None
             if (hasattr(self, 'middleware_sync') and 
                 self.middleware_sync and 
@@ -176,13 +175,13 @@ class LocalServer:
                     middleware_invocation_id = await self.middleware_sync.sync_invocation_start({
                         "agent_id": agent_id,
                         "local_execution_id": invocation_id,
-                        "input_data": {
+                        "input_data": {  # FIXED: Direct object
                             "input_args": request.input_data.input_args,
                             "input_kwargs": request.input_data.input_kwargs
                         },
                         "entrypoint_tag": entrypoint_tag,
                         "sdk_type": "local_server",
-                        "client_info": {
+                        "client_info": {  # FIXED: Direct object
                             "server_host": self.host,
                             "server_port": self.port,
                             "agent_name": self.agent_name,
@@ -209,13 +208,13 @@ class LocalServer:
                 execution_success = True
                 self.log_execution_complete(invocation_id, True, execution_time)
 
-                # Complete local invocation tracking with success
+                # Complete local invocation tracking with success 
                 try:
                     serializable_output = self._convert_to_serializable(result_data)
                     
                     self.db_service.complete_invocation(
                         invocation_id=invocation_id,
-                        output_data=serializable_output,
+                        output_data=serializable_output,  
                         execution_time_ms=execution_time * 1000
                     )
                     console.print("Local invocation tracking completed successfully")
@@ -226,7 +225,7 @@ class LocalServer:
                     try:
                         self.db_service.complete_invocation(
                             invocation_id=invocation_id,
-                            output_data={
+                            output_data={  # FIXED: Direct object
                                 "execution_completed": True,
                                 "result_type": str(type(result_data)),
                                 "result_length": len(str(result_data)) if result_data else 0,
@@ -238,13 +237,13 @@ class LocalServer:
                     except Exception as e2:
                         console.print(f"Critical: Could not complete local invocation tracking: {str(e2)}")
 
-                # NEW: Sync invocation completion to middleware
+                # Sync invocation completion to middleware - FIXED: Direct objects
                 if middleware_invocation_id:
                     try:
                         await self.middleware_sync.sync_invocation_complete(
                             middleware_invocation_id,
                             {
-                                "output_data": serializable_output,
+                                "output_data": serializable_output,  # Direct object
                                 "execution_time_ms": execution_time * 1000
                             }
                         )
@@ -253,7 +252,7 @@ class LocalServer:
 
                 # Record in original agent_runs table for backward compatibility
                 try:
-                    # Convert input_data to serializable format
+                    # Convert input_data to serializable format - FIXED: Direct objects
                     serializable_input = {
                         "input_args": request.input_data.input_args,
                         "input_kwargs": request.input_data.input_kwargs
@@ -261,7 +260,7 @@ class LocalServer:
                     
                     self.db_service.record_agent_run(
                         agent_id=agent_id,
-                        input_data=serializable_input,
+                        input_data=serializable_input,  # Direct object
                         output_data=result_str,
                         success=True,
                         execution_time=execution_time,
@@ -294,7 +293,7 @@ class LocalServer:
                     execution_time_ms=execution_time * 1000
                 )
 
-                # NEW: Sync invocation error to middleware
+                # Sync invocation error to middleware - FIXED: Direct objects
                 if middleware_invocation_id:
                     try:
                         await self.middleware_sync.sync_invocation_complete(
@@ -309,7 +308,7 @@ class LocalServer:
 
                 # Record in original agent_runs table for backward compatibility
                 try:
-                    # Convert input_data to serializable format
+                    # Convert input_data to serializable format - FIXED: Direct objects
                     serializable_input = {
                         "input_args": request.input_data.input_args,
                         "input_kwargs": request.input_data.input_kwargs
@@ -317,7 +316,7 @@ class LocalServer:
                     
                     self.db_service.record_agent_run(
                         agent_id=agent_id,
-                        input_data=serializable_input,
+                        input_data=serializable_input,  # Direct object
                         output_data=None,
                         success=False,
                         error_message=error_detail,
