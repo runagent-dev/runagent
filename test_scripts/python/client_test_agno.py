@@ -23,6 +23,6 @@ ra = RunAgentClient(
     )
 
 for chunk in ra.run(
-    "Benefits of a sound sleep"
+    "Benefits of a long drive"
 ):
     print(chunk['content'], end="")

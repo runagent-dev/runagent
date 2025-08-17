@@ -20,7 +20,10 @@
       {
         "file": "simple_assistant.py",
         "module": "agent_run_stream",
-        "tag": "agno_stream"
+        "tag": "agno_stream",
+        "extractor": {
+          "content": "$.content"
+        }
       },
       {
         "file": "simple_assistant.py",
