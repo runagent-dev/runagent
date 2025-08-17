@@ -139,8 +139,10 @@ class LocalServer:
             self.agent_synced_to_middleware = False
             return False
 
+
+
     def create_endpoint_handler_with_tracking(self, runner, agent_id, entrypoint_tag):
-        """ENHANCED - Create endpoint handler with invocation tracking and middleware sync"""
+        """Create endpoint handler with invocation tracking and middleware sync"""
 
         async def run_agent(request: AgentRunRequest):
             """Run a deployed agent with full invocation tracking and middleware sync"""
@@ -164,15 +166,16 @@ class LocalServer:
 
             self.log_execution_start(invocation_id, entrypoint_tag)
 
+            # NEW: Sync invocation start to middleware
             middleware_invocation_id = None
             if (hasattr(self, 'middleware_sync') and 
                 self.middleware_sync and 
                 self.middleware_sync.is_sync_enabled()):
                 
                 try:
-                    import asyncio
                     middleware_invocation_id = await self.middleware_sync.sync_invocation_start({
                         "agent_id": agent_id,
+                        "local_execution_id": invocation_id,
                         "input_data": {
                             "input_args": request.input_data.input_args,
                             "input_kwargs": request.input_data.input_kwargs
@@ -187,7 +190,7 @@ class LocalServer:
                         }
                     })
                 except Exception as e:
-                    console.print(f"[yellow]Middleware sync start failed: {e}[/yellow]")
+                    console.print(f"Middleware sync start failed: {e}")
 
             start_time = time.time()
             execution_success = False
@@ -195,7 +198,7 @@ class LocalServer:
             result_data = None
 
             try:
-                console.print(f"Running agent: [cyan]{agent_id}[/cyan] (invocation: {invocation_id}...)")
+                console.print(f"Running agent: {agent_id} (invocation: {invocation_id}...)")
 
                 result_data = await runner(
                     *request.input_data.input_args, **request.input_data.input_kwargs
@@ -215,10 +218,10 @@ class LocalServer:
                         output_data=serializable_output,
                         execution_time_ms=execution_time * 1000
                     )
-                    console.print(f"✅ [green]Local invocation tracking completed successfully[/green]")
+                    console.print("Local invocation tracking completed successfully")
                     
                 except Exception as e:
-                    console.print(f"❌ [red]Failed to complete local invocation tracking: {str(e)}[/red]")
+                    console.print(f"Failed to complete local invocation tracking: {str(e)}")
                     # Try with minimal safe data
                     try:
                         self.db_service.complete_invocation(
@@ -231,9 +234,9 @@ class LocalServer:
                             },
                             execution_time_ms=execution_time * 1000
                         )
-                        console.print(f"✅ [green]Local invocation tracking completed with safe fallback[/green]")
+                        console.print("Local invocation tracking completed with safe fallback")
                     except Exception as e2:
-                        console.print(f"❌ [red]Critical: Could not complete local invocation tracking: {str(e2)}[/red]")
+                        console.print(f"Critical: Could not complete local invocation tracking: {str(e2)}")
 
                 # NEW: Sync invocation completion to middleware
                 if middleware_invocation_id:
@@ -246,19 +249,28 @@ class LocalServer:
                             }
                         )
                     except Exception as e:
-                        console.print(f"[yellow]Failed to sync completion to middleware: {e}[/yellow]")
+                        console.print(f"Failed to sync completion to middleware: {e}")
 
                 # Record in original agent_runs table for backward compatibility
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=result_str,
-                    success=True,
-                    execution_time=execution_time,
-                )
+                try:
+                    # Convert input_data to serializable format
+                    serializable_input = {
+                        "input_args": request.input_data.input_args,
+                        "input_kwargs": request.input_data.input_kwargs
+                    }
+                    
+                    self.db_service.record_agent_run(
+                        agent_id=agent_id,
+                        input_data=serializable_input,
+                        output_data=result_str,
+                        success=True,
+                        execution_time=execution_time,
+                    )
+                except Exception as e:
+                    console.print(f"Warning: Could not record to agent_runs table: {e}")
 
                 console.print(
-                    f"✅ Agent [cyan]{agent_id}[/cyan] execution completed successfully in "
+                    f"Agent {agent_id} execution completed successfully in "
                     f"{execution_time:.2f}s (invocation: {invocation_id}...)"
                 )
 
@@ -271,8 +283,6 @@ class LocalServer:
                 )
 
             except Exception as e:
-                if os.getenv('DISABLE_TRY_CATCH'):
-                    raise
                 error_detail = f"Server error running agent {agent_id}: {str(e)}"
                 self.log_execution_error(invocation_id, e)
                 execution_time = time.time() - start_time
@@ -295,19 +305,28 @@ class LocalServer:
                             }
                         )
                     except Exception as sync_error:
-                        console.print(f"⚠️ [yellow]Failed to sync error to middleware: {sync_error}[/yellow]")
+                        console.print(f"Failed to sync error to middleware: {sync_error}")
 
                 # Record in original agent_runs table for backward compatibility
-                self.db_service.record_agent_run(
-                    agent_id=agent_id,
-                    input_data=request.input_data,
-                    output_data=None,
-                    success=False,
-                    error_message=error_detail,
-                    execution_time=execution_time,
-                )
+                try:
+                    # Convert input_data to serializable format
+                    serializable_input = {
+                        "input_args": request.input_data.input_args,
+                        "input_kwargs": request.input_data.input_kwargs
+                    }
+                    
+                    self.db_service.record_agent_run(
+                        agent_id=agent_id,
+                        input_data=serializable_input,
+                        output_data=None,
+                        success=False,
+                        error_message=error_detail,
+                        execution_time=execution_time,
+                    )
+                except Exception as e:
+                    console.print(f"Warning: Could not record to agent_runs table: {e}")
 
-                console.print(f"💥 [red]{error_detail}[/red] (invocation: {invocation_id[:8]}...)")
+                console.print(f"{error_detail} (invocation: {invocation_id[:8]}...)")
 
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail

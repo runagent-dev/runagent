@@ -1,7 +1,7 @@
 # from runagent import RunAgentClient
 
 # ra = RunAgentClient(
-#     agent_id="52f357ae-d4d8-4146-9ea5-8669a6091475",
+#     agent_id="80277adc-77f5-4314-a95d-9bb265bbdda3",
 #     entrypoint_tag="ag2_invoke",
 #     local=True
 #     )
@@ -18,7 +18,7 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="338d629e-53b4-46cb-a6d9-9db1b5b5c5c8",
+    agent_id="80277adc-77f5-4314-a95d-9bb265bbdda3",
     entrypoint_tag="ag2_stream",
     local=True
     )
