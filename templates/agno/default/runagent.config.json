@@ -15,17 +15,13 @@
       {
         "file": "simple_assistant.py",
         "module": "agent.run",
-        "tag": "agno_assistant",
-        "extractor": {
-          "content": "$.content"
-        }
+        "tag": "agno_assistant"
       },
       {
         "file": "simple_assistant.py",
         "module": "agent_run_stream",
         "tag": "agno_stream",
         "extractor": {
-          "timestamp": "$.created_at",
           "content": "$.content"
         }
       },

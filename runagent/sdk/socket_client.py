@@ -3,6 +3,7 @@ import asyncio
 from typing import AsyncIterator, Iterator, Optional
 from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest, AgentInputArgs, MessageType, SafeMessage
 import json
+import uuid
 from typing import Any
 from runagent.utils.config import Config
 from runagent.utils.serializer import CoreSerializer

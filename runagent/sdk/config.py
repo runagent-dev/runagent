@@ -91,7 +91,7 @@ class SDKConfig:
         api_key: t.Optional[str] = None,
         base_url: t.Optional[str] = None,
         save: bool = True,
-        validate_auth: bool = True,  # NEW: Add option to skip validation
+        validate_auth: bool = True,
     ) -> bool:
         """
         Setup and validate configuration.
@@ -100,7 +100,7 @@ class SDKConfig:
             api_key: API key for authentication
             base_url: Base URL for the service
             save: Whether to save to config file
-            validate_auth: Whether to validate authentication (can be disabled for testing)
+            validate_auth: Whether to validate authentication
 
         Returns:
             True if setup is successful
@@ -123,8 +123,10 @@ class SDKConfig:
 
         # Test authentication if requested
         if validate_auth:
-            if not self._test_authentication():
-                raise AuthenticationError("Authentication failed with provided credentials")
+            auth_result = self._test_authentication()
+            if not auth_result.get("success"):
+                error_msg = auth_result.get("error", "Authentication failed with provided credentials")
+                raise AuthenticationError(error_msg)
 
         # Save if requested
         if save:
@@ -132,8 +134,8 @@ class SDKConfig:
 
         return True
 
-    def _test_authentication(self) -> bool:
-        """Test authentication with current configuration"""
+    def _test_authentication(self) -> t.Dict[str, t.Any]:
+        """Test authentication with current configuration - SIMPLIFIED"""
         try:
             from .rest_client import RestClient
 
@@ -142,51 +144,99 @@ class SDKConfig:
                 base_url=self._config.get("base_url"),
             )
             
-            # Use the new auth validation endpoint
-            response = client.http.get("/auth/validate", timeout=10)
+            # Test connection using the profile endpoint
+            response = client.http.get("/users/profile", timeout=10)
             
             if response.status_code == 200:
-                user_data = response.json()
+                profile_data = response.json()
+                
+                # Extract user info from the middleware response structure
+                auth_data = profile_data.get("auth_data", {})
+                profile_data_inner = profile_data.get("profile_data", {})
+                
+                user_info = {
+                    "email": auth_data.get("email") or profile_data_inner.get("email"),
+                    "user_id": auth_data.get("id") or profile_data_inner.get("id"),
+                    "tier": profile_data_inner.get("tier", "free")
+                }
                 
                 # Store user info for later display
-                if user_data.get("status") == "success" and user_data.get("user"):
-                    self._config.update({
-                        "user_email": user_data["user"].get("email"),
-                        "user_id": user_data["user"].get("id"),
-                        "user_tier": user_data["user"].get("tier", "free")
-                    })
+                self._config.update({
+                    "user_email": user_info["email"],
+                    "user_id": user_info["user_id"],
+                    "user_tier": user_info["tier"],
+                    "auth_validated": True
+                })
                 
-                return True
+                return {
+                    "success": True,
+                    "user_info": user_info
+                }
+            
+            elif response.status_code == 401:
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("detail", "Invalid API key")
+                except:
+                    error_detail = "API key authentication failed"
+                
+                return {
+                    "success": False,
+                    "error": error_detail
+                }
+            
             else:
-                return False
+                return {
+                    "success": False,
+                    "error": f"Authentication test failed with status {response.status_code}"
+                }
                 
         except Exception as e:
-            print(f"Authentication test failed: {e}")
-            return False
+            # Handle connection errors gracefully
+            error_msg = str(e)
+            if "Connection" in error_msg or "timeout" in error_msg.lower():
+                return {
+                    "success": False,
+                    "error": "Cannot connect to middleware server"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Authentication test failed: {error_msg}"
+                }
 
     def is_configured(self) -> bool:
-        """Check if SDK is properly configured"""
+        """Check if SDK is configured"""
         return bool(self._config.get("api_key") and self._config.get("base_url"))
 
     def is_authenticated(self) -> bool:
-        """Check if current configuration is authenticated"""
-        return self.is_configured() and self._test_authentication()
+        """Check if current configuration is authenticated - USE CACHED RESULT"""
+        if not self.is_configured():
+            return False
+        
+        # Use cached validation result to avoid repeated API calls
+        return self._config.get("auth_validated", False)
 
     def get_status(self) -> t.Dict[str, t.Any]:
-        """Get detailed configuration status"""
-        return {
+        """Get detailed configuration status - NO REDUNDANT VALIDATION"""
+        status = {
             "configured": self.is_configured(),
-            "authenticated": self.is_authenticated() if self.is_configured() else False,
             "api_key_set": bool(self._config.get("api_key")),
             "base_url": self._config.get("base_url"),
-            "user_info": {
-                "email": self._config.get("user_email"),
-                "user_id": self._config.get("user_id"),
-                "tier": self._config.get("user_tier")
-            },
             "config_file": str(self.config_file),
             "config_file_exists": self.config_file.exists(),
+            "authenticated": self.is_authenticated(),  # Uses cached result
         }
+        
+        # Add user info if available (no additional API calls)
+        user_info = {
+            "email": self._config.get("user_email"),
+            "user_id": self._config.get("user_id"),
+            "tier": self._config.get("user_tier")
+        }
+        status["user_info"] = user_info
+        
+        return status
 
     def clear(self) -> bool:
         """Clear all configuration"""
@@ -197,6 +247,33 @@ class SDKConfig:
             return True
         except (IOError, OSError):
             return False
+
+    def validate_authentication(self) -> t.Dict[str, t.Any]:
+        """Public method to validate authentication - ONLY WHEN EXPLICITLY CALLED"""
+        if not self.is_configured():
+            return {
+                "success": False,
+                "error": "No API key configured",
+                "configured": False
+            }
+        
+        # Only validate if explicitly requested
+        auth_result = self._test_authentication()
+        
+        if auth_result.get("success"):
+            return {
+                "success": True,
+                "authenticated": True,
+                "user_info": auth_result.get("user_info", {}),
+                "base_url": self.base_url
+            }
+        else:
+            return {
+                "success": False,
+                "authenticated": False,
+                "error": auth_result.get("error", "Authentication failed"),
+                "base_url": self.base_url
+            }
 
     # Property accessors
     @property
@@ -213,5 +290,7 @@ class SDKConfig:
     def user_info(self) -> t.Dict[str, t.Any]:
         """Get user information"""
         return {
-            k: v for k, v in self._config.items() if k not in ["api_key", "base_url"]
+            "email": self._config.get("user_email"),
+            "user_id": self._config.get("user_id"),
+            "tier": self._config.get("user_tier")
         }

@@ -75,6 +75,7 @@ class HttpHandler:
         })
 
         if self.api_key:
+            # Support both JWT tokens and API keys
             self.session.headers.update({
                 "Authorization": f"Bearer {self.api_key}",
                 "User-Agent": "RunAgent-CLI/1.0"
@@ -85,12 +86,13 @@ class HttpHandler:
         return f"{self.base_url.rstrip('/')}/{path.lstrip('/')}"
 
     def _handle_error_response(self, response: requests.Response) -> None:
-        """Handle error responses"""
+        """Handle error responses - UPDATED for middleware errors"""
         error_message = f"HTTP Error: {response.status_code}"
 
         try:
             error_data = response.json()
             if isinstance(error_data, dict):
+                # Handle middleware-style errors
                 if "detail" in error_data:
                     error_message = error_data["detail"]
                 elif "message" in error_data:
@@ -98,14 +100,15 @@ class HttpHandler:
                 elif "error" in error_data:
                     error_message = error_data["error"]
         except (json.JSONDecodeError, ValueError):
-            if os.getenv('DISABLE_TRY_CATCH'):
-                raise
             if response.text:
                 error_message = response.text
 
         # Handle different error types based on status code
         if response.status_code == 401:
-            raise AuthenticationError(error_message, response.status_code, response)
+            if "Not authenticated" in error_message:
+                raise AuthenticationError("API key is invalid or expired", response.status_code, response)
+            else:
+                raise AuthenticationError(error_message, response.status_code, response)
         elif response.status_code == 403:
             raise AuthenticationError(f"Access denied: {error_message}", response.status_code, response)
         elif response.status_code in (400, 422):
@@ -223,6 +226,9 @@ class HttpHandler:
             pass
 
 
+
+# runagent/sdk/rest_client.py - FIXED RestClient initialization
+
 class RestClient:
     """Client for remote server deployment via REST API"""
 
@@ -242,8 +248,12 @@ class RestClient:
             raw_base_url = Config.get_base_url()
             self.base_url = raw_base_url.rstrip("/") + api_prefix
 
-        # Initialize HTTP handler
-        self.http = HttpHandler(api_key=self.api_key, base_url=self.base_url)
+        # Initialize HTTP handler directly with API key
+        # The middleware auth system will handle JWT conversion automatically
+        self.http = HttpHandler(
+            api_key=self.api_key,  # Use API key directly - middleware handles conversion
+            base_url=self.base_url
+        )
 
         # Cache for limits to avoid repeated API calls
         self._limits_cache = None
@@ -672,46 +682,120 @@ class RestClient:
                 return None
         return None
 
-    def validate_api_connection(self) -> Dict:
-        """Validate API connection and authentication"""
+# runagent/sdk/rest_client.py - FIXED RestClient initialization
+
+class RestClient:
+    """Client for remote server deployment via REST API"""
+
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_prefix: Optional[str] = "/api/v1",
+    ):
+        """Initialize REST client for middleware server"""
+        self.api_key = api_key or Config.get_api_key()
+        
+        # Fix base URL construction
+        if base_url:
+            self.base_url = base_url.rstrip("/") + api_prefix
+        else:
+            raw_base_url = Config.get_base_url()
+            self.base_url = raw_base_url.rstrip("/") + api_prefix
+
+        # Initialize HTTP handler directly with API key
+        # The middleware auth system will handle JWT conversion automatically
+        self.http = HttpHandler(
+            api_key=self.api_key,  # Use API key directly - middleware handles conversion
+            base_url=self.base_url
+        )
+
+        # Cache for limits to avoid repeated API calls
+        self._limits_cache = None
+        self._cache_expiry = None
+
+
+    def validate_api_connection(self) -> Dict[str, Any]:
+        """Validate API connection and authentication - SIMPLIFIED"""
         try:
-            # Test basic connectivity
+            # Test basic connectivity first
             try:
-                self.http.get("/health", timeout=10)
-
-                # Test authentication if API key provided
-                if self.api_key:
-                    limits_result = self.get_local_db_limits()
-                    
+                health_response = self.http.get("/health", timeout=10, handle_errors=False)
+                
+                if health_response.status_code != 200:
                     return {
-                        "success": True,
-                        "api_connected": True,
-                        "api_authenticated": limits_result.get("api_validated", False),
-                        "enhanced_limits": limits_result.get("enhanced_limits", False),
-                        "base_url": self.base_url,
-                    }
-                else:
-                    return {
-                        "success": True,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "enhanced_limits": False,
-                        "base_url": self.base_url,
-                        "message": "No API key provided",
+                        "success": False,
+                        "api_connected": False,
+                        "error": f"Health check failed: {health_response.status_code}",
                     }
 
-            except (ClientError, ServerError, ConnectionError) as e:
+            except Exception as e:
                 return {
                     "success": False,
                     "api_connected": False,
-                    "error": f"API health check failed: {e.message}",
+                    "error": f"Cannot connect to middleware: {str(e)}",
+                }
+
+            # Test authentication if API key provided
+            if self.api_key:
+                try:
+                    # Try to get user profile which requires authentication
+                    auth_response = self.http.get("/users/profile", timeout=10)
+                    
+                    if auth_response.status_code == 200:
+                        profile_data = auth_response.json()
+                        auth_data = profile_data.get("auth_data", {})
+                        
+                        return {
+                            "success": True,
+                            "api_connected": True,
+                            "api_authenticated": True,
+                            "user_info": {
+                                "email": auth_data.get("email"),
+                                "id": auth_data.get("id")
+                            },
+                            "base_url": self.base_url,
+                        }
+                    else:
+                        error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
+                        return {
+                            "success": False,
+                            "api_connected": True,
+                            "api_authenticated": False,
+                            "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
+                            "base_url": self.base_url,
+                        }
+                        
+                except AuthenticationError as e:
+                    return {
+                        "success": False,
+                        "api_connected": True,
+                        "api_authenticated": False,
+                        "error": f"Invalid API key: {e.message}",
+                        "base_url": self.base_url,
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "api_connected": True,
+                        "api_authenticated": False,
+                        "error": f"Authentication test failed: {str(e)}",
+                        "base_url": self.base_url,
+                    }
+            else:
+                return {
+                    "success": True,
+                    "api_connected": True,
+                    "api_authenticated": False,
+                    "base_url": self.base_url,
+                    "message": "No API key provided",
                 }
 
         except Exception as e:
             return {
                 "success": False,
                 "api_connected": False,
-                "error": f"Connection failed: {str(e)}",
+                "error": f"Connection validation failed: {str(e)}",
             }
 
 
@@ -839,12 +923,48 @@ class RestClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def validate_api_connection(self) -> Dict[str, Any]:
-        """Validate API connection and authentication - ENHANCED"""
+    def _get_jwt_token_from_api_key(self) -> Optional[str]:
+        """Convert API key to JWT token using middleware auth endpoint"""
+        if not self.api_key:
+            return None
+            
         try:
-            # Test basic connectivity
+            # Check if API key is already a JWT token
+            if self.api_key.startswith('eyJ'):  # JWT tokens start with 'eyJ'
+                return self.api_key
+            
+            # Create a temporary HTTP handler without auth for this request
+            temp_http = HttpHandler(base_url=self.base_url)
+            
+            # The middleware auth.py shows that API keys are validated and converted to JWT
+            # We'll use the validation endpoint which should return a JWT
             try:
-                health_response = self.http.get("/health", timeout=10)
+                response = temp_http.post("/tokens/validate", data={"token": self.api_key}, timeout=10)
+                
+                if response.status_code == 200:
+                    validation_result = response.json()
+                    if validation_result.get("valid"):
+
+                        return self.api_key
+                else:
+                    console.print(f"[red]API key validation failed: {response.status_code}[/red]")
+                    return None
+                    
+            except Exception as e:
+                console.print(f"[yellow]Could not validate API key: {e}[/yellow]")
+                # Return API key anyway - let middleware handle the conversion
+                return self.api_key
+                
+        except Exception as e:
+            console.print(f"[red]Error processing API key: {e}[/red]")
+            return None
+
+    def validate_api_connection(self) -> Dict[str, Any]:
+        """Validate API connection and authentication - UPDATED"""
+        try:
+            # Test basic connectivity first
+            try:
+                health_response = self.http.get("/health", timeout=10, handle_errors=False)
                 
                 if health_response.status_code != 200:
                     return {
@@ -853,50 +973,74 @@ class RestClient:
                         "error": f"Health check failed: {health_response.status_code}",
                     }
 
-                # Test authentication if API key provided
-                if self.api_key:
-                    auth_response = self.http.get("/auth/validate", timeout=10)
-                    
-                    if auth_response.status_code == 200:
-                        auth_data = auth_response.json()
-                        return {
-                            "success": True,
-                            "api_connected": True,
-                            "api_authenticated": True,
-                            "user_info": auth_data.get("user", {}),
-                            "base_url": self.base_url,
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "api_connected": True,
-                            "api_authenticated": False,
-                            "error": f"Authentication failed: {auth_response.status_code}",
-                            "base_url": self.base_url,
-                        }
-                else:
-                    return {
-                        "success": True,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "base_url": self.base_url,
-                        "message": "No API key provided",
-                    }
-
             except Exception as e:
                 return {
                     "success": False,
                     "api_connected": False,
-                    "error": f"Connection failed: {str(e)}",
+                    "error": f"Cannot connect to middleware: {str(e)}",
+                }
+
+            # Test authentication if API key provided
+            if self.api_key:
+                try:
+                    # Try to get user profile which requires authentication
+                    auth_response = self.http.get("/users/profile", timeout=10)
+                    
+                    if auth_response.status_code == 200:
+                        profile_data = auth_response.json()
+                        user_info = profile_data.get("auth_data", {})
+                        
+                        return {
+                            "success": True,
+                            "api_connected": True,
+                            "api_authenticated": True,
+                            "user_info": {
+                                "email": user_info.get("email"),
+                                "id": user_info.get("id")
+                            },
+                            "base_url": self.base_url,
+                        }
+                    else:
+                        error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
+                        return {
+                            "success": False,
+                            "api_connected": True,
+                            "api_authenticated": False,
+                            "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
+                            "base_url": self.base_url,
+                        }
+                        
+                except AuthenticationError as e:
+                    return {
+                        "success": False,
+                        "api_connected": True,
+                        "api_authenticated": False,
+                        "error": f"Invalid API key: {e.message}",
+                        "base_url": self.base_url,
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "api_connected": True,
+                        "api_authenticated": False,
+                        "error": f"Authentication test failed: {str(e)}",
+                        "base_url": self.base_url,
+                    }
+            else:
+                return {
+                    "success": True,
+                    "api_connected": True,
+                    "api_authenticated": False,
+                    "base_url": self.base_url,
+                    "message": "No API key provided",
                 }
 
         except Exception as e:
             return {
                 "success": False,
                 "api_connected": False,
-                "error": f"Validation failed: {str(e)}",
+                "error": f"Connection validation failed: {str(e)}",
             }
-
     def __del__(self):
         """Cleanup on deletion"""
         try:
