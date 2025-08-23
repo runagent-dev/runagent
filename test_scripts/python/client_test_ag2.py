@@ -1,3 +1,6 @@
+##non-streaming
+
+
 # from runagent import RunAgentClient
 
 # ra = RunAgentClient(
@@ -14,6 +17,9 @@
 
 # print(agent_result)
 # ==================================
+
+
+######streaming
 
 from runagent import RunAgentClient
 
