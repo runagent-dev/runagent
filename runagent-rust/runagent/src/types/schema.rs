@@ -149,6 +149,7 @@ pub enum MessageType {
     Error,
     Status,
     RawData,
+    Data,
     StructuredData,
 }
 
