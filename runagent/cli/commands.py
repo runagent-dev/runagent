@@ -27,6 +27,26 @@ from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 console = Console()
 
 
+def print_version(ctx, param, value):
+    """Custom version callback with colored output"""
+    if not value or ctx.resilient_parsing:
+        return
+    try:
+        from runagent.__version__ import __version__
+        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
+    except ImportError:
+        console.print("[red]runagent version unknown[/red]")
+    ctx.exit()
+
+
+@click.command()
+def version():
+    """Show version information"""
+    try:
+        from runagent.__version__ import __version__
+        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
+    except ImportError:
+        console.print("[red]runagent version unknown[/red]")
 
 @click.command()
 @click.option("--api-key", required=True, help="Your API key")
