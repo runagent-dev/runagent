@@ -1,5 +1,5 @@
 #!/bin/bash
-# release.sh - Version bumping and tagging script
+# release.sh - Version bumping and tagging scri
 
 set -e
 
