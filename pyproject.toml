@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "runagent"
-version = "0.1.19"
+version = "0.1.20"
 description = "A command-line tool and SDK for deploying, managing, and interacting with AI agents"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -103,7 +103,7 @@ line_length = 88
 skip = ["docs"]
 
 [tool.mypy]
-python_version = "0.1.19"
+python_version = "0.1.20"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -159,7 +159,7 @@ fail_under = 80
 
 [tool.ruff]
 line-length = 88
-target-version = "0.1.19"
+target-version = "0.1.20"
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
