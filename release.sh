@@ -105,6 +105,7 @@ update_python_version() {
     local version=$1
     local pyproject_file="pyproject.toml"
     local version_file="runagent/__version__.py"
+    local init_file="runagent/__init__.py"
     local success=false
     
     # Update pyproject.toml
@@ -130,6 +131,15 @@ update_python_version() {
     else
         mkdir -p "$(dirname "$version_file")"
         echo "__version__ = \"$version\"" > "$version_file"
+    fi
+    
+    # Also update __init__.py version
+    if [[ -f "$init_file" ]]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/__version__ = \".*\"/__version__ = \"$version\"/" "$init_file"
+        else
+            sed -i "s/__version__ = \".*\"/__version__ = \"$version\"/" "$init_file"
+        fi
     fi
     
     if verify_version_update "$version_file" "$version" "__version__ = \"$version\""; then
@@ -222,56 +232,9 @@ EOF
 }
 
 generate_changelog() {
-    # local version=$1
-    # local tag_name="v$version"
-    
-    # echo "📝 Generating changelog with git-cliff..."
-    
-    # # Find the previous tag to determine range
-    # local last_tag
-    # last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-    
-    # if [[ -n "$last_tag" ]]; then
-    #     echo "📍 Generating changelog for range: $last_tag → $tag_name"
-        
-    #     # Generate changelog for the current version using --latest if we're at the latest
-    #     # Or specify the tag explicitly for historical generation
-    #     if [[ -f "cliff.toml" ]]; then
-            # First try to generate for the specific tag
-    # git-cliff --tag "$tag_name" --latest --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
-    #             echo "⚠️  git-cliff --latest failed, trying full tag generation"
-    #             git-cliff --tag "$tag_name" --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
-    #                 echo "⚠️  git-cliff failed, creating basic changelog"
-    #                 create_basic_changelog "$version" "$last_tag"
-    #                 return
-    #             }
-    #         }
-    #     else
-    #         git-cliff --tag "$tag_name" --latest --strip header --strip footer > "CHANGELOG_NEW.md" 2>/dev/null || {
-    #             echo "⚠️  git-cliff failed, creating basic changelog"
-    #             create_basic_changelog "$version" "$last_tag"
-    #             return
-    #         }
-    #     fi
-    # else
-    #     echo "📍 No previous tags found - generating changelog for initial release"
-    #     create_initial_changelog "$version"
-    #     return
-    # fi
-    
-    # Check if we got meaningful output
-    # if [[ ! -s "CHANGELOG_NEW.md" ]] || [[ $(wc -l < "CHANGELOG_NEW.md") -lt 2 ]]; then
-    #     echo "⚠️  git-cliff produced minimal output, creating basic changelog"
-    #     create_basic_changelog "$version" "$last_tag"
-    #     return
-    # fi
     git-cliff --output CHANGELOG.md --latest
-    # Update main CHANGELOG.md
-    # update_main_changelog "$version"
-    
     echo "✅ Changelog generated successfully"
 }
-
 
 show_update_summary() {
     echo ""
@@ -317,7 +280,6 @@ check_prerequisites() {
         echo "❌ Error: Not in a git repository or git is not working"
         exit 1
     fi
-    
 }
 
 handle_existing_tag() {
@@ -372,7 +334,6 @@ check_git_cliff
 
 check_prerequisites
 
-
 # Update all package files
 update_python_version "$VERSION"
 update_javascript_version "$VERSION"
@@ -389,15 +350,8 @@ fi
 
 if [[ "$any_success" == "false" ]]; then
     echo "❌ No version updates succeeded. Aborting release."
-    # # Restore backup
-    # if [[ -f "CHANGELOG.md.bak" ]]; then
-    #     mv "CHANGELOG.md.bak" "CHANGELOG.md"
-    # fi
     exit 1
 fi
-
-# Generate changelog
-# generate_changelog "$VERSION"
 
 # Show git changes
 if ! git diff --name-only --quiet 2>/dev/null; then
@@ -413,10 +367,8 @@ echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Release cancelled."
     git checkout -- . 2>/dev/null || true
-
     exit 0
 fi
-
 
 # Handle existing tag
 if handle_existing_tag "$VERSION"; then
@@ -424,7 +376,6 @@ if handle_existing_tag "$VERSION"; then
     generate_changelog
     exit 0
 fi
-
 
 # Stage and commit changes
 git add .
@@ -434,7 +385,7 @@ if git diff --staged --quiet; then
     exit 1
 fi
 
-# # Create new tag
+# Create new tag
 git tag -a "v$VERSION" -m "Release v$VERSION
 RunAgent Universal Release v$VERSION"
 
@@ -442,7 +393,6 @@ git push --tag
 echo "✅ Tag v$VERSION created and pushed successfully!"
 
 generate_changelog
-
 
 git commit -m "chore: bump version to v$VERSION
 
