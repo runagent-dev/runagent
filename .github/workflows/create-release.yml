@@ -14,6 +14,7 @@ jobs:
       contents: write
       pull-requests: read
       issues: read
+      id-token: write  # Not needed for API token approach, but kept for compatibility
     
     steps:
     - uses: actions/checkout@v4
@@ -106,12 +107,7 @@ jobs:
         # Check if pyproject.toml exists
         elif [ -f "pyproject.toml" ]; then
           # Extract version from pyproject.toml
-          PACKAGE_VERSION=$(python -c "
-          import tomllib
-          with open('pyproject.toml', 'rb') as f:
-              data = tomllib.load(f)
-          print(data['project']['version'])
-          ")
+          PACKAGE_VERSION=$(python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); print(data['project']['version'])")
         else
           echo "❌ Neither setup.py nor pyproject.toml found!"
           exit 1
@@ -141,12 +137,7 @@ jobs:
         
         # Get package name from setup.py or pyproject.toml
         if [ -f "pyproject.toml" ]; then
-          PACKAGE_NAME=$(python -c "
-          import tomllib
-          with open('pyproject.toml', 'rb') as f:
-              data = tomllib.load(f)
-          print(data['project']['name'])
-          ")
+          PACKAGE_NAME=$(python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); print(data['project']['name'])")
         elif [ -f "setup.py" ]; then
           PACKAGE_NAME=$(python setup.py --name)
         else
