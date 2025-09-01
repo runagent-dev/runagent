@@ -3,7 +3,7 @@ import typing as t
 from pathlib import Path
 from runagent.constants import AGENT_CONFIG_FILE_NAME
 from runagent.utils.imports import PackageImporter
-from runagent.utils.schema import RunAgentConfig
+from runagent.utils.schema import RunAgentConfig, PythonicEntryPoint
 from .enums import FrameworkType
 
 
@@ -130,7 +130,14 @@ def validate_agent(
 
     config = get_agent_config(folder_path)
 
-    is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
+    if isinstance(config.agent_architecture.entrypoints[0], PythonicEntryPoint):
+        is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
+        return is_valid, details
+    else:
+        return True, {
+            "valid": True,
+            "error_msgs": [],
+        }
 
 
 def validate_pythonic_agent(config, dynamic_loading, folder_path):

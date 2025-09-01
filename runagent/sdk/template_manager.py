@@ -158,7 +158,7 @@ class TemplateManager:
         existing_config.created_at = time.strftime("%Y-%m-%d %H:%M:%S")
 
         config_content = existing_config.model_dump(
-            exclude={"agent_architecture"}
+            exclude={"agent_architecture", "framework"}
         )
 
         Config.create_config(str(folder_path), config_content)

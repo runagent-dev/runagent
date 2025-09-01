@@ -12,6 +12,7 @@ class PythonicType(Enum):
     AGNO = "agno"
     AUTOGEN = "autogen"
     CREWAI = "crewai"
+    DEFAULT = "default"
     LANGCHAIN = "langchain"
     LANGGRAPH = "langgraph"
     LETTA = "letta"
