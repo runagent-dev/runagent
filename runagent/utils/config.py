@@ -42,6 +42,7 @@ class Config:
 
         # Write config file
         with config_file.open("w") as f:
+            
             json.dump(config_content, f, indent=2)
 
         return str(config_file)
