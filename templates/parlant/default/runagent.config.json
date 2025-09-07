@@ -1,0 +1,46 @@
+{
+  "agent_name": "Parlant Assistant",
+  "description": "A Parlant-based conversational AI assistant with guideline-driven behavior",
+  "framework": "parlant", 
+  "template": "default",
+  "version": "1.0.0",
+  "created_at": "2025-01-15 00:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/parlant/default",
+    "author": "runagent-team"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "simple_chat",
+        "tag": "parlant_simple"
+      },
+      {
+        "file": "agent.py", 
+        "module": "conversational_chat",
+        "tag": "parlant_conversation"
+      },
+      {
+        "file": "agent.py",
+        "module": "chat_stream", 
+        "tag": "parlant_stream"
+      },
+      {
+        "file": "agent.py",
+        "module": "agent_with_guidelines",
+        "tag": "parlant_custom"
+      },
+      {
+        "file": "agent.py",
+        "module": "create_agent",
+        "tag": "parlant_info"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "",
+    "PARLANT_LOG_LEVEL": "INFO"
+  }
+}
