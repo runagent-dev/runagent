@@ -18,24 +18,9 @@
         "tag": "parlant_simple"
       },
       {
-        "file": "agent.py", 
-        "module": "conversational_chat",
-        "tag": "parlant_conversation"
-      },
-      {
         "file": "agent.py",
         "module": "chat_stream", 
         "tag": "parlant_stream"
-      },
-      {
-        "file": "agent.py",
-        "module": "agent_with_guidelines",
-        "tag": "parlant_custom"
-      },
-      {
-        "file": "agent.py",
-        "module": "create_agent",
-        "tag": "parlant_info"
       }
     ]
   },

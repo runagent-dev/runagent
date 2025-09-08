@@ -158,3 +158,5 @@ go.sum
 myenv/
 myvenv/
 
+#parlant
+parlant-data/
