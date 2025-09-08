@@ -18,6 +18,7 @@ class PythonicType(Enum):
     LETTA = "letta"
     LLAMAINDEX = "llamaindex"
     OPENAI = "openai"
+    PARLANT = "parlant"
 
 
 class WebhookType(Enum):
