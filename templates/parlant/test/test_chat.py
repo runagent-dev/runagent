@@ -148,7 +148,7 @@ async def main():
         
         # Test messages
         test_messages = [
-            "Hello!",
+            "Hey babe how can you help me?",
             "What time is it?", 
             "Calculate 25 * 4 + 10",
             "What's the square root of 144?"

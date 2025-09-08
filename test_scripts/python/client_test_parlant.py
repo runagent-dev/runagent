@@ -20,7 +20,7 @@ ra_simple = RunAgentClient(
 )
 
 simple_result = ra_simple.run(
-    message="Which of the things i can ask to you?"
+    message="can you tell me a joke."
 )
 
 print("✅ Simple Chat Response:")
@@ -28,26 +28,26 @@ print(simple_result)
 
 
 
-# # ============================================
-# # STREAMING TESTS
-# # ============================================
+# ============================================
+# STREAMING TESTS
+# ============================================
 
-# print("\n\n🌊 Testing Parlant Agent - Streaming")
-# print("=" * 50)
+print("\n\n🌊 Testing Parlant Agent - Streaming")
+print("=" * 50)
 
 
-# print("\n5️⃣ Testing Streaming Chat")
-# print("-" * 30)
+print("\n5️⃣ Testing Streaming Chat")
+print("-" * 30)
 
-# ra_stream = RunAgentClient(
-#     agent_id="9c39620c-c309-4478-a44e-2a45e254a9fb",  # Replace with actual agent ID
-#     entrypoint_tag="parlant_stream",
-#     local=True
-# )
+ra_stream = RunAgentClient(
+    agent_id="9c39620c-c309-4478-a44e-2a45e254a9fb",  # Replace with actual agent ID
+    entrypoint_tag="parlant_stream",
+    local=True
+)
 
-# print("✅ Streaming Response:")
-# for chunk in ra_stream.run(
-#     message="what is the current time now?"
-# ):
-#     print(chunk)
+print("✅ Streaming Response:")
+for chunk in ra_stream.run(
+    message="what is the current time now?"
+):
+    print(chunk)
 
