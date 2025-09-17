@@ -79,53 +79,53 @@ This starts a local FastAPI server with:
 - WebSocket support for streaming
 - Built-in API documentation at `/docs`
 
-### Supported Frameworks
+## Supported Frameworks
 
-RunAgent works with any Python AI framework. Here are some of the frameworks we officially support:
+RunAgent works with any Python AI framework. Here's how different frameworks integrate:
 
 ```mermaid
-graph TB
-    subgraph "🐍 Python AI Frameworks"
-        LG[🔷 LangGraph<br/>Graph-based agents]
-        LC[⛓️ LangChain<br/>Chain-based agents]
-        LI[🦜 LlamaIndex<br/>RAG & knowledge agents]
-        CR[👥 CrewAI<br/>Multi-agent systems]
-        LT[🧠 Letta<br/>Memory-enabled agents]
-        AG[🤖 AutoGen<br/>Conversational agents]
-        AN[⚡ Agno<br/>Reasoning agents]
-        CS[🎯 Custom<br/>Your framework]
+graph TD
+    A[Your Python Agent] --> B[RunAgent Platform]
+    
+    subgraph "AI Frameworks"
+        C[LangGraph]
+        D[LangChain] 
+        E[CrewAI]
+        F[Letta]
+        G[LlamaIndex]
+        H[AutoGen]
+        I[Agno]
+        J[Custom Framework]
     end
     
-    subgraph "🌐 RunAgent Universal Access"
-        RA[RunAgent Platform]
+    subgraph "RunAgent Core"
+        B --> K[Framework Detection]
+        K --> L[Entrypoint Mapping]
+        L --> M[Universal API]
     end
     
-    subgraph "💻 Multi-Language SDKs"
-        PY[🐍 Python SDK]
-        JS[🟨 JavaScript SDK]
-        RS[🦀 Rust SDK]
-        GO[🔷 Go SDK]
+    subgraph "SDK Access"
+        M --> N[Python SDK]
+        M --> O[JavaScript SDK]
+        M --> P[Rust SDK]
+        M --> Q[Go SDK]
+        M --> R[More SDKs...]
     end
     
-    LG --> RA
-    LC --> RA
-    LI --> RA
-    CR --> RA
-    LT --> RA
-    AG --> RA
-    AN --> RA
-    CS --> RA
+    C --> A
+    D --> A
+    E --> A
+    F --> A
+    G --> A
+    H --> A
+    I --> A
+    J --> A
     
-    RA --> PY
-    RA --> JS
-    RA --> RS
-    RA --> GO
-    
-    style RA fill:#4a90e2,stroke:#2171b5,stroke-width:3px,color:#fff
-    style PY fill:#3776ab,stroke:#2d5a87,stroke-width:2px,color:#fff
-    style JS fill:#f7df1e,stroke:#d4c117,stroke-width:2px,color:#000
-    style RS fill:#ce422b,stroke:#a33420,stroke-width:2px,color:#fff
-    style GO fill:#00add8,stroke:#0087a8,stroke-width:2px,color:#fff
+    N --> S[Your Application]
+    O --> S
+    P --> S
+    Q --> S
+    R --> S
 ```
 
 ### Use Your Agent
