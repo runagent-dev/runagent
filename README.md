@@ -83,27 +83,29 @@ This starts a local FastAPI server with:
 
 <div align="center">
 
-**Select a framework below and choose your SDK language:**
+**Select a Python agent framework and choose your SDK language:**
 
 </div>
 
-<!-- LangGraph Agent Examples -->
-<details>
-<summary><strong>🔷 LangGraph Agent</strong></summary>
+---
 
-<div align="center">
+## 🔷 **LangGraph Problem Solver Agent**
 
-**Choose your SDK:**
+**Perfect for**: Multi-step reasoning, problem decomposition, solution validation
 
-</div>
-
-<details>
-<summary>🐍 Python SDK</summary>
+<table>
+<tr>
+<td width="25%"><b>🐍 Python SDK</b></td>
+<td width="25%"><b>🟨 JavaScript SDK</b></td>
+<td width="25%"><b>🦀 Rust SDK</b></td>
+<td width="25%"><b>🔷 Go SDK</b></td>
+</tr>
+<tr>
+<td valign="top">
 
 ```python
 from runagent import RunAgentClient
 
-# LangGraph Problem Solver Agent
 client = RunAgentClient(
     agent_id="lg-solver-123",
     entrypoint_tag="solve_problem",
@@ -111,29 +113,22 @@ client = RunAgentClient(
 )
 
 result = client.run(
-    query="My laptop is running slow",
+    query="My laptop is slow",
     num_solutions=3,
-    constraints=[{"type": "budget", "value": 100}]
+    constraints=[{
+        "type": "budget", 
+        "value": 100
+    }]
 )
 print(result)
-
-# Streaming
-for chunk in client.run(
-    query="Fix my broken phone", 
-    num_solutions=4
-):
-    print(chunk)
 ```
 
-</details>
-
-<details>
-<summary>🟨 JavaScript SDK</summary>
+</td>
+<td valign="top">
 
 ```javascript
 import { RunAgentClient } from 'runagent';
 
-// LangGraph Problem Solver Agent
 const client = new RunAgentClient({
   agentId: "lg-solver-123",
   entrypointTag: "solve_problem",
@@ -142,25 +137,18 @@ const client = new RunAgentClient({
 
 await client.initialize();
 const result = await client.run({
-  query: "My laptop is running slow",
+  query: "My laptop is slow",
   num_solutions: 3,
-  constraints: [{"type": "budget", "value": 100}]
+  constraints: [{
+    type: "budget",
+    value: 100
+  }]
 });
 console.log(result);
-
-// Streaming
-for await (const chunk of client.run({
-  query: "Fix my broken phone",
-  num_solutions: 4
-})) {
-  process.stdout.write(chunk);
-}
 ```
 
-</details>
-
-<details>
-<summary>🦀 Rust SDK</summary>
+</td>
+<td valign="top">
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -168,13 +156,19 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // LangGraph Problem Solver Agent
-    let client = RunAgentClient::new("lg-solver-123", "solve_problem", true).await?;
+    let client = RunAgentClient::new(
+        "lg-solver-123", 
+        "solve_problem", 
+        true
+    ).await?;
     
     let result = client.run(&[
-        ("query", json!("My laptop is running slow")),
+        ("query", json!("My laptop is slow")),
         ("num_solutions", json!(3)),
-        ("constraints", json!([{"type": "budget", "value": 100}]))
+        ("constraints", json!([{
+            "type": "budget", 
+            "value": 100
+        }]))
     ]).await?;
     
     println!("Result: {}", result);
@@ -182,10 +176,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-</details>
-
-<details>
-<summary>🔷 Go SDK</summary>
+</td>
+<td valign="top">
 
 ```go
 package main
@@ -197,42 +189,50 @@ import (
 )
 
 func main() {
-    // LangGraph Problem Solver Agent
-    client, _ := client.New("lg-solver-123", "solve_problem", true)
+    client, _ := client.New(
+        "lg-solver-123", 
+        "solve_problem", 
+        true
+    )
     defer client.Close()
 
-    result, _ := client.Run(context.Background(), map[string]interface{}{
-        "query": "My laptop is running slow",
-        "num_solutions": 3,
-        "constraints": []map[string]interface{}{
-            {"type": "budget", "value": 100},
-        },
-    })
+    result, _ := client.Run(
+        context.Background(), 
+        map[string]interface{}{
+            "query": "My laptop is slow",
+            "num_solutions": 3,
+            "constraints": []map[string]interface{}{
+                {"type": "budget", "value": 100},
+            },
+        }
+    )
     fmt.Printf("Result: %v\n", result)
 }
 ```
 
-</details>
+</td>
+</tr>
+</table>
 
-</details>
+---
 
-<!-- CrewAI Agent Examples -->
-<details>
-<summary><strong>👥 CrewAI Multi-Agent</strong></summary>
+## 👥 **CrewAI Research Team**
 
-<div align="center">
+**Perfect for**: Multi-agent collaboration, research tasks, complex analysis
 
-**Choose your SDK:**
-
-</div>
-
-<details>
-<summary>🐍 Python SDK</summary>
+<table>
+<tr>
+<td width="25%"><b>🐍 Python SDK</b></td>
+<td width="25%"><b>🟨 JavaScript SDK</b></td>
+<td width="25%"><b>🦀 Rust SDK</b></td>
+<td width="25%"><b>🔷 Go SDK</b></td>
+</tr>
+<tr>
+<td valign="top">
 
 ```python
 from runagent import RunAgentClient
 
-# CrewAI Research Team
 client = RunAgentClient(
     agent_id="crew-research-456",
     entrypoint_tag="research_crew",
@@ -240,26 +240,24 @@ client = RunAgentClient(
 )
 
 result = client.run(
-    topic="AI Agent Security Best Practices"
+    topic="AI Security Best Practices"
 )
 print(result["final_report"])
 
 # Stream crew collaboration
 for update in client.run(
-    topic="Blockchain trends 2024"
+    topic="Blockchain trends"
 ):
-    print(f"Agent {update['agent']}: {update['task_update']}")
+    print(f"Agent {update['agent']}: "
+          f"{update['task_update']}")
 ```
 
-</details>
-
-<details>
-<summary>🟨 JavaScript SDK</summary>
+</td>
+<td valign="top">
 
 ```javascript
 import { RunAgentClient } from 'runagent';
 
-// CrewAI Research Team
 const client = new RunAgentClient({
   agentId: "crew-research-456",
   entrypointTag: "research_crew",
@@ -268,22 +266,20 @@ const client = new RunAgentClient({
 
 await client.initialize();
 const result = await client.run({
-  topic: "AI Agent Security Best Practices"
+  topic: "AI Security Best Practices"
 });
 console.log(result.final_report);
 
 // Stream crew collaboration
 for await (const update of client.run({
-  topic: "Blockchain trends 2024"
+  topic: "Blockchain trends"
 })) {
   console.log(`Agent ${update.agent}: ${update.task_update}`);
 }
 ```
 
-</details>
-
-<details>
-<summary>🦀 Rust SDK</summary>
+</td>
+<td valign="top">
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -291,11 +287,14 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // CrewAI Research Team
-    let client = RunAgentClient::new("crew-research-456", "research_crew", true).await?;
+    let client = RunAgentClient::new(
+        "crew-research-456", 
+        "research_crew", 
+        true
+    ).await?;
     
     let result = client.run(&[
-        ("topic", json!("AI Agent Security Best Practices"))
+        ("topic", json!("AI Security Best Practices"))
     ]).await?;
     
     println!("Research Result: {}", result);
@@ -303,10 +302,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-</details>
-
-<details>
-<summary>🔷 Go SDK</summary>
+</td>
+<td valign="top">
 
 ```go
 package main
@@ -318,66 +315,72 @@ import (
 )
 
 func main() {
-    // CrewAI Research Team
-    client, _ := client.New("crew-research-456", "research_crew", true)
+    client, _ := client.New(
+        "crew-research-456", 
+        "research_crew", 
+        true
+    )
     defer client.Close()
 
-    result, _ := client.Run(context.Background(), map[string]interface{}{
-        "topic": "AI Agent Security Best Practices",
-    })
+    result, _ := client.Run(
+        context.Background(), 
+        map[string]interface{}{
+            "topic": "AI Security Best Practices",
+        }
+    )
     fmt.Printf("Research Result: %v\n", result)
 }
 ```
 
-</details>
+</td>
+</tr>
+</table>
 
-</details>
+---
 
-<!-- Letta Agent Examples -->
-<details>
-<summary><strong>🧠 Letta Memory Agent</strong></summary>
+## 🧠 **Letta Memory Agent**
 
-<div align="center">
+**Perfect for**: Long-term conversations, personalized interactions, context retention
 
-**Choose your SDK:**
-
-</div>
-
-<details>
-<summary>🐍 Python SDK</summary>
+<table>
+<tr>
+<td width="25%"><b>🐍 Python SDK</b></td>
+<td width="25%"><b>🟨 JavaScript SDK</b></td>
+<td width="25%"><b>🦀 Rust SDK</b></td>
+<td width="25%"><b>🔷 Go SDK</b></td>
+</tr>
+<tr>
+<td valign="top">
 
 ```python
 from runagent import RunAgentClient
 
-# Letta Conversational Agent with Memory
 client = RunAgentClient(
     agent_id="letta-memory-789",
     entrypoint_tag="chat_with_memory",
     local=True
 )
 
-# Agent remembers previous conversations
+# Agent remembers context
 result = client.run(
     message="Hi, I'm Sarah and I love hiking"
 )
 print(result)
 
-# Later conversation - agent recalls Sarah loves hiking
+# Later - agent recalls Sarah's interests
 result = client.run(
-    message="What outdoor activities would you recommend?"
+    message="What outdoor activities "
+            "would you recommend?"
 )
 print(result)
 ```
 
-</details>
-
-<details>
-<summary>🟨 JavaScript SDK</summary>
+</td>
+<td valign="top">
 
 ```javascript
 import { RunAgentClient } from 'runagent';
 
-// Letta Conversational Agent with Memory
 const client = new RunAgentClient({
   agentId: "letta-memory-789",
   entrypointTag: "chat_with_memory",
@@ -386,23 +389,21 @@ const client = new RunAgentClient({
 
 await client.initialize();
 
-// Agent remembers previous conversations
+// Agent remembers context
 let result = await client.run({
   message: "Hi, I'm Sarah and I love hiking"
 });
 console.log(result);
 
-// Later conversation - agent recalls Sarah loves hiking
+// Later - agent recalls Sarah's interests
 result = await client.run({
   message: "What outdoor activities would you recommend?"
 });
 console.log(result);
 ```
 
-</details>
-
-<details>
-<summary>🦀 Rust SDK</summary>
+</td>
+<td valign="top">
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -410,10 +411,13 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Letta Conversational Agent with Memory
-    let client = RunAgentClient::new("letta-memory-789", "chat_with_memory", true).await?;
+    let client = RunAgentClient::new(
+        "letta-memory-789", 
+        "chat_with_memory", 
+        true
+    ).await?;
     
-    // Agent remembers previous conversations
+    // Agent remembers context
     let result = client.run(&[
         ("message", json!("Hi, I'm Sarah and I love hiking"))
     ]).await?;
@@ -423,10 +427,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-</details>
-
-<details>
-<summary>🔷 Go SDK</summary>
+</td>
+<td valign="top">
 
 ```go
 package main
@@ -438,39 +440,47 @@ import (
 )
 
 func main() {
-    // Letta Conversational Agent with Memory
-    client, _ := client.New("letta-memory-789", "chat_with_memory", true)
+    client, _ := client.New(
+        "letta-memory-789", 
+        "chat_with_memory", 
+        true
+    )
     defer client.Close()
 
-    // Agent remembers previous conversations
-    result, _ := client.Run(context.Background(), map[string]interface{}{
-        "message": "Hi, I'm Sarah and I love hiking",
-    })
+    // Agent remembers context
+    result, _ := client.Run(
+        context.Background(), 
+        map[string]interface{}{
+            "message": "Hi, I'm Sarah and I love hiking",
+        }
+    )
     fmt.Printf("Response: %v\n", result)
 }
 ```
 
-</details>
+</td>
+</tr>
+</table>
 
-</details>
+---
 
-<!-- Custom Agent Examples -->
-<details>
-<summary><strong>⚡ Custom OpenAI Agent</strong></summary>
+## ⚡ **Custom OpenAI Agent**
 
-<div align="center">
+**Perfect for**: Custom AI assistants, specialized tasks, flexible integrations
 
-**Choose your SDK:**
-
-</div>
-
-<details>
-<summary>🐍 Python SDK</summary>
+<table>
+<tr>
+<td width="25%"><b>🐍 Python SDK</b></td>
+<td width="25%"><b>🟨 JavaScript SDK</b></td>
+<td width="25%"><b>🦀 Rust SDK</b></td>
+<td width="25%"><b>🔷 Go SDK</b></td>
+</tr>
+<tr>
+<td valign="top">
 
 ```python
 from runagent import RunAgentClient
 
-# Custom OpenAI Assistant
 client = RunAgentClient(
     agent_id="openai-assistant-321",
     entrypoint_tag="smart_assistant",
@@ -478,7 +488,7 @@ client = RunAgentClient(
 )
 
 result = client.run(
-    user_msg="Analyze the benefits of remote work",
+    user_msg="Analyze remote work benefits",
     temperature=0.7,
     model="gpt-4"
 )
@@ -486,21 +496,18 @@ print(result)
 
 # Streaming response
 for chunk in client.run(
-    user_msg="Write a detailed report on AI trends",
+    user_msg="Write AI trends report",
     temperature=0.8
 ):
     print(chunk, end='')
 ```
 
-</details>
-
-<details>
-<summary>🟨 JavaScript SDK</summary>
+</td>
+<td valign="top">
 
 ```javascript
 import { RunAgentClient } from 'runagent';
 
-// Custom OpenAI Assistant
 const client = new RunAgentClient({
   agentId: "openai-assistant-321",
   entrypointTag: "smart_assistant",
@@ -509,7 +516,7 @@ const client = new RunAgentClient({
 
 await client.initialize();
 const result = await client.run({
-  user_msg: "Analyze the benefits of remote work",
+  user_msg: "Analyze remote work benefits",
   temperature: 0.7,
   model: "gpt-4"
 });
@@ -517,16 +524,14 @@ console.log(result);
 
 // Streaming response
 for await (const chunk of client.run({
-  user_msg: "Write a detailed report on AI trends"
+  user_msg: "Write AI trends report"
 })) {
   process.stdout.write(chunk);
 }
 ```
 
-</details>
-
-<details>
-<summary>🦀 Rust SDK</summary>
+</td>
+<td valign="top">
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -534,11 +539,14 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Custom OpenAI Assistant
-    let client = RunAgentClient::new("openai-assistant-321", "smart_assistant", true).await?;
+    let client = RunAgentClient::new(
+        "openai-assistant-321", 
+        "smart_assistant", 
+        true
+    ).await?;
     
     let result = client.run(&[
-        ("user_msg", json!("Analyze the benefits of remote work")),
+        ("user_msg", json!("Analyze remote work benefits")),
         ("temperature", json!(0.7)),
         ("model", json!("gpt-4"))
     ]).await?;
@@ -548,10 +556,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-</details>
-
-<details>
-<summary>🔷 Go SDK</summary>
+</td>
+<td valign="top">
 
 ```go
 package main
@@ -563,22 +569,28 @@ import (
 )
 
 func main() {
-    // Custom OpenAI Assistant
-    client, _ := client.New("openai-assistant-321", "smart_assistant", true)
+    client, _ := client.New(
+        "openai-assistant-321", 
+        "smart_assistant", 
+        true
+    )
     defer client.Close()
 
-    result, _ := client.Run(context.Background(), map[string]interface{}{
-        "user_msg": "Analyze the benefits of remote work",
-        "temperature": 0.7,
-        "model": "gpt-4",
-    })
+    result, _ := client.Run(
+        context.Background(), 
+        map[string]interface{}{
+            "user_msg": "Analyze remote work benefits",
+            "temperature": 0.7,
+            "model": "gpt-4",
+        }
+    )
     fmt.Printf("Response: %v\n", result)
 }
 ```
 
-</details>
-
-</details>
+</td>
+</tr>
+</table>
 
 ---
 
