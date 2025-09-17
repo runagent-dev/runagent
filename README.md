@@ -83,7 +83,7 @@ This starts a local FastAPI server with:
 
 <div align="center">
 
-**Select a Python agent framework and choose your SDK language:**
+**LangGraph Problem Solver Agent - Access from any language:**
 
 </div>
 
@@ -95,12 +95,54 @@ This starts a local FastAPI server with:
 
 <table>
 <tr>
-<td width="25%"><b>🐍 Python SDK</b></td>
-<td width="25%"><b>🟨 JavaScript SDK</b></td>
-<td width="25%"><b>🦀 Rust SDK</b></td>
-<td width="25%"><b>🔷 Go SDK</b></td>
+<td width="20%"><b>🐍 Python Agent</b></td>
+<td width="20%"><b>🐍 Python SDK</b></td>
+<td width="20%"><b>🟨 JavaScript SDK</b></td>
+<td width="20%"><b>🦀 Rust SDK</b></td>
+<td width="20%"><b>🔷 Go SDK</b></td>
 </tr>
 <tr>
+<td valign="top">
+
+```python
+# agent.py
+from langgraph.graph import StateGraph
+from typing import TypedDict, List
+
+class ProblemState(TypedDict):
+    query: str
+    num_solutions: int
+    constraints: List[dict]
+    solutions: List[str]
+    validated: bool
+
+def analyze_problem(state):
+    # Problem analysis logic
+    return {"solutions": [...]}
+
+def validate_solutions(state):
+    # Validation logic
+    return {"validated": True}
+
+# Build the graph
+workflow = StateGraph(ProblemState)
+workflow.add_node("analyze", analyze_problem)
+workflow.add_node("validate", validate_solutions)
+workflow.add_edge("analyze", "validate")
+workflow.set_entry_point("analyze")
+
+app = workflow.compile()
+
+def solve_problem(query, num_solutions, constraints):
+    result = app.invoke({
+        "query": query,
+        "num_solutions": num_solutions,
+        "constraints": constraints
+    })
+    return result
+```
+
+</td>
 <td valign="top">
 
 ```python
@@ -121,6 +163,13 @@ result = client.run(
     }]
 )
 print(result)
+
+# Streaming
+for chunk in client.run(
+    query="Fix my phone", 
+    num_solutions=4
+):
+    print(chunk)
 ```
 
 </td>
@@ -145,6 +194,14 @@ const result = await client.run({
   }]
 });
 console.log(result);
+
+// Streaming
+for await (const chunk of client.run({
+  query: "Fix my phone",
+  num_solutions: 4
+})) {
+  process.stdout.write(chunk);
+}
 ```
 
 </td>
@@ -153,6 +210,7 @@ console.log(result);
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
+use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -172,6 +230,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]).await?;
     
     println!("Result: {}", result);
+    
+    // Streaming
+    let mut stream = client.run_stream(&[
+        ("query", json!("Fix my phone")),
+        ("num_solutions", json!(4))
+    ]).await?;
+    
+    while let Some(chunk) = stream.next().await {
+        print!("{}", chunk?);
+    }
+    
     Ok(())
 }
 ```
@@ -207,384 +276,22 @@ func main() {
         }
     )
     fmt.Printf("Result: %v\n", result)
-}
-```
 
-</td>
-</tr>
-</table>
-
----
-
-## 👥 **CrewAI Research Team**
-
-**Perfect for**: Multi-agent collaboration, research tasks, complex analysis
-
-<table>
-<tr>
-<td width="25%"><b>🐍 Python SDK</b></td>
-<td width="25%"><b>🟨 JavaScript SDK</b></td>
-<td width="25%"><b>🦀 Rust SDK</b></td>
-<td width="25%"><b>🔷 Go SDK</b></td>
-</tr>
-<tr>
-<td valign="top">
-
-```python
-from runagent import RunAgentClient
-
-client = RunAgentClient(
-    agent_id="crew-research-456",
-    entrypoint_tag="research_crew",
-    local=True
-)
-
-result = client.run(
-    topic="AI Security Best Practices"
-)
-print(result["final_report"])
-
-# Stream crew collaboration
-for update in client.run(
-    topic="Blockchain trends"
-):
-    print(f"Agent {update['agent']}: "
-          f"{update['task_update']}")
-```
-
-</td>
-<td valign="top">
-
-```javascript
-import { RunAgentClient } from 'runagent';
-
-const client = new RunAgentClient({
-  agentId: "crew-research-456",
-  entrypointTag: "research_crew",
-  local: true
-});
-
-await client.initialize();
-const result = await client.run({
-  topic: "AI Security Best Practices"
-});
-console.log(result.final_report);
-
-// Stream crew collaboration
-for await (const update of client.run({
-  topic: "Blockchain trends"
-})) {
-  console.log(`Agent ${update.agent}: ${update.task_update}`);
-}
-```
-
-</td>
-<td valign="top">
-
-```rust
-use runagent::client::RunAgentClient;
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RunAgentClient::new(
-        "crew-research-456", 
-        "research_crew", 
-        true
-    ).await?;
-    
-    let result = client.run(&[
-        ("topic", json!("AI Security Best Practices"))
-    ]).await?;
-    
-    println!("Research Result: {}", result);
-    Ok(())
-}
-```
-
-</td>
-<td valign="top">
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/runagent-dev/runagent-go/pkg/client"
-)
-
-func main() {
-    client, _ := client.New(
-        "crew-research-456", 
-        "research_crew", 
-        true
-    )
-    defer client.Close()
-
-    result, _ := client.Run(
-        context.Background(), 
+    // Streaming
+    stream, _ := client.RunStream(
+        context.Background(),
         map[string]interface{}{
-            "topic": "AI Security Best Practices",
+            "query": "Fix my phone",
+            "num_solutions": 4,
         }
     )
-    fmt.Printf("Research Result: %v\n", result)
-}
-```
+    defer stream.Close()
 
-</td>
-</tr>
-</table>
-
----
-
-## 🧠 **Letta Memory Agent**
-
-**Perfect for**: Long-term conversations, personalized interactions, context retention
-
-<table>
-<tr>
-<td width="25%"><b>🐍 Python SDK</b></td>
-<td width="25%"><b>🟨 JavaScript SDK</b></td>
-<td width="25%"><b>🦀 Rust SDK</b></td>
-<td width="25%"><b>🔷 Go SDK</b></td>
-</tr>
-<tr>
-<td valign="top">
-
-```python
-from runagent import RunAgentClient
-
-client = RunAgentClient(
-    agent_id="letta-memory-789",
-    entrypoint_tag="chat_with_memory",
-    local=True
-)
-
-# Agent remembers context
-result = client.run(
-    message="Hi, I'm Sarah and I love hiking"
-)
-print(result)
-
-# Later - agent recalls Sarah's interests
-result = client.run(
-    message="What outdoor activities "
-            "would you recommend?"
-)
-print(result)
-```
-
-</td>
-<td valign="top">
-
-```javascript
-import { RunAgentClient } from 'runagent';
-
-const client = new RunAgentClient({
-  agentId: "letta-memory-789",
-  entrypointTag: "chat_with_memory",
-  local: true
-});
-
-await client.initialize();
-
-// Agent remembers context
-let result = await client.run({
-  message: "Hi, I'm Sarah and I love hiking"
-});
-console.log(result);
-
-// Later - agent recalls Sarah's interests
-result = await client.run({
-  message: "What outdoor activities would you recommend?"
-});
-console.log(result);
-```
-
-</td>
-<td valign="top">
-
-```rust
-use runagent::client::RunAgentClient;
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RunAgentClient::new(
-        "letta-memory-789", 
-        "chat_with_memory", 
-        true
-    ).await?;
-    
-    // Agent remembers context
-    let result = client.run(&[
-        ("message", json!("Hi, I'm Sarah and I love hiking"))
-    ]).await?;
-    
-    println!("Response: {}", result);
-    Ok(())
-}
-```
-
-</td>
-<td valign="top">
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/runagent-dev/runagent-go/pkg/client"
-)
-
-func main() {
-    client, _ := client.New(
-        "letta-memory-789", 
-        "chat_with_memory", 
-        true
-    )
-    defer client.Close()
-
-    // Agent remembers context
-    result, _ := client.Run(
-        context.Background(), 
-        map[string]interface{}{
-            "message": "Hi, I'm Sarah and I love hiking",
-        }
-    )
-    fmt.Printf("Response: %v\n", result)
-}
-```
-
-</td>
-</tr>
-</table>
-
----
-
-## ⚡ **Custom OpenAI Agent**
-
-**Perfect for**: Custom AI assistants, specialized tasks, flexible integrations
-
-<table>
-<tr>
-<td width="25%"><b>🐍 Python SDK</b></td>
-<td width="25%"><b>🟨 JavaScript SDK</b></td>
-<td width="25%"><b>🦀 Rust SDK</b></td>
-<td width="25%"><b>🔷 Go SDK</b></td>
-</tr>
-<tr>
-<td valign="top">
-
-```python
-from runagent import RunAgentClient
-
-client = RunAgentClient(
-    agent_id="openai-assistant-321",
-    entrypoint_tag="smart_assistant",
-    local=True
-)
-
-result = client.run(
-    user_msg="Analyze remote work benefits",
-    temperature=0.7,
-    model="gpt-4"
-)
-print(result)
-
-# Streaming response
-for chunk in client.run(
-    user_msg="Write AI trends report",
-    temperature=0.8
-):
-    print(chunk, end='')
-```
-
-</td>
-<td valign="top">
-
-```javascript
-import { RunAgentClient } from 'runagent';
-
-const client = new RunAgentClient({
-  agentId: "openai-assistant-321",
-  entrypointTag: "smart_assistant",
-  local: true
-});
-
-await client.initialize();
-const result = await client.run({
-  user_msg: "Analyze remote work benefits",
-  temperature: 0.7,
-  model: "gpt-4"
-});
-console.log(result);
-
-// Streaming response
-for await (const chunk of client.run({
-  user_msg: "Write AI trends report"
-})) {
-  process.stdout.write(chunk);
-}
-```
-
-</td>
-<td valign="top">
-
-```rust
-use runagent::client::RunAgentClient;
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RunAgentClient::new(
-        "openai-assistant-321", 
-        "smart_assistant", 
-        true
-    ).await?;
-    
-    let result = client.run(&[
-        ("user_msg", json!("Analyze remote work benefits")),
-        ("temperature", json!(0.7)),
-        ("model", json!("gpt-4"))
-    ]).await?;
-    
-    println!("Response: {}", result);
-    Ok(())
-}
-```
-
-</td>
-<td valign="top">
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/runagent-dev/runagent-go/pkg/client"
-)
-
-func main() {
-    client, _ := client.New(
-        "openai-assistant-321", 
-        "smart_assistant", 
-        true
-    )
-    defer client.Close()
-
-    result, _ := client.Run(
-        context.Background(), 
-        map[string]interface{}{
-            "user_msg": "Analyze remote work benefits",
-            "temperature": 0.7,
-            "model": "gpt-4",
-        }
-    )
-    fmt.Printf("Response: %v\n", result)
+    for {
+        chunk, hasMore, _ := stream.Next(context.Background())
+        if !hasMore { break }
+        fmt.Print(chunk)
+    }
 }
 ```
 
