@@ -79,6 +79,55 @@ This starts a local FastAPI server with:
 - WebSocket support for streaming
 - Built-in API documentation at `/docs`
 
+### Supported Frameworks
+
+RunAgent works with any Python AI framework. Here are some of the frameworks we officially support:
+
+```mermaid
+graph TB
+    subgraph "🐍 Python AI Frameworks"
+        LG[🔷 LangGraph<br/>Graph-based agents]
+        LC[⛓️ LangChain<br/>Chain-based agents]
+        LI[🦜 LlamaIndex<br/>RAG & knowledge agents]
+        CR[👥 CrewAI<br/>Multi-agent systems]
+        LT[🧠 Letta<br/>Memory-enabled agents]
+        AG[🤖 AutoGen<br/>Conversational agents]
+        AN[⚡ Agno<br/>Reasoning agents]
+        CS[🎯 Custom<br/>Your framework]
+    end
+    
+    subgraph "🌐 RunAgent Universal Access"
+        RA[RunAgent Platform]
+    end
+    
+    subgraph "💻 Multi-Language SDKs"
+        PY[🐍 Python SDK]
+        JS[🟨 JavaScript SDK]
+        RS[🦀 Rust SDK]
+        GO[🔷 Go SDK]
+    end
+    
+    LG --> RA
+    LC --> RA
+    LI --> RA
+    CR --> RA
+    LT --> RA
+    AG --> RA
+    AN --> RA
+    CS --> RA
+    
+    RA --> PY
+    RA --> JS
+    RA --> RS
+    RA --> GO
+    
+    style RA fill:#4a90e2,stroke:#2171b5,stroke-width:3px,color:#fff
+    style PY fill:#3776ab,stroke:#2d5a87,stroke-width:2px,color:#fff
+    style JS fill:#f7df1e,stroke:#d4c117,stroke-width:2px,color:#000
+    style RS fill:#ce422b,stroke:#a33420,stroke-width:2px,color:#fff
+    style GO fill:#00add8,stroke:#0087a8,stroke-width:2px,color:#fff
+```
+
 ### Use Your Agent
 
 <div align="center">
