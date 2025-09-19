@@ -1,4 +1,4 @@
-![Animated SVG](./docs/images/runagent_ecosystem.svg#gh-light-mode-only)
+![Animated SVG](./docs/images/runagent_ecosystem.svg)
 
 <p align="center">
   <a href="https://run-agent.ai/#gh-dark-mode-only">
