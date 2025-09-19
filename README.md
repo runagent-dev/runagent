@@ -1,4 +1,4 @@
-# RunAgent
+![Animated SVG](./docs/images/runagent ecosystem.drawio.svg)
 
 <p align="center">
   <a href="https://run-agent.ai/#gh-dark-mode-only">
