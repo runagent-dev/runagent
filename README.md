@@ -98,21 +98,21 @@ flowchart TD
 
 ```json
 {
-  "agent_name": "My AI Assistant",
-  "description": "A helpful AI agent",
-  "framework": "langchain",
+  "agent_name": "LangGraph Problem Solver",
+  "description": "Multi-step problem analysis and solution validation agent",
+  "framework": "langgraph",
   "version": "1.0.0",
   "agent_architecture": {
     "entrypoints": [
       {
         "file": "agent.py",
-        "module": "chat_function",
-        "tag": "chat"
+        "module": "solve_problem",
+        "tag": "solve_problem"
       },
       {
-        "file": "agent.py", 
-        "module": "stream_function",
-        "tag": "chat_stream"
+        "file": "agent.py",
+        "module": "solve_problem_stream",
+        "tag": "solve_problem_stream"
       }
     ]
   },
