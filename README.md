@@ -66,25 +66,28 @@ runagent init my-agent                # Basic template
 Every RunAgent project requires a `runagent.config.json` file that defines your agent's structure and entrypoints:
 
 ```mermaid
-graph TD
-    A[runagent.config.json]
+graph TB
+    A["runagent.config.json<br/>Main Configuration File"]
     
-    A --> B[Basic Info]
-    A --> C[Agent Architecture]
-    A --> D[Environment Variables]
+    A --> B["Basic Information<br/>Agent Metadata"]
+    A --> C["Agent Architecture<br/>Entrypoint Definitions"]
+    A --> D["Environment Variables<br/>API Keys & Settings"]
     
-    B --> B1[agent_name<br/>description<br/>framework<br/>version]
+    B --> B1["• agent_name<br/>• description<br/>• framework<br/>• version"]
     
-    C --> C1[entrypoints]
+    C --> C1["entrypoints<br/>Array of callable endpoints"]
     
-    C1 --> C2[Python Functions]
-    C1 --> C3[Webhooks<br/>N8N, Zapier, etc]
+    C1 --> C2["Python Functions<br/>LangGraph, CrewAI, OpenAI, etc"]
+    C1 --> C3["External Webhooks<br/>N8N, Zapier, HTTP APIs"]
     
-    C2 --> C2A[file<br/>module<br/>tag]
+    C2 --> C2A["Required Fields:<br/>• file: Python file path<br/>• module: Function name<br/>• tag: Endpoint identifier"]
     
-    C3 --> C3A[webhook_url<br/>method<br/>tag]
+    C3 --> C3A["Required Fields:<br/>• webhook_url: External URL<br/>• method: HTTP method<br/>• tag: Endpoint identifier"]
     
-    D --> D1[API Keys<br/>Config Values]
+    D --> D1["Key-Value Pairs:<br/>• OPENAI_API_KEY<br/>• Custom settings<br/>• Framework configs"]
+    
+    C2A -.-> E["Example: chat, stream_chat"]
+    C3A -.-> F["Example: food_doctor, workflow_trigger"]
 ```
 
 ### Example Configuration
