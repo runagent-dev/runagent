@@ -141,18 +141,6 @@ This starts a local FastAPI server with:
 
 
 
-### Use Your Agent 
-
-
-
-<div align="center">
-
-**LangGraph Problem Solver Agent - Access from any language:**
-
-</div>
-
----
-
 ##  **LangGraph Problem Solver Agent (An Example)**
 
 
