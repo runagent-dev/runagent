@@ -117,18 +117,6 @@ This starts a local FastAPI server with:
 
 ##  **LangGraph Problem Solver Agent (An Example)**
 
-
-<table>
-<tr>
-<td width="20%"><b> Python Agent</b></td>
-<td width="20%"><b> Python SDK</b></td>
-<td width="20%"><b> JavaScript SDK</b></td>
-<td width="20%"><b> Rust SDK</b></td>
-<td width="20%"><b> Go SDK</b></td>
-</tr>
-<tr>
-<td valign="top">
-
 ```python
 # agent.py
 from langgraph.graph import StateGraph
@@ -174,6 +162,20 @@ async def solve_problem_stream(query, num_solutions, constraints):
     }):
         yield event
 ```
+
+
+
+<table>
+<tr>
+<!-- <td width="20%"><b> Python Agent</b></td> -->
+<td width="20%"><b> Python SDK</b></td>
+<td width="20%"><b> JavaScript SDK</b></td>
+<td width="20%"><b> Rust SDK</b></td>
+<td width="20%"><b> Go SDK</b></td>
+</tr>
+<tr>
+<td valign="top">
+
 
 </td>
 <td valign="top">
