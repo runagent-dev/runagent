@@ -67,35 +67,24 @@ Every RunAgent project requires a `runagent.config.json` file that defines your 
 
 ```mermaid
 graph TD
-    A[runagent.config.json] --> B[Basic Info]
+    A[runagent.config.json]
+    
+    A --> B[Basic Info]
     A --> C[Agent Architecture]
     A --> D[Environment Variables]
     
-    B --> B1[agent_name]
-    B --> B2[description]
-    B --> B3[framework]
-    B --> B4[version]
+    B --> B1[agent_name<br/>description<br/>framework<br/>version]
     
     C --> C1[entrypoints]
-    C1 --> C2[Pythonic Entrypoints]
-    C1 --> C3[Webhook Entrypoints]
     
-    C2 --> C2A[file: agent.py]
-    C2 --> C2B[module: function_name]
-    C2 --> C2C[tag: endpoint_name]
-    C2 --> C2D[extractor: optional]
+    C1 --> C2[Python Functions]
+    C1 --> C3[Webhooks<br/>N8N, Zapier, etc]
     
-    C3 --> C3A[webhook_url]
-    C3 --> C3B[method: POST/GET]
-    C3 --> C3C[tag: endpoint_name]
+    C2 --> C2A[file<br/>module<br/>tag]
     
-    D --> D1[API Keys]
-    D --> D2[Configuration Values]
+    C3 --> C3A[webhook_url<br/>method<br/>tag]
     
-    style A fill:#e1f5fe
-    style C1 fill:#f3e5f5
-    style B fill:#e8f5e8
-    style D fill:#fff3e0
+    D --> D1[API Keys<br/>Config Values]
 ```
 
 ### Example Configuration
