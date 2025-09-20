@@ -191,6 +191,14 @@ def solve_problem(query, num_solutions, constraints):
         "constraints": constraints
     })
     return result
+
+async def solve_problem_stream(query, num_solutions, constraints):
+    async for event in app.astream({
+        "query": query,
+        "num_solutions": num_solutions,
+        "constraints": constraints
+    }):
+        yield event
 ```
 
 </td>
