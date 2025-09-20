@@ -392,24 +392,7 @@ Our remote deployment will provide:
 - Built-in monitoring and analytics  
 - Production-grade security and compliance
 
----
 
-
-## Why Choose RunAgent?
-
-**Universal Access**: Write in Python, use from any language - no API complexity
-
-**Framework Agnostic**: Works with your existing agent code, regardless of framework
-
-**Local + Remote**: Start local, scale to production seamlessly  
-
-**Action Memory**: Built-in reliability system that learns from successful patterns
-
-**Developer Experience**: Intuitive CLI, comprehensive SDKs, extensive documentation
-
-**Production Ready**: Enterprise-grade security, monitoring, and performance
-
----
 
 ## Documentation
 
