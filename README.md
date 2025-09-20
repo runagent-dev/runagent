@@ -66,28 +66,32 @@ runagent init my-agent                # Basic template
 Every RunAgent project requires a `runagent.config.json` file that defines your agent's structure and entrypoints:
 
 ```mermaid
+---
+config:
+  theme: redux-dark
+---
 flowchart TD
-    A["runagent.config.json<br/>Main Configuration File"]
-    
-    A --- B["Basic Information<br/>Agent Metadata"]
-    A --- C["Agent Architecture<br/>Entrypoint Definitions"] 
-    A --- D["Environment Variables<br/>API Keys & Settings"]
-    
-    B --> B1["• agent_name<br/>• description<br/>• framework<br/>• version"]
-    
-    C --> C1["entrypoints<br/>Array of callable endpoints"]
-    
-    C1 --> C2["Python Functions<br/>LangGraph, CrewAI, OpenAI, etc"]
-    C1 --> C3["External Webhooks<br/>N8N, Zapier, HTTP APIs"]
-    
-    C2 --> C2A["Required Fields:<br/>• file: Python file path<br/>• module: Function name<br/>• tag: Endpoint identifier"]
-    
-    C3 --> C3A["Required Fields:<br/>• webhook_url: External URL<br/>• method: HTTP method<br/>• tag: Endpoint identifier"]
-    
-    D --> D1["Key-Value Pairs:<br/>• OPENAI_API_KEY, Anthropic_API_KEY, etc.<br/>• Custom settings<br/>• Framework configs"]
-    
-    C2A -.-> E["Example: chat, stream_chat"]
-    C3A -.-> F["Example: food_doctor, workflow_trigger"]
+    A["runagent.config.json<br/>Main Configuration File<br/>═══════════════════"]
+    A ---|Primary Components| B["Basic Information<br/>Agent Metadata<br/>─────────────────"]
+    A ---|Primary Components| C["Agent Architecture<br/>Entrypoint Definitions<br/>─────────────────"] 
+    A ---|Primary Components| D["Environment Variables<br/>API Keys & Settings<br/>─────────────────"]
+    B -->|Contains| B1["▪ agent_name<br/>▪ description<br/>▪ framework<br/>▪ version"]
+    C -->|Defines| C1["entrypoints<br/>Array of callable endpoints<br/>═════════════════════"]
+    C1 ---|Implementation Types| C2["Python Functions<br/>LangGraph, CrewAI, OpenAI<br/>─────────────────────"]
+    C1 ---|Implementation Types| C3["External Webhooks<br/>N8N, Zapier, HTTP APIs<br/>─────────────────────"]
+    C2 -->|Required Fields| C2A["▪ file: Python file path<br/>▪ module: Function name<br/>▪ tag: Endpoint identifier<br/>─────────────────────"]
+    C3 -->|Required Fields| C3A["▪ webhook_url: External URL<br/>▪ method: HTTP method<br/>▪ tag: Endpoint identifier<br/>─────────────────────"]
+    D -->|Configuration| D1["Key-Value Pairs<br/>▪ OPENAI_API_KEY<br/>▪ Anthropic_API_KEY<br/>▪ Custom settings<br/>▪ Framework configs<br/>─────────────────"]
+    C2A -.->|Examples| E["chat<br/>stream_chat<br/>process_data"]
+    C3A -.->|Examples| F["food_doctor<br/>workflow_trigger<br/>external_api"]
+    style A fill:none,stroke:#333,stroke-width:3px
+    style B fill:none,stroke:#666,stroke-width:2px
+    style C fill:none,stroke:#666,stroke-width:2px
+    style D fill:none,stroke:#666,stroke-width:2px
+    style C1 fill:none,stroke:#333,stroke-width:2px
+    style E fill:none,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
+    style F fill:none,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
+
 ```
 
 ### Example Configuration
