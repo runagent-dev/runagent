@@ -167,7 +167,7 @@ async def solve_problem_stream(query, num_solutions, constraints):
 
 <table>
 <tr>
-<!-- <td width="20%"><b> Python Agent</b></td> -->
+<td width="20%"><b> Python Agent</b></td>
 <td width="20%"><b> Python SDK</b></td>
 <td width="20%"><b> JavaScript SDK</b></td>
 <td width="20%"><b> Rust SDK</b></td>
