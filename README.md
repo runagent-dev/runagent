@@ -82,6 +82,153 @@ This starts a local FastAPI server with:
 
 ### Use Your Agent
 
+
+# RunAgent Configuration JSON Structure
+
+Here's a visual representation of the `runagent.config.json` structure that every Python agent needs:
+
+```mermaid
+graph TD
+    A[runagent.config.json] --> B[agent_name]
+    A --> C[description]
+    A --> D[framework]
+    A --> E[template]
+    A --> F[version]
+    A --> G[created_at]
+    A --> H[template_source]
+    A --> I[agent_architecture]
+    A --> J[env_vars]
+    
+    D --> D1[langgraph]
+    D --> D2[langchain]
+    D --> D3[crewai]
+    D --> D4[llamaindex]
+    D --> D5[openai]
+    D --> D6[letta]
+    D --> D7[autogen]
+    D --> D8[ag2]
+    D --> D9[agno]
+    D --> D10[n8n]
+    D --> D11[parlant]
+    
+    H --> H1[repo_url]
+    H --> H2[author]
+    H --> H3[path]
+    
+    I --> I1[entrypoints]
+    I1 --> I2[PythonicEntryPoint]
+    I1 --> I3[WebHookEntryPoint]
+    
+    I2 --> I2A[file]
+    I2 --> I2B[module]
+    I2 --> I2C[tag]
+    I2 --> I2D[extractor]
+    
+    I3 --> I3A[webhook_url]
+    I3 --> I3B[method]
+    I3 --> I3C[tag]
+    I3 --> I3D[timeout]
+    I3 --> I3E[extractor]
+    
+    J --> J1[OPENAI_API_KEY]
+    J --> J2[Custom Environment Variables]
+    
+    style A fill:#e1f5fe
+    style D fill:#f3e5f5
+    style I fill:#e8f5e8
+    style H fill:#fff3e0
+    style J fill:#fce4ec
+```
+
+## Configuration Components
+
+### 🏷️ **Basic Metadata**
+- **agent_name**: Display name for your agent
+- **description**: Brief description of what your agent does
+- **framework**: The AI framework used (see supported frameworks above)
+- **template**: Template variant used during initialization
+- **version**: Semantic version of your agent
+- **created_at**: Timestamp when the agent was created
+
+### 📦 **Template Source**
+- **repo_url**: GitHub repository where templates are stored
+- **author**: Template author/maintainer
+- **path**: Relative path to the template in the repository
+
+### 🔧 **Agent Architecture**
+The heart of your agent configuration - defines how to execute your agent:
+
+#### **Pythonic Entrypoints** (Most Common)
+```json
+{
+  "file": "agent.py",
+  "module": "run_agent", 
+  "tag": "chat",
+  "extractor": {
+    "content": "$.message.content"
+  }
+}
+```
+
+#### **Webhook Entrypoints** (For N8N workflows)
+```json
+{
+  "webhook_url": "https://example.n8n.cloud/webhook/my-workflow",
+  "method": "post",
+  "tag": "webhook_handler",
+  "timeout": 60
+}
+```
+
+### 🌍 **Environment Variables**
+Store API keys and configuration securely:
+```json
+{
+  "env_vars": {
+    "OPENAI_API_KEY": "sk-...",
+    "CUSTOM_API_URL": "https://api.example.com"
+  }
+}
+```
+
+## 📋 **Complete Example**
+
+```json
+{
+  "agent_name": "Customer Support Bot",
+  "description": "AI assistant for customer inquiries",
+  "framework": "langgraph",
+  "template": "advanced",
+  "version": "1.2.0",
+  "created_at": "2024-01-15T10:30:00Z",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-dev",
+    "path": "templates/langgraph/advanced"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "handle_chat",
+        "tag": "chat"
+      },
+      {
+        "file": "agent.py", 
+        "module": "handle_chat_stream",
+        "tag": "chat_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "sk-proj-...",
+    "TEMPERATURE": "0.7"
+  }
+}
+```
+
+> 💡 **Tip**: This configuration file is automatically created when you run `runagent init`, but you can customize it to match your specific agent needs!
+
 <div align="center">
 
 **LangGraph Problem Solver Agent - Access from any language:**
