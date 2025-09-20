@@ -66,12 +66,12 @@ runagent init my-agent                # Basic template
 Every RunAgent project requires a `runagent.config.json` file that defines your agent's structure and entrypoints:
 
 ```mermaid
-graph TB
+flowchart TD
     A["runagent.config.json<br/>Main Configuration File"]
     
-    A --> B["Basic Information<br/>Agent Metadata"]
-    A --> C["Agent Architecture<br/>Entrypoint Definitions"]
-    A --> D["Environment Variables<br/>API Keys & Settings"]
+    A --- B["Basic Information<br/>Agent Metadata"]
+    A --- C["Agent Architecture<br/>Entrypoint Definitions"] 
+    A --- D["Environment Variables<br/>API Keys & Settings"]
     
     B --> B1["• agent_name<br/>• description<br/>• framework<br/>• version"]
     
