@@ -55,46 +55,19 @@ pip install runagent
 ### Initialize Your First Agent
 
 ```bash
-# Choose from various frameworks
+# The basic
+runagent init my-agent                # Basic template
+# Also you can choose from various frameworks
 runagent init my-agent --langgraph    # LangGraph template
 runagent init my-agent --crewai       # CrewAI template  
 runagent init my-agent --letta        # Letta template
-runagent init my-agent                # Basic template
 ```
 
 ## Agent Configuration
 
-Every RunAgent project requires a `runagent.config.json` file that defines your agent's structure and entrypoints:
+Every RunAgent project requires a `runagent.config.json` file that defines your agent's structure and capabilities. 
 
-```mermaid
----
-config:
-  theme: redux-dark
----
-flowchart TD
-    A["runagent.config.json<br/>Main Configuration File<br/>═══════════════════"]
-    A ---|Primary Components| B["Basic Information<br/>Agent Metadata<br/>─────────────────"]
-    A ---|Primary Components| C["Agent Architecture<br/>Entrypoint Definitions<br/>─────────────────"] 
-    A ---|Primary Components| D["Environment Variables<br/>API Keys & Settings<br/>─────────────────"]
-    B -->|Contains| B1["▪ agent_name<br/>▪ description<br/>▪ framework<br/>▪ version"]
-    C -->|Defines| C1["entrypoints<br/>Array of callable endpoints<br/>═════════════════════"]
-    C1 ---|Implementation Types| C2["Python Functions<br/>LangGraph, CrewAI, OpenAI<br/>─────────────────────"]
-    C1 ---|Implementation Types| C3["External Webhooks<br/>N8N, Zapier, HTTP APIs<br/>─────────────────────"]
-    C2 -->|Required Fields| C2A["▪ file: Python file path<br/>▪ module: Function name<br/>▪ tag: Endpoint identifier<br/>─────────────────────"]
-    C3 -->|Required Fields| C3A["▪ webhook_url: External URL<br/>▪ method: HTTP method<br/>▪ tag: Endpoint identifier<br/>─────────────────────"]
-    D -->|Configuration| D1["Key-Value Pairs<br/>▪ OPENAI_API_KEY<br/>▪ Anthropic_API_KEY<br/>▪ Custom settings<br/>▪ Framework configs<br/>─────────────────"]
-    C2A -.->|Examples| E["chat<br/>stream_chat<br/>process_data"]
-    C3A -.->|Examples| F["food_doctor<br/>workflow_trigger<br/>external_api"]
-    style A fill:none,stroke:#333,stroke-width:3px
-    style B fill:none,stroke:#666,stroke-width:2px
-    style C fill:none,stroke:#666,stroke-width:2px
-    style D fill:none,stroke:#666,stroke-width:2px
-    style C1 fill:none,stroke:#333,stroke-width:2px
-    style E fill:none,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
-    style F fill:none,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5
-
-```
-
+This configuration file specifies basic metadata (name, framework, version), defines entrypoints for either Python functions or external webhooks, and sets environment variables like API keys. The entrypoints array is the core component, allowing you to expose functions from any Python framework (LangGraph, CrewAI, OpenAI) or integrate external services (N8N, Zapier) through a unified interface accessible from any programming language.
 ### Example Configuration
 
 ```json
