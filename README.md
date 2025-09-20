@@ -84,7 +84,7 @@ flowchart TD
     
     C3 --> C3A["Required Fields:<br/>• webhook_url: External URL<br/>• method: HTTP method<br/>• tag: Endpoint identifier"]
     
-    D --> D1["Key-Value Pairs:<br/>• OPENAI_API_KEY<br/>• Custom settings<br/>• Framework configs"]
+    D --> D1["Key-Value Pairs:<br/>• OPENAI_API_KEY, Anthropic_API_KEY, etc.<br/>• Custom settings<br/>• Framework configs"]
     
     C2A -.-> E["Example: chat, stream_chat"]
     C3A -.-> F["Example: food_doctor, workflow_trigger"]
