@@ -164,7 +164,7 @@ async def solve_problem_stream(query, num_solutions, constraints):
         yield event
 ```
 
-**Access from any language:**
+**🌐 Access from any language:**
 
 RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
 
