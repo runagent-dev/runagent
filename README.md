@@ -1,5 +1,3 @@
-![Animated SVG](./docs/images/runagent_ecosystem_final2.svg)
-
 <p align="center">
   <a href="https://run-agent.ai/#gh-dark-mode-only">
     <img src="./docs/logo/logo_dark.svg" width="318px" alt="RunAgent logo" />
@@ -36,9 +34,13 @@
 
 ---
 
+![Animated SVG](./docs/images/runagent_ecosystem_final2.svg)
+
+
 ## What is RunAgent?
 
-RunAgent is a universal AI agent deployment platform that allows you to **write agents once in Python and access them natively from any programming language**. Whether you're building with LangGraph, CrewAI, Letta, or any Python framework, RunAgent provides seamless deployment and cross-language access.
+RunAgent is a comprehensive deployment platform that enables developers to build AI agents once in Python using any python agentic frameworks like LangGraph, CrewAI, Letta, LlamaIndex, then access them natively from any programming language. The platform features stateful self-learning capabilities with RunAgent Memory (coming soon), allowing agents to retain context and improve it's action memory over time.
+RunAgent has multi-language SDK support for seamless integration across TypeScript, JavaScript, Go, and other languages, eliminating the need to rewrite agents for different tech stacks. RunAgent Cloud provides automated deployment with serverless auto-scaling, comprehensive agent security, and real-time monitoring capabilities.
 
 <div align="center">
   <img src="./docs/images/runagent_dia_light.jpg" style="width:100%;max-width:900px;" alt="RunAgent Architecture" />
@@ -138,17 +140,17 @@ graph TD
 
 ---
 
-## 🔷 **LangGraph Problem Solver Agent**
+##  **LangGraph Problem Solver Agent**
 
 **Perfect for**: Multi-step reasoning, problem decomposition, solution validation
 
 <table>
 <tr>
-<td width="20%"><b>🐍 Python Agent</b></td>
-<td width="20%"><b>🐍 Python SDK</b></td>
-<td width="20%"><b>🟨 JavaScript SDK</b></td>
-<td width="20%"><b>🦀 Rust SDK</b></td>
-<td width="20%"><b>🔷 Go SDK</b></td>
+<td width="20%"><b> Python Agent</b></td>
+<td width="20%"><b> Python SDK</b></td>
+<td width="20%"><b> JavaScript SDK</b></td>
+<td width="20%"><b> Rust SDK</b></td>
+<td width="20%"><b> Go SDK</b></td>
 </tr>
 <tr>
 <td valign="top">
@@ -354,27 +356,6 @@ func main() {
 
 RunAgent is introducing **Action Memory** - a revolutionary approach to agent reliability that focuses on *how to remember* rather than *what to remember*.
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   User Request  │───▶│ Decision Engine  │───▶│  Action Store   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        │
-                       ┌──────────────────┐              │
-                       │  Context Layer   │              │
-                       └──────────────────┘              │
-                                │                        │
-                                ▼                        │
-                       ┌──────────────────┐              │
-                       │  Pattern Matcher │◀─────────────┘
-                       └──────────────────┘              
-                                │                        
-                                ▼                        
-                       ┌──────────────────┐    ┌─────────────────┐
-                       │  Response Gen.   │◀───│  Success Cache  │
-                       └──────────────────┘    └─────────────────┘
-```
-
 ### How It Will Work
 
 - **Action-Centric**: Instead of storing raw conversation data, it captures decision patterns and successful action sequences
@@ -386,11 +367,11 @@ This will ensure your agents become more reliable over time, regardless of which
 
 ---
 
-## Remote Deployment
+## Remote Deployment (Coming very soon)
 
 Deploy your agents to production with enterprise-grade infrastructure.
 
-### Lightning-Fast Deployment
+### Fastest agent deployment
 
 Our remote platform delivers **3-second agent spin-up times** - from cold start to ready state in under 3 seconds, making it one of the fastest agent deployment platforms available.
 
@@ -401,14 +382,8 @@ Every agent runs in its own **isolated sandbox environment**:
 - Network segmentation  
 - Resource limits and monitoring
 - Zero data leakage between agents
-- Encrypted communication channels
 
-### Coming Soon
-
-```bash
-# One-command deployment (in development)
-runagent deploy --remote
-```
+### The +++999 aura with agent deployment
 
 The remote deployment will provide:
 - Auto-scaling based on demand
@@ -418,17 +393,6 @@ The remote deployment will provide:
 
 ---
 
-## Supported Frameworks
-
-RunAgent works with any Python AI framework:
-
-- **LangGraph** - Deploy graph-based agents with full state management
-- **CrewAI** - Deploy multi-agent systems with role-based collaboration  
-- **Letta** - Deploy memory-enabled conversational agents
-- **LangChain** - Deploy chain-based agents with tool integration
-- **Custom** - Deploy agents built with any Python framework
-
----
 
 ## Why Choose RunAgent?
 
