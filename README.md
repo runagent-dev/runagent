@@ -141,7 +141,7 @@ This starts a local FastAPI server with:
 
 
 
-### Use Your Agent
+### Use Your Agent 
 
 
 
@@ -153,9 +153,8 @@ This starts a local FastAPI server with:
 
 ---
 
-##  **LangGraph Problem Solver Agent**
+##  **LangGraph Problem Solver Agent (An Example)**
 
-**Perfect for**: Multi-step reasoning, problem decomposition, solution validation
 
 <table>
 <tr>
