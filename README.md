@@ -114,7 +114,6 @@ This starts a local FastAPI server with:
 - Built-in API documentation at `/docs`
 
 
-
 ##  **LangGraph Problem Solver Agent (An Example)**
 
 ```python
@@ -163,20 +162,16 @@ async def solve_problem_stream(query, num_solutions, constraints):
         yield event
 ```
 
-
+**Access from any language:**
 
 <table>
 <tr>
-<td width="25%"><b> Python SDK</b></td>
-<td width="25%"><b> JavaScript SDK</b></td>
-<td width="25%"><b> Rust SDK</b></td>
-<td width="25%"><b> Go SDK</b></td>
+<td width="25%"><b>Python SDK</b></td>
+<td width="25%"><b>JavaScript SDK</b></td>
+<td width="25%"><b>Rust SDK</b></td>
+<td width="25%"><b>Go SDK</b></td>
 </tr>
 <tr>
-<td valign="top">
-
-
-</td>
 <td valign="top">
 
 ```python
