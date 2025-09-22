@@ -16,9 +16,15 @@ from rich.progress import (
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 
 from runagent.utils.config import Config
+from runagent.utils.agent_id import (
+    generate_agent_id,
+    generate_agent_fingerprint,
+    get_agent_metadata
+)
 
 console = Console()
 
@@ -388,29 +394,50 @@ class RestClient:
         return zip_path
 
     def _upload_metadata(self, metadata: Dict) -> Dict:
-        """Upload sensitive metadata securely"""
+        """Upload agent metadata to middleware server"""
         try:
-            # Enhanced metadata encoding with timestamp
-            metadata_with_timestamp = {
-                **metadata,
-                "upload_timestamp": time.time(),
-                "client_version": "1.0",
-            }
-
-            # Base64 encode metadata as JSON string
-            metadata_json = json.dumps(metadata_with_timestamp, sort_keys=True)
-            encrypted_data = base64.b64encode(metadata_json.encode()).decode()
-
+            # Use the agent_id from metadata (generated earlier)
+            agent_id = metadata.get("agent_id")
+            if not agent_id:
+                return {"success": False, "error": "No agent_id provided in metadata"}
+            
+            # Prepare metadata payload according to the new API structure
             payload = {
-                "encrypted_metadata": encrypted_data,
-                "encryption_method": "base64-json",
-                "client_info": {"version": "1.0", "platform": os.name},
+                "id": agent_id,
+                "config": {
+                    "agent_name": metadata.get("name", "agent_files"),
+                    "description": metadata.get("description", "A simple placeholder agent"),
+                    "framework": metadata.get("framework", "openai"),
+                    "template": metadata.get("template", "default"),
+                    "version": metadata.get("version", "1.0.0"),
+                    "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "template_source": {
+                        "repo_url": "https://github.com/runagent-dev/runagent.git",
+                        "author": "sawradip",
+                        "path": f"templates/{metadata.get('framework', 'default')}"
+                    },
+                    "agent_architecture": {
+                        "entrypoints": metadata.get("entrypoints", [
+                            {
+                                "file": "main.py",
+                                "module": "mock_response_stream",
+                                "tag": "minimal_stream"
+                            },
+                            {
+                                "file": "main.py", 
+                                "module": "mock_response",
+                                "tag": "minimal"
+                            }
+                        ])
+                    },
+                    "env_vars": metadata.get("env_vars", {})
+                }
             }
 
             try:
                 response = self.http.post("/agents/metadata-upload", data=payload, timeout=60)
                 result = response.json()
-                return {"success": True, "agent_id": result.get("agent_id")}
+                return {"success": True, "agent_id": agent_id}
 
             except (ClientError, ServerError, ConnectionError) as e:
                 return {"success": False, "error": f"Metadata upload failed: {e.message}"}
@@ -422,42 +449,46 @@ class RestClient:
         """Upload zip file to middleware server"""
         try:
             # Step 1: Upload metadata
-            progress.update(task_id, completed=5)
+            progress.update(task_id, completed=5, description="Uploading metadata...")
             metadata_result = self._upload_metadata(metadata)
 
             if not metadata_result.get("success"):
                 return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
 
             agent_id = metadata_result.get("agent_id")
-            progress.update(task_id, completed=20)
+            progress.update(task_id, completed=15, description="Metadata uploaded successfully")
 
             # Step 2: Upload file
+            file_size = os.path.getsize(zip_path)
+            progress.update(task_id, completed=20, description=f"Uploading {os.path.basename(zip_path)} ({file_size:,} bytes)...")
+            
             with open(zip_path, "rb") as f:
                 files = {"file": (os.path.basename(zip_path), f, "application/zip")}
                 data = {
-                    "framework": metadata.get("framework", "unknown"),
-                    "name": metadata.get("name", os.path.basename(zip_path).replace(".zip", "")),
-                    "has_metadata": "true",
                     "agent_id": agent_id,
                 }
 
-                # Update progress during upload
-                for i in range(20, 50, 5):
-                    progress.update(task_id, completed=i)
-                    time.sleep(0.05)
-
                 try:
+                    # Create a custom progress callback for the upload
+                    def upload_callback(bytes_uploaded):
+                        if file_size > 0:
+                            percentage = 20 + (bytes_uploaded / file_size) * 70  # Use 70% of progress bar for file upload
+                            progress.update(task_id, completed=percentage)
+                    
+                    # For now, we'll simulate progress since requests doesn't have built-in progress callback
+                    # In a real implementation, you might want to use httpx or requests-toolbelt for this
                     response = self.http.post("/agents/upload", files=files, data=data, timeout=300)
+                    
+                    # Complete the progress bar
+                    progress.update(task_id, completed=95, description="Processing upload...")
                     result = response.json()
-
-                    # Update progress during upload
-                    for i in range(50, 100, 10):
-                        progress.update(task_id, completed=i)
-                        time.sleep(0.1)
+                    
+                    progress.update(task_id, completed=100, description="Upload completed!")
+                    time.sleep(0.5)  # Brief pause to show completion
 
                     return {
                         "success": result.get("success", False),
-                        "agent_id": result.get("agent_id"),
+                        "agent_id": agent_id,
                         "message": result.get("message", "Upload completed"),
                         "status": result.get("status", "uploaded"),
                     }
@@ -473,6 +504,28 @@ class RestClient:
         if result.get("success"):
             agent_id = result.get("agent_id")
 
+            # Save to database
+            try:
+                from runagent.sdk.db import DBService
+                db_service = DBService()
+                
+                # Add remote agent to database
+                db_result = db_service.add_remote_agent(
+                    agent_id=agent_id,
+                    agent_path=upload_metadata.get("source_folder", ""),
+                    framework=upload_metadata.get("framework"),
+                    fingerprint=upload_metadata.get("fingerprint"),
+                    status="uploaded"
+                )
+                
+                if db_result.get("success"):
+                    console.print(f"💾 [green]Agent saved to local database[/green]")
+                else:
+                    console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
+                    
+            except Exception as e:
+                console.print(f"⚠️ [yellow]Warning: Database error: {str(e)}[/yellow]")
+
             # Save deployment info locally
             self._save_deployment_info(agent_id, {
                 **upload_metadata,
@@ -484,7 +537,8 @@ class RestClient:
             console.print(Panel(
                 f"✅ [bold green]Upload successful![/bold green]\n"
                 f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                f"🌐 Server: [blue]{self.base_url}[/blue]",
+                f"🌐 Server: [blue]{self.base_url}[/blue]\n"
+                f"🔍 Fingerprint: [dim]{upload_metadata.get('fingerprint', 'N/A')[:16]}...[/dim]",
                 title="📤 Upload Complete",
                 border_style="green",
             ))
@@ -507,38 +561,81 @@ class RestClient:
 
             console.print(f"📤 Uploading agent from: [blue]{folder_path}[/blue]")
 
+            # Auto-detect framework
+            from runagent.utils.agent_id import get_framework_from_folder
+            detected_framework = get_framework_from_folder(folder_path)
+            console.print(f"🔧 Framework detected: [cyan]{detected_framework}[/cyan]")
+
+            # Generate agent fingerprint for duplicate detection
+            fingerprint = generate_agent_fingerprint(folder_path)
+            console.print(f"🔍 Agent fingerprint: [dim]{fingerprint[:16]}...[/dim]")
+
+            # Check for existing agent with same fingerprint
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            existing_agent = db_service.get_agent_by_fingerprint(fingerprint)
+            
+            if existing_agent:
+                console.print(f"⚠️ [yellow]Agent with same fingerprint already exists![/yellow]")
+                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
+                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+                
+                # Ask user if they want to overwrite
+                from rich.prompt import Confirm
+                overwrite = Confirm.ask("Do you want to overwrite the existing agent?", default=False)
+                
+                if not overwrite:
+                    return {
+                        "success": False,
+                        "error": "Upload cancelled by user",
+                        "code": "USER_CANCELLED",
+                        "existing_agent": existing_agent
+                    }
+                
+                # Use existing agent ID for overwrite
+                agent_id = existing_agent['agent_id']
+                console.print(f"🔄 [yellow]Overwriting existing agent: {agent_id}[/yellow]")
+            else:
+                # Generate new agent ID
+                agent_id = generate_agent_id()
+                console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+
+            # Get comprehensive agent metadata
+            agent_metadata = get_agent_metadata(folder_path, metadata.get("framework") if metadata else None)
+            agent_metadata.update({
+                "agent_id": agent_id,
+                "fingerprint": fingerprint,
+                "uploaded_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "source_folder": str(folder_path),
+                **(metadata or {}),
+            })
+
             # Create zip file
             with console.status("[bold green]🔧 Preparing files for upload...[/bold green]", spinner="dots"):
                 zip_path = self._create_zip_from_folder(folder_path)
 
             console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
 
-            # Prepare upload metadata
-            upload_metadata = {
-                "framework": (metadata.get("framework", "unknown") if metadata else "unknown"),
-                "uploaded_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "source_folder": str(folder_path),
-                **(metadata or {}),
-            }
-
             # Upload to server
             console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
 
             with Progress(
                 SpinnerColumn(),
-                TextColumn("[bold green]Uploading...[/bold green]"),
+                TextColumn("[bold green]{task.description}[/bold green]"),
                 BarColumn(bar_width=40),
                 TextColumn("[bold]{task.percentage:>3.0f}%"),
                 TimeElapsedColumn(),
+                TimeRemainingColumn(),
                 console=console,
             ) as progress:
-                upload_task = progress.add_task("Uploading...", total=100)
-                result = self._upload_to_server_secure(zip_path, upload_metadata, progress, upload_task)
+                upload_task = progress.add_task("Initializing upload...", total=100)
+                result = self._upload_to_server_secure(zip_path, agent_metadata, progress, upload_task)
 
             # Clean up zip file
             os.unlink(zip_path)
 
-            return self._process_upload_result(result, upload_metadata)
+            return self._process_upload_result(result, agent_metadata)
 
         except Exception as e:
             return {"success": False, "error": f"Upload failed: {str(e)}"}

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+import os
 import asyncio
 import json
 import time
@@ -257,6 +258,8 @@ class AgentWebSocketHandler:
                 ))
                 
             except Exception as stream_error:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 # Streaming failed
                 execution_time = time.time() - start_time
                 error_detail = f"Streaming error: {str(stream_error)}"

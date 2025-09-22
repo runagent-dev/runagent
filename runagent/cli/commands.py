@@ -600,9 +600,19 @@ def template(action_list, action_info, framework, template, filter_framework, fo
 #         raise click.ClickException("Deployment failed")
 
 @click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-def upload(folder, framework):
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def upload(path):
     """Upload agent to remote server"""
 
     try:
@@ -616,14 +626,14 @@ def upload(folder, framework):
             raise click.ClickException("Authentication required")
 
         # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
         console.print(f"📤 [bold]Uploading agent...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-        # Upload agent
-        result = sdk.upload_agent(folder=folder, framework=framework)
+        # Upload agent (framework auto-detected)
+        result = sdk.upload_agent(folder=str(path))
 
         if result.get("success"):
             agent_id = result["agent_id"]
@@ -818,8 +828,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 raise click.ClickException("Agent to replace not found")
             
             # Generate new agent ID
-            import uuid
-            new_agent_id = str(uuid.uuid4())
+            from runagent.utils.agent_id import generate_agent_id
+            new_agent_id = generate_agent_id()
             
             # Get currently used ports to avoid conflicts
             used_ports = []

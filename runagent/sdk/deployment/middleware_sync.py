@@ -17,13 +17,14 @@ class MiddlewareSyncService:
     def __init__(self, config):
         self.config = config
         self.rest_client = None
-        
+
+        self.sync_enabled = False
+        self.enabled = False
+
         # Check if we have a valid API key
         self.api_key = getattr(config, 'api_key', None)
         if not self.api_key:
             console.print("[dim]No API key configured - middleware sync disabled[/dim]")
-            self.sync_enabled = False
-            self.enabled = False
             return
         
         # Initialize RestClient if we have an API key
@@ -40,21 +41,17 @@ class MiddlewareSyncService:
                 self.enabled = True
             else:
                 console.print("[dim]No cached authentication - middleware sync disabled[/dim]")
-                self.sync_enabled = False
-                self.enabled = False
                 
         except Exception as e:
             console.print(f"[red]Could not initialize middleware sync: {e}[/red]")
-            self.sync_enabled = False
-            self.enabled = False
             self.rest_client = None
 
     def is_sync_enabled(self) -> bool:
         """Public method to check if sync is enabled"""
-        return getattr(self, 'sync_enabled', False)
+        return self.sync_enabled
     
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
-        """Sync agent data when local server starts - FIXED for simplified ID structure"""
+        """Sync agent data when local server starts"""
         if not self.is_sync_enabled():
             console.print("[dim]Middleware sync disabled - agent will run in local-only mode[/dim]")
             return False
@@ -106,7 +103,7 @@ class MiddlewareSyncService:
             }
             
             response = await self._make_async_request(
-                "POST", 
+                "POST",
                 "/local-agents/invocations", 
                 sync_payload
             )

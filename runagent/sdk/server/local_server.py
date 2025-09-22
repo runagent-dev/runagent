@@ -548,7 +548,8 @@ class LocalServer:
                 )
 
             # Generate unique agent ID (same for all frameworks including Letta)
-            agent_id = str(uuid.uuid4())
+            from runagent.utils.agent_id import generate_agent_id
+            agent_id = generate_agent_id()
             
             # Add agent with automatic port allocation
             result = db_service.add_agent_with_auto_port(
