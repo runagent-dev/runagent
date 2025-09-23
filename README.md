@@ -38,7 +38,7 @@
 
 RunAgent is an agentic ecosystem that enables developers to build AI agents once in Python using any python agentic frameworks like LangGraph, CrewAI, Letta, LlamaIndex, then access them natively from any programming language. The platform features stateful self-learning capabilities with RunAgent Memory (coming soon), allowing agents to retain context and improve it's action memory over time.
 
-![Animated SVG](./docs/images/runagent_ecosystem_final2.svg)
+![Animated SVG](./docs/images/runagent_update.svg)
 
 
 RunAgent has multi-language SDK support for seamless integration across TypeScript, JavaScript, Go, and other languages, eliminating the need to rewrite agents for different tech stacks. RunAgent Cloud provides automated deployment with serverless auto-scaling, comprehensive agent security, and real-time monitoring capabilities.
