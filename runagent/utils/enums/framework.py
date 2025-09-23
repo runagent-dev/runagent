@@ -2,6 +2,7 @@ from enum import Enum
 import typing as t
 
 
+# Framework Enum with efficient caching
 class Framework(Enum):
     DEFAULT = "default"
     AG2 = "ag2"
@@ -15,27 +16,51 @@ class Framework(Enum):
     OPENAI = "openai"
     N8N = "n8n"
 
-    # Class methods for getting framework groups
     @classmethod
-    def get_pythonic_frameworks(cls) -> t.Set['Framework']:
-        """Get all pythonic frameworks"""
-        return {
-            cls.AG2, cls.AGNO, cls.AUTOGEN, cls.CREWAI, 
-            cls.LANGCHAIN, cls.LANGGRAPH, cls.LETTA, 
-            cls.LLAMAINDEX, cls.OPENAI
-        }
+    def _pythonic_frameworks_cache(cls) -> t.FrozenSet['Framework']:
+        return frozenset({
+                cls.AG2, cls.AGNO, cls.AUTOGEN, cls.CREWAI,
+                cls.LANGCHAIN, cls.LANGGRAPH, cls.LETTA,
+                cls.LLAMAINDEX, cls.OPENAI
+            })
 
     @classmethod
-    def get_webhook_frameworks(cls) -> t.Set['Framework']:
-        """Get all webhook frameworks"""
-        return {cls.N8N}
+    def _webhook_frameworks_cache(cls) -> t.FrozenSet['Framework']:
+        return frozenset({cls.N8N})
+        
+    @classmethod
+    def get_pythonic_frameworks(cls) -> t.FrozenSet['Framework']:
+        """Get all pythonic frameworks (cached)"""
+        return cls._pythonic_frameworks_cache()
 
     @classmethod
-    def get_default_framework(cls) -> 'Framework':
-        """Get the default framework"""
-        return cls.DEFAULT
+    def get_webhook_frameworks(cls) -> t.FrozenSet['Framework']:
+        """Get all webhook frameworks (cached)"""
+        return cls._webhook_frameworks_cache()
 
-    # Instance methods for checking this specific framework
+    @classmethod
+    def get_selectable_frameworks(cls) -> t.List['Framework']:
+        """Get frameworks that can be selected (excluding DEFAULT)"""
+        return [f for f in cls if f != cls.DEFAULT]
+
+    @classmethod
+    def from_string(cls, value: str) -> 'Framework':
+        """Convert string to Framework with validation"""
+        try:
+            return cls(value)
+        except ValueError:
+            valid_values = [f.value for f in cls]
+            raise ValueError(f"Invalid framework: '{value}'. Valid options: {valid_values}")
+
+    @classmethod
+    def validate_framework_str(cls, value: str) -> bool:
+        """Check if string is a valid framework"""
+        try:
+            cls(value)
+            return True
+        except ValueError:
+            return False
+
     def is_pythonic(self) -> bool:
         """Check if this framework is pythonic"""
         return self in self.get_pythonic_frameworks()
@@ -59,7 +84,6 @@ class Framework(Enum):
             return "webhook"
         else:
             return "unknown"
-
     # Class methods for string validation and conversion
     @classmethod
     def from_string(cls, framework_str: str) -> 'Framework':
@@ -79,35 +103,35 @@ class Framework(Enum):
         except ValueError:
             return False
 
-    @classmethod
-    def is_pythonic_string(cls, framework_str: str) -> bool:
-        """Check if string represents a pythonic framework"""
-        try:
-            framework = cls(framework_str)
-            return framework.is_pythonic()
-        except ValueError:
-            return False
+    # @classmethod
+    # def is_pythonic_string(cls, framework_str: str) -> bool:
+    #     """Check if string represents a pythonic framework"""
+    #     try:
+    #         framework = cls(framework_str)
+    #         return framework.is_pythonic()
+    #     except ValueError:
+    #         return False
+
+    # @classmethod
+    # def is_webhook_string(cls, framework_str: str) -> bool:
+    #     """Check if string represents a webhook framework"""
+    #     try:
+    #         framework = cls(framework_str)
+    #         return framework.is_webhook()
+    #     except ValueError:
+    #         return False
+
+    # @classmethod
+    # def is_default_string(cls, framework_str: str) -> bool:
+    #     """Check if string represents the default framework"""
+    #     try:
+    #         framework = cls(framework_str)
+    #         return framework.is_default()
+    #     except ValueError:
+    #         return False
 
     @classmethod
-    def is_webhook_string(cls, framework_str: str) -> bool:
-        """Check if string represents a webhook framework"""
-        try:
-            framework = cls(framework_str)
-            return framework.is_webhook()
-        except ValueError:
-            return False
-
-    @classmethod
-    def is_default_string(cls, framework_str: str) -> bool:
-        """Check if string represents the default framework"""
-        try:
-            framework = cls(framework_str)
-            return framework.is_default()
-        except ValueError:
-            return False
-
-    @classmethod
-    def get_category_from_string(cls, framework_str: str) -> str:
+    def from_str(cls, framework_str: str) -> str:
         """Get category from string"""
         try:
             framework = cls(framework_str)
@@ -115,19 +139,19 @@ class Framework(Enum):
         except ValueError:
             return "invalid"
 
-    # Utility class methods
-    @classmethod
-    def get_all_framework_values(cls) -> t.List[str]:
-        """Get all framework values as strings"""
-        return [f.value for f in cls]
+    # # Utility class methods
+    # @classmethod
+    # def get_all_framework_values(cls) -> t.List[str]:
+    #     """Get all framework values as strings"""
+    #     return [f.value for f in cls]
 
-    @classmethod
-    def get_pythonic_framework_values(cls) -> t.List[str]:
-        """Get pythonic framework values as strings"""
-        return [f.value for f in cls.get_pythonic_frameworks()]
+    # @classmethod
+    # def get_pythonic_framework_values(cls) -> t.List[str]:
+    #     """Get pythonic framework values as strings"""
+    #     return [f.value for f in cls.get_pythonic_frameworks()]
 
-    @classmethod
-    def get_webhook_framework_values(cls) -> t.List[str]:
-        """Get webhook framework values as strings"""
-        return [f.value for f in cls.get_webhook_frameworks()]
+    # @classmethod
+    # def get_webhook_framework_values(cls) -> t.List[str]:
+    #     """Get webhook framework values as strings"""
+    #     return [f.value for f in cls.get_webhook_frameworks()]
 
