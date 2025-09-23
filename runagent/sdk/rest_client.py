@@ -720,7 +720,8 @@ class RestClient:
     def _process_start_result(self, result: Dict, agent_id: str) -> Dict:
         """Process start agent result"""
         if result.get("success"):
-            endpoint = result.get("endpoint")
+            result_data = result["data"]
+            endpoint = result_data.get("endpoint")
 
             console.print(Panel(
                 f"✅ [bold green]Agent started successfully![/bold green]\n"
