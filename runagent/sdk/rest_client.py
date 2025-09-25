@@ -16,9 +16,16 @@ from rich.progress import (
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
+    TimeRemainingColumn,
 )
 
 from runagent.utils.config import Config
+from runagent.utils.agent_id import (
+    generate_agent_id,
+    generate_agent_fingerprint,
+    get_agent_metadata
+)
+from runagent.utils.agent import get_agent_config, validate_agent
 
 console = Console()
 
@@ -387,30 +394,6 @@ class RestClient:
 
         return zip_path
 
-<<<<<<< HEAD
-    def _upload_metadata(self, metadata: Dict) -> Dict:
-        """Upload sensitive metadata securely"""
-        try:
-            # Enhanced metadata encoding with timestamp
-            metadata_with_timestamp = {
-                **metadata,
-                "upload_timestamp": time.time(),
-                "client_version": "1.0",
-            }
-
-            # Base64 encode metadata as JSON string
-            metadata_json = json.dumps(metadata_with_timestamp, sort_keys=True)
-            encrypted_data = base64.b64encode(metadata_json.encode()).decode()
-
-            payload = {
-                "encrypted_metadata": encrypted_data,
-                "encryption_method": "base64-json",
-                "client_info": {"version": "1.0", "platform": os.name},
-            }
-
-            try:
-                response = self.http.post("/agents/metadata-upload", data=payload, timeout=60)
-=======
     def _upload_agent_metadata_to_server(self, config_data: Dict, agent_id: str) -> Dict:
         """Upload agent metadata (config, entrypoints) to middleware server"""
         try:
@@ -426,9 +409,23 @@ class RestClient:
             try:
 
                 response = self.http.post("/agents/metadata-upload", data=config_data, timeout=60)
->>>>>>> sawra/runagent_cloud_support
                 result = response.json()
-                return {"success": True, "agent_id": result.get("agent_id")}
+                
+                # Handle new API response format
+                if result.get("success"):
+                    return {
+                        "success": True, 
+                        "agent_id": result.get("data", {}).get("agent_id", agent_id),
+                        "entrypoints_created": result.get("data", {}).get("entrypoints_created", 0),
+                        "entrypoint_ids": result.get("data", {}).get("entrypoint_ids", [])
+                    }
+                else:
+                    error_info = result.get("error", {})
+                    return {
+                        "success": False, 
+                        "error": f"Metadata upload failed: {error_info.get('message', 'Unknown error')}",
+                        "error_code": error_info.get("code", "UNKNOWN_ERROR")
+                    }
 
             except (ClientError, ServerError, ConnectionError) as e:
                 return {"success": False, "error": f"Metadata upload failed: {e.message}"}
@@ -436,51 +433,6 @@ class RestClient:
         except Exception as e:
             return {"success": False, "error": f"Metadata upload error: {str(e)}"}
 
-<<<<<<< HEAD
-    def _upload_to_server_secure(self, zip_path: str, metadata: Dict, progress: Progress, task_id) -> Dict:
-        """Upload zip file to middleware server"""
-        try:
-            # Step 1: Upload metadata
-            progress.update(task_id, completed=5)
-            metadata_result = self._upload_metadata(metadata)
-
-            if not metadata_result.get("success"):
-                return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
-
-            agent_id = metadata_result.get("agent_id")
-            progress.update(task_id, completed=20)
-
-            # Step 2: Upload file
-            with open(zip_path, "rb") as f:
-                files = {"file": (os.path.basename(zip_path), f, "application/zip")}
-                data = {
-                    "framework": metadata.get("framework", "unknown"),
-                    "name": metadata.get("name", os.path.basename(zip_path).replace(".zip", "")),
-                    "has_metadata": "true",
-                    "agent_id": agent_id,
-                }
-
-                # Update progress during upload
-                for i in range(20, 50, 5):
-                    progress.update(task_id, completed=i)
-                    time.sleep(0.05)
-
-                try:
-                    response = self.http.post("/agents/upload", files=files, data=data, timeout=300)
-                    result = response.json()
-
-                    # Update progress during upload
-                    for i in range(50, 100, 10):
-                        progress.update(task_id, completed=i)
-                        time.sleep(0.1)
-
-                    return {
-                        "success": result.get("success", False),
-                        "agent_id": result.get("agent_id"),
-                        "message": result.get("message", "Upload completed"),
-                        "status": result.get("status", "uploaded"),
-                    }
-=======
     def _upload_agent_zip_file_to_server(self, zip_path: str, agent_id: str, progress: Progress, task_id) -> Dict:
         """Upload agent zip file (source code) to middleware server"""
         try:
@@ -521,7 +473,6 @@ class RestClient:
                             "error": f"File upload failed: {error_info.get('message', 'Unknown error')}",
                             "error_code": error_info.get("code", "UNKNOWN_ERROR")
                         }
->>>>>>> sawra/runagent_cloud_support
 
                 except (ClientError, ServerError, ConnectionError) as e:
                     return {"success": False, "error": f"File upload failed: {e.message}"}
@@ -534,6 +485,28 @@ class RestClient:
         if result.get("success"):
             agent_id = result.get("agent_id")
 
+            # Save to database
+            try:
+                from runagent.sdk.db import DBService
+                db_service = DBService()
+                
+                # Add remote agent to database
+                db_result = db_service.add_remote_agent(
+                    agent_id=agent_id,
+                    agent_path="",  # Remote agent, no local path
+                    framework="unknown",  # Will be updated when agent is started
+                    fingerprint=upload_metadata.get("fingerprint", ""),
+                    status="uploaded"
+                )
+                
+                if db_result.get("success"):
+                    console.print(f"💾 [green]Agent saved to local database[/green]")
+                else:
+                    console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
+                    
+            except Exception as e:
+                console.print(f"⚠️ [yellow]Warning: Database error: {str(e)}[/yellow]")
+
             # Save deployment info locally
             self._save_deployment_info(agent_id, {
                 **upload_metadata,
@@ -545,7 +518,8 @@ class RestClient:
             console.print(Panel(
                 f"✅ [bold green]Upload successful![/bold green]\n"
                 f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                f"🌐 Server: [blue]{self.base_url}[/blue]",
+                f"🌐 Server: [blue]{self.base_url}[/blue]\n"
+                f"🔍 Fingerprint: [dim]{upload_metadata.get('fingerprint', 'N/A')[:16]}...[/dim]",
                 title="📤 Upload Complete",
                 border_style="green",
             ))
@@ -558,13 +532,8 @@ class RestClient:
             }
         return result
 
-<<<<<<< HEAD
-    def upload_agent(self, folder_path: str, metadata: Dict = None) -> Dict:
-        """Upload agent folder to middleware server"""
-=======
     def upload_agent(self, folder_path: str) -> Dict:
         """Upload agent folder to middleware server with validation"""
->>>>>>> sawra/runagent_cloud_support
         try:
             folder_path = Path(folder_path)
 
@@ -573,11 +542,6 @@ class RestClient:
 
             console.print(f"📤 Uploading agent from: [blue]{folder_path}[/blue]")
 
-<<<<<<< HEAD
-            # Create zip file
-            with console.status("[bold green]🔧 Preparing files for upload...[/bold green]", spinner="dots"):
-                zip_path = self._create_zip_from_folder(folder_path)
-=======
             # Step 1: Validate agent
             console.print(f"🔍 Validating agent...")
 
@@ -595,33 +559,109 @@ class RestClient:
                 }
             
             console.print(f"✅ [green]Agent validation passed[/green]")
->>>>>>> sawra/runagent_cloud_support
 
-            console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
+            # Step 2: Load agent config
+            try:
+                agent_config = get_agent_config(folder_path)
+                console.print(f"📋 [green]Agent config loaded successfully[/green]")
+            except Exception as e:
+                return {"success": False, "error": f"Failed to load agent config: {str(e)}"}
 
-            # Prepare upload metadata
-            upload_metadata = {
-                "framework": (metadata.get("framework", "unknown") if metadata else "unknown"),
-                "uploaded_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "source_folder": str(folder_path),
-                **(metadata or {}),
-            }
+            # Step 3: Generate agent fingerprint for duplicate detection
+            fingerprint = generate_agent_fingerprint(folder_path)
+            console.print(f"🔍 Agent fingerprint: [dim]{fingerprint[:16]}...[/dim]")
 
-            # Upload to server
+            # Step 4: Check for existing agents (both by fingerprint and by path)
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            
+            # Check for exact fingerprint match (identical content)
+            existing_agent_by_fingerprint = db_service.get_agent_by_fingerprint(fingerprint)
+            
+            # Check for existing agent by path (same folder, potentially modified)
+            existing_agent_by_path = db_service.get_agent_by_path(str(folder_path))
+            
+            if existing_agent_by_fingerprint:
+                # Identical content detected
+                existing_agent = existing_agent_by_fingerprint
+                console.print(f"⚠️ [yellow]Agent with identical content already exists![/yellow]")
+                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
+                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+                
+                # Ask user if they want to overwrite identical content
+                from rich.prompt import Confirm
+                overwrite = Confirm.ask("Do you want to overwrite the existing agent?", default=False)
+                
+                if not overwrite:
+                    return {
+                        "success": False,
+                        "error": "Upload cancelled by user",
+                        "code": "USER_CANCELLED",
+                        "existing_agent": existing_agent
+                    }
+                
+                # Use existing agent ID for overwrite
+                agent_id = existing_agent['agent_id']
+                console.print(f"🔄 [yellow]Overwriting existing agent: {agent_id}[/yellow]")
+                
+            elif existing_agent_by_path:
+                # Modified content detected (same folder, different fingerprint)
+                existing_agent = existing_agent_by_path
+                console.print(f"⚠️ [yellow]Agent content has changed![/yellow]")
+                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
+                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+                console.print(f"🔍 Content fingerprint changed (modified files detected)")
+                
+                # Show enhanced options for modified content
+                from rich.prompt import Prompt
+                choice = Prompt.ask(
+                    "What would you like to do?",
+                    choices=["overwrite", "new", "cancel"],
+                    default="new"
+                )
+                
+                if choice == "overwrite":
+                    # Feature not available yet - show message and fallback
+                    console.print(f"\n🚧 [yellow]Overwrite functionality is not yet available.[/yellow]")
+                    console.print(f"💡 [cyan]This feature is coming soon! For now, we'll create a new agent.[/cyan]")
+                    console.print(f"📢 [blue]Contact us on Discord if you need this feature sooner.[/blue]")
+                    console.print(f"🔗 [link]https://discord.gg/Q9P9AdHVHz[/link]")
+                    
+                    # Fallback to new agent creation
+                    agent_id = generate_agent_id()
+                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                    
+                elif choice == "new":
+                    # Create new agent with new ID
+                    agent_id = generate_agent_id()
+                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                    
+                else:  # cancel
+                    return {
+                        "success": False,
+                        "error": "Upload cancelled by user",
+                        "code": "USER_CANCELLED",
+                        "existing_agent": existing_agent
+                    }
+            else:
+                # No existing agent found - create new one
+                agent_id = generate_agent_id()
+                console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+
+            # Step 5: Create zip file and upload in parallel
             console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
 
             with Progress(
                 SpinnerColumn(),
-                TextColumn("[bold green]Uploading...[/bold green]"),
+                TextColumn("[bold green]{task.description}[/bold green]"),
                 BarColumn(bar_width=40),
                 TextColumn("[bold]{task.percentage:>3.0f}%"),
                 TimeElapsedColumn(),
+                TimeRemainingColumn(),
                 console=console,
             ) as progress:
-<<<<<<< HEAD
-                upload_task = progress.add_task("Uploading...", total=100)
-                result = self._upload_to_server_secure(zip_path, upload_metadata, progress, upload_task)
-=======
                 upload_task = progress.add_task("Initializing upload...", total=100)
                 
                 # Step 1: Upload metadata first
@@ -646,12 +686,15 @@ class RestClient:
                 
                 # Step 3: Upload zip file
                 result = self._upload_agent_zip_file_to_server(zip_path, agent_id, progress, upload_task)
->>>>>>> sawra/runagent_cloud_support
 
             # Clean up zip file
             os.unlink(zip_path)
 
-            return self._process_upload_result(result, upload_metadata)
+            return self._process_upload_result(result, {
+                "agent_id": agent_id, 
+                "fingerprint": fingerprint,
+                "source_folder": str(folder_path)
+            })
 
         except Exception as e:
             return {"success": False, "error": f"Upload failed: {str(e)}"}
