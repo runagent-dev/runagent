@@ -232,7 +232,7 @@ class RunAgentSDK:
         )
 
     def upload_agent(
-        self, folder: str, framework: t.Optional[str] = None
+        self, folder: str
     ) -> t.Dict[str, t.Any]:
         """
         Upload an agent to the remote server (without starting).
@@ -247,8 +247,9 @@ class RunAgentSDK:
         Raises:
             AuthenticationError: If not properly authenticated
         """
+        # Check if auth params exists, not make the request
         self._require_authentication()
-        return self.remote.upload_agent(folder_path=folder, framework=framework)
+        return self.remote.upload_agent(folder_path=folder)
 
     def start_remote_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None
@@ -395,18 +396,6 @@ class RunAgentSDK:
             suggestions.append("Check environment variables (.env file)")
 
         return suggestions
-
-    def detect_framework(self, folder: str) -> str:
-        """
-        Auto-detect the framework used in an agent project.
-
-        Args:
-            folder: Path to agent folder
-
-        Returns:
-            Detected framework name
-        """
-        return detect_framework(folder)
 
     # Database and Server Management
     def cleanup_local_database(self, days_old: int = 30) -> t.Dict[str, t.Any]:

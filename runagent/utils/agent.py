@@ -3,8 +3,8 @@ import typing as t
 from pathlib import Path
 from runagent.constants import AGENT_CONFIG_FILE_NAME
 from runagent.utils.imports import PackageImporter
-from runagent.utils.schema import RunAgentConfig, PythonicEntryPoint
-from .enums import FrameworkType
+from runagent.utils.schema import RunAgentConfig
+from runagent.utils.enums.framework import Framework
 
 
 def get_agent_config(folder_path: Path) -> t.Optional[dict]:
@@ -93,7 +93,7 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
     return RunAgentConfig(**config_data)
 
 
-def detect_framework(folder_path: Path) -> str:
+def detect_framework(folder_path: Path) -> Framework:
     """
     Detect framework from agent's runagent.config.json file.
 
@@ -106,7 +106,7 @@ def detect_framework(folder_path: Path) -> str:
     config = get_agent_config(folder_path)
     framework = config.framework
 
-    return framework.value
+    return framework
 
 
 def validate_agent(
@@ -129,16 +129,25 @@ def validate_agent(
         }
 
     config = get_agent_config(folder_path)
-
-    if isinstance(config.agent_architecture.entrypoints[0], PythonicEntryPoint):
+    # framework = config.framework
+    if config.framework.is_pythonic():
         is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
-        return is_valid, details
     else:
-        return True, {
-            "valid": True,
-            "error_msgs": [],
-        }
+        is_valid, details = validate_webhook_agent(config, dynamic_loading, folder_path)
 
+    return is_valid, details
+
+
+def validate_webhook_agent(config, dynamic_loading, folder_path):
+    return True, dict(
+        valid=True,
+        folder_exists=True,
+        files_found=[],
+        missing_files=[],
+        success_msgs=[],
+        error_msgs=[],
+        warning_msgs=[],
+    )
 
 def validate_pythonic_agent(config, dynamic_loading, folder_path):
 
@@ -225,7 +234,7 @@ def validate_pythonic_agent(config, dynamic_loading, folder_path):
 
     # Detect framework
     try:
-        validation_details["framework"] = detect_framework(folder_path)
+        validation_details["framework"] = detect_framework(folder_path).value
     except Exception as e:
         validation_details["error_msgs"].append(f"Failed to detect framework: {str(e)}")
         validation_details["valid"] = False

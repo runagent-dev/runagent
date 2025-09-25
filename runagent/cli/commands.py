@@ -23,30 +23,9 @@ from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
 from runagent.utils.config import Config
 from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-
+from runagent.cli.utils import add_framework_options, get_selected_framework
+from runagent.utils.enums.framework import Framework
 console = Console()
-
-
-def print_version(ctx, param, value):
-    """Custom version callback with colored output"""
-    if not value or ctx.resilient_parsing:
-        return
-    try:
-        from runagent.__version__ import __version__
-        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
-    except ImportError:
-        console.print("[red]runagent version unknown[/red]")
-    ctx.exit()
-
-
-@click.command()
-def version():
-    """Show version information"""
-    try:
-        from runagent.__version__ import __version__
-        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
-    except ImportError:
-        console.print("[red]runagent version unknown[/red]")
 
 @click.command()
 @click.option("--api-key", required=True, help="Your API key")
@@ -251,150 +230,130 @@ def delete(agent_id, yes):
         raise click.ClickException("Delete failed")
 
 
-
-
-
 @click.command()
 @click.option("--template", default="default", help="Template variant (basic, advanced, default)")
 @click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
-@click.option("--ag2", is_flag=True, help="Use AG2 framework")
-@click.option("--agno", is_flag=True, help="Use AGNO framework")
-@click.option("--autogen", is_flag=True, help="Use Autogen framework")
-@click.option("--crewai", is_flag=True, help="Use CrewAI framework")
-@click.option("--langchain", is_flag=True, help="Use LangChain framework")
-@click.option("--langgraph", is_flag=True, help="Use LangGraph framework")
-@click.option("--letta", is_flag=True, help="Use Letta framework")
-@click.option("--llamaindex", is_flag=True, help="Use LlamaIndex framework")
-@click.option("--openai", is_flag=True, help="Use OpenAI framework")
-@click.option("--n8n", is_flag=True, help="Use N8N workflows")
+@add_framework_options  # This automatically adds all framework options!
 @click.argument(
     "path",
     type=click.Path(
-        file_okay=False,  # Don't allow files
-        dir_okay=True,  # Allow directories only
-        readable=True,  # Must be readable
-        resolve_path=True,  # Convert to absolute path
-        path_type=Path,  # Return as pathlib.Path object
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
     ),
     default=".",
-    required=False,  # Make path optional
+    required=False,
 )
-def init(
-    template,
-    interactive,
-    overwrite,
-    ag2,
-    agno,
-    autogen,
-    crewai,
-    langchain,
-    langgraph,
-    letta,
-    llamaindex,
-    openai,
-    n8n,
-    path
-):
+def init(template, interactive, overwrite, path, **kwargs):
     """Initialize a new RunAgent project"""
-
+    
     try:
         sdk = RunAgent()
-
-        # Check for mutually exclusive framework flags
-        framework_dict = {
-            "ag2": ag2,
-            "agno": agno,
-            "autogen": autogen,
-            "crewai": crewai,
-            "langchain": langchain,
-            "langgraph": langgraph,
-            "letta": letta,
-            "llamaindex": llamaindex,
-            "openai": openai,
-            "n8n": n8n
-        }
-        total_flags = sum(flag for flag in framework_dict.values())
-        if total_flags > 1:
-            frameworks_str = ", ".join(f"--{fw}" for fw in framework_dict)
-            raise click.UsageError(f"Only one framework can be specified: {frameworks_str}")
-
-        framework = (
-            [name for name, flag in framework_dict.items() if flag] or ["default"]
-        )[0]
+        
+        # Extract selected framework using our helper
+        selected_framework = get_selected_framework(kwargs)
+        framework = selected_framework if selected_framework else Framework.DEFAULT
         
         if interactive:
-            if framework == "default":
+            if framework == Framework.DEFAULT:
                 console.print("🎯 [bold]Available frameworks:[/bold]")
-                for i, fw in enumerate(framework_dict.keys(), 1):    # need to start from 1
-                    console.print(f"  {i}. {fw}")
-
+                selectable_frameworks = Framework.get_selectable_frameworks()
+                
+                for i, fw in enumerate(selectable_frameworks, 1):
+                    category_emoji = "🐍" if fw.is_pythonic() else "🌐" if fw.is_webhook() else "❓"
+                    console.print(f"  {i}. {category_emoji} {fw.value} ({fw.category})")
+                
                 choice = click.prompt(
-                    "Select framework", type=click.IntRange(1, len(framework_dict)), default=1
+                    "Select framework", 
+                    type=click.IntRange(1, len(selectable_frameworks)), 
+                    default=1
                 )
-                # framework = framework_dict[choice - 1]
-                framework = [
-                    fw_name for i, fw_name in enumerate(framework_dict) if i == (choice-1)
-                ][0]
-
+                framework = selectable_frameworks[choice - 1]
+            
             if template == "default":
-                templates = sdk.list_templates(framework)
-                template_list = templates.get(framework, ["default"])
-
-                console.print(f"\n🧱 [bold]Available templates for {framework}:[/bold]")
+                templates = sdk.list_templates(framework.value)
+                template_list = templates.get(framework.value, ["default"])
+                
+                console.print(f"\n🧱 [bold]Available templates for {framework.value}:[/bold]")
                 for i, tmpl in enumerate(template_list, 1):
                     console.print(f"  {i}. {tmpl}")
-
+                
                 choice = click.prompt(
-                    "Select template", type=click.IntRange(1, len(template_list)), default=1
+                    "Select template", 
+                    type=click.IntRange(1, len(template_list)), 
+                    default=1
                 )
                 template = template_list[choice - 1]
-                
+            
             if path.resolve() == Path.cwd():
                 project_name = click.prompt(
                     "Enter project name",
                     type=str,
                     default="runagent-project"
                 )
-                # Update path to include project name
                 path = Path.cwd() / project_name
-
+        
+        # Validate framework if it came from string input
+        if isinstance(framework, str):
+            try:
+                framework = Framework.from_string(framework)
+            except ValueError as e:
+                raise click.UsageError(str(e))
+        
         # Use the path as the project location
         project_path = path.resolve()
         relative_project_path = project_path.relative_to(Path.cwd())
-
-        # Ensure the path exists (create parent directories if needed)
+        
+        # Ensure the path exists
         project_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Show configuration
+        
+        # Show configuration with enhanced formatting
         console.print(f"\n🚀 [bold]Initializing project:[/bold]")
-
         console.print(f"   Path: [cyan]{relative_project_path}[/cyan]")
-        console.print(f"   Framework: [magenta]{framework if framework else 'None'}[/magenta]")
+        
+        # Enhanced framework display with category
+        framework_display = framework.value
+        if not framework.is_default():
+            category_emoji = "🐍" if framework.is_pythonic() else "🌐" if framework.is_webhook() else "❓"
+            framework_display = f"{category_emoji} {framework.value} ({framework.category})"
+        
+        console.print(f"   Framework: [magenta]{framework_display}[/magenta]")
         console.print(f"   Template: [yellow]{template}[/yellow]")
-
-        print(">>", framework, ">>", template)
+        
         # Initialize project
         success = sdk.init_project(
             folder_path=project_path,
-            framework=framework,
+            framework=framework.value,  # Pass the string value
             template=template,
             overwrite=overwrite
         )
-
+        
         if success:
             console.print(f"\n✅ [green]Project initialized successfully![/green]")
             console.print(f"📁 Created at: [cyan]{relative_project_path}[/cyan]")
-
-            # Show next steps
+            
+            # Enhanced next steps with framework-specific guidance
             console.print("\n📝 [bold]Next steps:[/bold]")
             console.print(f"  1. [cyan]cd {relative_project_path}[/cyan]")
             console.print(f"  2. Update your API keys in [yellow].env[/yellow] file")
-            console.print(f"  3. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
+            
+            # Framework-specific guidance
+            if framework.is_pythonic():
+                console.print(f"  3. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
+                console.print(f"  4. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
+            elif framework.is_webhook():
+                console.print(f"  3. Configure webhook endpoints in your workflow")
+                console.print(f"  4. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
+            else:
+                console.print(f"  3. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
+            
             console.print(
-                f"  4. Test: [cyan]Test the agent with any of our SDKs. For more details, refer to: [link]https://docs.run-agent.ai/sdk/overview[/link][/cyan]"
+                f"  5. Test: [cyan]Test the agent with any of our SDKs. For more details, refer to: [link]https://docs.run-agent.ai/sdk/overview[/link][/cyan]"
             )
-
+    
     except TemplateError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
@@ -406,11 +365,15 @@ def init(
         console.print(f"❌ [red]Path exists:[/red] {e}")
         console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
         raise click.ClickException("Project initialization failed")
+    except click.UsageError:
+        # Re-raise UsageError as-is for proper click handling
+        raise
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
         console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
+
 
 @click.command()
 @click.option(
@@ -525,106 +488,116 @@ def template(action_list, action_info, framework, template, filter_framework, fo
         raise click.ClickException("Template operation failed")
 
 
-@click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-@click.option("--replace", help="Agent ID to replace (for capacity management)")
-@click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
-@click.option("--host", default="127.0.0.1", help="Preferred host")
-def deploy_local(folder, framework, replace, port, host):
-    """Deploy agent locally for testing with automatic port allocation"""
+# @click.command()
+# @click.option("--folder", required=True, help="Folder containing agent files")
+# @click.option("--framework", help="Framework type (auto-detected if not specified)")
+# @click.option("--replace", help="Agent ID to replace (for capacity management)")
+# @click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
+# @click.option("--host", default="127.0.0.1", help="Preferred host")
+# def deploy_local(folder, framework, replace, port, host):
+#     """Deploy agent locally for testing with automatic port allocation"""
 
-    try:
-        sdk = RunAgent()
+#     try:
+#         sdk = RunAgent()
 
-        # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
+#         # Validate folder
+#         if not Path(folder).exists():
+#             raise click.ClickException(f"Folder not found: {folder}")
 
-        console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+#         console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
+#         console.print(f"📁 Source: [cyan]{folder}[/cyan]")
 
-        if replace:
-            # Replace existing agent
-            result = sdk.db_service.replace_agent(
-                old_agent_id=replace,
-                new_agent_id=str(uuid.uuid4()),  # Generate new ID
-                agent_path=folder,
-                host=host,
-                port=port,
-                framework=framework or detect_framework(folder),
-            )
-        else:
-            # Add new agent with auto port allocation
-            import uuid
-            agent_id = str(uuid.uuid4())
-            result = sdk.db_service.add_agent_with_auto_port(
-                agent_id=agent_id,
-                agent_path=folder,
-                framework=framework or detect_framework(folder),
-                status="deployed",
-                preferred_host=host,
-                preferred_port=port,
-            )
+#         if replace:
+#             # Replace existing agent
+#             result = sdk.db_service.replace_agent(
+#                 old_agent_id=replace,
+#                 new_agent_id=str(uuid.uuid4()),  # Generate new ID
+#                 agent_path=folder,
+#                 host=host,
+#                 port=port,
+#                 framework=framework or detect_framework(folder),
+#             )
+#         else:
+#             # Add new agent with auto port allocation
+#             import uuid
+#             agent_id = str(uuid.uuid4())
+#             result = sdk.db_service.add_agent_with_auto_port(
+#                 agent_id=agent_id,
+#                 agent_path=folder,
+#                 framework=framework or detect_framework(folder),
+#                 status="deployed",
+#                 preferred_host=host,
+#                 preferred_port=port,
+#             )
 
-        if result.get("success"):
-            agent_id = result.get("new_agent_id") if replace else result.get("agent_id")
-            allocated_host = result.get("allocated_host", host)
-            allocated_port = result.get("allocated_port", port)
+#         if result.get("success"):
+#             agent_id = result.get("new_agent_id") if replace else result.get("agent_id")
+#             allocated_host = result.get("allocated_host", host)
+#             allocated_port = result.get("allocated_port", port)
             
-            console.print(f"\n✅ [green]Local deployment successful![/green]")
-            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
-            console.print(f"🔌 Allocated Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
-            console.print(f"🌐 Endpoint: [link]http://{allocated_host}:{allocated_port}[/link]")
+#             console.print(f"\n✅ [green]Local deployment successful![/green]")
+#             console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+#             console.print(f"🔌 Allocated Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
+#             console.print(f"🌐 Endpoint: [link]http://{allocated_host}:{allocated_port}[/link]")
 
-            if replace:
-                console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
+#             if replace:
+#                 console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
 
-            # Show capacity info
-            # capacity = sdk.get_local_capacity()
-            capacity_info = sdk.db_service.get_database_capacity_info()
+#             # Show capacity info
+#             # capacity = sdk.get_local_capacity()
+#             capacity_info = sdk.db_service.get_database_capacity_info()
 
-            console.print(
-                f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
-            )
+#             console.print(
+#                 f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
+#             )
 
-            console.print(f"\n💡 [bold]Next steps:[/bold]")
-            console.print(f"  • Start server: [cyan]runagent serve {folder}[/cyan]")
-            console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
-            console.print(f"  • Or use Python SDK:")
-            console.print(f"    [dim]from runagent import RunAgentClient[/dim]")
-            console.print(f"    [dim]client = RunAgentClient(agent_id='{agent_id}', local=True)[/dim]")
-        else:
-            error_code = result.get("error_code")
-            if error_code == "DATABASE_FULL":
-                capacity_info = result.get("capacity_info", {})
-                console.print(f"\n❌ [red]Database at full capacity![/red]")
-                console.print(
-                    f"📊 Current: {capacity_info.get('current_count', 0)}/5 agents"
-                )
+#             console.print(f"\n💡 [bold]Next steps:[/bold]")
+#             console.print(f"  • Start server: [cyan]runagent serve {folder}[/cyan]")
+#             console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
+#             console.print(f"  • Or use Python SDK:")
+#             console.print(f"    [dim]from runagent import RunAgentClient[/dim]")
+#             console.print(f"    [dim]client = RunAgentClient(agent_id='{agent_id}', local=True)[/dim]")
+#         else:
+#             error_code = result.get("error_code")
+#             if error_code == "DATABASE_FULL":
+#                 capacity_info = result.get("capacity_info", {})
+#                 console.print(f"\n❌ [red]Database at full capacity![/red]")
+#                 console.print(
+#                     f"📊 Current: {capacity_info.get('current_count', 0)}/5 agents"
+#                 )
 
-                oldest_agent = capacity_info.get("oldest_agent", {}).get("agent_id")
-                if oldest_agent:
-                    console.print(f"\n💡 [yellow]Suggested command:[/yellow]")
-                    console.print(
-                        f"[cyan]runagent deploy-local --folder {folder} --replace {oldest_agent}[/cyan]"
-                    )
+#                 oldest_agent = capacity_info.get("oldest_agent", {}).get("agent_id")
+#                 if oldest_agent:
+#                     console.print(f"\n💡 [yellow]Suggested command:[/yellow]")
+#                     console.print(
+#                         f"[cyan]runagent deploy-local --folder {folder} --replace {oldest_agent}[/cyan]"
+#                     )
 
-                raise click.ClickException(result.get("error"))
-            else:
-                raise click.ClickException(result.get("error"))
+#                 raise click.ClickException(result.get("error"))
+#             else:
+#                 raise click.ClickException(result.get("error"))
 
-    except ValidationError as e:
-        console.print(f"❌ [red]Validation error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
-    except Exception as e:
-        console.print(f"❌ [red]Deployment error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
+#     except ValidationError as e:
+#         console.print(f"❌ [red]Validation error:[/red] {e}")
+#         raise click.ClickException("Deployment failed")
+#     except Exception as e:
+#         console.print(f"❌ [red]Deployment error:[/red] {e}")
+#         raise click.ClickException("Deployment failed")
 
 @click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-def upload(folder, framework):
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def upload(path):
     """Upload agent to remote server"""
 
     try:
@@ -638,14 +611,14 @@ def upload(folder, framework):
             raise click.ClickException("Authentication required")
 
         # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
         console.print(f"📤 [bold]Uploading agent...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-        # Upload agent
-        result = sdk.upload_agent(folder=folder, framework=framework)
+        # Upload agent (framework auto-detected)
+        result = sdk.upload_agent(folder=str(path))
 
         if result.get("success"):
             agent_id = result["agent_id"]
@@ -840,8 +813,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 raise click.ClickException("Agent to replace not found")
             
             # Generate new agent ID
-            import uuid
-            new_agent_id = str(uuid.uuid4())
+            from runagent.utils.agent_id import generate_agent_id
+            new_agent_id = generate_agent_id()
             
             # Get currently used ports to avoid conflicts
             used_ports = []
@@ -867,7 +840,7 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 agent_path=str(path),
                 host=allocated_host,
                 port=allocated_port,  # Ensure port is not None
-                framework=detect_framework(path),
+                framework=detect_framework(path).value,
             )
             
             if not result["success"]:
@@ -1082,6 +1055,8 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
     # Local execution
     if local:
         console.print("   Local: [green]Yes[/green]")
+    else:
+        console.print("   Local: [red]No(Deployed to RunAgent Cloud)[/red]")
     
     # Timeout
     if timeout:

@@ -68,7 +68,7 @@ class LocalServer:
         self.agent_name = self.agent_config.agent_name
         self.agent_version = self.agent_config.version
 
-        self.agent_framework = self.agent_config.framework.value
+        self.agent_framework = self.agent_config.framework
         self.agent_architecture = self.agent_config.agent_architecture  
 
         # Install dependencies if requirements.txt exists
@@ -110,7 +110,7 @@ class LocalServer:
             agent_data = {
                 "local_agent_id": self.agent_id,  # This becomes the main agent ID in middleware
                 "name": self.agent_name,
-                "framework": self.agent_framework,
+                "framework": self.agent_framework.value,
                 "version": self.agent_version,
                 "path": str(self.agent_path),
                 "host": self.host,
@@ -159,7 +159,7 @@ class LocalServer:
                     "server_host": self.host,
                     "server_port": self.port,
                     "agent_name": self.agent_name,
-                    "agent_framework": self.agent_framework
+                    "agent_framework": self.agent_framework.value
                 }
             )
 
@@ -186,7 +186,7 @@ class LocalServer:
                             "server_host": self.host,
                             "server_port": self.port,
                             "agent_name": self.agent_name,
-                            "agent_framework": self.agent_framework
+                            "agent_framework": self.agent_framework.value
                         }
                     }
                     
@@ -346,7 +346,7 @@ class LocalServer:
             "server_type": "FastAPI",
             "agent_id": self.agent_id,
             "agent_name": self.agent_name,
-            "agent_framework": self.agent_framework,
+            "agent_framework": self.agent_framework.value,
             "invocation_tracking": True,
             "middleware_sync": {
                 "enabled": sync_status["sync_enabled"],
@@ -548,7 +548,8 @@ class LocalServer:
                 )
 
             # Generate unique agent ID (same for all frameworks including Letta)
-            agent_id = str(uuid.uuid4())
+            from runagent.utils.agent_id import generate_agent_id
+            agent_id = generate_agent_id()
             
             # Add agent with automatic port allocation
             result = db_service.add_agent_with_auto_port(
