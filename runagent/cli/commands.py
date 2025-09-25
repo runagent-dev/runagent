@@ -1055,6 +1055,8 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
     # Local execution
     if local:
         console.print("   Local: [green]Yes[/green]")
+    else:
+        console.print("   Local: [red]No(Deployed to RunAgent Cloud)[/red]")
     
     # Timeout
     if timeout:
