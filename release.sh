@@ -370,14 +370,16 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# Generate changelog BEFORE creating tag
+generate_changelog
+
 # Handle existing tag
 if handle_existing_tag "$VERSION"; then
     echo "✅ Tag v$VERSION updated successfully!"
-    generate_changelog
     exit 0
 fi
 
-# Stage and commit changes
+# Stage and commit changes (including changelog)
 git add .
 
 if git diff --staged --quiet; then
@@ -385,23 +387,29 @@ if git diff --staged --quiet; then
     exit 1
 fi
 
-# Create new tag
-git tag -a "v$VERSION" -m "Release v$VERSION
-RunAgent Universal Release v$VERSION"
-
-git push --tag
-echo "✅ Tag v$VERSION created and pushed successfully!"
-
-generate_changelog
-
+# Commit changes first
 git commit -m "chore: bump version to v$VERSION
 
 - Updated all SDK versions to $VERSION
 - Generated changelog with git-cliff" -q
 
+# Create new tag
+git tag -a "v$VERSION" -m "Release v$VERSION
+RunAgent Universal Release v$VERSION
+
+All SDKs updated to version $VERSION"
+
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+# Push commit first, then tag (to prevent orphaned tags)
+echo "📤 Pushing commit to origin/$CURRENT_BRANCH..."
+git push origin "$CURRENT_BRANCH"
+
+echo "📤 Pushing tag v$VERSION..."
+git push origin "v$VERSION"
+
+echo "✅ Release v$VERSION completed successfully!"
 echo ""
 echo "📋 Next steps:"
-echo "  1. Push changes: git push origin $CURRENT_BRANCH"
-echo "  2. Push tag: git push origin v$VERSION"
-echo "  3. Monitor workflows at: https://github.com/runagent-dev/runagent/actions"
+echo "  1. Monitor workflows at: https://github.com/runagent-dev/runagent/actions"
+echo "  2. Verify release at: https://github.com/runagent-dev/runagent/releases"
