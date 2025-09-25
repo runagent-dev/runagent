@@ -532,10 +532,9 @@ class RestClient:
             }
         return result
 
-    def upload_agent(self, folder_path: str) -> Dict:
+    def upload_agent_metadata_and_zip(self, folder_path: Path) -> Dict:
         """Upload agent folder to middleware server with validation"""
         try:
-            folder_path = Path(folder_path)
 
             if not folder_path.exists():
                 return {"success": False, "error": f"Folder not found: {folder_path}"}

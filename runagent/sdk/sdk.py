@@ -232,7 +232,7 @@ class RunAgentSDK:
         )
 
     def upload_agent(
-        self, folder: str, framework: t.Optional[str] = None
+        self, folder: Path
     ) -> t.Dict[str, t.Any]:
         """
         Upload an agent to the remote server (without starting).
@@ -248,7 +248,7 @@ class RunAgentSDK:
             AuthenticationError: If not properly authenticated
         """
         self._require_authentication()
-        return self.remote.upload_agent(folder_path=folder, framework=framework)
+        return self.remote.upload_agent_to_server(folder_path=folder)
 
     def start_remote_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None
