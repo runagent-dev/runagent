@@ -397,18 +397,6 @@ class RunAgentSDK:
 
         return suggestions
 
-    def detect_framework(self, folder: str) -> str:
-        """
-        Auto-detect the framework used in an agent project.
-
-        Args:
-            folder: Path to agent folder
-
-        Returns:
-            Detected framework name
-        """
-        return detect_framework(folder)
-
     # Database and Server Management
     def cleanup_local_database(self, days_old: int = 30) -> t.Dict[str, t.Any]:
         """

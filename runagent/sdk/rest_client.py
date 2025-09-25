@@ -4,10 +4,8 @@ import os
 import tempfile
 import time
 import zipfile
-import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from rich.console import Console
@@ -377,10 +375,10 @@ class RestClient:
         self._cache_expiry = None
         console.print("🔄 [dim]Limits cache cleared[/dim]")
 
-    def _create_zip_from_folder(self, folder_path: Path) -> str:
+    def _create_zip_from_folder(self, agent_id: str, folder_path: Path) -> str:
         """Create a zip file from the agent folder"""
         temp_dir = tempfile.gettempdir()
-        zip_path = os.path.join(temp_dir, f"agent_{int(time.time())}.zip")
+        zip_path = os.path.join(temp_dir, f"agent_{agent_id[:8]}.zip")
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
             for file_path in folder_path.rglob("*"):
@@ -396,20 +394,21 @@ class RestClient:
 
         return zip_path
 
-    def _upload_metadata(self, agent_config: Dict, agent_id: str) -> Dict:
-        """Upload agent metadata to middleware server using full agent config"""
+    def _upload_agent_metadata_to_server(self, config_data: Dict, agent_id: str) -> Dict:
+        """Upload agent metadata (config, entrypoints) to middleware server"""
         try:
             if not agent_id:
                 return {"success": False, "error": "No agent_id provided"}
             
             # Use the full agent config directly
-            payload = {
-                "id": agent_id,
-                "config": agent_config
-            }
+            # payload = {
+            #     "id": agent_id,
+            #     "config": agent_config
+            # }
 
             try:
-                response = self.http.post("/agents/metadata-upload", json=payload, timeout=60)
+
+                response = self.http.post("/agents/metadata-upload", data=config_data, timeout=60)
                 result = response.json()
                 
                 # Handle new API response format
@@ -434,66 +433,49 @@ class RestClient:
         except Exception as e:
             return {"success": False, "error": f"Metadata upload error: {str(e)}"}
 
-    def _upload_to_server_secure(self, zip_path: str, agent_config: Dict, agent_id: str, progress: Progress, task_id) -> Dict:
-        """Upload zip file to middleware server with parallel processing"""
+    def _upload_agent_zip_file_to_server(self, zip_path: str, agent_id: str, progress: Progress, task_id) -> Dict:
+        """Upload agent zip file (source code) to middleware server"""
         try:
-            # Step 1: Start metadata upload asynchronously
-            progress.update(task_id, completed=5, description="Starting metadata upload...")
+            # Upload zip file
+            file_size = os.path.getsize(zip_path)
+            progress.update(task_id, completed=30, description=f"Uploading {os.path.basename(zip_path)} ({file_size:,} bytes)...")
             
-            # Use ThreadPoolExecutor for parallel processing
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                # Submit metadata upload task
-                metadata_future = executor.submit(self._upload_metadata, agent_config, agent_id)
-                
-                # Wait for metadata upload to complete
-                progress.update(task_id, completed=15, description="Waiting for metadata upload...")
-                metadata_result = metadata_future.result()
-                
-                if not metadata_result.get("success"):
-                    return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+            with open(zip_path, "rb") as f:
+                files = {"file": (os.path.basename(zip_path), f, "application/zip")}
+                data = {
+                    "agent_id": agent_id,
+                }
 
-                progress.update(task_id, completed=20, description="Metadata uploaded successfully")
-
-                # Step 2: Upload file
-                file_size = os.path.getsize(zip_path)
-                progress.update(task_id, completed=25, description=f"Uploading {os.path.basename(zip_path)} ({file_size:,} bytes)...")
-                
-                with open(zip_path, "rb") as f:
-                    files = {"file": (os.path.basename(zip_path), f, "application/zip")}
-                    data = {
-                        "agent_id": agent_id,
-                    }
-
-                    try:
-                        response = self.http.post("/agents/upload", files=files, data=data, timeout=300)
+                try:
+                    response = self.http.post("/agents/upload", files=files, data=data, timeout=300)
+                    
+                    # Complete the progress bar
+                    progress.update(task_id, completed=95, description="Processing upload...")
+                    result = response.json()
+                    
+                    # Handle new API response format
+                    if result.get("success"):
+                        progress.update(task_id, completed=100, description="Upload completed!")
+                        time.sleep(0.5)  # Brief pause to show completion
                         
-                        # Complete the progress bar
-                        progress.update(task_id, completed=95, description="Processing upload...")
-                        result = response.json()
-                        
-                        # Handle new API response format
-                        if result.get("success"):
-                            progress.update(task_id, completed=100, description="Upload completed!")
-                            time.sleep(0.5)  # Brief pause to show completion
-                            
-                            return {
-                                "success": True,
-                                "agent_id": result.get("data", {}).get("agent_id", agent_id),
-                                "message": result.get("message", "Upload completed"),
-                                "status": result.get("data", {}).get("status", "uploaded"),
-                                "file_size": result.get("data", {}).get("file_size", file_size),
-                                "file_name": result.get("data", {}).get("file_name", os.path.basename(zip_path))
-                            }
-                        else:
-                            error_info = result.get("error", {})
-                            return {
-                                "success": False, 
-                                "error": f"File upload failed: {error_info.get('message', 'Unknown error')}",
-                                "error_code": error_info.get("code", "UNKNOWN_ERROR")
-                            }
+                        return {
+                            "success": True,
+                            "agent_id": result.get("data", {}).get("agent_id", agent_id),
+                            "message": result.get("message", "Upload completed"),
+                            "status": result.get("data", {}).get("status", "uploaded"),
+                            "file_size": result.get("data", {}).get("file_size", file_size),
+                            "file_name": result.get("data", {}).get("file_name", os.path.basename(zip_path))
+                        }
+                    else:
+                        error_info = result.get("error", {})
+                        return {
+                            "success": False, 
+                            "error": f"File upload failed: {error_info.get('message', 'Unknown error')}",
+                            "error_code": error_info.get("code", "UNKNOWN_ERROR")
+                        }
 
-                    except (ClientError, ServerError, ConnectionError) as e:
-                        return {"success": False, "error": f"File upload failed: {e.message}"}
+                except (ClientError, ServerError, ConnectionError) as e:
+                    return {"success": False, "error": f"File upload failed: {e.message}"}
 
         except Exception as e:
             return {"success": False, "error": f"Upload error: {str(e)}"}
@@ -550,8 +532,8 @@ class RestClient:
             }
         return result
 
-    def upload_agent(self, folder_path: str, metadata: Dict = None) -> Dict:
-        """Upload agent folder to middleware server with parallel processing and validation"""
+    def upload_agent(self, folder_path: str) -> Dict:
+        """Upload agent folder to middleware server with validation"""
         try:
             folder_path = Path(folder_path)
 
@@ -562,6 +544,7 @@ class RestClient:
 
             # Step 1: Validate agent
             console.print(f"🔍 Validating agent...")
+
             is_valid, validation_details = validate_agent(folder_path)
             
             if not is_valid:
@@ -681,19 +664,28 @@ class RestClient:
             ) as progress:
                 upload_task = progress.add_task("Initializing upload...", total=100)
                 
-                # Create zip file in parallel with metadata upload
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    # Submit zip creation task
-                    zip_future = executor.submit(self._create_zip_from_folder, folder_path)
-                    
-                    # Wait for zip creation to complete
-                    progress.update(upload_task, completed=10, description="Creating upload package...")
-                    zip_path = zip_future.result()
-                    
-                    console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
-                    
-                    # Now upload with the new parallel method
-                    result = self._upload_to_server_secure(zip_path, agent_config, agent_id, progress, upload_task)
+                # Step 1: Upload metadata first
+                progress.update(upload_task, completed=10, description="Uploading agent metadata...")
+                config_data = {
+                    "id": agent_id,
+                    "config": agent_config.to_dict()
+                }
+
+                metadata_result = self._upload_agent_metadata_to_server(config_data, agent_id)
+                
+                if not metadata_result.get("success"):
+                    return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                
+                progress.update(upload_task, completed=20, description="Metadata uploaded successfully")
+                
+                # Step 2: Create zip file
+                progress.update(upload_task, completed=25, description="Creating upload package...")
+                zip_path = self._create_zip_from_folder(agent_id, folder_path)
+                
+                console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
+                
+                # Step 3: Upload zip file
+                result = self._upload_agent_zip_file_to_server(zip_path, agent_id, progress, upload_task)
 
             # Clean up zip file
             os.unlink(zip_path)
@@ -728,7 +720,8 @@ class RestClient:
     def _process_start_result(self, result: Dict, agent_id: str) -> Dict:
         """Process start agent result"""
         if result.get("success"):
-            endpoint = result.get("endpoint")
+            result_data = result["data"]
+            endpoint = result_data.get("endpoint")
 
             console.print(Panel(
                 f"✅ [bold green]Agent started successfully![/bold green]\n"
@@ -848,422 +841,422 @@ class RestClient:
 
 # runagent/sdk/rest_client.py - FIXED RestClient initialization
 
-class RestClient:
-    """Client for remote server deployment via REST API"""
+# class RestClient:
+#     """Client for remote server deployment via REST API"""
 
-    def __init__(
-        self,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        api_prefix: Optional[str] = "/api/v1",
-    ):
-        """Initialize REST client for middleware server"""
-        self.api_key = api_key or Config.get_api_key()
+#     def __init__(
+#         self,
+#         base_url: Optional[str] = None,
+#         api_key: Optional[str] = None,
+#         api_prefix: Optional[str] = "/api/v1",
+#     ):
+#         """Initialize REST client for middleware server"""
+#         self.api_key = api_key or Config.get_api_key()
         
-        # Fix base URL construction
-        if base_url:
-            self.base_url = base_url.rstrip("/") + api_prefix
-        else:
-            raw_base_url = Config.get_base_url()
-            self.base_url = raw_base_url.rstrip("/") + api_prefix
+#         # Fix base URL construction
+#         if base_url:
+#             self.base_url = base_url.rstrip("/") + api_prefix
+#         else:
+#             raw_base_url = Config.get_base_url()
+#             self.base_url = raw_base_url.rstrip("/") + api_prefix
 
-        # Initialize HTTP handler directly with API key
-        # The middleware auth system will handle JWT conversion automatically
-        self.http = HttpHandler(
-            api_key=self.api_key,  # Use API key directly - middleware handles conversion
-            base_url=self.base_url
-        )
+#         # Initialize HTTP handler directly with API key
+#         # The middleware auth system will handle JWT conversion automatically
+#         self.http = HttpHandler(
+#             api_key=self.api_key,  # Use API key directly - middleware handles conversion
+#             base_url=self.base_url
+#         )
 
-        # Cache for limits to avoid repeated API calls
-        self._limits_cache = None
-        self._cache_expiry = None
+#         # Cache for limits to avoid repeated API calls
+#         self._limits_cache = None
+#         self._cache_expiry = None
 
 
-    def validate_api_connection(self) -> Dict[str, Any]:
-        """Validate API connection and authentication - SIMPLIFIED"""
-        try:
-            # Test basic connectivity first
-            try:
-                health_response = self.http.get("/health", timeout=10, handle_errors=False)
+#     def validate_api_connection(self) -> Dict[str, Any]:
+#         """Validate API connection and authentication - SIMPLIFIED"""
+#         try:
+#             # Test basic connectivity first
+#             try:
+#                 health_response = self.http.get("/health", timeout=10, handle_errors=False)
                 
-                if health_response.status_code != 200:
-                    return {
-                        "success": False,
-                        "api_connected": False,
-                        "error": f"Health check failed: {health_response.status_code}",
-                    }
+#                 if health_response.status_code != 200:
+#                     return {
+#                         "success": False,
+#                         "api_connected": False,
+#                         "error": f"Health check failed: {health_response.status_code}",
+#                     }
 
-            except Exception as e:
-                return {
-                    "success": False,
-                    "api_connected": False,
-                    "error": f"Cannot connect to middleware: {str(e)}",
-                }
+#             except Exception as e:
+#                 return {
+#                     "success": False,
+#                     "api_connected": False,
+#                     "error": f"Cannot connect to middleware: {str(e)}",
+#                 }
 
-            # Test authentication if API key provided
-            if self.api_key:
-                try:
-                    # Try to get user profile which requires authentication
-                    auth_response = self.http.get("/users/profile", timeout=10)
+#             # Test authentication if API key provided
+#             if self.api_key:
+#                 try:
+#                     # Try to get user profile which requires authentication
+#                     auth_response = self.http.get("/users/profile", timeout=10)
                     
-                    if auth_response.status_code == 200:
-                        profile_data = auth_response.json()
-                        auth_data = profile_data.get("auth_data", {})
+#                     if auth_response.status_code == 200:
+#                         profile_data = auth_response.json()
+#                         auth_data = profile_data.get("auth_data", {})
                         
-                        return {
-                            "success": True,
-                            "api_connected": True,
-                            "api_authenticated": True,
-                            "user_info": {
-                                "email": auth_data.get("email"),
-                                "id": auth_data.get("id")
-                            },
-                            "base_url": self.base_url,
-                        }
-                    else:
-                        error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
-                        return {
-                            "success": False,
-                            "api_connected": True,
-                            "api_authenticated": False,
-                            "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
-                            "base_url": self.base_url,
-                        }
+#                         return {
+#                             "success": True,
+#                             "api_connected": True,
+#                             "api_authenticated": True,
+#                             "user_info": {
+#                                 "email": auth_data.get("email"),
+#                                 "id": auth_data.get("id")
+#                             },
+#                             "base_url": self.base_url,
+#                         }
+#                     else:
+#                         error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
+#                         return {
+#                             "success": False,
+#                             "api_connected": True,
+#                             "api_authenticated": False,
+#                             "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
+#                             "base_url": self.base_url,
+#                         }
                         
-                except AuthenticationError as e:
-                    return {
-                        "success": False,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "error": f"Invalid API key: {e.message}",
-                        "base_url": self.base_url,
-                    }
-                except Exception as e:
-                    return {
-                        "success": False,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "error": f"Authentication test failed: {str(e)}",
-                        "base_url": self.base_url,
-                    }
-            else:
-                return {
-                    "success": True,
-                    "api_connected": True,
-                    "api_authenticated": False,
-                    "base_url": self.base_url,
-                    "message": "No API key provided",
-                }
+#                 except AuthenticationError as e:
+#                     return {
+#                         "success": False,
+#                         "api_connected": True,
+#                         "api_authenticated": False,
+#                         "error": f"Invalid API key: {e.message}",
+#                         "base_url": self.base_url,
+#                     }
+#                 except Exception as e:
+#                     return {
+#                         "success": False,
+#                         "api_connected": True,
+#                         "api_authenticated": False,
+#                         "error": f"Authentication test failed: {str(e)}",
+#                         "base_url": self.base_url,
+#                     }
+#             else:
+#                 return {
+#                     "success": True,
+#                     "api_connected": True,
+#                     "api_authenticated": False,
+#                     "base_url": self.base_url,
+#                     "message": "No API key provided",
+#                 }
 
-        except Exception as e:
-            return {
-                "success": False,
-                "api_connected": False,
-                "error": f"Connection validation failed: {str(e)}",
-            }
+#         except Exception as e:
+#             return {
+#                 "success": False,
+#                 "api_connected": False,
+#                 "error": f"Connection validation failed: {str(e)}",
+#             }
 
 
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
-        """
-        Make authenticated HTTP request to middleware API (for middleware sync)
+#     def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
+#         """
+#         Make authenticated HTTP request to middleware API (for middleware sync)
         
-        Args:
-            method: HTTP method (GET, POST, PUT, DELETE)
-            endpoint: API endpoint path
-            **kwargs: Additional arguments for requests
+#         Args:
+#             method: HTTP method (GET, POST, PUT, DELETE)
+#             endpoint: API endpoint path
+#             **kwargs: Additional arguments for requests
             
-        Returns:
-            Response data as dict
-        """
-        if not self.api_key:
-            raise Exception("API key not configured")
+#         Returns:
+#             Response data as dict
+#         """
+#         if not self.api_key:
+#             raise Exception("API key not configured")
         
-        try:
-            # Convert 'json' kwarg to 'data' to match HttpHandler interface
-            if 'json' in kwargs:
-                kwargs['data'] = kwargs.pop('json')
+#         try:
+#             # Convert 'json' kwarg to 'data' to match HttpHandler interface
+#             if 'json' in kwargs:
+#                 kwargs['data'] = kwargs.pop('json')
             
-            # Use the existing HTTP handler for consistency
-            if method.upper() == "GET":
-                response = self.http.get(endpoint, **kwargs)
-            elif method.upper() == "POST":
-                response = self.http.post(endpoint, **kwargs)
-            elif method.upper() == "PUT":
-                response = self.http.put(endpoint, **kwargs)
-            elif method.upper() == "DELETE":
-                response = self.http.delete(endpoint, **kwargs)
-            elif method.upper() == "PATCH":
-                response = self.http.patch(endpoint, **kwargs)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
+#             # Use the existing HTTP handler for consistency
+#             if method.upper() == "GET":
+#                 response = self.http.get(endpoint, **kwargs)
+#             elif method.upper() == "POST":
+#                 response = self.http.post(endpoint, **kwargs)
+#             elif method.upper() == "PUT":
+#                 response = self.http.put(endpoint, **kwargs)
+#             elif method.upper() == "DELETE":
+#                 response = self.http.delete(endpoint, **kwargs)
+#             elif method.upper() == "PATCH":
+#                 response = self.http.patch(endpoint, **kwargs)
+#             else:
+#                 raise ValueError(f"Unsupported HTTP method: {method}")
             
-            # Handle response - check if it's already a dict or a Response object
-            if hasattr(response, 'json') and callable(response.json):
-                return response.json()
-            elif isinstance(response, dict):
-                return response
-            else:
-                # Fallback: try to get json content
-                try:
-                    return response.json()
-                except:
-                    return {"success": False, "error": "Invalid response format"}
+#             # Handle response - check if it's already a dict or a Response object
+#             if hasattr(response, 'json') and callable(response.json):
+#                 return response.json()
+#             elif isinstance(response, dict):
+#                 return response
+#             else:
+#                 # Fallback: try to get json content
+#                 try:
+#                     return response.json()
+#                 except:
+#                     return {"success": False, "error": "Invalid response format"}
                 
-        except (ClientError, ServerError, ConnectionError, AuthenticationError, ValidationError) as e:
-            raise Exception(f"API request failed: {e.message}")
-        except Exception as e:
-            raise Exception(f"Request error: {e}")
+#         except (ClientError, ServerError, ConnectionError, AuthenticationError, ValidationError) as e:
+#             raise Exception(f"API request failed: {e.message}")
+#         except Exception as e:
+#             raise Exception(f"Request error: {e}")
 
-    def run_agent(
-        self,
-        agent_id: str,
-        entrypoint_tag: str,
-        input_args: list = None,
-        input_kwargs: dict = None,
-        execution_type: str = "generic",
-    ) -> Dict:
-        """Execute an agent with given parameters"""
-        try:
-            console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
+#     def run_agent(
+#         self,
+#         agent_id: str,
+#         entrypoint_tag: str,
+#         input_args: list = None,
+#         input_kwargs: dict = None,
+#         execution_type: str = "generic",
+#     ) -> Dict:
+#         """Execute an agent with given parameters"""
+#         try:
+#             console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
 
-            # Prepare request data
-            request_data = {
-                "input_data": {"input_args": input_args, "input_kwargs": input_kwargs}
-            }
+#             # Prepare request data
+#             request_data = {
+#                 "input_data": {"input_args": input_args, "input_kwargs": input_kwargs}
+#             }
 
-            # Execute the agent
-            try:
-                response = self.http.post(
-                    f"/agents/{agent_id}/execute/{entrypoint_tag}",
-                    data=request_data,
-                    timeout=120,  # Longer timeout for agent execution
-                )
-                result = response.json()
+#             # Execute the agent
+#             try:
+#                 response = self.http.post(
+#                     f"/agents/{agent_id}/execute/{entrypoint_tag}",
+#                     data=request_data,
+#                     timeout=120,  # Longer timeout for agent execution
+#                 )
+#                 result = response.json()
 
-                if result.get("success", True):  # Assume success if not explicitly false
-                    console.print("✅ [bold green]Agent execution completed![/bold green]")
-                    return result
-                else:
-                    console.print(f"❌ [bold red]Agent execution failed: {result.get('error', 'Unknown error')}[/bold red]")
-                    return result
+#                 if result.get("success", True):  # Assume success if not explicitly false
+#                     console.print("✅ [bold green]Agent execution completed![/bold green]")
+#                     return result
+#                 else:
+#                     console.print(f"❌ [bold red]Agent execution failed: {result.get('error', 'Unknown error')}[/bold red]")
+#                     return result
 
-            except (ClientError, ServerError, ConnectionError) as e:
-                return {"success": False, "error": f"Agent execution failed: {e.message}"}
+#             except (ClientError, ServerError, ConnectionError) as e:
+#                 return {"success": False, "error": f"Agent execution failed: {e.message}"}
 
-        except Exception as e:
-            return {"success": False, "error": f"Execute agent failed: {str(e)}"}
+#         except Exception as e:
+#             return {"success": False, "error": f"Execute agent failed: {str(e)}"}
 
-    def get_agent_architecture(self, agent_id: str) -> Dict:
-        """Get the architecture information for a specific agent"""
-        try:
-            response = self.http.get(f"/agents/{agent_id}/architecture")
-            return response.json()
-        except Exception as e:
-            return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
+#     def get_agent_architecture(self, agent_id: str) -> Dict:
+#         """Get the architecture information for a specific agent"""
+#         try:
+#             response = self.http.get(f"/agents/{agent_id}/architecture")
+#             return response.json()
+#         except Exception as e:
+#             return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
 
 
-    def sync_local_agent(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Sync local agent to middleware"""
-        try:
-            response = self.http.post("/local-agents", data=agent_data, timeout=30)
-            return response.json()
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+#     def sync_local_agent(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
+#         """Sync local agent to middleware"""
+#         try:
+#             response = self.http.post("/local-agents", data=agent_data, timeout=30)
+#             return response.json()
+#         except Exception as e:
+#             return {"success": False, "error": str(e)}
 
-    def create_local_invocation(self, invocation_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create local invocation in middleware"""
-        try:
-            response = self.http.post("/local-invocations", data=invocation_data, timeout=30)
-            return response.json()
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+#     def create_local_invocation(self, invocation_data: Dict[str, Any]) -> Dict[str, Any]:
+#         """Create local invocation in middleware"""
+#         try:
+#             response = self.http.post("/local-invocations", data=invocation_data, timeout=30)
+#             return response.json()
+#         except Exception as e:
+#             return {"success": False, "error": str(e)}
 
-    def update_local_invocation(self, invocation_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update local invocation in middleware"""
-        try:
-            response = self.http.put(f"/local-invocations/{invocation_id}", data=update_data, timeout=30)
-            return response.json()
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+#     def update_local_invocation(self, invocation_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+#         """Update local invocation in middleware"""
+#         try:
+#             response = self.http.put(f"/local-invocations/{invocation_id}", data=update_data, timeout=30)
+#             return response.json()
+#         except Exception as e:
+#             return {"success": False, "error": str(e)}
 
-    def _get_jwt_token_from_api_key(self) -> Optional[str]:
-        """Convert API key to JWT token using middleware auth endpoint"""
-        if not self.api_key:
-            return None
+#     def _get_jwt_token_from_api_key(self) -> Optional[str]:
+#         """Convert API key to JWT token using middleware auth endpoint"""
+#         if not self.api_key:
+#             return None
             
-        try:
-            # Check if API key is already a JWT token
-            if self.api_key.startswith('eyJ'):  # JWT tokens start with 'eyJ'
-                return self.api_key
+#         try:
+#             # Check if API key is already a JWT token
+#             if self.api_key.startswith('eyJ'):  # JWT tokens start with 'eyJ'
+#                 return self.api_key
             
-            # Create a temporary HTTP handler without auth for this request
-            temp_http = HttpHandler(base_url=self.base_url)
+#             # Create a temporary HTTP handler without auth for this request
+#             temp_http = HttpHandler(base_url=self.base_url)
             
-            # The middleware auth.py shows that API keys are validated and converted to JWT
-            # We'll use the validation endpoint which should return a JWT
-            try:
-                response = temp_http.post("/tokens/validate", data={"token": self.api_key}, timeout=10)
+#             # The middleware auth.py shows that API keys are validated and converted to JWT
+#             # We'll use the validation endpoint which should return a JWT
+#             try:
+#                 response = temp_http.post("/tokens/validate", data={"token": self.api_key}, timeout=10)
                 
-                if response.status_code == 200:
-                    validation_result = response.json()
-                    if validation_result.get("valid"):
+#                 if response.status_code == 200:
+#                     validation_result = response.json()
+#                     if validation_result.get("valid"):
 
-                        return self.api_key
-                else:
-                    console.print(f"[red]API key validation failed: {response.status_code}[/red]")
-                    return None
+#                         return self.api_key
+#                 else:
+#                     console.print(f"[red]API key validation failed: {response.status_code}[/red]")
+#                     return None
                     
-            except Exception as e:
-                console.print(f"[yellow]Could not validate API key: {e}[/yellow]")
-                # Return API key anyway - let middleware handle the conversion
-                return self.api_key
+#             except Exception as e:
+#                 console.print(f"[yellow]Could not validate API key: {e}[/yellow]")
+#                 # Return API key anyway - let middleware handle the conversion
+#                 return self.api_key
                 
-        except Exception as e:
-            console.print(f"[red]Error processing API key: {e}[/red]")
-            return None
+#         except Exception as e:
+#             console.print(f"[red]Error processing API key: {e}[/red]")
+#             return None
 
-    def validate_api_connection(self) -> Dict[str, Any]:
-        """Validate API connection and authentication - UPDATED"""
-        try:
-            # Test basic connectivity first
-            try:
-                health_response = self.http.get("/health", timeout=10, handle_errors=False)
+#     def validate_api_connection(self) -> Dict[str, Any]:
+#         """Validate API connection and authentication - UPDATED"""
+#         try:
+#             # Test basic connectivity first
+#             try:
+#                 health_response = self.http.get("/health", timeout=10, handle_errors=False)
                 
-                if health_response.status_code != 200:
-                    return {
-                        "success": False,
-                        "api_connected": False,
-                        "error": f"Health check failed: {health_response.status_code}",
-                    }
+#                 if health_response.status_code != 200:
+#                     return {
+#                         "success": False,
+#                         "api_connected": False,
+#                         "error": f"Health check failed: {health_response.status_code}",
+#                     }
 
-            except Exception as e:
-                return {
-                    "success": False,
-                    "api_connected": False,
-                    "error": f"Cannot connect to middleware: {str(e)}",
-                }
+#             except Exception as e:
+#                 return {
+#                     "success": False,
+#                     "api_connected": False,
+#                     "error": f"Cannot connect to middleware: {str(e)}",
+#                 }
 
-            # Test authentication if API key provided
-            if self.api_key:
-                try:
-                    # Try to get user profile which requires authentication
-                    auth_response = self.http.get("/users/profile", timeout=10)
+#             # Test authentication if API key provided
+#             if self.api_key:
+#                 try:
+#                     # Try to get user profile which requires authentication
+#                     auth_response = self.http.get("/users/profile", timeout=10)
                     
-                    if auth_response.status_code == 200:
-                        profile_data = auth_response.json()
-                        user_info = profile_data.get("auth_data", {})
+#                     if auth_response.status_code == 200:
+#                         profile_data = auth_response.json()
+#                         user_info = profile_data.get("auth_data", {})
                         
-                        return {
-                            "success": True,
-                            "api_connected": True,
-                            "api_authenticated": True,
-                            "user_info": {
-                                "email": user_info.get("email"),
-                                "id": user_info.get("id")
-                            },
-                            "base_url": self.base_url,
-                        }
-                    else:
-                        error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
-                        return {
-                            "success": False,
-                            "api_connected": True,
-                            "api_authenticated": False,
-                            "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
-                            "base_url": self.base_url,
-                        }
+#                         return {
+#                             "success": True,
+#                             "api_connected": True,
+#                             "api_authenticated": True,
+#                             "user_info": {
+#                                 "email": user_info.get("email"),
+#                                 "id": user_info.get("id")
+#                             },
+#                             "base_url": self.base_url,
+#                         }
+#                     else:
+#                         error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
+#                         return {
+#                             "success": False,
+#                             "api_connected": True,
+#                             "api_authenticated": False,
+#                             "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
+#                             "base_url": self.base_url,
+#                         }
                         
-                except AuthenticationError as e:
-                    return {
-                        "success": False,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "error": f"Invalid API key: {e.message}",
-                        "base_url": self.base_url,
-                    }
-                except Exception as e:
-                    return {
-                        "success": False,
-                        "api_connected": True,
-                        "api_authenticated": False,
-                        "error": f"Authentication test failed: {str(e)}",
-                        "base_url": self.base_url,
-                    }
-            else:
-                return {
-                    "success": True,
-                    "api_connected": True,
-                    "api_authenticated": False,
-                    "base_url": self.base_url,
-                    "message": "No API key provided",
-                }
+#                 except AuthenticationError as e:
+#                     return {
+#                         "success": False,
+#                         "api_connected": True,
+#                         "api_authenticated": False,
+#                         "error": f"Invalid API key: {e.message}",
+#                         "base_url": self.base_url,
+#                     }
+#                 except Exception as e:
+#                     return {
+#                         "success": False,
+#                         "api_connected": True,
+#                         "api_authenticated": False,
+#                         "error": f"Authentication test failed: {str(e)}",
+#                         "base_url": self.base_url,
+#                     }
+#             else:
+#                 return {
+#                     "success": True,
+#                     "api_connected": True,
+#                     "api_authenticated": False,
+#                     "base_url": self.base_url,
+#                     "message": "No API key provided",
+#                 }
 
-        except Exception as e:
-            return {
-                "success": False,
-                "api_connected": False,
-                "error": f"Connection validation failed: {str(e)}",
-            }
-    def __del__(self):
-        """Cleanup on deletion"""
-        try:
-            self.close()
-        except:
-            pass
+#         except Exception as e:
+#             return {
+#                 "success": False,
+#                 "api_connected": False,
+#                 "error": f"Connection validation failed: {str(e)}",
+#             }
+#     def __del__(self):
+#         """Cleanup on deletion"""
+#         try:
+#             self.close()
+#         except:
+#             pass
 
-    def debug_connection(self) -> Dict:
-        """Debug middleware connection"""
-        try:
-            print(f"🔍 Debug: Testing connection to {self.base_url}")
+#     def debug_connection(self) -> Dict:
+#         """Debug middleware connection"""
+#         try:
+#             print(f"🔍 Debug: Testing connection to {self.base_url}")
             
-            # Test health endpoint
-            try:
-                response = self.http.get("health", timeout=5)
-                print(f"✅ Health check successful: {response}")
-                health_data = response.json() if hasattr(response, 'json') else response
+#             # Test health endpoint
+#             try:
+#                 response = self.http.get("health", timeout=5)
+#                 print(f"✅ Health check successful: {response}")
+#                 health_data = response.json() if hasattr(response, 'json') else response
                 
-                # Test auth validation if API key exists
-                if self.api_key:
-                    try:
-                        auth_response = self.http.get("validate", timeout=5)
-                        print(f"✅ Auth validation successful: {auth_response}")
-                        auth_data = auth_response.json() if hasattr(auth_response, 'json') else auth_response
+#                 # Test auth validation if API key exists
+#                 if self.api_key:
+#                     try:
+#                         auth_response = self.http.get("validate", timeout=5)
+#                         print(f"✅ Auth validation successful: {auth_response}")
+#                         auth_data = auth_response.json() if hasattr(auth_response, 'json') else auth_response
                         
-                        return {
-                            "success": True,
-                            "health": health_data,
-                            "auth": auth_data,
-                            "base_url": self.base_url
-                        }
-                    except Exception as auth_e:
-                        print(f"❌ Auth validation failed: {auth_e}")
-                        return {
-                            "success": False,
-                            "health": health_data,
-                            "auth_error": str(auth_e),
-                            "base_url": self.base_url
-                        }
-                else:
-                    return {
-                        "success": True,
-                        "health": health_data,
-                        "auth": "No API key provided",
-                        "base_url": self.base_url
-                    }
+#                         return {
+#                             "success": True,
+#                             "health": health_data,
+#                             "auth": auth_data,
+#                             "base_url": self.base_url
+#                         }
+#                     except Exception as auth_e:
+#                         print(f"❌ Auth validation failed: {auth_e}")
+#                         return {
+#                             "success": False,
+#                             "health": health_data,
+#                             "auth_error": str(auth_e),
+#                             "base_url": self.base_url
+#                         }
+#                 else:
+#                     return {
+#                         "success": True,
+#                         "health": health_data,
+#                         "auth": "No API key provided",
+#                         "base_url": self.base_url
+#                     }
                     
-            except Exception as health_e:
-                print(f"❌ Health check failed: {health_e}")
-                return {
-                    "success": False,
-                    "health_error": str(health_e),
-                    "base_url": self.base_url
-                }
+#             except Exception as health_e:
+#                 print(f"❌ Health check failed: {health_e}")
+#                 return {
+#                     "success": False,
+#                     "health_error": str(health_e),
+#                     "base_url": self.base_url
+#                 }
                 
-        except Exception as e:
-            print(f"❌ Connection debug failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "base_url": self.base_url
-            }
+#         except Exception as e:
+#             print(f"❌ Connection debug failed: {e}")
+#             return {
+#                 "success": False,
+#                 "error": str(e),
+#                 "base_url": self.base_url
+#             }
