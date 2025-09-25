@@ -1,6 +1,7 @@
 from pathlib import Path
 # from typing import Dict
 import typing as t
+from runagent.utils.enums.framework import Framework
 from runagent.sdk.server.framework.langgraph import LangGraphExecutor
 from runagent.sdk.server.framework.langchain import LangChainExecutor
 from runagent.sdk.server.framework.openai import OpenAIExecutor
@@ -16,21 +17,20 @@ from runagent.utils.schema import PythonicEntryPoint, WebHookEntryPoint
 
 
 def get_executor(
-    agent_dir: Path, framework: str, agent_entrypoints: t.Dict[str, t.Union[PythonicEntryPoint, WebHookEntryPoint]]
+    agent_dir: Path, framework: Framework, agent_entrypoints: t.Dict[str, t.Union[PythonicEntryPoint, WebHookEntryPoint]]
 ):
     executor_dict = {
-        "default": GenericExecutor,
-        "openai": OpenAIExecutor,
-        "ag2": AG2Executor,
-        "agno": AgnoExecutor,
-        "autogen": AutogenExecutor,
-        "crewai": CrewAIExecutor,
-        "langgraph": LangGraphExecutor,
-        "langchain": GenericExecutor,
-        "letta": GenericExecutor,
-        "llamaindex": LlamaIndexExecutor,
-        "n8n": N8NExecutor,
-        "parlant": ParlantExecutor
+        Framework.DEFAULT: GenericExecutor,
+        Framework.OPENAI: OpenAIExecutor,
+        Framework.AG2: AG2Executor,
+        Framework.AGNO: AgnoExecutor,
+        Framework.AUTOGEN: AutogenExecutor,
+        Framework.CREWAI: CrewAIExecutor,
+        Framework.LANGGRAPH: LangGraphExecutor,
+        Framework.LANGCHAIN: GenericExecutor,
+        Framework.LETTA: GenericExecutor,
+        Framework.LLAMAINDEX: LlamaIndexExecutor,
+        Framework.N8N: N8NExecutor
     }
     framework_executor = executor_dict.get(framework)
     if framework_executor is None:
