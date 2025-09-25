@@ -157,7 +157,7 @@ Your insights would be extremely helpful as we work through the next steps. Plea
                              model: str = None,
                              stream: bool = False,
                              max_tokens: int = 1000,
-                             temperature: float = 0.7) -> Iterator[StreamChunk] | CompletionResponse:
+                             temperature: float = 0.7):
         """
         Main method to simulate AI chat completion
         """
@@ -379,7 +379,7 @@ class MockOpenAIClient:
                model: str = "gpt-4",
                messages: list = None,
                stream: bool = False,
-               **kwargs) -> Iterator[StreamChunk] | CompletionResponse:
+               **kwargs):
         """OpenAI-compatible create method"""
         return self.agent.chat_completion_create(
             messages=messages or [],

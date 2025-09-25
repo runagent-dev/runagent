@@ -1,0 +1,27 @@
+{
+  "agent_name": "problem_solver",
+  "description": "A simple agent that responds to basic queries",
+  "framework": "langgraph",
+  "template": "advanced",
+  "version": "1.0.0",
+  "created_at": "2025-06-25 13:42:03",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/langgraph/advanced",
+    "author": "sawradip"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "run",
+        "tag": "generic"
+      },
+      {
+        "file": "agents.py",
+        "module": "run_stream",
+        "tag": "generic_stream"
+      }
+    ]
+  }
+}

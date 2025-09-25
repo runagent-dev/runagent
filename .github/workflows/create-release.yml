@@ -1,13 +1,11 @@
 # .github/workflows/create-release.yml
-name: Create GitHub Release
-
+name: Create GitHub Release and Publish to PyPI
 on:
   push:
     branches: [main]  # Trigger on ANY push to main (including PR merges)
   pull_request:
     types: [closed]   # Also trigger when PRs are merged
     branches: [main]
-
 jobs:
   detect-and-release:
     runs-on: ubuntu-latest
@@ -16,6 +14,7 @@ jobs:
       contents: write
       pull-requests: read
       issues: read
+      id-token: write  # Not needed for API token approach, but kept for compatibility
     
     steps:
     - uses: actions/checkout@v4
@@ -82,7 +81,91 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-
+    # NEW: Set up Python for PyPI publishing
+    - name: Set up Python
+      if: steps.check-release.outputs.should_release == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    # NEW: Install build dependencies
+    - name: Install build dependencies
+      if: steps.check-release.outputs.should_release == 'true'
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build twine
+    
+    # NEW: Verify version matches tag
+    - name: Verify package version matches tag
+      if: steps.check-release.outputs.should_release == 'true'
+      run: |
+        TAG_VERSION="${{ steps.find-tags.outputs.version }}"
+        
+        # Check if setup.py exists
+        if [ -f "setup.py" ]; then
+          PACKAGE_VERSION=$(python setup.py --version)
+        # Check if pyproject.toml exists
+        elif [ -f "pyproject.toml" ]; then
+          # Extract version from pyproject.toml
+          PACKAGE_VERSION=$(python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); print(data['project']['version'])")
+        else
+          echo "❌ Neither setup.py nor pyproject.toml found!"
+          exit 1
+        fi
+        
+        echo "Tag version: $TAG_VERSION"
+        echo "Package version: $PACKAGE_VERSION"
+        
+        if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+          echo "❌ Version mismatch! Tag: $TAG_VERSION, Package: $PACKAGE_VERSION"
+          exit 1
+        else
+          echo "✅ Version match confirmed: $TAG_VERSION"
+        fi
+    
+    # NEW: Build Python package
+    - name: Build package
+      if: steps.check-release.outputs.should_release == 'true'
+      run: python -m build
+    
+    # NEW: Check if package already exists on PyPI
+    - name: Check if package exists on PyPI
+      if: steps.check-release.outputs.should_release == 'true'
+      id: check-pypi
+      run: |
+        VERSION="${{ steps.find-tags.outputs.version }}"
+        
+        # Get package name from setup.py or pyproject.toml
+        if [ -f "pyproject.toml" ]; then
+          PACKAGE_NAME=$(python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); print(data['project']['name'])")
+        elif [ -f "setup.py" ]; then
+          PACKAGE_NAME=$(python setup.py --name)
+        else
+          echo "❌ Cannot determine package name"
+          exit 1
+        fi
+        
+        echo "Checking if $PACKAGE_NAME version $VERSION exists on PyPI..."
+        
+        # Check if this version already exists on PyPI
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PACKAGE_NAME/$VERSION/json/")
+        
+        if [ "$HTTP_CODE" = "200" ]; then
+          echo "⚠️ Package $PACKAGE_NAME v$VERSION already exists on PyPI, skipping upload"
+          echo "should_publish_pypi=false" >> $GITHUB_OUTPUT
+        else
+          echo "✅ Package $PACKAGE_NAME v$VERSION not found on PyPI, proceeding with upload"
+          echo "should_publish_pypi=true" >> $GITHUB_OUTPUT
+        fi
+    
+    # NEW: Publish to PyPI using API token
+    - name: Publish package to PyPI
+      if: steps.check-release.outputs.should_release == 'true' && steps.check-pypi.outputs.should_publish_pypi == 'true'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        print-hash: true
+    
     - name: Create main GitHub Release
       if: steps.check-release.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v1
@@ -99,6 +182,12 @@ jobs:
           For detailed changes in this release, see [CHANGELOG.md](./CHANGELOG.md).
           
           This release synchronizes all RunAgent SDKs (Python, JavaScript, Rust, Go) to version ${{ steps.find-tags.outputs.version }}.
+          
+          ## 📦 Installation
+          
+          ```bash
+          pip install runagent==${{ steps.find-tags.outputs.version }}
+          ```
           
         draft: false
         prerelease: false

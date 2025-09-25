@@ -12,6 +12,7 @@ from runagent.sdk.server.framework.autogen import AutogenExecutor
 from runagent.sdk.server.framework.crewai import CrewAIExecutor
 from runagent.sdk.server.framework.ag2 import AG2Executor
 from runagent.sdk.server.framework.n8n import N8NExecutor
+from runagent.sdk.server.framework.parlant import ParlantExecutor
 from runagent.utils.schema import PythonicEntryPoint, WebHookEntryPoint
 
 
