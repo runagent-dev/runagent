@@ -59,7 +59,6 @@ class RemoteDeployment:
 
         Args:
             folder_path: Path to agent folder
-            framework: Framework type (auto-detected if None)
 
         Returns:
             Upload result
@@ -72,9 +71,8 @@ class RemoteDeployment:
         if not framework:
             framework = self._detect_framework(folder_path)
 
-        metadata = {"framework": framework}
-
-        return self.client.upload_agent(folder_path=str(folder_path), metadata=metadata)
+        # metadata = {"framework": framework}
+        return self.client.upload_agent(folder_path=str(folder_path))
 
     def start_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None
