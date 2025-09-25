@@ -35,7 +35,7 @@ Base = declarative_base()
 
 
 class Agent(Base):
-    """Agent model - Enhanced with remote upload tracking"""
+    """Agent model - UNCHANGED to maintain SDK compatibility"""
 
     __tablename__ = "agents"
 
@@ -44,9 +44,7 @@ class Agent(Base):
     host = Column(String, nullable=False, default="localhost")
     port = Column(Integer, nullable=False, default=8000)
     framework = Column(String)
-    status = Column(String, default="deployed")  # deployed, uploaded, uploading
-    is_local = Column(Boolean, default=True)  # True for local agents, False for remote uploads
-    fingerprint = Column(String, nullable=True)  # Agent folder fingerprint for duplicate detection
+    status = Column(String, default="deployed")
     deployed_at = Column(DateTime, default=func.current_timestamp())
     last_run = Column(DateTime)
     run_count = Column(Integer, default=0)
@@ -1261,8 +1259,6 @@ class DBService:
                     "port": agent.port,
                     "framework": agent.framework,
                     "status": agent.status,
-                    "is_local": agent.is_local,
-                    "fingerprint": agent.fingerprint,
                     "deployed_at": (
                         agent.deployed_at.isoformat() if agent.deployed_at else None
                     ),
@@ -1280,156 +1276,6 @@ class DBService:
             except Exception as e:
                 console.print(f"Error getting agent by path from database: {e}")
                 return None
-
-    def get_agent_by_fingerprint(self, fingerprint: str) -> Optional[Dict]:
-        """Get agent information by fingerprint"""
-        with self.db_manager.get_session() as session:
-            try:
-                agent = session.query(Agent).filter(
-                    Agent.fingerprint == fingerprint
-                ).first()
-                
-                if not agent:
-                    return None
-
-                return {
-                    "agent_id": agent.agent_id,
-                    "agent_path": agent.agent_path,
-                    "host": agent.host,
-                    "port": agent.port,
-                    "framework": agent.framework,
-                    "status": agent.status,
-                    "is_local": agent.is_local,
-                    "fingerprint": agent.fingerprint,
-                    "deployed_at": (
-                        agent.deployed_at.isoformat() if agent.deployed_at else None
-                    ),
-                    "last_run": agent.last_run.isoformat() if agent.last_run else None,
-                    "run_count": agent.run_count,
-                    "success_count": agent.success_count,
-                    "error_count": agent.error_count,
-                    "created_at": (
-                        agent.created_at.isoformat() if agent.created_at else None
-                    ),
-                    "updated_at": (
-                        agent.updated_at.isoformat() if agent.updated_at else None
-                    ),
-                }
-            except Exception as e:
-                console.print(f"Error getting agent by fingerprint from database: {e}")
-                return None
-
-    def add_remote_agent(
-        self,
-        agent_id: str,
-        agent_path: str,
-        framework: str = None,
-        fingerprint: str = None,
-        status: str = "uploaded"
-    ) -> Dict:
-        """
-        Add a remote uploaded agent to the database
-        
-        Args:
-            agent_id: Unique agent identifier
-            agent_path: Path to agent directory (local path for reference)
-            framework: Framework type
-            fingerprint: Agent fingerprint for duplicate detection
-            status: Agent status (uploaded, uploading, deployed)
-            
-        Returns:
-            Dictionary with success status and details
-        """
-        if not agent_id or not agent_path:
-            return {
-                "success": False,
-                "error": "Missing required fields",
-                "code": "INVALID_INPUT",
-            }
-
-        with self.db_manager.get_session() as session:
-            try:
-                # Check if agent already exists by ID
-                existing_agent = (
-                    session.query(Agent).filter(Agent.agent_id == agent_id).first()
-                )
-                if existing_agent:
-                    return {
-                        "success": False,
-                        "error": f"Agent {agent_id} already exists",
-                        "code": "AGENT_EXISTS",
-                        "existing_agent": {
-                            "agent_id": existing_agent.agent_id,
-                            "status": existing_agent.status,
-                            "is_local": existing_agent.is_local,
-                        }
-                    }
-
-                # Check if agent with same fingerprint exists (for duplicate detection)
-                if fingerprint:
-                    duplicate_agent = (
-                        session.query(Agent).filter(Agent.fingerprint == fingerprint).first()
-                    )
-                    if duplicate_agent:
-                        return {
-                            "success": False,
-                            "error": f"Agent with same fingerprint already exists",
-                            "code": "DUPLICATE_FINGERPRINT",
-                            "existing_agent": {
-                                "agent_id": duplicate_agent.agent_id,
-                                "status": duplicate_agent.status,
-                                "is_local": duplicate_agent.is_local,
-                                "fingerprint": duplicate_agent.fingerprint,
-                            }
-                        }
-
-                # Create new remote agent record
-                new_agent = Agent(
-                    agent_id=agent_id,
-                    agent_path=str(agent_path),
-                    host="remote",  # Remote agents don't have local host/port
-                    port=0,  # Remote agents don't have local port
-                    framework=framework,
-                    status=status,
-                    is_local=False,  # Mark as remote
-                    fingerprint=fingerprint,
-                )
-
-                session.add(new_agent)
-                session.commit()
-
-                return {
-                    "success": True,
-                    "message": f"Remote agent {agent_id} added successfully",
-                    "agent_id": agent_id,
-                    "status": status,
-                    "is_local": False,
-                }
-
-            except Exception as e:
-                session.rollback()
-                return {
-                    "success": False,
-                    "error": f"Database error: {str(e)}",
-                    "code": "DATABASE_ERROR",
-                }
-
-    def update_agent_fingerprint(self, agent_id: str, fingerprint: str) -> bool:
-        """Update agent fingerprint"""
-        with self.db_manager.get_session() as session:
-            try:
-                agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
-                if not agent:
-                    return False
-
-                agent.fingerprint = fingerprint
-                agent.updated_at = func.current_timestamp()
-                session.commit()
-                return True
-            except Exception as e:
-                session.rollback()
-                console.print(f"Error updating agent fingerprint: {e}")
-                return False
                 
     def list_agents(self, status: str = None) -> List[Dict]:
         """List all agents, optionally filtered by status"""
