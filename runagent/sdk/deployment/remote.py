@@ -52,13 +52,14 @@ class RemoteDeployment:
         return self.client.deploy_agent(folder_path=str(folder_path), metadata=metadata)
 
     def upload_agent(
-        self, folder_path: str
+        self, folder_path: str, framework: t.Optional[str] = None
     ) -> t.Dict[str, t.Any]:
         """
         Upload an agent without starting it.
 
         Args:
             folder_path: Path to agent folder
+            framework: Framework type (auto-detected if None)
 
         Returns:
             Upload result
@@ -68,11 +69,12 @@ class RemoteDeployment:
             raise ValidationError(f"Folder not found: {folder_path}")
 
         # Auto-detect framework if not provided
-        # if not framework:
-        #     framework = self._detect_framework(folder_path)
+        if not framework:
+            framework = self._detect_framework(folder_path)
 
-        # metadata = {"framework": framework}
-        return self.client.upload_agent(folder_path=str(folder_path))
+        metadata = {"framework": framework}
+
+        return self.client.upload_agent(folder_path=str(folder_path), metadata=metadata)
 
     def start_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None

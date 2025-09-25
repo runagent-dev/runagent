@@ -4,7 +4,7 @@ import typing as t
 # from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 from pydantic import BaseModel, Field, validator
-from runagent.utils.enums.framework import Framework    
+from .enums import FrameworkType
 
 
 class TemplateSource(BaseModel):
@@ -57,21 +57,13 @@ class AgentArchitecture(BaseModel):
             raise ValueError("All entrypoint tags must be unique")
         return v
 
-from pydantic import ConfigDict
-
 
 class RunAgentConfig(BaseModel):
     """Schema for runagent.config.json"""
-    # model_config = ConfigDict(
-    #     use_enum_values=True,  # Automatically convert enums to values
-    #     json_encoders={
-    #         datetime: lambda v: v.isoformat()  # Custom datetime serialization
-    #     }
-    # )
 
     agent_name: str = Field(..., description="Name of the agent")
     description: str = Field(..., description="Description of the agent")
-    framework: Framework = Field(..., description="Framework used (langchain, etc)")
+    framework: FrameworkType = Field(..., description="Framework used (langchain, etc)")
     template: str = Field(..., description="Template name")
     version: str = Field(..., description="Agent version")
     created_at: datetime = Field(..., description="Creation timestamp")
@@ -85,19 +77,6 @@ class RunAgentConfig(BaseModel):
         default_factory=dict, description="Environment variables"
     )
 
-    def to_dict(self) -> dict:
-        """Convert to dictionary with custom serialization"""
-        data = self.model_dump()
-        
-        # Convert enum to string value
-        if isinstance(data.get('framework'), Framework):
-            data['framework'] = data['framework'].value
-            
-        # Convert datetime to ISO string if needed
-        if isinstance(data.get('created_at'), datetime):
-            data['created_at'] = data['created_at'].isoformat()
-            
-        return data
 
 class AgentInputArgs(BaseModel):
     """Request model for agent execution"""

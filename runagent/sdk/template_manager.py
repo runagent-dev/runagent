@@ -2,7 +2,6 @@
 Template management for the SDK.
 """
 import os
-import subprocess
 import typing as t
 from pathlib import Path
 
@@ -22,20 +21,11 @@ class TemplateManager:
         )
 
     def check_connectivity(self) -> bool:
-        """Check if template repository is accessible using git ls-remote (lightweight approach)"""
+        """Check if template repository is accessible"""
         try:
-            # Use git ls-remote to check repository accessibility without cloning
-            # This is much faster than the previous approach of calling list_available()
-            result = subprocess.run(
-                ["git", "ls-remote", "--heads", self.downloader.repo_url, self.downloader.branch],
-                capture_output=True,
-                text=True,
-                timeout=10,  # 10 second timeout
-                check=True
-            )
-            # Check if the branch exists in the remote repository
-            return bool(result.stdout.strip())
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            self.list_available()
+            return True
+        except Exception:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
             return False
