@@ -511,105 +511,19 @@ def template(action_list, action_info, framework, template, filter_framework, fo
 
 
 @click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-@click.option("--replace", help="Agent ID to replace (for capacity management)")
-@click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
-@click.option("--host", default="127.0.0.1", help="Preferred host")
-def deploy_local(folder, framework, replace, port, host):
-    """Deploy agent locally for testing with automatic port allocation"""
-
-    try:
-        sdk = RunAgent()
-
-        # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
-
-        console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
-
-        if replace:
-            # Replace existing agent
-            result = sdk.db_service.replace_agent(
-                old_agent_id=replace,
-                new_agent_id=str(uuid.uuid4()),  # Generate new ID
-                agent_path=folder,
-                host=host,
-                port=port,
-                framework=framework or detect_framework(folder),
-            )
-        else:
-            # Add new agent with auto port allocation
-            import uuid
-            agent_id = str(uuid.uuid4())
-            result = sdk.db_service.add_agent_with_auto_port(
-                agent_id=agent_id,
-                agent_path=folder,
-                framework=framework or detect_framework(folder),
-                status="deployed",
-                preferred_host=host,
-                preferred_port=port,
-            )
-
-        if result.get("success"):
-            agent_id = result.get("new_agent_id") if replace else result.get("agent_id")
-            allocated_host = result.get("allocated_host", host)
-            allocated_port = result.get("allocated_port", port)
-            
-            console.print(f"\n✅ [green]Local deployment successful![/green]")
-            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
-            console.print(f"🔌 Allocated Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
-            console.print(f"🌐 Endpoint: [link]http://{allocated_host}:{allocated_port}[/link]")
-
-            if replace:
-                console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
-
-            # Show capacity info
-            # capacity = sdk.get_local_capacity()
-            capacity_info = sdk.db_service.get_database_capacity_info()
-
-            console.print(
-                f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
-            )
-
-            console.print(f"\n💡 [bold]Next steps:[/bold]")
-            console.print(f"  • Start server: [cyan]runagent serve {folder}[/cyan]")
-            console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
-            console.print(f"  • Or use Python SDK:")
-            console.print(f"    [dim]from runagent import RunAgentClient[/dim]")
-            console.print(f"    [dim]client = RunAgentClient(agent_id='{agent_id}', local=True)[/dim]")
-        else:
-            error_code = result.get("error_code")
-            if error_code == "DATABASE_FULL":
-                capacity_info = result.get("capacity_info", {})
-                console.print(f"\n❌ [red]Database at full capacity![/red]")
-                console.print(
-                    f"📊 Current: {capacity_info.get('current_count', 0)}/5 agents"
-                )
-
-                oldest_agent = capacity_info.get("oldest_agent", {}).get("agent_id")
-                if oldest_agent:
-                    console.print(f"\n💡 [yellow]Suggested command:[/yellow]")
-                    console.print(
-                        f"[cyan]runagent deploy-local --folder {folder} --replace {oldest_agent}[/cyan]"
-                    )
-
-                raise click.ClickException(result.get("error"))
-            else:
-                raise click.ClickException(result.get("error"))
-
-    except ValidationError as e:
-        console.print(f"❌ [red]Validation error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
-    except Exception as e:
-        console.print(f"❌ [red]Deployment error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
-
-@click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-def upload(folder, framework):
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def upload(path: Path):
     """Upload agent to remote server"""
 
     try:
@@ -623,14 +537,14 @@ def upload(folder, framework):
             raise click.ClickException("Authentication required")
 
         # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
         console.print(f"📤 [bold]Uploading agent...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-        # Upload agent
-        result = sdk.upload_agent(folder=folder, framework=framework)
+        # Upload agent (framework auto-detected)
+        result = sdk.upload_agent(folder=path)
 
         if result.get("success"):
             agent_id = result["agent_id"]
