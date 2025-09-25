@@ -5,7 +5,7 @@ This package provides both a CLI and SDK for deploying and managing AI agents
 built with frameworks like LangGraph, LangChain, and LlamaIndex.
 """
 
-__version__ = "0.1.20"
+__version__ = "0.1.23"
 
 from .client import RunAgentClient
 
