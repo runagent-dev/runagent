@@ -1,7 +1,7 @@
 import websockets
 import asyncio
 from typing import AsyncIterator, Iterator, Optional
-from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest, AgentInputArgs, MessageType, SafeMessage
+from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest, MessageType, SafeMessage
 import json
 import uuid
 from typing import Any
@@ -36,10 +36,8 @@ class SocketClient:
             request = WebSocketAgentRequest(
                 action=WebSocketActionType.START_STREAM,
                 agent_id=agent_id,
-                input_data=AgentInputArgs(
-                    input_args=input_args,
-                    input_kwargs=input_kwargs
-                )
+                input_args=input_args,
+                input_kwargs=input_kwargs,
             )
             
             start_msg = SafeMessage(
@@ -85,10 +83,8 @@ class SocketClient:
             request = WebSocketAgentRequest(
                 action=WebSocketActionType.START_STREAM,
                 agent_id=agent_id,
-                input_data=AgentInputArgs(
-                    input_args=input_args,
-                    input_kwargs=input_kwargs
-                )
+                input_args=input_args,
+                input_kwargs=input_kwargs,
             )
             
             start_msg = SafeMessage(

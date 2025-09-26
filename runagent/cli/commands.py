@@ -28,6 +28,18 @@ from runagent.utils.enums.framework import Framework
 console = Console()
 
 
+def format_error_message(error_info):
+    """Format error information from API responses"""
+    if isinstance(error_info, dict) and "message" in error_info:
+        # New format with ErrorDetail object
+        error_message = error_info.get("message", "Unknown error")
+        error_code = error_info.get("code", "UNKNOWN_ERROR")
+        return f"[{error_code}] {error_message}"
+    else:
+        # Fallback to old format for backward compatibility
+        return str(error_info) if error_info else "Unknown error"
+
+
 def print_version(ctx, param, value):
     """Custom version callback with colored output"""
     if not value or ctx.resilient_parsing:
@@ -242,14 +254,16 @@ def delete(agent_id, yes):
             capacity_info = sdk.db_service.get_database_capacity_info()
             console.print(f"📊 Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
         else:
-            console.print(f"❌ [red]Failed to delete agent: {result.get('error')}[/red]")
-            raise click.ClickException("Deletion failed")
+            console.print(f"❌ [red]Failed to delete agent:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
     
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
         console.print(f"❌ [red]Delete error:[/red] {e}")
-        raise click.ClickException("Delete failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
@@ -553,14 +567,18 @@ def upload(path: Path):
             console.print(f"\n💡 [bold]Next step:[/bold]")
             console.print(f"[cyan]runagent start --id {agent_id}[/cyan]")
         else:
-            raise click.ClickException(result.get("error"))
+            console.print(f"❌ [red]Upload failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
     except AuthenticationError as e:
         console.print(f"❌ [red]Authentication error:[/red] {e}")
-        raise click.ClickException("Upload failed")
+        import sys
+        sys.exit(1)
     except Exception as e:
         console.print(f"❌ [red]Upload error:[/red] {e}")
-        raise click.ClickException("Upload failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
@@ -599,14 +617,18 @@ def start(agent_id, config):
             console.print(f"\n✅ [green]Agent started successfully![/green]")
             console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
-            raise click.ClickException(result.get("error"))
+            console.print(f"❌ [red]Start failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
     except AuthenticationError as e:
         console.print(f"❌ [red]Authentication error:[/red] {e}")
-        raise click.ClickException("Start failed")
+        import sys
+        sys.exit(1)
     except Exception as e:
         console.print(f"❌ [red]Start error:[/red] {e}")
-        raise click.ClickException("Start failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
@@ -667,7 +689,9 @@ def deploy(folder, agent_id, local, framework, config):
                 )
                 console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
             else:
-                raise click.ClickException(result.get("error"))
+                console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(result.get('error'))}")
+                import sys
+                sys.exit(1)
 
         elif agent_id:
             # Start existing agent
@@ -1040,7 +1064,11 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        raise click.ClickException(f"Execution failed: {e}")
+        # Display error with red ❌ symbol
+        console.print(f"❌ [bold red]Execution failed:[/bold red] {e}")
+        # Exit with error code 1 instead of raising ClickException to avoid duplicate message
+        import sys
+        sys.exit(1)
 
 
 @click.group()

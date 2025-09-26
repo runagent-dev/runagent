@@ -99,16 +99,6 @@ class RunAgentConfig(BaseModel):
             
         return data
 
-class AgentInputArgs(BaseModel):
-    """Request model for agent execution"""
-
-    input_args: t.List[t.Any] = Field(
-        default={}, description="Input data for agent invocation"
-    )
-    input_kwargs: t.Dict[str, t.Any] = Field(
-        default={}, description="Input data for agent invocation"
-    )
-
 
 class WebSocketActionType(str, Enum):
     START_STREAM = "start_stream"
@@ -120,17 +110,26 @@ class WebSocketAgentRequest(BaseModel):
     """WebSocket request model for agent streaming"""
     action: WebSocketActionType
     agent_id: str
-    input_data: AgentInputArgs
+    input_args: t.List[t.Any] = Field(
+        default_factory=list, description="Input data for positional arguments"
+    )
+    input_kwargs: t.Dict[str, t.Any] = Field(
+        default_factory=dict, description="Input data for keyword arguments"
+    )
     stream_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict)
 
 
 # Pydantic Models
 class AgentRunRequest(BaseModel):
     """Request model for agent execution"""
-
-    input_data: AgentInputArgs = Field(
-        default={}, description="Input data for agent invocation"
+    entrypoint_tag: str = Field(..., description="Entrypoint tag")
+    input_args: t.List[t.Any] = Field(
+        default_factory=list, description="Input data for positional arguments"
     )
+    input_kwargs: t.Dict[str, t.Any] = Field(
+        default_factory=dict, description="Input data for keyword arguments"
+    )
+
 
 
 class AgentRunResponse(BaseModel):
@@ -141,6 +140,53 @@ class AgentRunResponse(BaseModel):
     error: t.Optional[str] = None
     execution_time: t.Optional[float] = None
     agent_id: str
+
+
+class ExecutionData(BaseModel):
+    """Execution data for the new response format"""
+    
+    execution_id: str
+    agent_id: str
+    user_id: t.Optional[str] = None
+    deployment_id: t.Optional[str] = None
+    entrypoint_id: t.Optional[str] = None
+    status: str
+    started_at: str
+    completed_at: t.Optional[str] = None
+    runtime_seconds: t.Optional[float] = None
+    input_data: t.Dict[str, t.Any]
+    result_data: t.Optional[t.Dict[str, t.Any]] = None
+    execution_metadata: t.Optional[t.Dict[str, t.Any]] = None
+    error_message: t.Optional[str] = None
+    is_local: bool = True
+    agent_name: t.Optional[str] = None
+    project_id: t.Optional[str] = None
+    project_name: t.Optional[str] = None
+    endpoint: t.Optional[str] = None
+    priority: str = "normal"
+    success: bool
+    result: t.Optional[t.Dict[str, t.Any]] = None
+    error: t.Optional[str] = None
+
+
+class ErrorDetail(BaseModel):
+    """Error detail structure for API responses"""
+    
+    code: str
+    message: str
+    details: t.Optional[t.Any] = None
+    field: t.Optional[str] = None
+
+
+class AgentRunResponseV2(BaseModel):
+    """New response model for agent execution with detailed execution data"""
+    
+    success: bool
+    data: t.Optional[ExecutionData] = None
+    message: t.Optional[str] = None
+    error: t.Optional[ErrorDetail] = None
+    timestamp: str
+    request_id: str
 
 
 class CapacityInfo(BaseModel):

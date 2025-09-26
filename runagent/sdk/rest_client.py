@@ -137,9 +137,9 @@ class HttpHandler:
         handle_errors: bool = True,
     ) -> Union[Dict[str, Any], requests.Response]:
         """Core request method"""
-        
+
         url = self._get_url(path)
-        
+
         # Prepare headers
         request_headers = {}
         if headers:
@@ -838,6 +838,90 @@ class RestClient:
                 return None
         return None
 
+
+    def run_agent(
+        self,
+        agent_id: str,
+        entrypoint_tag: str,
+        input_args: list = None,
+        input_kwargs: dict = None,
+        timeout_seconds: int = 60,
+        async_execution: bool = False,
+    ) -> Dict:
+        """Execute an agent with given parameters"""
+        try:
+            console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
+
+            # Prepare request data according to API specification
+            request_data = {
+                "entrypoint_tag": entrypoint_tag,
+                "input_args": input_args or [],
+                "input_kwargs": input_kwargs or {},
+                "timeout_seconds": timeout_seconds,
+                "async_execution": async_execution
+            }
+
+            # Execute the agent
+            try:
+                response = self.http.post(
+                    f"/agents/{agent_id}/run",
+                    data=request_data,
+                    timeout=timeout_seconds + 10,  # Add buffer to request timeout
+                )
+                result = response.json()
+
+                if result.get("success", True):  # Assume success if not explicitly false
+                    console.print("✅ [bold green]Agent execution completed![/bold green]")
+                    return result
+                else:
+                    # Handle new error format with ErrorDetail object
+                    error_info = result.get('error')
+                    if isinstance(error_info, dict) and "message" in error_info:
+                        # New format with ErrorDetail object - don't print here, let client handle it
+                        pass
+                    else:
+                        # Fallback to old format for backward compatibility - don't print, let CLI handle it
+                        pass
+                    return result
+
+            except (ClientError, ServerError, ConnectionError) as e:
+                return {
+                    "success": False, 
+                    "data": None,
+                    "message": None,
+                    "error": {
+                        "code": "CONNECTION_ERROR",
+                        "message": f"Agent execution failed: {e.message}",
+                        "details": None,
+                        "field": None
+                    },
+                    "timestamp": None,
+                    "request_id": None
+                }
+
+        except Exception as e:
+            return {
+                "success": False, 
+                "data": None,
+                "message": None,
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": f"Execute agent failed: {str(e)}",
+                    "details": None,
+                    "field": None
+                },
+                "timestamp": None,
+                "request_id": None
+            }
+
+    def get_agent_architecture(self, agent_id: str) -> Dict:
+        """Get the architecture information for a specific agent"""
+        try:
+            response = self.http.get(f"/agents/{agent_id}/architecture")
+            return response.json()
+        except Exception as e:
+            return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
+
 # runagent/sdk/rest_client.py - FIXED RestClient initialization
 
 # class RestClient:
@@ -1006,53 +1090,6 @@ class RestClient:
 #             raise Exception(f"API request failed: {e.message}")
 #         except Exception as e:
 #             raise Exception(f"Request error: {e}")
-
-#     def run_agent(
-#         self,
-#         agent_id: str,
-#         entrypoint_tag: str,
-#         input_args: list = None,
-#         input_kwargs: dict = None,
-#         execution_type: str = "generic",
-#     ) -> Dict:
-#         """Execute an agent with given parameters"""
-#         try:
-#             console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
-
-#             # Prepare request data
-#             request_data = {
-#                 "input_data": {"input_args": input_args, "input_kwargs": input_kwargs}
-#             }
-
-#             # Execute the agent
-#             try:
-#                 response = self.http.post(
-#                     f"/agents/{agent_id}/execute/{entrypoint_tag}",
-#                     data=request_data,
-#                     timeout=120,  # Longer timeout for agent execution
-#                 )
-#                 result = response.json()
-
-#                 if result.get("success", True):  # Assume success if not explicitly false
-#                     console.print("✅ [bold green]Agent execution completed![/bold green]")
-#                     return result
-#                 else:
-#                     console.print(f"❌ [bold red]Agent execution failed: {result.get('error', 'Unknown error')}[/bold red]")
-#                     return result
-
-#             except (ClientError, ServerError, ConnectionError) as e:
-#                 return {"success": False, "error": f"Agent execution failed: {e.message}"}
-
-#         except Exception as e:
-#             return {"success": False, "error": f"Execute agent failed: {str(e)}"}
-
-#     def get_agent_architecture(self, agent_id: str) -> Dict:
-#         """Get the architecture information for a specific agent"""
-#         try:
-#             response = self.http.get(f"/agents/{agent_id}/architecture")
-#             return response.json()
-#         except Exception as e:
-#             return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
 
 
 #     def sync_local_agent(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
