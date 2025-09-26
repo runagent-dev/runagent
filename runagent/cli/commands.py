@@ -912,8 +912,11 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         # Using host/port with input file
         runagent run --host localhost --port 8080 --input config.json
         
-        # Generic streaming mode with extra params
-        runagent run --agent-id my-agent --generic-stream --debug=true --retries=3
+        # local agent
+        runagent run --id d33c497d-d3f5-462e-8ff4-c28d819b92d6  --tag minimal  --local --message=something
+
+        # remote agent
+        runagent run --id d33c497d-d3f5-462e-8ff4-c28d819b92d6  --tag minimal  --message=something
     """
     
     # ============================================
@@ -940,17 +943,12 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         )
     
     # ============================================
-    # # VALIDATION 2: Generic mode selection
+    # # VALIDATION 2: tag validation
     # # ============================================
-    # if generic and generic_stream:
-    #     raise click.UsageError(
-    #         "Cannot specify both --generic and --generic-stream. Choose one."
-    #     )
+    if tag.endswith("_stream"):
+        console.print(f"❌ [bold red]Execution failed:[/bold red] Cannot use streaming Entrypoint tag `{tag}` through non-streaming endpoint.")
+        return
     
-    # # Default to generic mode if neither specified
-    # if not generic and not generic_stream:
-    #     generic = True
-    #     console.print("🔧 Defaulting to --generic mode")
     
     # ============================================
     # VALIDATION 3: Input file OR extra params
