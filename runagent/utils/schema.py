@@ -109,7 +109,7 @@ class WebSocketActionType(str, Enum):
 class WebSocketAgentRequest(BaseModel):
     """WebSocket request model for agent streaming"""
     action: WebSocketActionType
-    agent_id: str
+    entrypoint_tag: str = Field(..., description="Entrypoint tag")
     input_args: t.List[t.Any] = Field(
         default_factory=list, description="Input data for positional arguments"
     )

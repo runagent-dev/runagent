@@ -77,13 +77,16 @@ class RunAgentClient:
                 # Fallback to old format for backward compatibility
                 raise Exception(response.get("error", "Unknown error"))
 
-    def _run_stream(self, *input_args, **input_kwargs):
-        return self.socket_client.run_stream(
-            self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
-        )
+    def run_stream(self, *input_args, **input_kwargs):
+        """Stream agent execution results in real-time via WebSocket"""
+        try:
+            return self.socket_client.run_stream(
+                self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
+            )
+        except Exception as e:
+            # Handle streaming errors with proper formatting
+            raise Exception(f"Streaming failed: {str(e)}")
 
-    # def run(self, *input_args, **input_kwargs):
-    #     if self.entrypoint_tag.endswith("_stream"):
-    #         return self._run_stream(*input_args, **input_kwargs)
-    #     else:
-    #         return self._run(*input_args, **input_kwargs)
+    def _run_stream(self, *input_args, **input_kwargs):
+        """Legacy method - use run_stream instead"""
+        return self.run_stream(*input_args, **input_kwargs)

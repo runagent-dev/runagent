@@ -90,7 +90,7 @@ class LocalServer:
         self._setup_logging()
 
         self.app = self._setup_fastapi_app()
-        self._setup_websocket_routes()
+        # self._setup_websocket_routes()
         self._setup_routes()
         self.agent_synced_to_middleware = False
 
@@ -697,6 +697,12 @@ class LocalServer:
             entrypoint_runner_dict[entrypoint.tag] = runner
 
 
+        @self.app.websocket(f"/api/v1/agents/{self.agent_id}/run-stream")
+        async def run_agent_stream(websocket: WebSocket, agent_id: str = self.agent_id):
+            
+            await self.websocket_handler.handle_agent_stream_with_tracking(
+                websocket, agent_id, entrypoint_runner_dict, self.db_service
+            )
             
         @self.app.exception_handler(HTTPException)
         async def http_exception_handler(request, exc):
@@ -1087,24 +1093,24 @@ class LocalServer:
                     "str": str(obj)[:500]     # Limit length
                 }
 
-    def _setup_websocket_routes(self):
-        """Setup WebSocket routes with invocation tracking"""
-        for entrypoint in self.agent_architecture.entrypoints:
-            if not entrypoint.tag.endswith("_stream"):
-                continue
+    # def _setup_websocket_routes(self):
+    #     """Setup WebSocket routes with invocation tracking"""
+    #     for entrypoint in self.agent_architecture.entrypoints:
+    #         if not entrypoint.tag.endswith("_stream"):
+    #             continue
 
-            stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
+    #         stream_runner = self.agentic_executor.get_stream_runner(entrypoint)
 
-            # Create a separate function for each entrypoint with invocation tracking
-            def make_websocket_handler_with_tracking(runner, entrypoint_tag):  # Factory function
-                @self.app.websocket(f"/api/v1/agents/{self.agent_id}/execute/{entrypoint_tag}")
-                async def websocket_endpoint(websocket: WebSocket, agent_id: str = self.agent_id):
-                    await self.websocket_handler.handle_agent_stream_with_tracking(
-                        websocket, agent_id, runner, entrypoint_tag, self.db_service
-                    )
-                return websocket_endpoint
+    #         # Create a separate function for each entrypoint with invocation tracking
+    #         def make_websocket_handler_with_tracking(runner, entrypoint_tag):  # Factory function
+    #             @self.app.websocket(f"/api/v1/agents/{self.agent_id}/run-stream")
+    #             async def websocket_endpoint(websocket: WebSocket, agent_id: str = self.agent_id):
+    #                 await self.websocket_handler.handle_agent_stream_with_tracking(
+    #                     websocket, agent_id, runner, entrypoint_tag, self.db_service
+    #                 )
+    #             return websocket_endpoint
             
-            make_websocket_handler_with_tracking(stream_runner, entrypoint.tag)
+    #         make_websocket_handler_with_tracking(stream_runner, entrypoint.tag)
 
     def extract_endpoints(self):
         """Extract all endpoints from the FastAPI app"""

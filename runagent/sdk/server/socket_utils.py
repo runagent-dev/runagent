@@ -63,8 +63,7 @@ class AgentWebSocketHandler:
         self, 
         websocket: WebSocket, 
         agent_id: str, 
-        stream_runner, 
-        entrypoint_tag: str,
+        entrypoint_runner_dict: dict,
         db_service
     ):
         """Handle streaming execution - FIXED for middleware sync"""
@@ -74,13 +73,58 @@ class AgentWebSocketHandler:
         middleware_invocation_id = None  # FIXED: Add middleware invocation ID tracking
         
         try:
-            # Wait for start message
+            # Wait for start message - expect direct JSON format
             data = await websocket.receive_text()
-            start_message = self.serializer.deserialize_message(data)
             
-            request_data = start_message.data
-            input_args = request_data.get("input_data", {}).get("input_args", [])
-            input_kwargs = request_data.get("input_data", {}).get("input_kwargs", {})
+            # Parse the direct JSON request format
+            try:
+                request_data = json.loads(data)
+            except json.JSONDecodeError as e:
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": f"Invalid JSON format: {str(e)}"
+                })
+                await websocket.close(code=1003)
+                return
+            
+            # Validate required fields
+            required_fields = ["entrypoint_tag", "input_args", "input_kwargs"]
+            for field in required_fields:
+                if field not in request_data:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": f"Missing required field: {field}"
+                    })
+                    await websocket.close(code=1003)
+                    return
+            
+            entrypoint_tag = request_data["entrypoint_tag"]
+
+            # For WebSocket, we want to check if the entrypoint exists and is a streaming entrypoint.
+            if entrypoint_tag not in entrypoint_runner_dict:
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": f"Entrypoint {entrypoint_tag} not found"
+                })
+                await websocket.close(code=1003)  # 1003 = unsupported data
+                return
+
+            # For WebSocket, we REQUIRE the entrypoint to be a streaming entrypoint
+            if not entrypoint_tag.endswith("_stream"):
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": f"Entrypoint `{entrypoint_tag}` is not a streaming entrypoint. Use a streaming entrypoint (ending with '_stream')."
+                })
+                await websocket.close(code=1003)
+                return
+
+            stream_runner = entrypoint_runner_dict[entrypoint_tag]
+
+            # Extract input data from the new format
+            input_args = request_data.get("input_args", [])
+            input_kwargs = request_data.get("input_kwargs", {})
+            timeout_seconds = request_data.get("timeout_seconds", 60)
+            async_execution = request_data.get("async_execution", False)
             
             # Start LOCAL invocation tracking first
             invocation_id = self.db_service.start_invocation(
@@ -137,19 +181,13 @@ class AgentWebSocketHandler:
                 except Exception as e:
                     console.print(f"❌ [red]Middleware sync start failed: {e}[/red]")
             
-            # Send stream started status to client
-            await websocket.send_text(self.serializer.serialize_message(
-                SafeMessage(
-                    id="stream_status",
-                    type=MessageType.STATUS,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    data={
-                        "status": "stream_started",
-                        "invocation_id": invocation_id,
-                        "middleware_invocation_id": middleware_invocation_id
-                    }
-                )
-            ))
+            # Send stream started status to client (simple JSON format)
+            await websocket.send_text(json.dumps({
+                "type": "status",
+                "status": "stream_started",
+                "invocation_id": invocation_id,
+                "middleware_invocation_id": middleware_invocation_id
+            }))
             
             start_time = time.time()
             chunk_count = 0
@@ -174,16 +212,11 @@ class AgentWebSocketHandler:
                                 "chunk_preview": str(chunk)
                             })
                     
-                    # Send chunk to client
-                    chunk_message = SafeMessage(
-                        id=f"chunk_{uuid.uuid4()}",
-                        type=MessageType.DATA,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        data={"content": chunk}
-                    )
-                    
-                    serialized_chunk = self.serializer.serialize_message(chunk_message)
-                    await websocket.send_text(serialized_chunk)
+                    # Send chunk to client (simple JSON format)
+                    await websocket.send_text(json.dumps({
+                        "type": "data",
+                        "content": chunk
+                    }))
                 
                 # Streaming completed successfully
                 execution_time = time.time() - start_time
@@ -240,21 +273,15 @@ class AgentWebSocketHandler:
                     except Exception as e:
                         console.print(f"❌ [red]Middleware sync completion error: {e}[/red]")
                 
-                # Send completion status to client
-                await websocket.send_text(self.serializer.serialize_message(
-                    SafeMessage(
-                        id="stream_complete",
-                        type=MessageType.STATUS,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        data={
-                            "status": "stream_completed",
-                            "total_chunks": chunk_count,
-                            "execution_time": execution_time,
-                            "invocation_id": invocation_id,
-                            "middleware_synced": middleware_invocation_id is not None
-                        }
-                    )
-                ))
+                # Send completion status to client (simple JSON format)
+                await websocket.send_text(json.dumps({
+                    "type": "status",
+                    "status": "stream_completed",
+                    "total_chunks": chunk_count,
+                    "execution_time": execution_time,
+                    "invocation_id": invocation_id,
+                    "middleware_synced": middleware_invocation_id is not None
+                }))
                 
             except Exception as stream_error:
                 # Streaming failed
@@ -290,16 +317,11 @@ class AgentWebSocketHandler:
                     except Exception as sync_error:
                         console.print(f"❌ [red]Middleware sync error failed: {sync_error}[/red]")
                 
-                # Send error to client
-                await websocket.send_text(self.serializer.serialize_message(
-                    SafeMessage(
-                        id="stream_error",
-                        type=MessageType.ERROR,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        data={"error": error_detail},
-                        error=error_detail
-                    )
-                ))
+                # Send error to client (simple JSON format)
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "error": error_detail
+                }))
         
         except WebSocketDisconnect:
             console.print(f"WebSocket disconnected for agent {agent_id}")
@@ -443,218 +465,218 @@ class AgentWebSocketHandler:
         finally:
             self._cleanup_stream(connection_id)
 
-    async def _handle_stream_start_with_tracking(
-        self, 
-        websocket: WebSocket, 
-        request: WebSocketAgentRequest, 
-        connection_id: str, 
-        agent_execution_streamer: Callable,
-        invocation_id: str,
-        db_service,
-        middleware_invocation_id: str = None  
-    ):
-        """Enhanced stream start with invocation tracking and middleware sync"""
-        start_time = time.time()
-        chunk_count = 0
-        stream_output_data = []
-        error_detail = None
+    # async def _handle_stream_start_with_tracking(
+    #     self, 
+    #     websocket: WebSocket, 
+    #     request: WebSocketAgentRequest, 
+    #     connection_id: str, 
+    #     agent_execution_streamer: Callable,
+    #     invocation_id: str,
+    #     db_service,
+    #     middleware_invocation_id: str = None  
+    # ):
+    #     """Enhanced stream start with invocation tracking and middleware sync"""
+    #     start_time = time.time()
+    #     chunk_count = 0
+    #     stream_output_data = []
+    #     error_detail = None
 
-        try:
-            # Send stream started status
-            await self._send_status(websocket, "stream_started", {
-                "agent_id": request.agent_id,
-                "invocation_id": invocation_id,
-                "middleware_invocation_id": middleware_invocation_id,  # NEW: Include middleware ID
-                "input_args": request.input_data.input_args,
-                "input_kwargs": list(request.input_data.input_kwargs.keys())
-            })
+    #     try:
+    #         # Send stream started status
+    #         await self._send_status(websocket, "stream_started", {
+    #             "agent_id": request.agent_id,
+    #             "invocation_id": invocation_id,
+    #             "middleware_invocation_id": middleware_invocation_id,  # NEW: Include middleware ID
+    #             "input_args": request.input_data.input_args,
+    #             "input_kwargs": list(request.input_data.input_kwargs.keys())
+    #         })
             
-            console.print(f"Starting tracked stream for agent: [cyan]{request.agent_id}[/cyan] (invocation: {invocation_id}...)")
-            if middleware_invocation_id:
-                console.print(f"[dim]Middleware invocation: {middleware_invocation_id}...[/dim]")
+    #         console.print(f"Starting tracked stream for agent: [cyan]{request.agent_id}[/cyan] (invocation: {invocation_id}...)")
+    #         if middleware_invocation_id:
+    #             console.print(f"[dim]Middleware invocation: {middleware_invocation_id}...[/dim]")
             
-            console.print(f"Input args: [cyan]{request.input_data.input_args}[/cyan]")
-            console.print(f"Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
+    #         console.print(f"Input args: [cyan]{request.input_data.input_args}[/cyan]")
+    #         console.print(f"Input kwargs: [cyan]{request.input_data.input_kwargs}[/cyan]")
             
-            # Track active stream
-            self.active_streams[connection_id] = {
-                "agent_id": request.agent_id,
-                "invocation_id": invocation_id,
-                "middleware_invocation_id": middleware_invocation_id,  # NEW: Track middleware ID
-                "start_time": start_time,
-                "chunk_count": 0
-            }
+    #         # Track active stream
+    #         self.active_streams[connection_id] = {
+    #             "agent_id": request.agent_id,
+    #             "invocation_id": invocation_id,
+    #             "middleware_invocation_id": middleware_invocation_id,  # NEW: Track middleware ID
+    #             "start_time": start_time,
+    #             "chunk_count": 0
+    #         }
             
-            # Start the streaming iteration
-            async for chunk in self._safe_agent_stream(
-                agent_execution_streamer,
-                *request.input_data.input_args,
-                **request.input_data.input_kwargs
-            ):
-                # Check if stream is still active
-                if connection_id not in self.active_streams:
-                    break
+    #         # Start the streaming iteration
+    #         async for chunk in self._safe_agent_stream(
+    #             agent_execution_streamer,
+    #             *request.input_data.input_args,
+    #             **request.input_data.input_kwargs
+    #         ):
+    #             # Check if stream is still active
+    #             if connection_id not in self.active_streams:
+    #                 break
                 
-                chunk_count += 1
-                self.active_streams[connection_id]["chunk_count"] = chunk_count
+    #             chunk_count += 1
+    #             self.active_streams[connection_id]["chunk_count"] = chunk_count
                 
-                # Convert chunk to serializable format before storing
-                try:
-                    serializable_chunk = self._convert_to_serializable(chunk)
+    #             # Convert chunk to serializable format before storing
+    #             try:
+    #                 serializable_chunk = self._convert_to_serializable(chunk)
                     
-                    # Store chunk for final output tracking (limit to prevent memory issues)
-                    if chunk_count <= 100:
-                        stream_output_data.append(serializable_chunk)
+    #                 # Store chunk for final output tracking (limit to prevent memory issues)
+    #                 if chunk_count <= 100:
+    #                     stream_output_data.append(serializable_chunk)
                     
-                except Exception as e:
-                    console.print(f"⚠️ [yellow]Warning: Could not serialize chunk {chunk_count}: {e}[/yellow]")
-                    # Store a safe representation
-                    stream_output_data.append({
-                        "chunk_number": chunk_count,
-                        "serialization_error": str(e),
-                        "chunk_type": str(type(chunk)),
-                        "chunk_preview": str(chunk)[:100] + "..." if len(str(chunk)) > 100 else str(chunk)
-                    })
+    #             except Exception as e:
+    #                 console.print(f"⚠️ [yellow]Warning: Could not serialize chunk {chunk_count}: {e}[/yellow]")
+    #                 # Store a safe representation
+    #                 stream_output_data.append({
+    #                     "chunk_number": chunk_count,
+    #                     "serialization_error": str(e),
+    #                     "chunk_type": str(type(chunk)),
+    #                     "chunk_preview": str(chunk)[:100] + "..." if len(str(chunk)) > 100 else str(chunk)
+    #                 })
                 
-                raw_data_msg = SafeMessage(
-                    id="raw_chunk",
-                    type=MessageType.RAW_DATA,
-                    timestamp="",
-                    data=chunk
-                )
-                # Send chunk with appropriate message type
-                serialized_chunk = self.serializer.serialize_message(raw_data_msg)
-                await websocket.send_text(serialized_chunk)
+    #             raw_data_msg = SafeMessage(
+    #                 id="raw_chunk",
+    #                 type=MessageType.RAW_DATA,
+    #                 timestamp="",
+    #                 data=chunk
+    #             )
+    #             # Send chunk with appropriate message type
+    #             serialized_chunk = self.serializer.serialize_message(raw_data_msg)
+    #             await websocket.send_text(serialized_chunk)
                 
-                # Small delay to prevent overwhelming the client
-                await asyncio.sleep(0)
+    #             # Small delay to prevent overwhelming the client
+    #             await asyncio.sleep(0)
             
-            # Calculate execution time
-            execution_time = time.time() - start_time
+    #         # Calculate execution time
+    #         execution_time = time.time() - start_time
             
-            # Send completion status
-            await self._send_status(websocket, "stream_completed", {
-                "agent_id": request.agent_id,
-                "invocation_id": invocation_id,
-                "middleware_invocation_id": middleware_invocation_id,  # NEW: Include middleware ID
-                "total_chunks": chunk_count,
-                "execution_time": execution_time
-            })
+    #         # Send completion status
+    #         await self._send_status(websocket, "stream_completed", {
+    #             "agent_id": request.agent_id,
+    #             "invocation_id": invocation_id,
+    #             "middleware_invocation_id": middleware_invocation_id,  # NEW: Include middleware ID
+    #             "total_chunks": chunk_count,
+    #             "execution_time": execution_time
+    #         })
             
-            # Complete local invocation tracking with success
-            try:
-                db_service.complete_invocation(
-                    invocation_id=invocation_id,
-                    output_data={
-                        "stream_completed": True,
-                        "total_chunks": chunk_count,
-                        "sample_chunks": stream_output_data[:10] if stream_output_data else [],
-                        "execution_time_seconds": execution_time,
-                        "chunk_summary": {
-                            "total_chunks": chunk_count,
-                            "stored_samples": min(len(stream_output_data), 10),
-                            "stream_type": "websocket"
-                        }
-                    },
-                    execution_time_ms=execution_time * 1000
-                )
-                console.print(f"✅ [green]Local invocation tracking completed successfully[/green]")
-            except Exception as e:
-                console.print(f"❌ [red]Failed to complete local invocation tracking: {str(e)}[/red]")
-                # Try to complete with minimal data
-                try:
-                    db_service.complete_invocation(
-                        invocation_id=invocation_id,
-                        output_data={
-                            "stream_completed": True,
-                            "total_chunks": chunk_count,
-                            "execution_time_seconds": execution_time,
-                            "serialization_note": "Some chunks could not be serialized"
-                        },
-                        execution_time_ms=execution_time * 1000
-                    )
-                    console.print(f"✅ [green]Local invocation tracking completed with minimal data[/green]")
-                except Exception as e2:
-                    console.print(f"❌ [red]Critical: Could not complete local invocation tracking: {str(e2)}[/red]")
+    #         # Complete local invocation tracking with success
+    #         try:
+    #             db_service.complete_invocation(
+    #                 invocation_id=invocation_id,
+    #                 output_data={
+    #                     "stream_completed": True,
+    #                     "total_chunks": chunk_count,
+    #                     "sample_chunks": stream_output_data[:10] if stream_output_data else [],
+    #                     "execution_time_seconds": execution_time,
+    #                     "chunk_summary": {
+    #                         "total_chunks": chunk_count,
+    #                         "stored_samples": min(len(stream_output_data), 10),
+    #                         "stream_type": "websocket"
+    #                     }
+    #                 },
+    #                 execution_time_ms=execution_time * 1000
+    #             )
+    #             console.print(f"✅ [green]Local invocation tracking completed successfully[/green]")
+    #         except Exception as e:
+    #             console.print(f"❌ [red]Failed to complete local invocation tracking: {str(e)}[/red]")
+    #             # Try to complete with minimal data
+    #             try:
+    #                 db_service.complete_invocation(
+    #                     invocation_id=invocation_id,
+    #                     output_data={
+    #                         "stream_completed": True,
+    #                         "total_chunks": chunk_count,
+    #                         "execution_time_seconds": execution_time,
+    #                         "serialization_note": "Some chunks could not be serialized"
+    #                     },
+    #                     execution_time_ms=execution_time * 1000
+    #                 )
+    #                 console.print(f"✅ [green]Local invocation tracking completed with minimal data[/green]")
+    #             except Exception as e2:
+    #                 console.print(f"❌ [red]Critical: Could not complete local invocation tracking: {str(e2)}[/red]")
             
-            # NEW: Sync completion to middleware
-            if middleware_invocation_id and self.middleware_sync:
-                try:
-                    await self.middleware_sync.sync_invocation_complete(
-                        middleware_invocation_id,
-                        {
-                            "output_data": {
-                                "stream_completed": True,
-                                "total_chunks": chunk_count,
-                                "sample_chunks": stream_output_data[:10] if stream_output_data else [],
-                                "execution_time_seconds": execution_time,
-                                "chunk_summary": {
-                                    "total_chunks": chunk_count,
-                                    "stored_samples": min(len(stream_output_data), 10),
-                                    "stream_type": "websocket"
-                                }
-                            },
-                            "execution_time_ms": execution_time * 1000
-                        }
-                    )
-                    console.print(f"📡 [dim]Stream completion synced to middleware[/dim]")
-                except Exception as e:
-                    console.print(f"⚠️ [yellow]Failed to sync stream completion to middleware: {e}[/yellow]")
+    #         # NEW: Sync completion to middleware
+    #         if middleware_invocation_id and self.middleware_sync:
+    #             try:
+    #                 await self.middleware_sync.sync_invocation_complete(
+    #                     middleware_invocation_id,
+    #                     {
+    #                         "output_data": {
+    #                             "stream_completed": True,
+    #                             "total_chunks": chunk_count,
+    #                             "sample_chunks": stream_output_data[:10] if stream_output_data else [],
+    #                             "execution_time_seconds": execution_time,
+    #                             "chunk_summary": {
+    #                                 "total_chunks": chunk_count,
+    #                                 "stored_samples": min(len(stream_output_data), 10),
+    #                                 "stream_type": "websocket"
+    #                             }
+    #                         },
+    #                         "execution_time_ms": execution_time * 1000
+    #                     }
+    #                 )
+    #                 console.print(f"📡 [dim]Stream completion synced to middleware[/dim]")
+    #             except Exception as e:
+    #                 console.print(f"⚠️ [yellow]Failed to sync stream completion to middleware: {e}[/yellow]")
             
-            # Record in original agent_runs table for backward compatibility
-            self.db_service.record_agent_run(
-                agent_id=request.agent_id,
-                input_data=request.input_data.dict(),
-                output_data={"stream_completed": True, "chunk_count": chunk_count},
-                success=True,
-                execution_time=execution_time,
-            )
+    #         # Record in original agent_runs table for backward compatibility
+    #         self.db_service.record_agent_run(
+    #             agent_id=request.agent_id,
+    #             input_data=request.input_data.dict(),
+    #             output_data={"stream_completed": True, "chunk_count": chunk_count},
+    #             success=True,
+    #             execution_time=execution_time,
+    #         )
             
-            console.print(
-                f"✅ Agent [cyan]{request.agent_id}[/cyan] tracked stream completed successfully in "
-                f"{execution_time:.2f}s with {chunk_count} chunks (invocation: {invocation_id[:8]}...)"
-            )
+    #         console.print(
+    #             f"✅ Agent [cyan]{request.agent_id}[/cyan] tracked stream completed successfully in "
+    #             f"{execution_time:.2f}s with {chunk_count} chunks (invocation: {invocation_id[:8]}...)"
+    #         )
             
-        except Exception as e:
-            execution_time = time.time() - start_time
-            error_detail = f"Error streaming agent {request.agent_id}: {str(e)}"
+    #     except Exception as e:
+    #         execution_time = time.time() - start_time
+    #         error_detail = f"Error streaming agent {request.agent_id}: {str(e)}"
             
-            await self._send_error(websocket, error_detail)
+    #         await self._send_error(websocket, error_detail)
             
-            # Complete local invocation tracking with error
-            db_service.complete_invocation(
-                invocation_id=invocation_id,
-                error_detail=error_detail,
-                execution_time_ms=execution_time * 1000
-            )
+    #         # Complete local invocation tracking with error
+    #         db_service.complete_invocation(
+    #             invocation_id=invocation_id,
+    #             error_detail=error_detail,
+    #             execution_time_ms=execution_time * 1000
+    #         )
             
-            # NEW: Sync error to middleware
-            if middleware_invocation_id and self.middleware_sync:
-                try:
-                    await self.middleware_sync.sync_invocation_complete(
-                        middleware_invocation_id,
-                        {
-                            "error_detail": error_detail,
-                            "execution_time_ms": execution_time * 1000
-                        }
-                    )
-                except Exception as sync_error:
-                    console.print(f"⚠️ [yellow]Failed to sync stream error to middleware: {sync_error}[/yellow]")
+    #         # NEW: Sync error to middleware
+    #         if middleware_invocation_id and self.middleware_sync:
+    #             try:
+    #                 await self.middleware_sync.sync_invocation_complete(
+    #                     middleware_invocation_id,
+    #                     {
+    #                         "error_detail": error_detail,
+    #                         "execution_time_ms": execution_time * 1000
+    #                     }
+    #                 )
+    #             except Exception as sync_error:
+    #                 console.print(f"⚠️ [yellow]Failed to sync stream error to middleware: {sync_error}[/yellow]")
             
-            # Record failed run in database (backward compatibility)
-            self.db_service.record_agent_run(
-                agent_id=request.agent_id,
-                input_data=request.input_data.dict(),
-                output_data=None,
-                success=False,
-                error_message=error_detail,
-                execution_time=execution_time,
-            )
+    #         # Record failed run in database (backward compatibility)
+    #         self.db_service.record_agent_run(
+    #             agent_id=request.agent_id,
+    #             input_data=request.input_data.dict(),
+    #             output_data=None,
+    #             success=False,
+    #             error_message=error_detail,
+    #             execution_time=execution_time,
+    #         )
             
-            console.print(f"💥 [red]{error_detail}[/red] (invocation: {invocation_id[:8]}...)")
+    #         console.print(f"💥 [red]{error_detail}[/red] (invocation: {invocation_id[:8]}...)")
         
-        finally:
-            self._cleanup_stream(connection_id)
+    #     finally:
+    #         self._cleanup_stream(connection_id)
 
     def _convert_to_serializable(self, obj):
         """Convert objects to JSON-serializable format"""
