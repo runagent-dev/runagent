@@ -89,6 +89,8 @@ def setup(api_key, base_url, force):
             sdk.configure(api_key=api_key, base_url=base_url, save=True)
             console.print("✅ [green]Setup completed successfully![/green]")
         except AuthenticationError as auth_err:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"❌ [red]Authentication failed:[/red] {auth_err}")
             
             # Provide specific troubleshooting based on error message
@@ -520,6 +522,8 @@ def template(action_list, action_info, framework, template, filter_framework, fo
                     )
 
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Template error:[/red] {e}")
         raise click.ClickException("Template operation failed")
 
@@ -572,10 +576,14 @@ def upload(path: Path):
             sys.exit(1)
 
     except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Authentication error:[/red] {e}")
         import sys
         sys.exit(1)
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Upload error:[/red] {e}")
         import sys
         sys.exit(1)
@@ -622,10 +630,14 @@ def start(agent_id, config):
             sys.exit(1)
 
     except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Authentication error:[/red] {e}")
         import sys
         sys.exit(1)
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Start error:[/red] {e}")
         import sys
         sys.exit(1)
@@ -854,6 +866,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                     else:
                         console.print(f"   Connection: [red]❌ Failed to connect: {test_result.get('error', 'Unknown error')}[/red]")
                 except Exception as e:
+                    if os.getenv('DISABLE_TRY_CATCH'):
+                        raise
                     console.print(f"   Connection: [red]❌ Connection test failed: {e}[/red]")
             else:
                 console.print(f"   Status: [yellow]⚠️ DISABLED[/yellow]")
