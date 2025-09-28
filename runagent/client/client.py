@@ -34,11 +34,11 @@ class RunAgentClient:
             agent_base_url_local = f"http://{agent_host}:{agent_port}"
             agent_socket_url_local = f"ws://{agent_host}:{agent_port}"
 
-            self.rest_client = RestClient(base_url=agent_base_url_local, api_prefix="/api/v1")
+            self.rest_client = RestClient(base_url=agent_base_url_local)
             self.socket_client = SocketClient(base_socket_url=agent_socket_url_local)
         else:
-            self.rest_client = RestClient()
-            self.socket_client = SocketClient()
+            self.rest_client = RestClient(is_local=False)
+            self.socket_client = SocketClient(is_local=False)
 
         # self.agent_architecture = self.rest_client.get_agent_architecture(agent_id)
 
