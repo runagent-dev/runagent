@@ -79,13 +79,13 @@ class HttpHandler:
         self.session.headers.update({
             "accept": "application/json",
             "content-type": "application/json",
+            "User-Agent": "RunAgent-CLI/1.0"
         })
 
         if self.api_key:
             # Support both JWT tokens and API keys
             self.session.headers.update({
-                "Authorization": f"Bearer {self.api_key}",
-                "User-Agent": "RunAgent-CLI/1.0"
+                "Authorization": f"Bearer {self.api_key}"
             })
 
     def _get_url(self, path: str) -> str:
@@ -155,6 +155,7 @@ class HttpHandler:
             data = None
 
         try:
+            print("[REQUEST] to: ", url)
             response = self.session.request(
                 method=method.upper(),
                 url=url,
@@ -244,6 +245,7 @@ class RestClient:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         api_prefix: Optional[str] = "/api/v1",
+        is_local: Optional[bool] = True
     ):
         """Initialize REST client for middleware server"""
         self.api_key = api_key or Config.get_api_key()
@@ -257,10 +259,10 @@ class RestClient:
 
         # Initialize HTTP handler directly with API key
         # The middleware auth system will handle JWT conversion automatically
-        self.http = HttpHandler(
-            api_key=self.api_key,  # Use API key directly - middleware handles conversion
-            base_url=self.base_url
-        )
+        # if is_local:
+        #     self.http = HttpHandler(base_url=self.base_url)
+        # else:
+        self.http = HttpHandler(api_key=self.api_key, base_url=self.base_url)
 
         # Cache for limits to avoid repeated API calls
         self._limits_cache = None
@@ -367,6 +369,8 @@ class RestClient:
                 return self._get_error_response("connection")
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return self._get_error_response("generic", str(e))
 
     def clear_limits_cache(self):
@@ -382,7 +386,8 @@ class RestClient:
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
             for file_path in folder_path.rglob("*"):
-                if file_path.is_file() and not file_path.name.startswith("."):
+                if file_path.is_file():
+                    #  and not file_path.name.startswith("."):
                     # Skip unnecessary files
                     if file_path.name in ["__pycache__", ".DS_Store", "Thumbs.db"]:
                         continue
@@ -428,9 +433,13 @@ class RestClient:
                     }
 
             except (ClientError, ServerError, ConnectionError) as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 return {"success": False, "error": f"Metadata upload failed: {e.message}"}
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Metadata upload error: {str(e)}"}
 
     def _upload_agent_zip_file_to_server(self, zip_path: str, agent_id: str, progress: Progress, task_id) -> Dict:
@@ -475,9 +484,13 @@ class RestClient:
                         }
 
                 except (ClientError, ServerError, ConnectionError) as e:
+                    if os.getenv('DISABLE_TRY_CATCH'):
+                        raise
                     return {"success": False, "error": f"File upload failed: {e.message}"}
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Upload error: {str(e)}"}
 
     def _process_upload_result(self, result: Dict, upload_metadata: Dict) -> Dict:
@@ -505,6 +518,8 @@ class RestClient:
                     console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
                     
             except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 console.print(f"⚠️ [yellow]Warning: Database error: {str(e)}[/yellow]")
 
             # Save deployment info locally
@@ -564,6 +579,8 @@ class RestClient:
                 agent_config = get_agent_config(folder_path)
                 console.print(f"📋 [green]Agent config loaded successfully[/green]")
             except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
                 return {"success": False, "error": f"Failed to load agent config: {str(e)}"}
 
             # Step 3: Generate agent fingerprint for duplicate detection
@@ -696,6 +713,8 @@ class RestClient:
             })
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Upload failed: {str(e)}"}
 
     def start_agent(self, agent_id: str, config: Dict = None) -> Dict:
@@ -714,6 +733,8 @@ class RestClient:
                 return {"success": False, "error": f"Failed to start agent: {e.message}"}
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Start agent failed: {str(e)}"}
 
     def _process_start_result(self, result: Dict, agent_id: str) -> Dict:
@@ -823,6 +844,8 @@ class RestClient:
         except (ClientError, ServerError, ConnectionError) as e:
             return {"success": False, "error": f"Status check failed: {e.message}"}
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Status check failed: {str(e)}"}
 
     def _get_local_deployment_info(self, agent_id: str) -> Optional[Dict]:
@@ -900,6 +923,8 @@ class RestClient:
                 }
 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {
                 "success": False, 
                 "data": None,
@@ -920,6 +945,8 @@ class RestClient:
             response = self.http.get(f"/agents/{agent_id}/architecture")
             return response.json()
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
 
 # runagent/sdk/rest_client.py - FIXED RestClient initialization

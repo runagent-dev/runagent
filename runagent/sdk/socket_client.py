@@ -16,20 +16,25 @@ class SocketClient:
         self,
         base_socket_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        api_prefix: Optional[str] = "/api/v1"
+        api_prefix: Optional[str] = "/api/v1",
+        is_local: Optional[bool] = True
     ):
         if not base_socket_url:
             base_url = Config.get_base_url()
             base_url = base_url.lstrip("http://").lstrip("https://")
             base_socket_url = f"ws://{base_url}"
 
+        self.is_local = is_local
         self.base_socket_url = base_socket_url.rstrip("/") + api_prefix
         self.api_key = api_key or Config.get_api_key()
         self.serializer = CoreSerializer()
         
     async def run_stream_async(self, agent_id: str, entrypoint_tag: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
         """Stream agent execution results (async version)"""
-        uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream"
+
+        uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream?token={self.api_key}"
+        # if not self.is_local:
+                # uri = f"{uri}?token={self.api_key}"
         
         async with websockets.connect(uri) as websocket:
             # Send start stream request in the exact format required
@@ -40,7 +45,6 @@ class SocketClient:
                 "timeout_seconds": 60,
                 "async_execution": False
             }
-            
             # Send the request as direct JSON
             await websocket.send(json.dumps(request_data))
             
@@ -69,7 +73,7 @@ class SocketClient:
         """Stream agent execution results (sync version)"""
         from websockets.sync.client import connect
         
-        uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream"
+        uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream?token={self.api_key}"
         
         with connect(uri) as websocket:
 

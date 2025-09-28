@@ -144,34 +144,42 @@ class SDKConfig:
                 base_url=self._config.get("base_url"),
             )
             
-            # Test connection using the profile endpoint
-            response = client.http.get("/users/profile", timeout=10)
+            # Test connection using the token validation endpoint
+            api_key = self._config.get("api_key")
+            response = client.http.post(f"/tokens/validate?token={api_key}", timeout=10)
             
             if response.status_code == 200:
-                profile_data = response.json()
+                token_data = response.json()
                 
-                # Extract user info from the middleware response structure
-                auth_data = profile_data.get("auth_data", {})
-                profile_data_inner = profile_data.get("profile_data", {})
-                
-                user_info = {
-                    "email": auth_data.get("email") or profile_data_inner.get("email"),
-                    "user_id": auth_data.get("id") or profile_data_inner.get("id"),
-                    "tier": profile_data_inner.get("tier", "free")
-                }
-                
-                # Store user info for later display
-                self._config.update({
-                    "user_email": user_info["email"],
-                    "user_id": user_info["user_id"],
-                    "user_tier": user_info["tier"],
-                    "auth_validated": True
-                })
-                
-                return {
-                    "success": True,
-                    "user_info": user_info
-                }
+                # Check if token validation was successful
+                if token_data.get("success") and token_data.get("data", {}).get("valid"):
+                    data = token_data.get("data", {})
+                    
+                    user_info = {
+                        "email": data.get("user_email"),
+                        "user_id": data.get("user_id"),
+                        "tier": data.get("user_tier", "Free")
+                    }
+                    
+                    # Store user info for later display
+                    self._config.update({
+                        "user_email": user_info["email"],
+                        "user_id": user_info["user_id"],
+                        "user_tier": user_info["tier"],
+                        "auth_validated": True
+                    })
+                    
+                    return {
+                        "success": True,
+                        "user_info": user_info
+                    }
+                else:
+                    # Token validation failed
+                    reason = token_data.get("data", {}).get("reason", "Token validation failed")
+                    return {
+                        "success": False,
+                        "error": reason
+                    }
             
             elif response.status_code == 401:
                 try:
@@ -192,6 +200,8 @@ class SDKConfig:
                 }
                 
         except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             # Handle connection errors gracefully
             error_msg = str(e)
             if "Connection" in error_msg or "timeout" in error_msg.lower():

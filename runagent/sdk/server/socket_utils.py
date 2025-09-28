@@ -182,12 +182,12 @@ class AgentWebSocketHandler:
                     console.print(f"❌ [red]Middleware sync start failed: {e}[/red]")
             
             # Send stream started status to client (simple JSON format)
-            await websocket.send_text(json.dumps({
+            await websocket.send_json({
                 "type": "status",
                 "status": "stream_started",
                 "invocation_id": invocation_id,
                 "middleware_invocation_id": middleware_invocation_id
-            }))
+            })
             
             start_time = time.time()
             chunk_count = 0
@@ -274,14 +274,14 @@ class AgentWebSocketHandler:
                         console.print(f"❌ [red]Middleware sync completion error: {e}[/red]")
                 
                 # Send completion status to client (simple JSON format)
-                await websocket.send_text(json.dumps({
+                await websocket.send_json({
                     "type": "status",
                     "status": "stream_completed",
                     "total_chunks": chunk_count,
                     "execution_time": execution_time,
                     "invocation_id": invocation_id,
                     "middleware_synced": middleware_invocation_id is not None
-                }))
+                })
                 
             except Exception as stream_error:
                 # Streaming failed
