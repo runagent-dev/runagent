@@ -14,12 +14,12 @@
     "entrypoints": [
       {
         "file": "agents.py",
-        "module": "app.invoke",
+        "module": "app_invoke",
         "tag": "generic"
       },
       {
         "file": "agents.py",
-        "module": "app.stream",
+        "module": "app_stream",
         "tag": "generic_stream"
       }
     ]

@@ -187,6 +187,42 @@ def get_solutions(query: str, num_solutions: int = 3):
 # Create workflow
 app = create_workflow()
 
+def app_invoke(query: str, num_solutions: int = 3) -> dict:
+    """
+    Entrypoint for synchronous agent invocation.
+    Args:
+        input_data: Dictionary with keys 'query' and 'num_solutions'
+    Returns:
+        Dictionary with solutions and validated results
+    """
+    # Ensure required keys
+
+    initial_state = {
+        "query": query,
+        "num_solutions": num_solutions,
+        "solutions": [],
+        "validated_results": "",
+    }
+    result = app.invoke(initial_state)
+    return result
+
+def app_stream(query: str, num_solutions: int = 3):
+    """
+    Entrypoint for streaming agent invocation.
+    Args:
+        input_data: Dictionary with keys 'query' and 'num_solutions'
+    Yields:
+        Intermediate states as the workflow progresses
+    """
+
+    initial_state = {
+        "query": query,
+        "num_solutions": num_solutions,
+        "solutions": [],
+        "validated_results": "",
+    }
+    for state in app.stream(initial_state):
+        yield state
 
 if __name__ == "__main__":
     for out in app.stream(
