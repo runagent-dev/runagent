@@ -644,82 +644,62 @@ def start(agent_id, config):
 
 
 @click.command()
-@click.option("--folder", help="Folder containing agent files (for upload + start)")
-@click.option("--id", "agent_id", help="Agent ID (for start only)")
-@click.option("--local", is_flag=True, help="Deploy locally instead of remote server")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-@click.option("--config", help="JSON configuration for deployment")
-def deploy(folder, agent_id, local, framework, config):
-    """Deploy agent (upload + start) or deploy locally"""
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def deploy(path: Path):
+    """Deploy agent (upload + start) to remote server"""
 
     try:
         sdk = RunAgent()
 
-        if local:
-            # Local deployment
-            if not folder:
-                raise click.ClickException("--folder is required for local deployment")
-
-            # Use deploy_local command logic
-            ctx = click.get_current_context()
-            ctx.invoke(deploy_local, folder=folder, framework=framework)
-            return
-
-        # Remote deployment
+        # Check authentication
         if not sdk.is_configured():
             console.print(
                 "❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first"
             )
             raise click.ClickException("Authentication required")
 
-        # Parse config
-        config_dict = {}
-        if config:
-            try:
-                config_dict = json.loads(config)
-            except json.JSONDecodeError:
-                if os.getenv('DISABLE_TRY_CATCH'):
-                    raise
-                raise click.ClickException("Invalid JSON in config parameter")
+        # Validate folder
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
-        if folder:
-            # Full deployment (upload + start)
-            if not Path(folder).exists():
-                raise click.ClickException(f"Folder not found: {folder}")
+        console.print(f"🎯 [bold]Deploying agent (upload + start)...[/bold]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-            console.print(f"🎯 [bold]Full deployment (upload + start)...[/bold]")
-            console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        # Deploy agent (framework auto-detected)
+        result = sdk.deploy_remote(folder=str(path))
 
-            result = sdk.deploy_remote(
-                folder=folder, framework=framework, config=config_dict
-            )
-
-            if result.get("success"):
-                console.print(f"\n✅ [green]Full deployment successful![/green]")
-                console.print(
-                    f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]"
-                )
-                console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
-            else:
-                console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(result.get('error'))}")
-                import sys
-                sys.exit(1)
-
-        elif agent_id:
-            # Start existing agent
-            ctx = click.get_current_context()
-            ctx.invoke(start, agent_id=agent_id, config=config)
-
+        if result.get("success"):
+            console.print(f"\n✅ [green]Deployment successful![/green]")
+            console.print(f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
+            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
-            raise click.ClickException(
-                "Either --folder (for upload+start) or --id (for start only) is required"
-            )
+            console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
+    except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Authentication error:[/red] {e}")
+        import sys
+        sys.exit(1)
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
         console.print(f"❌ [red]Deployment error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
+        import sys
+        sys.exit(1)
 
 
 

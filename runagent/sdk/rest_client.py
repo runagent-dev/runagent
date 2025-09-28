@@ -346,6 +346,20 @@ class RestClient:
         console.print(response["message"])
         return response
 
+    def _create_progress_bar(self, initial_description: str = "Processing..."):
+        """Create a standardized progress bar for operations"""
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]{task.description}[/bold green]"),
+            BarColumn(bar_width=40),
+            TextColumn("[bold]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        )
+        task_id = progress.add_task(initial_description, total=100)
+        return progress, task_id
+
     def get_local_db_limits(self) -> Dict:
         """Fetch local database limits from backend API"""
         try:
@@ -442,6 +456,10 @@ class RestClient:
                 raise
             return {"success": False, "error": f"Metadata upload error: {str(e)}"}
 
+    def _upload_agent_metadata_core(self, config_data: Dict, agent_id: str) -> Dict:
+        """Core logic for uploading agent metadata without progress bar"""
+        return self._upload_agent_metadata_to_server(config_data, agent_id)
+
     def _upload_agent_zip_file_to_server(self, zip_path: str, agent_id: str, progress: Progress, task_id) -> Dict:
         """Upload agent zip file (source code) to middleware server"""
         try:
@@ -467,6 +485,50 @@ class RestClient:
                         progress.update(task_id, completed=100, description="Upload completed!")
                         time.sleep(0.5)  # Brief pause to show completion
                         
+                        return {
+                            "success": True,
+                            "agent_id": result.get("data", {}).get("agent_id", agent_id),
+                            "message": result.get("message", "Upload completed"),
+                            "status": result.get("data", {}).get("status", "uploaded"),
+                            "file_size": result.get("data", {}).get("file_size", file_size),
+                            "file_name": result.get("data", {}).get("file_name", os.path.basename(zip_path))
+                        }
+                    else:
+                        error_info = result.get("error", {})
+                        return {
+                            "success": False, 
+                            "error": f"File upload failed: {error_info.get('message', 'Unknown error')}",
+                            "error_code": error_info.get("code", "UNKNOWN_ERROR")
+                        }
+
+                except (ClientError, ServerError, ConnectionError) as e:
+                    if os.getenv('DISABLE_TRY_CATCH'):
+                        raise
+                    return {"success": False, "error": f"File upload failed: {e.message}"}
+
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            return {"success": False, "error": f"Upload error: {str(e)}"}
+
+    def _upload_agent_zip_file_core(self, zip_path: str, agent_id: str) -> Dict:
+        """Core logic for uploading agent zip file without progress bar"""
+        try:
+            # Upload zip file
+            file_size = os.path.getsize(zip_path)
+            
+            with open(zip_path, "rb") as f:
+                files = {"file": (os.path.basename(zip_path), f, "application/zip")}
+                data = {
+                    "agent_id": agent_id,
+                }
+
+                try:
+                    response = self.http.post("/agents/upload", files=files, data=data, timeout=300)
+                    result = response.json()
+                    
+                    # Handle new API response format
+                    if result.get("success"):
                         return {
                             "success": True,
                             "agent_id": result.get("data", {}).get("agent_id", agent_id),
@@ -548,9 +610,8 @@ class RestClient:
         return result
 
     def upload_agent_metadata_and_zip(self, folder_path: Path) -> Dict:
-        """Upload agent folder to middleware server with validation"""
+        """Upload agent folder to middleware server with validation and progress bar"""
         try:
-
             if not folder_path.exists():
                 return {"success": False, "error": f"Folder not found: {folder_path}"}
 
@@ -666,7 +727,7 @@ class RestClient:
                 agent_id = generate_agent_id()
                 console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
 
-            # Step 5: Create zip file and upload in parallel
+            # Step 5: Upload with progress bar
             console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
 
             with Progress(
@@ -687,7 +748,7 @@ class RestClient:
                     "config": agent_config.to_dict()
                 }
 
-                metadata_result = self._upload_agent_metadata_to_server(config_data, agent_id)
+                metadata_result = self._upload_agent_metadata_core(config_data, agent_id)
                 
                 if not metadata_result.get("success"):
                     return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
@@ -700,8 +761,13 @@ class RestClient:
                 
                 console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
                 
-                # Step 3: Upload zip file
-                result = self._upload_agent_zip_file_to_server(zip_path, agent_id, progress, upload_task)
+                # Step 3: Upload zip file with progress updates
+                progress.update(upload_task, completed=30, description="Uploading agent files...")
+                result = self._upload_agent_zip_file_core(zip_path, agent_id)
+                
+                if result.get("success"):
+                    progress.update(upload_task, completed=100, description="Upload completed!")
+                    time.sleep(0.5)  # Brief pause to show completion
 
             # Clean up zip file
             os.unlink(zip_path)
@@ -718,10 +784,44 @@ class RestClient:
             return {"success": False, "error": f"Upload failed: {str(e)}"}
 
     def start_agent(self, agent_id: str, config: Dict = None) -> Dict:
-        """Start/deploy an uploaded agent on the middleware server"""
+        """Start/deploy an uploaded agent on the middleware server with progress bar"""
         try:
             console.print(f"Starting agent: [bold magenta]{agent_id}[/bold magenta]")
 
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold green]{task.description}[/bold green]"),
+                BarColumn(bar_width=40),
+                TextColumn("[bold]{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                start_task = progress.add_task("Initializing agent startup...", total=100)
+                
+                # Step 1: Prepare startup
+                progress.update(start_task, completed=20, description="Preparing agent deployment...")
+                
+                # Step 2: Start agent
+                progress.update(start_task, completed=50, description="Starting agent on server...")
+                result = self._start_agent_core(agent_id, config)
+                
+                if result.get("success"):
+                    progress.update(start_task, completed=100, description="Agent started successfully!")
+                    time.sleep(0.5)  # Brief pause to show completion
+                else:
+                    progress.update(start_task, completed=100, description="Agent startup failed!")
+
+            return result
+
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            return {"success": False, "error": f"Start agent failed: {str(e)}"}
+
+    def _start_agent_core(self, agent_id: str, config: Dict = None) -> Dict:
+        """Core logic for starting agent without progress bar"""
+        try:
             payload = config or {}
 
             try:
@@ -767,34 +867,203 @@ class RestClient:
         return result
 
     def deploy_agent(self, folder_path: str, metadata: Dict = None) -> Dict:
-        """Upload and start agent in one operation"""
+        """Upload and start agent in one operation with single progress bar"""
         console.print("🎯 [bold cyan]Starting full deployment (upload + start)...[/bold cyan]")
 
-        # First upload
-        upload_result = self.upload_agent(folder_path, metadata)
+        try:
+            folder_path = Path(folder_path)
+            if not folder_path.exists():
+                return {"success": False, "error": f"Folder not found: {folder_path}"}
 
-        if not upload_result.get("success"):
-            return upload_result
+            # Step 1: Validate agent
+            console.print(f"🔍 Validating agent...")
+            is_valid, validation_details = validate_agent(folder_path)
+            
+            if not is_valid:
+                error_msgs = validation_details.get("error_msgs", [])
+                console.print(f"❌ [red]Agent validation failed:[/red]")
+                for error in error_msgs:
+                    console.print(f"  • {error}")
+                return {
+                    "success": False, 
+                    "error": "Agent validation failed", 
+                    "validation_details": validation_details
+                }
+            
+            console.print(f"✅ [green]Agent validation passed[/green]")
 
-        agent_id = upload_result.get("agent_id")
+            # Step 2: Load agent config
+            try:
+                agent_config = get_agent_config(folder_path)
+                console.print(f"📋 [green]Agent config loaded successfully[/green]")
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                return {"success": False, "error": f"Failed to load agent config: {str(e)}"}
 
-        # Then start
-        start_result = self.start_agent(agent_id)
+            # Step 3: Generate agent fingerprint for duplicate detection
+            fingerprint = generate_agent_fingerprint(folder_path)
+            console.print(f"🔍 Agent fingerprint: [dim]{fingerprint[:16]}...[/dim]")
 
-        if start_result.get("success"):
-            return {
-                "success": True,
-                "agent_id": agent_id,
-                "endpoint": start_result.get("endpoint"),
-                "status": "running",
-                "message": f'Agent fully deployed and running. Endpoint: {start_result.get("endpoint")}',
-            }
-        else:
-            return {
-                "success": False,
-                "error": f"Upload succeeded but start failed: {start_result.get('error')}",
-                "agent_id": agent_id,
-            }
+            # Step 4: Check for existing agents (both by fingerprint and by path)
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            
+            # Check for exact fingerprint match (identical content)
+            existing_agent_by_fingerprint = db_service.get_agent_by_fingerprint(fingerprint)
+            
+            # Check for existing agent by path (same folder, potentially modified)
+            existing_agent_by_path = db_service.get_agent_by_path(str(folder_path))
+            
+            if existing_agent_by_fingerprint:
+                # Identical content detected
+                existing_agent = existing_agent_by_fingerprint
+                console.print(f"⚠️ [yellow]Agent with identical content already exists![/yellow]")
+                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
+                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+                
+                # Ask user if they want to overwrite identical content
+                from rich.prompt import Confirm
+                overwrite = Confirm.ask("Do you want to overwrite the existing agent?", default=False)
+                
+                if not overwrite:
+                    return {
+                        "success": False,
+                        "error": "Deployment cancelled by user",
+                        "code": "USER_CANCELLED",
+                        "existing_agent": existing_agent
+                    }
+                
+                # Use existing agent ID for overwrite
+                agent_id = existing_agent['agent_id']
+                console.print(f"🔄 [yellow]Overwriting existing agent: {agent_id}[/yellow]")
+                
+            elif existing_agent_by_path:
+                # Modified content detected (same folder, different fingerprint)
+                existing_agent = existing_agent_by_path
+                console.print(f"⚠️ [yellow]Agent content has changed![/yellow]")
+                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
+                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+                console.print(f"🔍 Content fingerprint changed (modified files detected)")
+                
+                # Show enhanced options for modified content
+                from rich.prompt import Prompt
+                choice = Prompt.ask(
+                    "What would you like to do?",
+                    choices=["overwrite", "new", "cancel"],
+                    default="new"
+                )
+                
+                if choice == "overwrite":
+                    # Feature not available yet - show message and fallback
+                    console.print(f"\n🚧 [yellow]Overwrite functionality is not yet available.[/yellow]")
+                    console.print(f"💡 [cyan]This feature is coming soon! For now, we'll create a new agent.[/cyan]")
+                    console.print(f"📢 [blue]Contact us on Discord if you need this feature sooner.[/blue]")
+                    console.print(f"🔗 [link]https://discord.gg/Q9P9AdHVHz[/link]")
+                    
+                    # Fallback to new agent creation
+                    agent_id = generate_agent_id()
+                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                    
+                elif choice == "new":
+                    # Create new agent with new ID
+                    agent_id = generate_agent_id()
+                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                    
+                else:  # cancel
+                    return {
+                        "success": False,
+                        "error": "Deployment cancelled by user",
+                        "code": "USER_CANCELLED",
+                        "existing_agent": existing_agent
+                    }
+            else:
+                # No existing agent found - create new one
+                agent_id = generate_agent_id()
+                console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+
+            # Step 5: Full deployment with single progress bar
+            console.print(f"🌐 Deploying to: [bold blue]{self.base_url}[/bold blue]")
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold green]{task.description}[/bold green]"),
+                BarColumn(bar_width=40),
+                TextColumn("[bold]{task.percentage:>3.0f}%"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                deploy_task = progress.add_task("Initializing deployment...", total=100)
+                
+                # Phase 1: Upload metadata (0-20%)
+                progress.update(deploy_task, completed=5, description="Uploading agent metadata...")
+                config_data = {
+                    "id": agent_id,
+                    "config": agent_config.to_dict()
+                }
+
+                metadata_result = self._upload_agent_metadata_core(config_data, agent_id)
+                
+                if not metadata_result.get("success"):
+                    return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                
+                progress.update(deploy_task, completed=20, description="Metadata uploaded successfully")
+                
+                # Phase 2: Create and upload zip file (20-70%)
+                progress.update(deploy_task, completed=25, description="Creating upload package...")
+                zip_path = self._create_zip_from_folder(agent_id, folder_path)
+                
+                console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
+                
+                progress.update(deploy_task, completed=30, description="Uploading agent files...")
+                upload_result = self._upload_agent_zip_file_core(zip_path, agent_id)
+                
+                if not upload_result.get("success"):
+                    os.unlink(zip_path)  # Clean up zip file
+                    return {"success": False, "error": f"File upload failed: {upload_result.get('error')}"}
+                
+                progress.update(deploy_task, completed=70, description="Files uploaded successfully")
+                
+                # Clean up zip file
+                os.unlink(zip_path)
+                
+                # Phase 3: Start agent (70-100%)
+                progress.update(deploy_task, completed=75, description="Starting agent deployment...")
+                start_result = self._start_agent_core(agent_id, metadata)
+                
+                if start_result.get("success"):
+                    progress.update(deploy_task, completed=100, description="Deployment completed successfully!")
+                    time.sleep(0.5)  # Brief pause to show completion
+                    
+                    # Process upload result for database storage
+                    self._process_upload_result(upload_result, {
+                        "agent_id": agent_id, 
+                        "fingerprint": fingerprint,
+                        "source_folder": str(folder_path)
+                    })
+                    
+                    return {
+                        "success": True,
+                        "agent_id": agent_id,
+                        "endpoint": start_result.get("endpoint"),
+                        "status": "running",
+                        "message": f'Agent fully deployed and running. Endpoint: {start_result.get("endpoint")}',
+                    }
+                else:
+                    progress.update(deploy_task, completed=100, description="Deployment failed!")
+                    return {
+                        "success": False,
+                        "error": f"Upload succeeded but start failed: {start_result.get('error')}",
+                        "agent_id": agent_id,
+                    }
+
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            return {"success": False, "error": f"Deployment failed: {str(e)}"}
 
     def _save_deployment_info(self, agent_id: str, metadata: Dict):
         """Save deployment info for CLI reference"""
