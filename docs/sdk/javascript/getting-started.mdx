@@ -1,0 +1,108 @@
+---
+title: 'JavaScript SDK Getting Started'
+description: 'Get started with the RunAgent JavaScript SDK'
+icon: 'js'
+---
+
+# JavaScript SDK Getting Started
+
+The RunAgent JavaScript SDK provides a native-feeling interface for calling your deployed agents from JavaScript and TypeScript applications.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install runagent
+```
+
+```bash yarn
+yarn add runagent
+```
+
+```bash pnpm
+pnpm add runagent
+```
+
+```bash bun
+bun add runagent
+```
+</CodeGroup>
+
+## Basic Usage
+
+### Initialize the Client
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+  agentId: 'your-agent-id',
+  entrypointTag: 'your-tag',
+  local: true // Set to false for production
+});
+```
+
+### Call Your Agent
+
+```javascript
+// Non-streaming call
+const result = await client.run({
+  message: "Hello, world!",
+  role: "user"
+});
+
+console.log(result);
+```
+
+### Streaming Response
+
+```javascript
+// Streaming call
+const stream = await client.runStream({
+  message: "Tell me a story",
+  role: "user"
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk);
+}
+```
+
+## TypeScript Support
+
+The SDK comes with full TypeScript support:
+
+```typescript
+import { RunAgentClient, RunAgentConfig } from 'runagent';
+
+const config: RunAgentConfig = {
+  agentId: 'your-agent-id',
+  entrypointTag: 'your-tag',
+  local: true
+};
+
+const client = new RunAgentClient(config);
+```
+
+## Error Handling
+
+```javascript
+try {
+  const result = await client.run({ message: "Hello" });
+  console.log(result);
+} catch (error) {
+  if (error.code === 'AGENT_NOT_FOUND') {
+    console.error('Agent not found');
+  } else if (error.code === 'TIMEOUT') {
+    console.error('Request timed out');
+  } else {
+    console.error('Unexpected error:', error.message);
+  }
+}
+```
+
+## Next Steps
+
+- [API Reference](/sdk/python/api-reference) - Complete API documentation
+- [Streaming Guide](/sdk/python/streaming) - Advanced streaming patterns
+- [Examples](/resources/examples) - Real-world usage examples

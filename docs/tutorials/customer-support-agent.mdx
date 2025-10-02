@@ -1,0 +1,469 @@
+---
+title: 'Customer Support Agent'
+description: 'Build a customer support chatbot with streaming responses'
+icon: 'headset'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Completed the [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## What You'll Build
+
+In this tutorial, you'll create a customer support agent that:
+- Answers common questions about your product
+- Provides streaming responses for better user experience
+- Can be integrated into any web application
+- Handles multiple conversation flows
+
+## The Customer Support Challenge
+
+Every business needs customer support, but building a good chatbot is hard:
+- **Knowledge management**: Keeping FAQs up-to-date
+- **Response quality**: Making answers helpful and accurate
+- **Integration**: Embedding in websites and apps
+- **Scalability**: Handling multiple users simultaneously
+
+RunAgent solves all of these by letting you focus on the AI logic while handling the infrastructure.
+
+## Step 1: Create Your Support Agent
+
+Let's start by creating a new agent specifically for customer support:
+
+```bash
+runagent init customer-support --framework custom
+cd customer-support
+```
+
+This creates a clean slate for your support agent.
+
+## Step 2: Build the Support Logic
+
+Replace the contents of `main.py` with a customer support agent:
+
+```python main.py
+from typing import Iterator, Dict, Any
+import json
+
+class CustomerSupportAgent:
+    def __init__(self):
+        # Knowledge base - in production, this would be a database
+        self.knowledge_base = {
+            "pricing": {
+                "basic": "$9/month - Up to 1000 requests",
+                "pro": "$29/month - Up to 10,000 requests", 
+                "enterprise": "Custom pricing - Unlimited requests"
+            },
+            "features": [
+                "Multi-language SDKs (Python, JavaScript, Rust, Go)",
+                "Real-time streaming responses",
+                "Auto-scaling infrastructure",
+                "Framework integrations (LangGraph, CrewAI, etc.)"
+            ],
+            "troubleshooting": {
+                "connection": "Check your API key and agent ID",
+                "timeout": "Increase timeout settings or check network",
+                "streaming": "Ensure your entrypoint tag ends with '_stream'"
+            }
+        }
+    
+    def categorize_query(self, message: str) -> str:
+        """Categorize the customer query"""
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in ["price", "cost", "pricing", "plan"]):
+            return "pricing"
+        elif any(word in message_lower for word in ["feature", "capability", "what can"]):
+            return "features"
+        elif any(word in message_lower for word in ["help", "problem", "error", "issue", "troubleshoot"]):
+            return "troubleshooting"
+        else:
+            return "general"
+
+def customer_support_sync(message: str, user_id: str = "anonymous") -> Dict[str, Any]:
+    """Synchronous customer support response"""
+    agent = CustomerSupportAgent()
+    category = agent.categorize_query(message)
+    
+    response = {
+        "message": "",
+        "category": category,
+        "user_id": user_id,
+        "timestamp": "2024-01-01T00:00:00Z"  # In production, use actual timestamp
+    }
+    
+    if category == "pricing":
+        response["message"] = f"""Here are our current pricing plans:
+
+**Basic Plan**: {agent.knowledge_base['pricing']['basic']}
+- Perfect for small projects and testing
+
+**Pro Plan**: {agent.knowledge_base['pricing']['pro']}
+- Great for growing applications
+
+**Enterprise Plan**: {agent.knowledge_base['pricing']['enterprise']}
+- Custom solutions for large organizations
+
+Would you like to know more about any specific plan?"""
+    
+    elif category == "features":
+        features_list = "\n".join([f"• {feature}" for feature in agent.knowledge_base['features']])
+        response["message"] = f"""RunAgent offers these key features:
+
+{features_list}
+
+Is there a specific feature you'd like to learn more about?"""
+    
+    elif category == "troubleshooting":
+        response["message"] = """I'd be happy to help troubleshoot! Here are some common solutions:
+
+• **Connection issues**: Check your API key and agent ID
+• **Timeout errors**: Increase timeout settings or check your network
+• **Streaming problems**: Ensure your entrypoint tag ends with '_stream'
+
+Can you describe the specific issue you're experiencing?"""
+    
+    else:
+        response["message"] = """Hello! I'm here to help with any questions about RunAgent. 
+
+I can help you with:
+• Pricing and plans
+• Features and capabilities  
+• Technical troubleshooting
+• Getting started guides
+
+What would you like to know?"""
+    
+    return response
+
+def customer_support_stream(message: str, user_id: str = "anonymous") -> Iterator[str]:
+    """Streaming customer support response"""
+    agent = CustomerSupportAgent()
+    category = agent.categorize_query(message)
+    
+    # Stream the response with typing effect
+    if category == "pricing":
+        yield "Let me check our current pricing for you...\n\n"
+        yield "**Basic Plan**: $9/month - Up to 1000 requests\n"
+        yield "Perfect for small projects and testing\n\n"
+        yield "**Pro Plan**: $29/month - Up to 10,000 requests\n"
+        yield "Great for growing applications\n\n"
+        yield "**Enterprise Plan**: Custom pricing - Unlimited requests\n"
+        yield "Custom solutions for large organizations\n\n"
+        yield "Would you like to know more about any specific plan?"
+    
+    elif category == "features":
+        yield "Here are RunAgent's key features:\n\n"
+        for feature in agent.knowledge_base['features']:
+            yield f"• {feature}\n"
+        yield "\nIs there a specific feature you'd like to learn more about?"
+    
+    elif category == "troubleshooting":
+        yield "I'd be happy to help troubleshoot!\n\n"
+        yield "Here are some common solutions:\n\n"
+        yield "• **Connection issues**: Check your API key and agent ID\n"
+        yield "• **Timeout errors**: Increase timeout settings or check your network\n"
+        yield "• **Streaming problems**: Ensure your entrypoint tag ends with '_stream'\n\n"
+        yield "Can you describe the specific issue you're experiencing?"
+    
+    else:
+        yield "Hello! I'm here to help with any questions about RunAgent.\n\n"
+        yield "I can help you with:\n"
+        yield "• Pricing and plans\n"
+        yield "• Features and capabilities\n"
+        yield "• Technical troubleshooting\n"
+        yield "• Getting started guides\n\n"
+        yield "What would you like to know?"
+```
+
+## Step 3: Configure Your Agent
+
+Update `runagent.config.json` to include both sync and streaming entrypoints:
+
+```json
+{
+  "agent_name": "customer-support",
+  "description": "AI-powered customer support agent",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "customer_support_sync",
+        "tag": "support"
+      },
+      {
+        "file": "main.py", 
+        "module": "customer_support_stream",
+        "tag": "support_stream"
+      }
+    ]
+  }
+}
+```
+
+## Step 4: Deploy Your Support Agent
+
+Start your customer support agent:
+
+```bash
+runagent serve .
+```
+
+You should see output like:
+```
+🤖 Agent Details:
+- Agent ID: support_agent_123
+- Host: 127.0.0.1
+- Port: 8451
+- Framework: custom
+- Status: ready
+
+🌐 Server running at: http://127.0.0.1:8451
+📖 API Documentation: http://127.0.0.1:8451/docs
+
+📍 Available endpoints:
+- POST /api/v1/agents/.../execute/support - Run your agent
+- POST /api/v1/agents/.../execute/support_stream - Stream your agent
+```
+
+## Step 5: Test Your Support Agent
+
+### Test Synchronous Responses
+
+```python
+from runagent import RunAgentClient
+
+# Connect to your support agent
+support = RunAgentClient(
+    agent_id="support_agent_123",
+    entrypoint_tag="support",
+    local=True
+)
+
+# Test different types of queries
+queries = [
+    "What are your pricing plans?",
+    "What features does RunAgent offer?",
+    "I'm having connection issues",
+    "Hello, I need help"
+]
+
+for query in queries:
+    print(f"\nQuery: {query}")
+    response = support.run(message=query, user_id="test_user")
+    print(f"Response: {response['message']}")
+    print(f"Category: {response['category']}")
+```
+
+### Test Streaming Responses
+
+```python
+# Test streaming for better user experience
+support_stream = RunAgentClient(
+    agent_id="support_agent_123", 
+    entrypoint_tag="support_stream",
+    local=True
+)
+
+print("Streaming response:")
+for chunk in support_stream.run(message="What are your pricing plans?", user_id="test_user"):
+    print(chunk, end="", flush=True)
+```
+
+## Step 6: Build a Simple Web Interface
+
+Create a simple HTML file to demonstrate the support agent in action:
+
+```html support_demo.html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RunAgent Customer Support</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .chat-container { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin: 20px 0; }
+        .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .user { background-color: #e3f2fd; text-align: right; }
+        .bot { background-color: #f5f5f5; }
+        .input-container { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .typing { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>RunAgent Customer Support</h1>
+    <div id="chat" class="chat-container"></div>
+    <div class="input-container">
+        <input type="text" id="messageInput" placeholder="Ask me anything about RunAgent..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        // Replace with your actual agent details
+        const AGENT_ID = "support_agent_123";
+        const API_BASE = "http://127.0.0.1:8451";
+        
+        function addMessage(content, isUser = false) {
+            const chat = document.getElementById('chat');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.textContent = content;
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+        
+        function addTyping() {
+            const chat = document.getElementById('chat');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot typing';
+            typingDiv.id = 'typing';
+            typingDiv.textContent = 'Bot is typing...';
+            chat.appendChild(typingDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+        
+        function removeTyping() {
+            const typing = document.getElementById('typing');
+            if (typing) typing.remove();
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, true);
+            input.value = '';
+            
+            // Add typing indicator
+            addTyping();
+            
+            try {
+                // Call the support agent
+                const response = await fetch(`${API_BASE}/api/v1/agents/${AGENT_ID}/execute/support`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: "web_user"
+                    })
+                });
+                
+                const data = await response.json();
+                removeTyping();
+                addMessage(data.message);
+                
+            } catch (error) {
+                removeTyping();
+                addMessage("Sorry, I'm having trouble connecting. Please try again later.");
+                console.error('Error:', error);
+            }
+        }
+        
+        // Allow sending with Enter key
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Welcome message
+        addMessage("Hello! I'm your RunAgent support assistant. How can I help you today?");
+    </script>
+</body>
+</html>
+```
+
+## Step 7: Test the Web Interface
+
+1. Open `support_demo.html` in your browser
+2. Try asking questions like:
+   - "What are your pricing plans?"
+   - "What features do you offer?"
+   - "I'm having connection issues"
+   - "How do I get started?"
+
+## What You've Accomplished
+
+In this tutorial, you've built a complete customer support system:
+
+<CardGroup cols={2}>
+  <Card title="🤖 AI-Powered Support" icon="robot">
+    Created an intelligent agent that categorizes and responds to customer queries
+  </Card>
+  <Card title="⚡ Real-Time Streaming" icon="bolt">
+    Implemented streaming responses for better user experience
+  </Card>
+  <Card title="🌐 Web Integration" icon="globe">
+    Built a web interface that can be embedded anywhere
+  </Card>
+  <Card title="📊 Query Categorization" icon="chart-bar">
+    Added intelligent query classification for better responses
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+### Enhance Your Support Agent
+
+1. **Add more knowledge**: Expand the knowledge base with more FAQs
+2. **Database integration**: Connect to a real database for dynamic content
+3. **User authentication**: Track user sessions and history
+4. **Analytics**: Add logging and metrics collection
+5. **Multi-language support**: Add support for different languages
+
+### Production Deployment
+
+1. **Environment variables**: Move configuration to environment variables
+2. **Error handling**: Add robust error handling and fallbacks
+3. **Rate limiting**: Implement rate limiting for API calls
+4. **Monitoring**: Add health checks and monitoring
+5. **Scaling**: Deploy to cloud with auto-scaling
+
+## Common Support Patterns
+
+<AccordionGroup>
+  <Accordion title="FAQ Management">
+    Keep your knowledge base updated and organized. Consider using a vector database for semantic search.
+  </Accordion>
+  <Accordion title="Escalation Handling">
+    Add logic to escalate complex queries to human agents when needed.
+  </Accordion>
+  <Accordion title="Context Awareness">
+    Implement conversation memory to maintain context across multiple exchanges.
+  </Accordion>
+  <Accordion title="Integration Patterns">
+    Use webhooks to integrate with your existing support systems and CRM.
+  </Accordion>
+</AccordionGroup>
+
+## Ready for More?
+
+<CardGroup cols={2}>
+  <Card title="Multi-Language Wrapper" icon="globe" href="/tutorials/multi-language-wrapper">
+    Learn how to call your support agent from different programming languages
+  </Card>
+  <Card title="Framework Integration" icon="code" href="/how-to/frameworks/langgraph">
+    Integrate with advanced AI frameworks for more sophisticated responses
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your support agent to production with proper scaling
+  </Card>
+  <Card title="Advanced Features" icon="cog" href="/how-to/advanced-tasks">
+    Add advanced features like memory, context, and analytics
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great job!** You've built a production-ready customer support agent that can be integrated into any application. This is just the beginning of what you can create with RunAgent!
+</Note>
+
+<NeedHelp context="Customer Support Agent" />

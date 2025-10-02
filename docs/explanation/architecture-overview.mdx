@@ -1,0 +1,494 @@
+---
+title: 'Architecture Overview'
+description: 'Understand RunAgent system architecture and how it works'
+icon: 'diagram'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Understanding of [Core Concepts](/explanation/core-concepts) and basic knowledge of distributed systems
+</Info>
+
+## Overview
+
+RunAgent is built on a modern, scalable architecture that enables Python-based AI agents to be accessed from any programming language. The system is designed for high performance, reliability, and ease of use.
+
+## High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Applications"
+        PY[Python SDK]
+        JS[JavaScript SDK]
+        GO[Go SDK]
+        RS[Rust SDK]
+    end
+    
+    subgraph "RunAgent Platform"
+        LB[Load Balancer]
+        API[REST API Gateway]
+        WS[WebSocket Gateway]
+        AG[Agent Manager]
+        VM[Firecracker VMs]
+    end
+    
+    subgraph "Python Agents"
+        A1[Agent 1]
+        A2[Agent 2]
+        A3[Agent N]
+    end
+    
+    subgraph "Infrastructure"
+        DB[(Database)]
+        CACHE[(Cache)]
+        MON[Monitoring]
+        LOG[Logging]
+    end
+    
+    PY --> LB
+    JS --> LB
+    GO --> LB
+    RS --> LB
+    
+    LB --> API
+    LB --> WS
+    
+    API --> AG
+    WS --> AG
+    
+    AG --> VM
+    VM --> A1
+    VM --> A2
+    VM --> A3
+    
+    AG --> DB
+    AG --> CACHE
+    AG --> MON
+    AG --> LOG
+```
+
+## Core Components
+
+### 1. **Client SDKs**
+
+RunAgent provides native SDKs for multiple programming languages:
+
+- **Python SDK**: Full-featured with sync/async support
+- **JavaScript SDK**: TypeScript support with async/await
+- **Go SDK**: Idiomatic Go with context-aware operations
+- **Rust SDK**: High-performance with zero-cost abstractions
+
+Each SDK provides:
+- **Authentication**: API key management
+- **Request/Response**: Synchronous and asynchronous calls
+- **Streaming**: Real-time response streaming
+- **Error Handling**: Language-appropriate error types
+- **Retry Logic**: Automatic retry with backoff
+
+### 2. **API Gateway**
+
+The API Gateway handles:
+
+- **Request Routing**: Routes requests to appropriate agents
+- **Authentication**: Validates API keys and permissions
+- **Rate Limiting**: Enforces rate limits per client
+- **Load Balancing**: Distributes load across agent instances
+- **Protocol Translation**: Converts between HTTP and WebSocket
+
+### 3. **Agent Manager**
+
+The Agent Manager is responsible for:
+
+- **Agent Lifecycle**: Starting, stopping, and monitoring agents
+- **Configuration Management**: Loading and validating configurations
+- **Health Monitoring**: Checking agent health and availability
+- **Scaling**: Automatically scaling agents based on demand
+- **Resource Management**: Allocating and managing resources
+
+### 4. **Firecracker MicroVMs**
+
+RunAgent uses Firecracker for secure, isolated agent execution:
+
+- **Security**: Each agent runs in its own microVM
+- **Isolation**: Complete process and resource isolation
+- **Performance**: Near-native performance with minimal overhead
+- **Scalability**: Fast boot times and efficient resource usage
+- **Sandboxing**: Secure execution environment
+
+## Data Flow
+
+### 1. **Request Processing**
+
+```mermaid
+sequenceDiagram
+    participant C as Client SDK
+    participant LB as Load Balancer
+    participant API as API Gateway
+    participant AM as Agent Manager
+    participant VM as Firecracker VM
+    participant A as Python Agent
+    
+    C->>LB: HTTP/WebSocket Request
+    LB->>API: Route Request
+    API->>AM: Validate & Route
+    AM->>VM: Execute Agent
+    VM->>A: Call Entrypoint
+    A->>VM: Return Response
+    VM->>AM: Stream Response
+    AM->>API: Forward Response
+    API->>LB: Send Response
+    LB->>C: Return to Client
+```
+
+### 2. **Streaming Response**
+
+```mermaid
+sequenceDiagram
+    participant C as Client SDK
+    participant WS as WebSocket Gateway
+    participant AM as Agent Manager
+    participant VM as Firecracker VM
+    participant A as Python Agent
+    
+    C->>WS: WebSocket Connection
+    WS->>AM: Route Stream Request
+    AM->>VM: Execute Streaming Agent
+    VM->>A: Call Streaming Entrypoint
+    
+    loop Stream Response
+        A->>VM: Yield Chunk
+        VM->>AM: Forward Chunk
+        AM->>WS: Stream Chunk
+        WS->>C: Send Chunk
+    end
+    
+    A->>VM: Stream Complete
+    VM->>AM: Stream End
+    AM->>WS: Close Stream
+    WS->>C: Close Connection
+```
+
+## Security Architecture
+
+### 1. **Multi-Layer Security**
+
+```mermaid
+graph TB
+    subgraph "Security Layers"
+        AUTH[Authentication]
+        AUTHZ[Authorization]
+        RATE[Rate Limiting]
+        VALID[Input Validation]
+        SANDBOX[Sandboxing]
+        ISOLATION[Process Isolation]
+    end
+    
+    subgraph "Client Request"
+        REQ[HTTP/WebSocket Request]
+    end
+    
+    subgraph "Agent Execution"
+        AGENT[Python Agent]
+    end
+    
+    REQ --> AUTH
+    AUTH --> AUTHZ
+    AUTHZ --> RATE
+    RATE --> VALID
+    VALID --> SANDBOX
+    SANDBOX --> ISOLATION
+    ISOLATION --> AGENT
+```
+
+### 2. **Firecracker Security Model**
+
+- **MicroVM Isolation**: Each agent runs in its own microVM
+- **Resource Limits**: CPU, memory, and network constraints
+- **File System**: Restricted file system access
+- **Network**: Controlled network access
+- **Process**: Complete process isolation
+
+## Scalability Architecture
+
+### 1. **Horizontal Scaling**
+
+```mermaid
+graph TB
+    subgraph "Load Balancer"
+        LB[Load Balancer]
+    end
+    
+    subgraph "Agent Instances"
+        A1[Agent Instance 1]
+        A2[Agent Instance 2]
+        A3[Agent Instance 3]
+        AN[Agent Instance N]
+    end
+    
+    subgraph "Auto-scaling"
+        AS[Auto-scaler]
+        METRICS[Metrics Collector]
+    end
+    
+    LB --> A1
+    LB --> A2
+    LB --> A3
+    LB --> AN
+    
+    METRICS --> AS
+    AS --> A1
+    AS --> A2
+    AS --> A3
+    AS --> AN
+```
+
+### 2. **Auto-scaling Triggers**
+
+- **CPU Usage**: Scale up when CPU usage exceeds threshold
+- **Memory Usage**: Scale up when memory usage is high
+- **Request Rate**: Scale up when request rate increases
+- **Response Time**: Scale up when response times are slow
+- **Queue Length**: Scale up when request queue is long
+
+## Performance Architecture
+
+### 1. **Caching Strategy**
+
+```mermaid
+graph TB
+    subgraph "Client Side"
+        CLIENT[Client SDK]
+        CLIENT_CACHE[Client Cache]
+    end
+    
+    subgraph "API Gateway"
+        API[API Gateway]
+        API_CACHE[API Cache]
+    end
+    
+    subgraph "Agent Manager"
+        AM[Agent Manager]
+        AM_CACHE[Agent Cache]
+    end
+    
+    CLIENT --> CLIENT_CACHE
+    CLIENT_CACHE --> API
+    API --> API_CACHE
+    API_CACHE --> AM
+    AM --> AM_CACHE
+    AM_CACHE --> AGENT[Python Agent]
+```
+
+### 2. **Performance Optimizations**
+
+- **Connection Pooling**: Reuse connections for efficiency
+- **Request Batching**: Batch multiple requests together
+- **Response Compression**: Compress responses to reduce bandwidth
+- **CDN Integration**: Use CDN for static content
+- **Database Optimization**: Optimize database queries and indexes
+
+## Monitoring and Observability
+
+### 1. **Monitoring Stack**
+
+```mermaid
+graph TB
+    subgraph "Applications"
+        AGENT[Python Agent]
+        API[API Gateway]
+        AM[Agent Manager]
+    end
+    
+    subgraph "Metrics Collection"
+        PROMETHEUS[Prometheus]
+        GRAFANA[Grafana]
+    end
+    
+    subgraph "Logging"
+        ELASTIC[Elasticsearch]
+        KIBANA[Kibana]
+    end
+    
+    subgraph "Tracing"
+        JAEGER[Jaeger]
+        ZIPKIN[Zipkin]
+    end
+    
+    AGENT --> PROMETHEUS
+    API --> PROMETHEUS
+    AM --> PROMETHEUS
+    
+    AGENT --> ELASTIC
+    API --> ELASTIC
+    AM --> ELASTIC
+    
+    AGENT --> JAEGER
+    API --> JAEGER
+    AM --> JAEGER
+```
+
+### 2. **Key Metrics**
+
+- **Request Rate**: Requests per second
+- **Response Time**: Average and P95 response times
+- **Error Rate**: Percentage of failed requests
+- **Resource Usage**: CPU, memory, and network usage
+- **Agent Health**: Agent availability and performance
+
+## Deployment Architecture
+
+### 1. **Cloud Deployment**
+
+```mermaid
+graph TB
+    subgraph "Cloud Provider"
+        subgraph "Load Balancer"
+            LB[Load Balancer]
+        end
+        
+        subgraph "API Tier"
+            API1[API Gateway 1]
+            API2[API Gateway 2]
+        end
+        
+        subgraph "Agent Tier"
+            AGENT1[Agent Manager 1]
+            AGENT2[Agent Manager 2]
+        end
+        
+        subgraph "VM Tier"
+            VM1[Firecracker VM 1]
+            VM2[Firecracker VM 2]
+            VM3[Firecracker VM 3]
+        end
+        
+        subgraph "Data Tier"
+            DB[(Database)]
+            CACHE[(Cache)]
+        end
+    end
+    
+    LB --> API1
+    LB --> API2
+    API1 --> AGENT1
+    API2 --> AGENT2
+    AGENT1 --> VM1
+    AGENT1 --> VM2
+    AGENT2 --> VM3
+    AGENT1 --> DB
+    AGENT2 --> CACHE
+```
+
+### 2. **Local Development**
+
+```mermaid
+graph TB
+    subgraph "Local Machine"
+        CLI[RunAgent CLI]
+        SERVER[Local Server]
+        AGENT[Python Agent]
+    end
+    
+    CLI --> SERVER
+    SERVER --> AGENT
+```
+
+## Error Handling Architecture
+
+### 1. **Error Propagation**
+
+```mermaid
+graph TB
+    subgraph "Error Sources"
+        AGENT[Python Agent]
+        VM[Firecracker VM]
+        AM[Agent Manager]
+        API[API Gateway]
+    end
+    
+    subgraph "Error Handling"
+        VALIDATE[Validation]
+        RETRY[Retry Logic]
+        FALLBACK[Fallback]
+        LOG[Logging]
+    end
+    
+    subgraph "Client Response"
+        CLIENT[Client SDK]
+    end
+    
+    AGENT --> VM
+    VM --> AM
+    AM --> API
+    API --> VALIDATE
+    VALIDATE --> RETRY
+    RETRY --> FALLBACK
+    FALLBACK --> LOG
+    LOG --> CLIENT
+```
+
+### 2. **Error Types**
+
+- **Client Errors**: Authentication, validation, rate limiting
+- **Server Errors**: Internal server errors, agent failures
+- **Network Errors**: Connection timeouts, network issues
+- **Agent Errors**: Python exceptions, function errors
+
+## Future Architecture
+
+### 1. **Planned Enhancements**
+
+- **Multi-Region Deployment**: Global agent deployment
+- **Edge Computing**: Deploy agents closer to users
+- **GPU Support**: GPU-accelerated agent execution
+- **Custom Runtimes**: Support for additional languages
+- **Advanced Caching**: Intelligent response caching
+
+### 2. **Scalability Improvements**
+
+- **Kubernetes Integration**: Native Kubernetes support
+- **Service Mesh**: Istio integration for advanced networking
+- **Event-Driven Architecture**: Event-based agent communication
+- **Stream Processing**: Real-time data processing capabilities
+
+## Best Practices
+
+### 1. **Agent Design**
+
+- **Stateless**: Design agents to be stateless
+- **Idempotent**: Make operations idempotent
+- **Error Handling**: Implement proper error handling
+- **Resource Management**: Manage resources efficiently
+- **Monitoring**: Add appropriate logging and metrics
+
+### 2. **Performance Optimization**
+
+- **Caching**: Use caching for expensive operations
+- **Streaming**: Use streaming for long-running operations
+- **Batch Processing**: Batch multiple operations together
+- **Resource Limits**: Set appropriate resource limits
+- **Connection Pooling**: Use connection pooling
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Production Considerations" icon="gauge" href="/explanation/production-considerations">
+    Learn about production deployment requirements
+  </Card>
+  <Card title="Security" icon="shield" href="/explanation/security">
+    Understand RunAgent's security model
+  </Card>
+  <Card title="Performance Tuning" icon="speed" href="/how-to/advanced-tasks">
+    Learn advanced performance optimization techniques
+  </Card>
+  <Card title="Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your agents to production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Excellent!** You now understand RunAgent's architecture and how it enables seamless multi-language AI agent deployment. This knowledge will help you build more effective agents and troubleshoot issues!
+</Note>
+
+<NeedHelp context="Architecture Overview" />

@@ -1,0 +1,481 @@
+---
+title: Introduction
+description: 'Deploy AI agents to production in seconds, not hours'
+icon: 'book-open'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+RunAgent lets you deploy Python-based AI agents and access them from any language with full streaming support.
+
+## Key Benefits
+
+- 🚀 **Deploy agents in minutes** (serverless, sandboxed microVMs)
+- 🌐 **Access from Python, JS, Go, Rust** with native-feeling SDKs
+- ⚡ **Built-in autoscaling + token streaming** for real-time applications
+
+## Quick Actions
+
+<CardGroup cols={3}>
+  <Card title="👉 Deploy your first agent" icon="rocket" href="/tutorials/deploy-your-first-agent">
+    Get started with a complete tutorial
+  </Card>
+  <Card title="👉 Use frameworks" icon="code" href="/how-to/frameworks/langgraph">
+    Integrate with popular AI frameworks
+  </Card>
+  <Card title="👉 Explore SDKs" icon="terminal" href="/reference/sdk/overview">
+    Access agents from any language
+  </Card>
+</CardGroup>
+
+<img
+  className="block dark:hidden"
+  src="/images/runagent_update.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/runagent_update.svg"
+  alt="Hero Dark"
+/>
+
+## The Problem Every AI Developer Faces
+
+Suppose you've built an incredible AI agent in Python. It uses **LangGraph for complex reasoning**, leverages **powerful tools**, and produces **amazing results**. Your team loves it!
+
+### Then reality hits:
+
+Your whole team is excited to use it! But the **frontend team** needs to access it in JavaScript, your **mobile app team** wants it in Kotlin, your **Unity team** wants it in good old C#, your **systems team** requires it in Rust.
+
+### The traditional approach?
+Build separate implementations, REST APIs, WebSocket handlers...
+
+<Danger>**Sound exhausting?** That's because it is!</Danger>
+
+## What RunAgent Actually Does
+
+RunAgent fundamentally changes how AI agent deployment works. Your Python function signatures automatically become API contracts (REST or Streaming) for every supported language.
+
+<Tip>Once `runagent.config.json` of your project points to your Python function, they are automatically converted to corresponding API endpoints, and all language SDKs automatically adapt. No API versioning, no breaking changes.</Tip>
+
+The fastest way to experience the magic is with **RunAgent CLI**:
+
+<Steps>
+
+  <Step title="Install the RunAgent CLI">
+  This installs the powerful RunAgent CLI, which is used to deploy and manage your agents.
+   ```bash
+   pip install runagent
+   ```
+  </Step>
+
+  <Step title="Initialize Agent">
+
+  Let's start with our minimal Agent example.
+  ```bash
+  runagent init my_agent
+  cd my_agent
+  ```
+  </Step>
+
+  <Step title="Setting Up RunAgent config file">
+  Somewhere in your Agent codebase (in this case `main.py`)
+  ```python main.py icon="python"
+def mock_response(message, role="user"):
+    """Test the mock agent with non-streaming responses"""
+    ...
+    return response.content
+  ```
+  This `mock_response` function is one of the invocation functions for our agent, so we will add this in `runagent.config.json` file:
+  ```json
+"entrypoints": [
+    {
+      "file": "main.py",
+      "module": "mock_response",
+      "tag": "minimal"
+    }
+]
+  ```
+  </Step>
+
+  <Step title="Run the Agent (Locally)">
+  ```bash
+runagent serve .
+```
+
+And you will see output similar to:
+```bash
+🤖 Agent Details:
+- Agent ID: f7066c98-0eb2-488c-bb37-a869a93d51ce
+- Host: 127.0.0.1
+- Port: 8451
+- Framework: default
+- Status: ready
+
+🌐 Server running at: http://127.0.0.1:8451
+📖 API Documentation: http://127.0.0.1:8451/docs
+
+📍 Available endpoints:
+- POST /api/v1/agents/.../execute/minimal - Run your agent
+
+INFO: Uvicorn running on http://127.0.0.1:8451 (Press CTRL+C to quit)
+  ```
+  That's it, your agent is running, and is accessible through standard REST-api as well as all RunAgent SDKs.
+  </Step>
+
+<Step title="Use in your application">
+Using the RunAgent SDKs, you can use your agent in your application, only using the agent ID and the entrypoint tag. Your agentic entrypoint (`mock_response` function) now becomes accessible in:
+<CodeGroup>
+
+
+```python Python 
+from runagent import RunAgentClient
+
+ra = RunAgentClient(
+    agent_id="f7066c98-0eb2-488c-bb37-a869a93d51ce",
+    entrypoint_tag="minimal",
+    local=True
+)
+
+agent_result = ra.run(
+    role="user",
+    message="Analyze the benefits of remote work for software teams"
+)
+```
+
+```javascript JavaScript
+import { RunAgentClient } from 'runagent';
+
+const ra = new RunAgentClient({
+  agentId: 'f7066c98-0eb2-488c-bb37-a869a93d51ce',
+  entrypointTag: 'minimal',
+  local: true,
+});
+
+const analysis = await client.run({
+    role: "user",
+    message: "Analyze the benefits of remote work for software teams"
+});
+```
+
+```rust Rust  
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("f7066c98-0eb2-488c-bb37-a869a93d51ce", "minimal", true).await?;
+    
+    let response = client.run(&[
+        ("role", json!("user")),
+        ("message", json!("Analyze the benefits of remote work for software teams"))
+    ]).await?;
+    
+    println!("Response: {}", response);
+    Ok(())
+}
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	agentClient, err := client.NewWithAddress(
+		"f7066c98-0eb2-488c-bb37-a869a93d51ce",
+		"minimal",
+		true,
+		"localhost",
+		8453,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"message": "Analyze the benefits of remote work for software teams",
+		"role": "user",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+</CodeGroup>
+
+</Step>
+</Steps>
+
+...and you're ready to **deploy your AI agents** & **use them in the futuristic software** you are building.
+
+We will ❤️ to hear about it. Hit us up on [Discord](https://discord.gg/Q9P9AdHVHz).
+
+<NeedHelp />
+
+## Agent Framework Support
+
+RunAgent works with any Python-based AI agent framework:
+
+<CardGroup cols={3}>
+  <Card
+    title="LangGraph"
+    icon="spider-web"
+    href="/how-to/frameworks/langgraph"
+  >
+    Deploy your LangGraph agents with built-in state management and workflow execution.
+  </Card>
+  <Card 
+    title="CrewAI" 
+    icon="users" 
+    href="/how-to/frameworks/crewai"
+  >
+    Deploy multi-agent CrewAI systems with coordinated execution and monitoring.
+  </Card>
+  <Card 
+    title="AutoGen" 
+    icon="robot" 
+    href="/how-to/frameworks/autogen"
+  >
+    Deploy Microsoft AutoGen multi-agent conversations with step-by-step execution.
+  </Card>
+  <Card 
+    title="AG2" 
+    icon="robot" 
+    href="/how-to/frameworks/ag2"
+  >
+    Deploy AG2 conversational agents with fact-checking and multi-turn interactions.
+  </Card>
+  <Card 
+    title="Agno" 
+    icon="terminal"
+    href="/how-to/frameworks/agno"
+  >
+    Deploy Agno AI agents with print response capabilities and streaming support.
+  </Card>
+  <Card 
+    title="Letta" 
+    icon="gear" 
+    href="/how-to/frameworks/letta"
+  >
+    Deploy Letta memory-enabled agents with persistent conversations and tool integration.
+  </Card>
+</CardGroup>
+  <Card 
+    title="Custom Framework" 
+    icon="person-running-fast" 
+    href="/how-to/frameworks/custom"
+    horizontal
+  >
+    Use any Python-based framework by defining simple entrypoint functions.
+  </Card>
+
+## Multi-Language SDK Support
+
+RunAgent provides native-like access to your deployed agents across multiple languages:
+
+<CardGroup cols={2}>
+  <Card
+    title="Python SDK"
+    icon="python"
+    href="/reference/sdk/python"
+  >
+    Python client with streaming capabilities. Access your agents like local functions with full type safety and Python idioms.
+  </Card>
+  <Card 
+    title="JavaScript SDK" 
+    icon="js" 
+    href="/reference/sdk/javascript"
+  >
+    Full TypeScript support with streaming and Promise-based APIs. Perfect for modern web applications with async/await patterns.
+  </Card>
+  <Card 
+    title="Rust SDK" 
+    icon="rust" 
+    href="/reference/sdk/rust"
+  >
+    High-performance async SDK with futures and streaming support. Zero-cost abstractions for systems programming and performance-critical applications.
+  </Card>
+  <Card 
+    title="Go SDK" 
+    icon="golang" 
+    href="/reference/sdk/go"
+  >
+    Idiomatic Go client with context-aware operations and channel-based streaming. Built for concurrent, scalable applications.
+  </Card>
+</CardGroup>
+
+<Card 
+  title="All Language SDKs" 
+  icon="code" 
+  href="/reference/sdk/overview"
+  horizontal
+>
+  We're actively developing SDKs for additional languages including C#, Java, and PHP. Want to contribute or request a specific language? Join our Discord community.
+</Card>
+
+## Real-Time Streaming Across Languages
+
+In addition to REST API like responses, you can also stream your agent response super-easily through our SDKs. 
+
+When your targeted entrypoint streams response, RunAgent makes it feel native in every language SDK:
+
+<Steps>
+
+  <Step title="Setting Up RunAgent config file">
+
+  Somewhere an Iterator in your Agent codebase (in this case `main.py`)
+
+  ```python main.py icon="python"
+def mock_response_stream(message, role="user") -> Iterator[str]:
+    """Test the mock agent with streaming responses"""
+    ...
+    return response.content
+  ```
+  This `mock_response_stream` function will return an Iterator, and to stream this response, we will add this in `runagent.config.json` file, as another entrypoint:
+  ```json
+"entrypoints": [
+    {
+      "file": "main.py",
+      "module": "mock_response_stream",
+      "tag": "minimal_stream"
+    }
+]
+  ```
+  <Note> The tag for a Streaming Entrypoint must end with a `_stream` suffix. That is how RunAgent identifies it for streaming.</Note>
+  </Step>
+
+  <Step title="Run the Agent (Locally)">
+  Spin up the agent just like we did before. But now we have an additional streaming entrypoint.
+  ```bash
+runagent serve .
+```
+
+  </Step>
+
+<Step title="Use streaming in your application">
+Using the RunAgent SDKs, you can use your agent in your application, only using the agent ID and the entrypoint tag. Your agentic entrypoint (`mock_response` function) now becomes accessible in:
+
+<CodeGroup>
+
+```python Python 
+from runagent import RunAgentClient
+
+ra = RunAgentClient(
+    agent_id="f7066c98-0eb2-488c-bb37-a869a93d51ce",
+    entrypoint_tag="minimal_stream",
+    local=True
+)
+
+for chunk in ra.run(
+  role = "user",
+  content = "Analyze the benefits of remote work for software teams"
+):
+    print(chunk)
+
+```
+
+
+```javascript JavaScript
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'f7066c98-0eb2-488c-bb37-a869a93d51ce',
+    entrypointTag: 'report_gen_streaming',
+    local: true
+});
+
+await client.initialize();
+
+const stream = await client.runStream({topic: "AI Market Trends"});
+for await (const chunk of stream) {
+    document.getElementById('report').innerHTML += chunk;
+}
+```
+
+```rust Rust  
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("f7066c98-0eb2-488c-bb37-a869a93d51ce", "report_gen_streaming", true).await?;
+    
+    let mut stream = client.run_stream(&[("topic", json!("AI Market"))]).await?;
+    while let Some(chunk) = stream.next().await {
+        print!("{}", chunk?);
+    }
+    Ok(())
+}
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/runagent-dev/runagent/runagent-go/runagent"
+)
+
+func main() {
+    client := runagent.NewRunAgentClient(runagent.Config{
+        AgentID:       "f7066c98-0eb2-488c-bb37-a869a93d51ce",
+        EntrypointTag: "report_gen_streaming",
+        Local:         true,
+    })
+    
+    ctx := context.Background()
+    client.Initialize(ctx)
+    
+    s, err := client.RunStream(ctx, map[string]interface{}{
+		    "role":    "user",
+		    "message": "Analyze the benefits of remote work for software teams",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer s.Close()
+
+    for {
+        data, hasMore, err := s.Next(ctx)
+        if err != nil {
+            log.Fatal(err)
+        }
+        if !hasMore {
+            break
+        }
+        fmt.Printf("%v", data)
+    }
+}
+```
+</CodeGroup>
+
+</Step>
+
+
+</Steps>
+
+**What's happening**: WebSocket connections, real-time data flow, and native iteration patterns—all handled automatically by RunAgent.
+
+- Head to the [tutorials](/tutorials/deploy-your-first-agent) guide to see the full magic
+- Browse our [framework guides](/how-to/frameworks/langgraph) for LangGraph, CrewAI, and more
+- Check out [core concepts](/explanation/core-concepts) to understand how it works
+
+<NeedHelp context="Introduction" />

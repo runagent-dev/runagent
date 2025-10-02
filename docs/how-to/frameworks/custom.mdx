@@ -1,0 +1,544 @@
+---
+title: 'Custom Framework Integration'
+description: 'Deploy agents built with any Python-based framework'
+icon: 'person-running-fast'
+---
+
+<Info>
+  **Prerequisites**: Basic Python knowledge and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+RunAgent supports any Python-based AI framework by defining simple entrypoint functions. This guide shows you how to integrate custom frameworks and create your own AI agents.
+
+## Quick Start
+
+### 1. Create a Custom Agent
+
+```bash
+runagent init my-custom-agent --framework custom
+cd my-custom-agent
+```
+
+### 2. Install Your Framework
+
+```bash
+pip install your-framework-name
+```
+
+### 3. Configure Your Agent
+
+The generated `runagent.config.json` will be pre-configured for custom frameworks:
+
+```json
+{
+  "agent_name": "my-custom-agent",
+  "description": "Custom AI agent",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "custom_agent",
+        "tag": "main"
+      }
+    ]
+  }
+}
+```
+
+## Basic Custom Agent
+
+Here's a simple custom agent that demonstrates the core concepts:
+
+```python main.py
+from typing import Dict, Any, List, Optional
+import json
+from datetime import datetime
+
+class CustomAgent:
+    def __init__(self):
+        self.name = "CustomAgent"
+        self.version = "1.0.0"
+        self.capabilities = ["text_processing", "data_analysis", "custom_logic"]
+    
+    def process_request(self, request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Process a request using custom logic"""
+        try:
+            # Your custom AI logic here
+            response = self._generate_response(request, context)
+            
+            return {
+                "response": response,
+                "agent": self.name,
+                "version": self.version,
+                "timestamp": datetime.now().isoformat(),
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "response": f"Error: {str(e)}",
+                "agent": self.name,
+                "version": self.version,
+                "timestamp": datetime.now().isoformat(),
+                "status": "error"
+            }
+    
+    def _generate_response(self, request: str, context: Dict[str, Any] = None) -> str:
+        """Generate response using custom logic"""
+        # Example: Simple rule-based response
+        if "hello" in request.lower():
+            return "Hello! How can I help you today?"
+        elif "help" in request.lower():
+            return "I can help you with various tasks. What do you need?"
+        else:
+            return f"I received your request: {request}. This is a custom response."
+
+def custom_agent(request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Main entrypoint for the custom agent"""
+    agent = CustomAgent()
+    return agent.process_request(request, context)
+```
+
+## Advanced Custom Patterns
+
+### 1. Streaming Custom Agent
+
+```python streaming_custom.py
+from typing import Iterator, Dict, Any
+import time
+
+def streaming_custom_agent(request: str, context: Dict[str, Any] = None) -> Iterator[str]:
+    """Streaming custom agent with step-by-step output"""
+    yield f"🚀 Custom Agent starting processing...\n\n"
+    
+    yield f"📝 Processing request: {request}\n\n"
+    
+    # Simulate step-by-step processing
+    steps = [
+        "🔍 Analyzing request...",
+        "🧠 Applying custom logic...",
+        "⚙️ Processing data...",
+        "📊 Generating response...",
+        "✅ Finalizing output..."
+    ]
+    
+    for i, step in enumerate(steps):
+        yield f"Step {i+1}: {step}\n"
+        time.sleep(0.5)  # Simulate processing time
+    
+    yield f"\n🎉 Custom processing complete! Response: {request} processed successfully."
+```
+
+### 2. Multi-Modal Custom Agent
+
+```python multimodal_custom.py
+from typing import Dict, Any, List
+import base64
+import json
+
+class MultiModalAgent:
+    def __init__(self):
+        self.name = "MultiModalAgent"
+        self.supported_types = ["text", "image", "audio", "data"]
+    
+    def process_multimodal(self, content: str, content_type: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Process multimodal content"""
+        try:
+            if content_type == "text":
+                response = self._process_text(content)
+            elif content_type == "image":
+                response = self._process_image(content)
+            elif content_type == "audio":
+                response = self._process_audio(content)
+            elif content_type == "data":
+                response = self._process_data(content)
+            else:
+                response = f"Unsupported content type: {content_type}"
+            
+            return {
+                "response": response,
+                "content_type": content_type,
+                "agent": self.name,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "response": f"Error processing {content_type}: {str(e)}",
+                "content_type": content_type,
+                "agent": self.name,
+                "status": "error"
+            }
+    
+    def _process_text(self, text: str) -> str:
+        """Process text content"""
+        return f"Processed text: {text[:100]}..."
+    
+    def _process_image(self, image_data: str) -> str:
+        """Process image content"""
+        # In real implementation, decode and process image
+        return f"Processed image: {len(image_data)} bytes"
+    
+    def _process_audio(self, audio_data: str) -> str:
+        """Process audio content"""
+        # In real implementation, decode and process audio
+        return f"Processed audio: {len(audio_data)} bytes"
+    
+    def _process_data(self, data: str) -> str:
+        """Process structured data"""
+        try:
+            parsed_data = json.loads(data)
+            return f"Processed data: {len(parsed_data)} items"
+        except:
+            return f"Processed data: {len(data)} characters"
+
+def multimodal_agent(content: str, content_type: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Multimodal custom agent entrypoint"""
+    agent = MultiModalAgent()
+    return agent.process_multimodal(content, content_type, metadata)
+```
+
+### 3. Specialized Custom Agents
+
+```python specialized_custom.py
+from typing import Dict, Any, List
+import re
+import json
+
+# Document Processing Agent
+def document_agent(document: str, operation: str, user_id: str) -> Dict[str, Any]:
+    """Document processing custom agent"""
+    try:
+        if operation == "summarize":
+            # Simple summarization (in production, use proper NLP)
+            sentences = document.split('.')
+            summary = '. '.join(sentences[:3]) + '.'
+            response = f"Summary: {summary}"
+        elif operation == "extract_keywords":
+            # Simple keyword extraction
+            words = re.findall(r'\b\w+\b', document.lower())
+            keywords = list(set(words))[:10]
+            response = f"Keywords: {', '.join(keywords)}"
+        elif operation == "translate":
+            # Simple translation simulation
+            response = f"Translated: {document} (simulated translation)"
+        else:
+            response = f"Unknown operation: {operation}"
+        
+        return {
+            "response": response,
+            "operation": operation,
+            "agent_type": "document",
+            "user_id": user_id,
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "operation": operation,
+            "agent_type": "document",
+            "user_id": user_id,
+            "status": "error"
+        }
+
+# Code Analysis Agent
+def code_agent(code: str, language: str, analysis_type: str) -> Dict[str, Any]:
+    """Code analysis custom agent"""
+    try:
+        if analysis_type == "syntax_check":
+            # Simple syntax check simulation
+            if code.strip():
+                response = "Syntax check passed (simulated)"
+            else:
+                response = "Syntax check failed: Empty code"
+        elif analysis_type == "complexity":
+            # Simple complexity analysis
+            lines = len(code.split('\n'))
+            functions = code.count('def ')
+            response = f"Complexity: {lines} lines, {functions} functions"
+        elif analysis_type == "security":
+            # Simple security check
+            if 'eval(' in code or 'exec(' in code:
+                response = "Security warning: Potentially dangerous code detected"
+            else:
+                response = "Security check passed (simulated)"
+        else:
+            response = f"Unknown analysis type: {analysis_type}"
+        
+        return {
+            "response": response,
+            "language": language,
+            "analysis_type": analysis_type,
+            "agent_type": "code",
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "language": language,
+            "analysis_type": analysis_type,
+            "agent_type": "code",
+            "status": "error"
+        }
+
+# Data Processing Agent
+def data_agent(data: str, format_type: str, operation: str) -> Dict[str, Any]:
+    """Data processing custom agent"""
+    try:
+        if format_type == "json":
+            parsed_data = json.loads(data)
+            if operation == "validate":
+                response = "JSON validation passed"
+            elif operation == "transform":
+                response = f"Transformed {len(parsed_data)} items"
+            else:
+                response = f"Unknown operation: {operation}"
+        elif format_type == "csv":
+            lines = data.split('\n')
+            if operation == "validate":
+                response = f"CSV validation passed: {len(lines)} lines"
+            elif operation == "transform":
+                response = f"Transformed {len(lines)} CSV lines"
+            else:
+                response = f"Unknown operation: {operation}"
+        else:
+            response = f"Unsupported format: {format_type}"
+        
+        return {
+            "response": response,
+            "format_type": format_type,
+            "operation": operation,
+            "agent_type": "data",
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "format_type": format_type,
+            "operation": operation,
+            "agent_type": "data",
+            "status": "error"
+        }
+```
+
+## Configuration for Multiple Agents
+
+Update your `runagent.config.json` to include multiple custom agents:
+
+```json
+{
+  "agent_name": "advanced-custom-agent",
+  "description": "Advanced custom multi-agent system",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "custom_agent",
+        "tag": "main"
+      },
+      {
+        "file": "streaming_custom.py",
+        "module": "streaming_custom_agent",
+        "tag": "streaming"
+      },
+      {
+        "file": "multimodal_custom.py",
+        "module": "multimodal_agent",
+        "tag": "multimodal"
+      },
+      {
+        "file": "specialized_custom.py",
+        "module": "document_agent",
+        "tag": "document"
+      },
+      {
+        "file": "specialized_custom.py",
+        "module": "code_agent",
+        "tag": "code"
+      },
+      {
+        "file": "specialized_custom.py",
+        "module": "data_agent",
+        "tag": "data"
+      }
+    ]
+  }
+}
+```
+
+## Testing Your Custom Agent
+
+### Python Client
+
+```python test_custom.py
+from runagent import RunAgentClient
+
+# Connect to your custom agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="main",
+    local=True
+)
+
+# Test basic functionality
+result = client.run(request="Hello, how are you?", context={"user": "test"})
+print(f"Response: {result['response']}")
+
+# Test document processing
+doc_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="document",
+    local=True
+)
+
+doc_result = doc_client.run(
+    document="This is a sample document for testing.",
+    operation="summarize",
+    user_id="test_user"
+)
+print(f"Document Result: {doc_result['response']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="streaming",
+    local=True
+)
+
+print("Streaming custom workflow:")
+for chunk in stream_client.run(request="Process this data", context={"type": "test"}):
+    print(chunk, end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript test_custom.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true
+});
+
+await client.initialize();
+
+const result = await client.run({
+    request: 'Hello, how are you?',
+    context: { user: 'test' }
+});
+
+console.log('Response:', result.response);
+```
+
+## Best Practices
+
+### 1. **Entrypoint Design**
+- Keep entrypoint functions simple and focused
+- Use clear parameter names
+- Provide meaningful return values
+
+### 2. **Error Handling**
+- Implement comprehensive error handling
+- Provide meaningful error messages
+- Log errors for debugging
+
+### 3. **Performance**
+- Optimize your custom logic
+- Use caching when appropriate
+- Monitor performance metrics
+
+### 4. **Testing**
+- Test each entrypoint thoroughly
+- Use mock data for testing
+- Implement integration tests
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Rule-Based Agents">
+    Create agents that use rule-based logic for decision making.
+  </Accordion>
+  <Accordion title="Data Processing Agents">
+    Build agents specialized in data transformation and analysis.
+  </Accordion>
+  <Accordion title="Multi-Modal Agents">
+    Create agents that can process different types of content.
+  </Accordion>
+  <Accordion title="Workflow Agents">
+    Implement complex workflows with multiple steps.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Entrypoint Errors**
+   - Check function signatures
+   - Verify parameter types
+   - Handle exceptions properly
+
+2. **Framework Integration**
+   - Ensure proper imports
+   - Check framework compatibility
+   - Test framework functionality
+
+3. **Performance Issues**
+   - Profile your custom logic
+   - Optimize expensive operations
+   - Use appropriate data structures
+
+### Debug Tips
+
+```python
+# Add debugging to your custom agents
+def debug_custom_agent(request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    print(f"Debug: Processing request: {request}")
+    print(f"Debug: Context: {context}")
+    
+    # Your custom logic here
+    
+    print(f"Debug: Response generated: {response}")
+    return result
+```
+
+## Performance Optimization
+
+### 1. **Code Optimization**
+- Use efficient algorithms
+- Optimize data structures
+- Minimize memory usage
+
+### 2. **Caching**
+- Cache expensive operations
+- Use appropriate cache strategies
+- Monitor cache performance
+
+### 3. **Async Processing**
+- Use async/await when appropriate
+- Implement parallel processing
+- Optimize I/O operations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Patterns" icon="cog" href="/how-to/advanced-tasks">
+    Learn advanced custom agent patterns and techniques
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your custom agents to production
+  </Card>
+  <Card title="Multi-Language Access" icon="globe" href="/tutorials/multi-language-wrapper">
+    Access your custom agents from different languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your custom agents for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You've learned how to deploy custom agents with RunAgent. The flexibility of custom frameworks combined with RunAgent's multi-language access gives you unlimited possibilities for AI agent development!
+</Note>

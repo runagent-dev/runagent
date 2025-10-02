@@ -1,0 +1,839 @@
+---
+title: 'Call from Rust'
+description: 'Use RunAgent agents from Rust applications'
+icon: 'rust'
+---
+
+<Info>
+  **Prerequisites**: Rust 1.70+ and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+The Rust SDK provides high-performance access to RunAgent agents with zero-cost abstractions, futures-based async operations, and compile-time type safety. It's designed to work seamlessly with Rust's ownership model and error handling.
+
+## Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+runagent = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+```
+
+## Basic Usage
+
+### Synchronous Calls
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create client
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "main",
+        true, // local
+    ).await?;
+
+    // Call your agent
+    let result = client.run(&[
+        ("message", json!("Hello, how are you?")),
+        ("userId", json!("rust_user")),
+    ]).await?;
+
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+### Asynchronous Calls
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::future::join_all;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "main",
+        true,
+    ).await?;
+
+    // Run multiple requests concurrently
+    let futures = (0..5).map(|i| {
+        let client = client.clone();
+        async move {
+            client.run(&[
+                ("message", json!(format!("Request {}", i))),
+                ("userId", json!("rust_user")),
+            ]).await
+        }
+    });
+
+    let results = join_all(futures).await;
+    
+    for (i, result) in results.into_iter().enumerate() {
+        match result {
+            Ok(response) => println!("Request {}: {}", i, response),
+            Err(e) => println!("Request {} failed: {}", i, e),
+        }
+    }
+
+    Ok(())
+}
+```
+
+## Advanced Features
+
+### 1. Streaming Responses
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "streaming", // Note: tag ends with _stream
+        true,
+    ).await?;
+
+    // Stream responses
+    let mut stream = client.run_stream(&[
+        ("message", json!("Tell me a story")),
+        ("userId", json!("rust_user")),
+    ]).await?;
+
+    while let Some(chunk) = stream.next().await {
+        print!("{}", chunk?);
+    }
+
+    Ok(())
+}
+```
+
+### 2. Error Handling
+
+```rust
+use runagent::client::RunAgentClient;
+use runagent::errors::*;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "main",
+        true,
+    ).await?;
+
+    let result = client.run(&[
+        ("message", json!("Test message")),
+    ]).await;
+
+    match result {
+        Ok(response) => println!("Success: {}", response),
+        Err(e) => {
+            match e {
+                RunAgentError::AuthenticationError => {
+                    eprintln!("Authentication failed. Check your API key.");
+                }
+                RunAgentError::AgentNotFoundError => {
+                    eprintln!("Agent not found. Check your agent ID.");
+                }
+                RunAgentError::ValidationError(msg) => {
+                    eprintln!("Validation error: {}", msg);
+                }
+                RunAgentError::RateLimitError => {
+                    eprintln!("Rate limit exceeded. Please wait and try again.");
+                }
+                RunAgentError::TimeoutError => {
+                    eprintln!("Request timed out. Please try again.");
+                }
+                RunAgentError::NetworkError => {
+                    eprintln!("Network error. Check your connection.");
+                }
+                _ => {
+                    eprintln!("Unexpected error: {}", e);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+```
+
+### 3. Custom Headers and Metadata
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut headers = HashMap::new();
+    headers.insert("X-Request-ID".to_string(), "unique-request-id".to_string());
+    headers.insert("X-User-ID".to_string(), "rust_user".to_string());
+
+    let client = RunAgentClient::new_with_config(
+        "your_agent_id_here",
+        "main",
+        true,
+        Some(headers),
+        Some(30), // timeout in seconds
+    ).await?;
+
+    let result = client.run(&[
+        ("message", json!("Hello with custom headers")),
+        ("metadata", json!({
+            "source": "rust_app",
+            "version": "1.0.0"
+        })),
+    ]).await?;
+
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Set API key
+export RUNAGENT_API_KEY="your-api-key"
+
+# Set API URL
+export RUNAGENT_API_URL="https://api.run-agent.ai"
+
+# Set default agent ID
+export RUNAGENT_AGENT_ID="your-agent-id"
+```
+
+### Configuration File
+
+Create `~/.runagent/config.json`:
+
+```json
+{
+  "apiKey": "your-api-key",
+  "apiUrl": "https://api.run-agent.ai",
+  "defaultAgentId": "your-agent-id",
+  "timeout": 30,
+  "retryAttempts": 3
+}
+```
+
+### Programmatic Configuration
+
+```rust
+use runagent::client::RunAgentClient;
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut headers = HashMap::new();
+    headers.insert("X-Custom-Header".to_string(), "value".to_string());
+
+    let client = RunAgentClient::new_with_config(
+        "your_agent_id_here",
+        "main",
+        true,
+        Some(headers),
+        Some(30),
+    ).await?;
+
+    // Use client...
+    Ok(())
+}
+```
+
+## Best Practices
+
+### 1. **Connection Management**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+struct AgentManager {
+    client: Arc<Mutex<RunAgentClient>>,
+}
+
+impl AgentManager {
+    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
+        Ok(Self {
+            client: Arc::new(Mutex::new(client)),
+        })
+    }
+
+    async fn run(&self, message: &str, options: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+        let client = self.client.lock().await;
+        let mut params = vec![("message", json!(message))];
+        params.extend(options.iter().map(|(k, v)| (*k, v.clone())));
+        
+        let result = client.run(&params).await?;
+        Ok(result)
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let manager = AgentManager::new("your_agent_id", "main").await?;
+    let result = manager.run("Hello", &[]).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+### 2. **Retry Logic**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use tokio::time::{sleep, Duration};
+
+async fn run_with_retry(
+    client: &RunAgentClient,
+    message: &str,
+    max_retries: usize,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut last_error = None;
+    
+    for attempt in 0..max_retries {
+        match client.run(&[("message", json!(message))]).await {
+            Ok(result) => return Ok(result),
+            Err(e) => {
+                last_error = Some(e);
+                if attempt < max_retries - 1 {
+                    // Exponential backoff
+                    let backoff = Duration::from_secs(2_u64.pow(attempt as u32));
+                    sleep(backoff).await;
+                }
+            }
+        }
+    }
+    
+    Err(last_error.unwrap().into())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new("your_agent_id", "main", true).await?;
+    let result = run_with_retry(&client, "Hello with retry", 3).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+### 3. **Logging and Monitoring**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::time::Instant;
+use tracing::{info, error, warn};
+
+struct MonitoredAgent {
+    client: RunAgentClient,
+}
+
+impl MonitoredAgent {
+    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
+        Ok(Self { client })
+    }
+
+    async fn run(&self, message: &str) -> Result<String, Box<dyn std::error::Error>> {
+        info!("Starting request: {}", message);
+        let start_time = Instant::now();
+        
+        match self.client.run(&[("message", json!(message))]).await {
+            Ok(result) => {
+                let duration = start_time.elapsed();
+                info!("Request completed in {:?}", duration);
+                Ok(result)
+            }
+            Err(e) => {
+                let duration = start_time.elapsed();
+                error!("Request failed after {:?}: {}", duration, e);
+                Err(e.into())
+            }
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
+    
+    let agent = MonitoredAgent::new("your_agent_id", "main").await?;
+    let result = agent.run("Hello with monitoring").await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+## Common Patterns
+
+### 1. **Agent Factory Pattern**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::collections::HashMap;
+
+struct AgentFactory {
+    base_config: AgentConfig,
+}
+
+#[derive(Clone)]
+struct AgentConfig {
+    local: bool,
+    timeout: Option<u64>,
+    headers: Option<HashMap<String, String>>,
+}
+
+impl AgentFactory {
+    fn new(base_config: AgentConfig) -> Self {
+        Self { base_config }
+    }
+
+    async fn get_agent(&self, agent_id: &str, entrypoint_tag: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+        RunAgentClient::new_with_config(
+            agent_id,
+            entrypoint_tag,
+            self.base_config.local,
+            self.base_config.headers.clone(),
+            self.base_config.timeout,
+        ).await.map_err(|e| e.into())
+    }
+
+    async fn get_chat_agent(&self, agent_id: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+        self.get_agent(agent_id, "chat").await
+    }
+
+    async fn get_analysis_agent(&self, agent_id: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+        self.get_agent(agent_id, "analyze").await
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let factory = AgentFactory::new(AgentConfig {
+        local: true,
+        timeout: Some(30),
+        headers: None,
+    });
+    
+    let chat_agent = factory.get_chat_agent("your_agent_id").await?;
+    let result = chat_agent.run(&[("message", json!("Hello"))]).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+### 2. **Agent Wrapper Pattern**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+struct AgentWrapper {
+    client: RunAgentClient,
+    agent_id: String,
+    entrypoint_tag: String,
+}
+
+impl AgentWrapper {
+    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
+        Ok(Self {
+            client,
+            agent_id: agent_id.to_string(),
+            entrypoint_tag: entrypoint_tag.to_string(),
+        })
+    }
+
+    async fn call(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+        self.client.run(params).await.map_err(|e| e.into())
+    }
+
+    async fn chat(&self, message: &str, user_id: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let result = self.client.run(&[
+            ("message", json!(message)),
+            ("userId", json!(user_id)),
+        ]).await?;
+        Ok(result)
+    }
+
+    async fn analyze(&self, data: &str, analysis_type: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let result = self.client.run(&[
+            ("data", json!(data)),
+            ("analysisType", json!(analysis_type)),
+        ]).await?;
+        Ok(result)
+    }
+
+    async fn stream(&self, message: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let mut stream = self.client.run_stream(&[("message", json!(message))]).await?;
+        let mut response = String::new();
+        
+        while let Some(chunk) = stream.next().await {
+            response.push_str(&chunk?);
+        }
+        
+        Ok(response)
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let agent = AgentWrapper::new("your_agent_id", "main").await?;
+    let response = agent.chat("Hello, how are you?", "rust_user").await?;
+    println!("Response: {}", response);
+    Ok(())
+}
+```
+
+### 3. **Agent Pool Pattern**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+struct AgentPool {
+    agents: Vec<Arc<Mutex<RunAgentClient>>>,
+    index: Arc<Mutex<usize>>,
+}
+
+impl AgentPool {
+    async fn new(agent_configs: Vec<AgentConfig>) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut agents = Vec::new();
+        
+        for config in agent_configs {
+            let client = RunAgentClient::new_with_config(
+                &config.agent_id,
+                &config.entrypoint_tag,
+                config.local,
+                config.headers,
+                config.timeout,
+            ).await?;
+            agents.push(Arc::new(Mutex::new(client)));
+        }
+        
+        Ok(Self {
+            agents,
+            index: Arc::new(Mutex::new(0)),
+        })
+    }
+
+    async fn get_agent(&self) -> Arc<Mutex<RunAgentClient>> {
+        let mut index = self.index.lock().await;
+        let agent = self.agents[*index].clone();
+        *index = (*index + 1) % self.agents.len();
+        agent
+    }
+
+    async fn call(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+        let agent = self.get_agent().await;
+        let client = agent.lock().await;
+        client.run(params).await.map_err(|e| e.into())
+    }
+}
+
+#[derive(Clone)]
+struct AgentConfig {
+    agent_id: String,
+    entrypoint_tag: String,
+    local: bool,
+    headers: Option<std::collections::HashMap<String, String>>,
+    timeout: Option<u64>,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pool = AgentPool::new(vec![
+        AgentConfig {
+            agent_id: "agent1".to_string(),
+            entrypoint_tag: "main".to_string(),
+            local: true,
+            headers: None,
+            timeout: None,
+        },
+        AgentConfig {
+            agent_id: "agent2".to_string(),
+            entrypoint_tag: "main".to_string(),
+            local: true,
+            headers: None,
+            timeout: None,
+        },
+        AgentConfig {
+            agent_id: "agent3".to_string(),
+            entrypoint_tag: "main".to_string(),
+            local: true,
+            headers: None,
+            timeout: None,
+        },
+    ]).await?;
+
+    let result = pool.call(&[("message", json!("Hello from pool"))]).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+## Error Handling
+
+### Common Error Types
+
+```rust
+use runagent::client::RunAgentClient;
+use runagent::errors::*;
+use serde_json::json;
+
+async fn handle_errors(client: &RunAgentClient, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let result = client.run(&[("message", json!(message))]).await;
+    
+    match result {
+        Ok(response) => {
+            println!("Success: {}", response);
+        }
+        Err(e) => {
+            match e {
+                RunAgentError::AuthenticationError => {
+                    eprintln!("Authentication failed. Check your API key.");
+                }
+                RunAgentError::AgentNotFoundError => {
+                    eprintln!("Agent not found. Check your agent ID.");
+                }
+                RunAgentError::ValidationError(msg) => {
+                    eprintln!("Validation error: {}", msg);
+                }
+                RunAgentError::RateLimitError => {
+                    eprintln!("Rate limit exceeded. Please wait and try again.");
+                }
+                RunAgentError::TimeoutError => {
+                    eprintln!("Request timed out. Please try again.");
+                }
+                RunAgentError::NetworkError => {
+                    eprintln!("Network error. Check your connection.");
+                }
+                _ => {
+                    eprintln!("Unexpected error: {}", e);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+## Performance Optimization
+
+### 1. **Connection Pooling**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+struct ConnectionPool {
+    pool: Vec<Arc<Mutex<RunAgentClient>>>,
+    index: Arc<Mutex<usize>>,
+}
+
+impl ConnectionPool {
+    async fn new(agent_id: &str, entrypoint_tag: &str, pool_size: usize) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut pool = Vec::new();
+        
+        for _ in 0..pool_size {
+            let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
+            pool.push(Arc::new(Mutex::new(client)));
+        }
+        
+        Ok(Self {
+            pool,
+            index: Arc::new(Mutex::new(0)),
+        })
+    }
+
+    async fn get_client(&self) -> Arc<Mutex<RunAgentClient>> {
+        let mut index = self.index.lock().await;
+        let client = self.pool[*index].clone();
+        *index = (*index + 1) % self.pool.len();
+        client
+    }
+
+    async fn run(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+        let client = self.get_client().await;
+        let client = client.lock().await;
+        client.run(params).await.map_err(|e| e.into())
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pool = ConnectionPool::new("your_agent_id", "main", 5).await?;
+    let result = pool.run(&[("message", json!("Hello"))]).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+### 2. **Caching**
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+struct CachedAgent {
+    client: RunAgentClient,
+    cache: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl CachedAgent {
+    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
+        Ok(Self {
+            client,
+            cache: Arc::new(RwLock::new(HashMap::new())),
+        })
+    }
+
+    fn cache_key(&self, params: &[(&str, serde_json::Value)]) -> String {
+        // Simple cache key generation (in production, use a proper hash)
+        format!("{:?}", params)
+    }
+
+    async fn run(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+        let cache_key = self.cache_key(params);
+        
+        // Check cache
+        {
+            let cache = self.cache.read().await;
+            if let Some(result) = cache.get(&cache_key) {
+                return Ok(result.clone());
+            }
+        }
+        
+        // Call agent
+        let result = self.client.run(params).await?;
+        
+        // Store in cache
+        {
+            let mut cache = self.cache.write().await;
+            cache.insert(cache_key, result.clone());
+        }
+        
+        Ok(result)
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cached_agent = CachedAgent::new("your_agent_id", "main").await?;
+    let result = cached_agent.run(&[("message", json!("Hello"))]).await?;
+    println!("Response: {}", result);
+    Ok(())
+}
+```
+
+## Testing
+
+### Unit Testing
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::test]
+async fn test_agent_client() {
+    let client = RunAgentClient::new("test_agent", "main", true).await.unwrap();
+    
+    let result = client.run(&[("message", json!("Hello"))]).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_agent_client_error() {
+    let client = RunAgentClient::new("invalid_agent", "main", true).await.unwrap();
+    
+    let result = client.run(&[("message", json!("Hello"))]).await;
+    assert!(result.is_err());
+}
+```
+
+### Integration Testing
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::test]
+async fn test_agent_integration() {
+    let client = RunAgentClient::new("test_agent", "main", true).await.unwrap();
+    
+    let result = client.run(&[("message", json!("Hello"))]).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_agent_streaming() {
+    let client = RunAgentClient::new("test_agent", "streaming", true).await.unwrap();
+    
+    let mut stream = client.run_stream(&[("message", json!("Hello"))]).await.unwrap();
+    let mut response = String::new();
+    
+    while let Some(chunk) = stream.next().await {
+        response.push_str(&chunk.unwrap());
+    }
+    
+    assert!(!response.is_empty());
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Async Patterns" icon="async" href="/how-to/advanced-tasks">
+    Learn advanced async patterns for Rust
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your Rust applications to production
+  </Card>
+  <Card title="Multi-Language Integration" icon="globe" href="/tutorials/multi-language-wrapper">
+    Integrate with other programming languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your Rust applications for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You've learned how to use RunAgent agents from Rust applications. The Rust SDK provides high-performance access with zero-cost abstractions and compile-time type safety!
+</Note>

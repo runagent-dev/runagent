@@ -1,0 +1,281 @@
+---
+title: 'Why RunAgent?'
+description: 'Why choose RunAgent over building your own agent infrastructure'
+icon: 'question-mark'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+> The traditional approach to deploying AI agents is painful. RunAgent eliminates the infrastructure complexity so you can focus on what matters: building great AI agents.
+
+## The Problem Every AI Developer Faces
+
+You have built an amazing AI agent in Python. It works perfectly. Now your team wants to use it:
+
+- **Frontend team** needs it in JavaScript
+- **Mobile team** wants it in Kotlin  
+- **Systems team** requires it in Rust
+- **Unity team** needs it in C#
+
+### The Traditional Approach
+
+<AccordionGroup>
+  <Accordion title="🔧 Build REST APIs">
+    - Create FastAPI/Flask endpoints
+    - Handle request/response serialization
+    - Write API documentation
+    - Manage versioning and backward compatibility
+  </Accordion>
+  
+  <Accordion title="📡 Add Streaming Support">
+    - Implement WebSocket handlers
+    - Manage connection lifecycle
+    - Handle reconnection logic
+    - Deal with message ordering
+  </Accordion>
+  
+  <Accordion title="🔒 Handle Security">
+    - Implement authentication
+    - Add rate limiting
+    - Manage API keys and scopes
+    - Secure against common attacks
+  </Accordion>
+  
+  <Accordion title="📈 Scale Infrastructure">
+    - Set up load balancers
+    - Configure auto-scaling
+    - Monitor resource usage
+    - Handle cold starts and warm-up
+  </Accordion>
+  
+  <Accordion title="🌐 Write SDKs">
+    - Create client libraries for each language
+    - Handle async/await patterns
+    - Manage connection pooling
+    - Provide streaming interfaces
+  </Accordion>
+</AccordionGroup>
+
+**Result**: Weeks or months of infrastructure work before your agent is usable.
+
+---
+
+## The RunAgent Solution
+
+<CardGroup cols={2}>
+  <Card title="⚡ Deploy in Minutes" icon="rocket">
+    One command: `runagent serve .` and your agent is live with full API and SDK support.
+  </Card>
+  <Card title="🌐 Multi-Language Ready" icon="code">
+    Automatically generates native-feeling APIs for Python, JavaScript, Go, and Rust.
+  </Card>
+  <Card title="📡 Streaming Built-in" icon="stream">
+    Real-time token streaming works out of the box across all languages.
+  </Card>
+  <Card title="🔒 Production Security" icon="shield">
+    Sandboxed execution, API authentication, and rate limiting included.
+  </Card>
+</CardGroup>
+
+---
+
+## Cost Comparison
+
+<AccordionGroup>
+  <Accordion title="💰 DIY Approach Costs">
+    **Time Investment:**
+    - 2-4 weeks for basic REST API
+    - 1-2 weeks for streaming support
+    - 2-3 weeks for security implementation
+    - 1-2 weeks per language SDK
+    - Ongoing maintenance and updates
+    
+    **Total: 2-3 months of development time**
+    
+    **Ongoing Costs:**
+    - Infrastructure management
+    - Security updates
+    - SDK maintenance
+    - Monitoring and debugging
+  </Accordion>
+  
+  <Accordion title="✅ RunAgent Approach">
+    **Time Investment:**
+    - 5 minutes to deploy
+    - Focus on agent logic only
+    
+    **Ongoing Costs:**
+    - Zero infrastructure management
+    - Automatic updates and security patches
+    - Built-in monitoring and scaling
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Real-World Example
+
+### Before RunAgent
+
+```python
+# Your agent logic
+def analyze_document(content: str) -> str:
+    return llm.analyze(content)
+
+# You need to build:
+# - FastAPI server
+# - WebSocket handlers  
+# - Authentication middleware
+# - Rate limiting
+# - Error handling
+# - SDKs for JS, Go, Rust
+# - Deployment configuration
+# - Monitoring setup
+```
+
+**Time to production**: 6-8 weeks
+
+### With RunAgent
+
+```python
+# Your agent logic (same as before)
+def analyze_document(content: str) -> str:
+    return llm.analyze(content)
+
+# Configuration
+# runagent.config.json
+{
+  "entrypoints": [{"file": "agent.py", "module": "analyze_document", "tag": "analyze"}]
+}
+
+# Deploy
+runagent serve .
+```
+
+**Time to production**: 5 minutes
+
+---
+
+## What You Get vs What You Build
+
+<CardGroup cols={2}>
+  <Card title="✅ What RunAgent Provides" icon="check">
+    - **Sandboxed execution** (Firecracker microVMs)
+    - **Auto-scaling** (0 to thousands of requests)
+    - **Multi-language SDKs** (Python, JS, Go, Rust)
+    - **Streaming support** (WebSocket + HTTP)
+    - **Authentication** (API keys, scopes)
+    - **Rate limiting** (per-agent, per-user)
+    - **Monitoring** (logs, metrics, traces)
+    - **Error handling** (retries, timeouts)
+    - **Security** (isolation, input validation)
+  </Card>
+  
+  <Card title="❌ What You Would Build" icon="times">
+    - Custom API framework
+    - WebSocket infrastructure
+    - Language-specific clients
+    - Authentication system
+    - Rate limiting logic
+    - Monitoring dashboard
+    - Error handling
+    - Security measures
+    - Deployment automation
+  </Card>
+</CardGroup>
+
+---
+
+## The Developer Experience Difference
+
+<Steps>
+  <Step title="Traditional Approach">
+    ```bash
+    # Week 1-2: Set up FastAPI
+    pip install fastapi uvicorn
+    # Write API endpoints, middleware, etc.
+    
+    # Week 3-4: Add streaming
+    pip install websockets
+    # Implement WebSocket handlers
+    
+    # Week 5-6: Security
+    pip install python-jose
+    # Add auth, rate limiting
+    
+    # Week 7-8: SDKs
+    # Write clients for each language
+    
+    # Week 9-10: Deployment
+    # Docker, Kubernetes, CI/CD
+    ```
+  </Step>
+  
+  <Step title="RunAgent Approach">
+    ```bash
+    # Write your agent
+    def my_agent(query: str) -> str:
+        return process(query)
+    
+    # Deploy
+    runagent serve .
+    
+    # Use from any language
+    # Python, JS, Go, Rust - all work immediately
+    ```
+  </Step>
+</Steps>
+
+---
+
+## When to Choose RunAgent
+
+<CardGroup cols={2}>
+  <Card title="✅ Perfect For" icon="check">
+    - **Rapid prototyping** of AI agents
+    - **Multi-language teams** needing shared agents
+    - **Startups** wanting to focus on AI, not infrastructure
+    - **Production deployments** requiring reliability
+    - **Streaming applications** (chat, real-time analysis)
+    - **Teams** without dedicated DevOps resources
+  </Card>
+  
+  <Card title="❌ Not Ideal For" icon="times">
+    - **Simple scripts** that only run locally
+    - **Legacy systems** with complex integration requirements
+    - **Teams** with extensive existing infrastructure
+    - **Applications** requiring custom protocols
+    - **On-premise only** deployments (currently)
+  </Card>
+</CardGroup>
+
+---
+
+## The Bottom Line
+
+<Note>
+**RunAgent is not just another deployment tool** — it is a complete platform designed specifically for AI agents. It eliminates the 80% of infrastructure work that is common to all agent deployments, letting you focus on the 20% that makes your agent unique.
+</Note>
+
+**Time saved**: 2-3 months of development
+**Focus gained**: 100% on AI agent logic
+**Languages supported**: 4+ out of the box
+**Production ready**: From day one
+
+---
+
+## Ready to Get Started?
+
+<Cards num={3}>
+  <Card title="🚀 Deploy Your First Agent" href="/tutorials/deploy-your-first-agent" arrow>
+    See the difference in 5 minutes
+  </Card>
+  <Card title="🏗️ See the Architecture" href="/explanation/architecture-overview" arrow>
+    Understand how RunAgent works
+  </Card>
+  <Card title="📚 Explore Examples" href="/resources/examples" arrow>
+    See real-world use cases
+  </Card>
+</Cards>
+
+<NeedHelp context="Why RunAgent?" />

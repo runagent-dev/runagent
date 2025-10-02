@@ -1,0 +1,816 @@
+---
+title: 'Internal Q&A Agent'
+description: 'Build an internal knowledge base agent for your team'
+icon: 'question-circle'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Completed the [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## What You'll Build
+
+In this tutorial, you'll create an internal Q&A agent that:
+- Answers questions about your company's internal processes
+- Provides instant access to team knowledge
+- Integrates with your existing documentation
+- Can be embedded in Slack, Teams, or web applications
+
+## The Internal Knowledge Challenge
+
+Every organization struggles with knowledge management:
+- **Scattered information**: Docs in different systems and formats
+- **Expertise silos**: Knowledge locked in individual team members
+- **Onboarding friction**: New team members struggle to find answers
+- **Consistent responses**: Ensuring everyone gets the same accurate information
+
+RunAgent solves this by creating a centralized, AI-powered knowledge interface that can be accessed from anywhere.
+
+## Step 1: Create Your Q&A Agent
+
+Let's start by creating a new agent for internal Q&A:
+
+```bash
+runagent init internal-qa --framework custom
+cd internal-qa
+```
+
+## Step 2: Build the Knowledge Base Agent
+
+Replace `main.py` with a comprehensive Q&A agent:
+
+```python main.py
+from typing import Iterator, Dict, Any, List
+import json
+from datetime import datetime
+import re
+
+class InternalQAAgent:
+    def __init__(self):
+        # Internal knowledge base - in production, this would be a vector database
+        self.knowledge_base = {
+            "company_info": {
+                "name": "RunAgent Inc.",
+                "founded": "2024",
+                "mission": "Making AI agent deployment accessible to every developer",
+                "headquarters": "San Francisco, CA",
+                "team_size": "15-20 employees"
+            },
+            "policies": {
+                "remote_work": {
+                    "policy": "We support flexible remote work with core hours 10 AM - 3 PM PST",
+                    "meetings": "All meetings should be scheduled during core hours",
+                    "communication": "Use Slack for async communication, Zoom for meetings"
+                },
+                "vacation": {
+                    "policy": "Unlimited PTO with manager approval",
+                    "notice": "Give at least 2 weeks notice for planned time off",
+                    "blackout": "No vacation during major release periods"
+                },
+                "expenses": {
+                    "policy": "All business expenses must be pre-approved",
+                    "limit": "Meals under $50, travel requires manager approval",
+                    "reimbursement": "Submit receipts within 30 days"
+                }
+            },
+            "technical": {
+                "deployment": {
+                    "staging": "Deploy to staging environment first",
+                    "production": "Production deployments require code review and tests",
+                    "rollback": "Always have a rollback plan ready"
+                },
+                "code_review": {
+                    "policy": "All code must be reviewed by at least one team member",
+                    "requirements": "Pass all tests and linting checks",
+                    "approval": "Requires approval from code owner"
+                },
+                "security": {
+                    "secrets": "Never commit secrets to version control",
+                    "api_keys": "Use environment variables for all API keys",
+                    "access": "Follow principle of least privilege"
+                }
+            },
+            "tools": {
+                "development": ["VS Code", "Git", "Docker", "Python 3.8+"],
+                "communication": ["Slack", "Zoom", "Notion", "GitHub"],
+                "monitoring": ["DataDog", "Sentry", "CloudWatch"],
+                "deployment": ["AWS", "Docker", "Kubernetes", "Terraform"]
+            },
+            "contacts": {
+                "hr": "hr@runagent.ai",
+                "it": "it@runagent.ai", 
+                "security": "security@runagent.ai",
+                "legal": "legal@runagent.ai"
+            }
+        }
+    
+    def search_knowledge(self, query: str, category: str = None) -> List[Dict[str, Any]]:
+        """Search the knowledge base for relevant information"""
+        query_lower = query.lower()
+        results = []
+        
+        # Define search categories
+        categories = {
+            "company": ["company_info"],
+            "policies": ["policies"],
+            "technical": ["technical"],
+            "tools": ["tools"],
+            "contacts": ["contacts"]
+        }
+        
+        # Determine search scope
+        search_scope = categories.get(category, self.knowledge_base.keys()) if category else self.knowledge_base.keys()
+        
+        for scope in search_scope:
+            if scope in self.knowledge_base:
+                scope_data = self.knowledge_base[scope]
+                matches = self._find_matches(scope_data, query_lower, scope)
+                results.extend(matches)
+        
+        # Sort by relevance (simple keyword matching)
+        results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
+        return results[:5]  # Return top 5 results
+    
+    def _find_matches(self, data: Any, query: str, category: str) -> List[Dict[str, Any]]:
+        """Find matches in a specific category of data"""
+        matches = []
+        
+        if isinstance(data, dict):
+            for key, value in data.items():
+                # Check if key matches
+                if query in key.lower():
+                    matches.append({
+                        "category": category,
+                        "key": key,
+                        "value": str(value),
+                        "relevance": 2
+                    })
+                
+                # Check if value matches
+                if isinstance(value, (str, list)):
+                    if query in str(value).lower():
+                        matches.append({
+                            "category": category,
+                            "key": key,
+                            "value": str(value),
+                            "relevance": 1
+                        })
+                
+                # Recursively search nested structures
+                if isinstance(value, (dict, list)):
+                    nested_matches = self._find_matches(value, query, category)
+                    matches.extend(nested_matches)
+        
+        elif isinstance(data, list):
+            for i, item in enumerate(data):
+                if query in str(item).lower():
+                    matches.append({
+                        "category": category,
+                        "key": f"item_{i}",
+                        "value": str(item),
+                        "relevance": 1
+                    })
+        
+        return matches
+    
+    def generate_answer(self, query: str, context: List[Dict[str, Any]]) -> str:
+        """Generate a comprehensive answer based on context"""
+        if not context:
+            return "I couldn't find relevant information for your question. Please try rephrasing or contact the appropriate team member."
+        
+        answer_parts = []
+        
+        # Group by category
+        by_category = {}
+        for item in context:
+            cat = item['category']
+            if cat not in by_category:
+                by_category[cat] = []
+            by_category[cat].append(item)
+        
+        # Build answer
+        for category, items in by_category.items():
+            answer_parts.append(f"**{category.title()} Information:**")
+            
+            for item in items:
+                if item['key'] != item['value']:  # Not a simple key-value pair
+                    answer_parts.append(f"• **{item['key']}**: {item['value']}")
+                else:
+                    answer_parts.append(f"• {item['value']}")
+            
+            answer_parts.append("")  # Empty line between categories
+        
+        # Add contact information if relevant
+        if any("contact" in item['category'] for item in context):
+            answer_parts.append("**Need more help?** Contact the appropriate team member listed above.")
+        
+        return "\n".join(answer_parts)
+
+def ask_question_sync(question: str, category: str = None, user: str = "anonymous") -> Dict[str, Any]:
+    """Synchronous Q&A response"""
+    agent = InternalQAAgent()
+    
+    # Search for relevant information
+    results = agent.search_knowledge(question, category)
+    
+    # Generate answer
+    answer = agent.generate_answer(question, results)
+    
+    return {
+        "question": question,
+        "answer": answer,
+        "category": category,
+        "user": user,
+        "timestamp": datetime.now().isoformat(),
+        "sources": len(results),
+        "confidence": "high" if results else "low"
+    }
+
+def ask_question_stream(question: str, category: str = None, user: str = "anonymous") -> Iterator[str]:
+    """Streaming Q&A response"""
+    agent = InternalQAAgent()
+    
+    yield f"🔍 Searching for information about: {question}\n\n"
+    
+    # Search for relevant information
+    results = agent.search_knowledge(question, category)
+    
+    if not results:
+        yield "❌ I couldn't find relevant information for your question.\n"
+        yield "💡 Try rephrasing your question or contact the appropriate team member.\n"
+        return
+    
+    yield f"✅ Found {len(results)} relevant information sources.\n\n"
+    
+    # Generate and stream answer
+    answer = agent.generate_answer(question, results)
+    
+    # Stream the answer with typing effect
+    for line in answer.split('\n'):
+        if line.strip():
+            yield line + '\n'
+        else:
+            yield '\n'
+    
+    yield f"\n📚 Based on {len(results)} sources from our knowledge base.\n"
+
+def get_available_categories() -> Dict[str, Any]:
+    """Get available question categories"""
+    agent = InternalQAAgent()
+    return {
+        "categories": [
+            {"name": "company", "description": "Company information and general questions"},
+            {"name": "policies", "description": "HR policies, vacation, expenses"},
+            {"name": "technical", "description": "Development processes and technical guidelines"},
+            {"name": "tools", "description": "Tools and software used by the team"},
+            {"name": "contacts", "description": "Team contacts and who to reach out to"}
+        ],
+        "total_categories": 5,
+        "last_updated": datetime.now().isoformat()
+    }
+
+def suggest_questions(category: str = None) -> Dict[str, Any]:
+    """Suggest common questions for a category"""
+    suggestions = {
+        "company": [
+            "What is our company mission?",
+            "When was the company founded?",
+            "How many employees do we have?",
+            "Where is our headquarters?"
+        ],
+        "policies": [
+            "What is our remote work policy?",
+            "How much vacation time do I get?",
+            "What is the expense reimbursement policy?",
+            "What are our core working hours?"
+        ],
+        "technical": [
+            "What is our deployment process?",
+            "What are our code review requirements?",
+            "How do we handle security?",
+            "What testing is required before deployment?"
+        ],
+        "tools": [
+            "What development tools do we use?",
+            "What communication tools are available?",
+            "How do I access our monitoring systems?",
+            "What deployment tools are we using?"
+        ],
+        "contacts": [
+            "Who should I contact for HR questions?",
+            "How do I reach the IT team?",
+            "Who handles security issues?",
+            "Who can I talk to about legal matters?"
+        ]
+    }
+    
+    if category and category in suggestions:
+        return {
+            "category": category,
+            "suggestions": suggestions[category],
+            "total": len(suggestions[category])
+        }
+    else:
+        return {
+            "all_categories": suggestions,
+            "total_suggestions": sum(len(v) for v in suggestions.values())
+        }
+```
+
+## Step 3: Configure Your Agent
+
+Update `runagent.config.json`:
+
+```json
+{
+  "agent_name": "internal-qa",
+  "description": "Internal Q&A agent for team knowledge",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "ask_question_sync",
+        "tag": "ask"
+      },
+      {
+        "file": "main.py",
+        "module": "ask_question_stream",
+        "tag": "ask_stream"
+      },
+      {
+        "file": "main.py",
+        "module": "get_available_categories",
+        "tag": "categories"
+      },
+      {
+        "file": "main.py",
+        "module": "suggest_questions",
+        "tag": "suggest"
+      }
+    ]
+  }
+}
+```
+
+## Step 4: Deploy Your Q&A Agent
+
+Start your internal Q&A agent:
+
+```bash
+runagent serve .
+```
+
+## Step 5: Test Your Q&A Agent
+
+### Test Basic Questions
+
+```python
+from runagent import RunAgentClient
+
+# Connect to your Q&A agent
+qa = RunAgentClient(
+    agent_id="your_agent_id_here",  # Replace with actual ID
+    entrypoint_tag="ask",
+    local=True
+)
+
+# Test different types of questions
+questions = [
+    "What is our remote work policy?",
+    "What development tools do we use?",
+    "Who should I contact for HR questions?",
+    "What is our deployment process?",
+    "How much vacation time do I get?"
+]
+
+for question in questions:
+    print(f"\nQ: {question}")
+    response = qa.run(question=question, user="test_user")
+    print(f"A: {response['answer']}")
+    print(f"Sources: {response['sources']}, Confidence: {response['confidence']}")
+```
+
+### Test Category-Specific Questions
+
+```python
+# Test category-specific questions
+category_questions = {
+    "policies": "What is our expense reimbursement policy?",
+    "technical": "What are our code review requirements?",
+    "tools": "What monitoring tools do we use?",
+    "company": "What is our company mission?"
+}
+
+for category, question in category_questions.items():
+    print(f"\n[{category.upper()}] Q: {question}")
+    response = qa.run(question=question, category=category, user="test_user")
+    print(f"A: {response['answer']}")
+```
+
+### Test Streaming Responses
+
+```python
+# Test streaming for better user experience
+qa_stream = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="ask_stream",
+    local=True
+)
+
+print("Streaming Q&A:")
+for chunk in qa_stream.run(question="What is our remote work policy?", user="test_user"):
+    print(chunk, end="", flush=True)
+```
+
+## Step 6: Build a Web Interface
+
+Create a web interface for your internal Q&A system:
+
+```html qa_interface.html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Internal Q&A System</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .search-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        .category-select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        .search-btn { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        .search-btn:hover { background: #0056b3; }
+        .results { margin-top: 20px; }
+        .question { background: #e3f2fd; padding: 15px; border-radius: 6px; margin-bottom: 10px; }
+        .answer { background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 10px; white-space: pre-line; }
+        .metadata { font-size: 12px; color: #666; margin-top: 10px; }
+        .categories { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .category-btn { padding: 8px 16px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .category-btn:hover { background: #e9ecef; }
+        .category-btn.active { background: #007bff; color: white; }
+        .suggestions { margin-top: 20px; }
+        .suggestion { padding: 8px 12px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; margin: 5px; cursor: pointer; display: inline-block; }
+        .suggestion:hover { background: #e9ecef; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Internal Q&A System</h1>
+        <p>Ask questions about company policies, technical processes, tools, and more!</p>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="questionInput" class="search-input" placeholder="Ask a question..." />
+        <select id="categorySelect" class="category-select">
+            <option value="">All Categories</option>
+            <option value="company">Company Info</option>
+            <option value="policies">Policies</option>
+            <option value="technical">Technical</option>
+            <option value="tools">Tools</option>
+            <option value="contacts">Contacts</option>
+        </select>
+        <button onclick="askQuestion()" class="search-btn">Ask Question</button>
+    </div>
+
+    <div class="categories">
+        <div class="category-btn active" onclick="setCategory('')">All</div>
+        <div class="category-btn" onclick="setCategory('company')">Company</div>
+        <div class="category-btn" onclick="setCategory('policies')">Policies</div>
+        <div class="category-btn" onclick="setCategory('technical')">Technical</div>
+        <div class="category-btn" onclick="setCategory('tools')">Tools</div>
+        <div class="category-btn" onclick="setCategory('contacts')">Contacts</div>
+    </div>
+
+    <div id="suggestions" class="suggestions"></div>
+    <div id="results" class="results"></div>
+
+    <script>
+        // Replace with your actual agent details
+        const AGENT_ID = "your_agent_id_here";
+        const API_BASE = "http://127.0.0.1:8451";
+        
+        let currentCategory = '';
+
+        function setCategory(category) {
+            currentCategory = category;
+            document.getElementById('categorySelect').value = category;
+            
+            // Update category buttons
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Load suggestions for this category
+            loadSuggestions(category);
+        }
+
+        async function loadSuggestions(category) {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/agents/${AGENT_ID}/execute/suggest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: category })
+                });
+                
+                const data = await response.json();
+                displaySuggestions(data.suggestions || data.all_categories);
+            } catch (error) {
+                console.error('Error loading suggestions:', error);
+            }
+        }
+
+        function displaySuggestions(suggestions) {
+            const container = document.getElementById('suggestions');
+            container.innerHTML = '<h3>💡 Suggested Questions:</h3>';
+            
+            if (Array.isArray(suggestions)) {
+                suggestions.forEach(suggestion => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion';
+                    div.textContent = suggestion;
+                    div.onclick = () => {
+                        document.getElementById('questionInput').value = suggestion;
+                        askQuestion();
+                    };
+                    container.appendChild(div);
+                });
+            } else {
+                Object.entries(suggestions).forEach(([category, questions]) => {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.innerHTML = `<h4>${category.charAt(0).toUpperCase() + category.slice(1)}:</h4>`;
+                    container.appendChild(categoryDiv);
+                    
+                    questions.forEach(question => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion';
+                        div.textContent = question;
+                        div.onclick = () => {
+                            document.getElementById('questionInput').value = question;
+                            askQuestion();
+                        };
+                        container.appendChild(div);
+                    });
+                });
+            }
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+            if (!question) return;
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="loading">🔍 Searching for answers...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/agents/${AGENT_ID}/execute/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        category: currentCategory || null,
+                        user: "web_user"
+                    })
+                });
+
+                const data = await response.json();
+                displayAnswer(question, data);
+            } catch (error) {
+                results.innerHTML = '<div class="answer">❌ Error: Could not connect to Q&A system. Please try again later.</div>';
+                console.error('Error:', error);
+            }
+        }
+
+        function displayAnswer(question, data) {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <div class="question">
+                    <strong>Q:</strong> ${question}
+                </div>
+                <div class="answer">
+                    ${data.answer}
+                </div>
+                <div class="metadata">
+                    Sources: ${data.sources} | Confidence: ${data.confidence} | Category: ${data.category || 'All'}
+                </div>
+            `;
+        }
+
+        // Allow searching with Enter key
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+
+        // Load initial suggestions
+        loadSuggestions('');
+    </script>
+</body>
+</html>
+```
+
+## Step 7: Test the Web Interface
+
+1. Open `qa_interface.html` in your browser
+2. Try asking questions like:
+   - "What is our remote work policy?"
+   - "What development tools do we use?"
+   - "Who should I contact for HR questions?"
+3. Use the category filters to narrow down your search
+4. Click on suggested questions to try them out
+
+## What You've Accomplished
+
+You've built a comprehensive internal Q&A system:
+
+<CardGroup cols={2}>
+  <Card title="📚 Knowledge Management" icon="book">
+    Created a centralized knowledge base for team information
+  </Card>
+  <Card title="🔍 Smart Search" icon="search">
+    Implemented intelligent search across different categories
+  </Card>
+  <Card title="🌐 Web Interface" icon="globe">
+    Built a user-friendly web interface for easy access
+  </Card>
+  <Card title="💡 Smart Suggestions" icon="lightbulb">
+    Added question suggestions to help users discover information
+  </Card>
+</CardGroup>
+
+## Advanced Features
+
+### 1. **Integration with Slack**
+
+Create a Slack bot that uses your Q&A agent:
+
+```python slack_bot.py
+import os
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+from runagent import RunAgentClient
+
+# Initialize Slack client
+slack_client = WebClient(token=os.environ["SLACK_BOT_TOKEN"])
+
+# Initialize Q&A agent
+qa_agent = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="ask",
+    local=True
+)
+
+def handle_message(event):
+    """Handle incoming Slack messages"""
+    text = event.get('text', '')
+    if text.startswith('!qa '):
+        question = text[4:]  # Remove '!qa ' prefix
+        
+        # Get answer from Q&A agent
+        response = qa_agent.run(question=question, user=event['user'])
+        
+        # Send answer back to Slack
+        slack_client.chat_postMessage(
+            channel=event['channel'],
+            text=f"🤖 *Q&A Response:*\n{response['answer']}"
+        )
+```
+
+### 2. **Integration with Microsoft Teams**
+
+Create a Teams webhook that uses your Q&A agent:
+
+```python teams_webhook.py
+import json
+import requests
+from runagent import RunAgentClient
+
+qa_agent = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="ask",
+    local=True
+)
+
+def handle_teams_message(question, user):
+    """Handle Teams webhook messages"""
+    response = qa_agent.run(question=question, user=user)
+    
+    # Format response for Teams
+    teams_message = {
+        "type": "message",
+        "text": f"🤖 **Q&A Response:**\n\n{response['answer']}\n\n*Sources: {response['sources']} | Confidence: {response['confidence']}*"
+    }
+    
+    return teams_message
+```
+
+### 3. **Knowledge Base Updates**
+
+Add functionality to update the knowledge base:
+
+```python
+def update_knowledge_base(category: str, key: str, value: str) -> Dict[str, Any]:
+    """Update the knowledge base with new information"""
+    # In production, this would update a database
+    # For now, we'll just return a success message
+    
+    return {
+        "status": "success",
+        "message": f"Updated {category}.{key}",
+        "timestamp": datetime.now().isoformat()
+    }
+```
+
+## Production Considerations
+
+### 1. **Database Integration**
+Replace the in-memory knowledge base with a real database:
+
+```python
+import sqlite3
+import json
+
+class DatabaseKnowledgeBase:
+    def __init__(self, db_path="knowledge.db"):
+        self.conn = sqlite3.connect(db_path)
+        self.create_tables()
+    
+    def create_tables(self):
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge (
+                id INTEGER PRIMARY KEY,
+                category TEXT,
+                key TEXT,
+                value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        self.conn.commit()
+    
+    def search(self, query: str, category: str = None):
+        # Implement database search
+        pass
+```
+
+### 2. **Vector Search**
+For better search results, integrate with a vector database:
+
+```python
+import chromadb
+
+class VectorKnowledgeBase:
+    def __init__(self):
+        self.client = chromadb.Client()
+        self.collection = self.client.create_collection("knowledge")
+    
+    def add_document(self, text: str, metadata: dict):
+        self.collection.add(
+            documents=[text],
+            metadatas=[metadata],
+            ids=[f"doc_{len(self.collection.get()['ids'])}"]
+        )
+    
+    def search(self, query: str, n_results: int = 5):
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=n_results
+        )
+        return results
+```
+
+### 3. **Analytics and Monitoring**
+Track usage and improve the system:
+
+```python
+def log_question(question: str, answer: str, user: str, confidence: str):
+    """Log questions for analytics"""
+    # In production, send to analytics service
+    print(f"Q&A Log: {user} asked '{question}' -> confidence: {confidence}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Slack Integration" icon="slack" href="/how-to/advanced-tasks">
+    Learn how to integrate with Slack and other communication tools
+  </Card>
+  <Card title="Database Integration" icon="database" href="/how-to/advanced-tasks">
+    Connect to real databases for dynamic knowledge management
+  </Card>
+  <Card title="Vector Search" icon="search" href="/how-to/advanced-tasks">
+    Implement semantic search for better results
+  </Card>
+  <Card title="Analytics" icon="chart-bar" href="/how-to/advanced-tasks">
+    Add analytics and monitoring to track usage
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Excellent work!** You've built a production-ready internal Q&A system that can centralize your team's knowledge and make it accessible from anywhere. This is a powerful tool for improving team productivity and knowledge sharing!
+</Note>
+
+<NeedHelp context="Internal Q&A Agent" />

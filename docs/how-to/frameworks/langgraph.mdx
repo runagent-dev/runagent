@@ -1,0 +1,550 @@
+---
+title: 'LangGraph Integration'
+description: 'Deploy LangGraph agents with RunAgent'
+icon: 'diagram-project'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Basic understanding of LangGraph and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+LangGraph is a powerful framework for building stateful, multi-step AI agents with complex workflows. RunAgent makes it easy to deploy LangGraph agents and access them from any programming language.
+
+## Quick Start
+
+### 1. Create a LangGraph Agent
+
+```bash
+runagent init my-langgraph-agent --framework langgraph
+cd my-langgraph-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Your Agent
+
+The generated `runagent.config.json` will be pre-configured for LangGraph:
+
+```json
+{
+  "agent_name": "my-langgraph-agent",
+  "description": "LangGraph agent with stateful workflows",
+  "framework": "langgraph",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "langgraph_agent",
+        "tag": "main"
+      }
+    ]
+  }
+}
+```
+
+## Basic LangGraph Agent
+
+Here's a simple LangGraph agent that demonstrates the core concepts:
+
+```python agents.py
+from typing import Dict, Any, List
+from langgraph import StateGraph, END
+from langgraph.graph import StateGraph
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_openai import ChatOpenAI
+
+# Define the state structure
+class AgentState:
+    messages: List[Any]
+    user_input: str
+    response: str
+    step_count: int
+
+# Initialize the LLM
+llm = ChatOpenAI(model="gpt-4", temperature=0.7)
+
+def process_input(state: AgentState) -> AgentState:
+    """Process the user input and prepare for reasoning"""
+    state.step_count = 0
+    state.messages = [HumanMessage(content=state.user_input)]
+    return state
+
+def reason_step(state: AgentState) -> AgentState:
+    """Perform reasoning step"""
+    state.step_count += 1
+    
+    # Add reasoning message
+    reasoning = f"Step {state.step_count}: Analyzing the user's request..."
+    state.messages.append(AIMessage(content=reasoning))
+    
+    return state
+
+def generate_response(state: AgentState) -> AgentState:
+    """Generate the final response"""
+    # Get response from LLM
+    response = llm.invoke(state.messages)
+    state.response = response.content
+    state.messages.append(response)
+    
+    return state
+
+def should_continue(state: AgentState) -> str:
+    """Decide whether to continue reasoning or finish"""
+    if state.step_count >= 3:  # Max 3 reasoning steps
+        return "finish"
+    elif "complex" in state.user_input.lower():
+        return "reason"
+    else:
+        return "finish"
+
+# Build the graph
+workflow = StateGraph(AgentState)
+
+# Add nodes
+workflow.add_node("process_input", process_input)
+workflow.add_node("reason", reason_step)
+workflow.add_node("generate_response", generate_response)
+
+# Add edges
+workflow.add_edge("process_input", "reason")
+workflow.add_conditional_edges(
+    "reason",
+    should_continue,
+    {
+        "reason": "reason",
+        "finish": "generate_response"
+    }
+)
+workflow.add_edge("generate_response", END)
+
+# Compile the graph
+app = workflow.compile()
+
+def langgraph_agent(user_input: str) -> Dict[str, Any]:
+    """Main entrypoint for the LangGraph agent"""
+    try:
+        # Initialize state
+        initial_state = AgentState(
+            messages=[],
+            user_input=user_input,
+            response="",
+            step_count=0
+        )
+        
+        # Run the workflow
+        result = app.invoke(initial_state)
+        
+        return {
+            "response": result.response,
+            "step_count": result.step_count,
+            "messages": [msg.content for msg in result.messages],
+            "status": "success"
+        }
+        
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "step_count": 0,
+            "messages": [],
+            "status": "error"
+        }
+```
+
+## Advanced LangGraph Patterns
+
+### 1. Multi-Agent Workflows
+
+```python multi_agent.py
+from typing import Dict, Any, List
+from langgraph import StateGraph, END
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+class MultiAgentState:
+    messages: List[Any]
+    user_input: str
+    researcher_output: str
+    writer_output: str
+    final_response: str
+
+def researcher_agent(state: MultiAgentState) -> MultiAgentState:
+    """Research agent that gathers information"""
+    research_prompt = f"""
+    Research the following topic: {state.user_input}
+    Provide key facts and insights.
+    """
+    
+    # Simulate research (in real app, use web search, databases, etc.)
+    state.researcher_output = f"Research findings for: {state.user_input}"
+    return state
+
+def writer_agent(state: MultiAgentState) -> MultiAgentState:
+    """Writer agent that creates content"""
+    writer_prompt = f"""
+    Based on this research: {state.researcher_output}
+    Create a comprehensive response to: {state.user_input}
+    """
+    
+    # Simulate writing (in real app, use LLM)
+    state.writer_output = f"Written content based on: {state.researcher_output}"
+    return state
+
+def coordinator_agent(state: MultiAgentState) -> MultiAgentState:
+    """Coordinator that combines outputs"""
+    state.final_response = f"""
+    Research: {state.researcher_output}
+    
+    Content: {state.writer_output}
+    
+    Final Response: Based on the research and writing, here's the complete answer.
+    """
+    return state
+
+# Build multi-agent workflow
+multi_workflow = StateGraph(MultiAgentState)
+
+multi_workflow.add_node("researcher", researcher_agent)
+multi_workflow.add_node("writer", writer_agent)
+multi_workflow.add_node("coordinator", coordinator_agent)
+
+multi_workflow.add_edge("researcher", "writer")
+multi_workflow.add_edge("writer", "coordinator")
+multi_workflow.add_edge("coordinator", END)
+
+multi_app = multi_workflow.compile()
+
+def multi_agent_workflow(user_input: str) -> Dict[str, Any]:
+    """Multi-agent workflow entrypoint"""
+    initial_state = MultiAgentState(
+        messages=[],
+        user_input=user_input,
+        researcher_output="",
+        writer_output="",
+        final_response=""
+    )
+    
+    result = multi_app.invoke(initial_state)
+    
+    return {
+        "response": result.final_response,
+        "research": result.researcher_output,
+        "writing": result.writer_output,
+        "status": "success"
+    }
+```
+
+### 2. Conditional Workflows
+
+```python conditional_workflow.py
+from typing import Dict, Any, List
+from langgraph import StateGraph, END
+
+class ConditionalState:
+    user_input: str
+    intent: str
+    response: str
+    confidence: float
+
+def classify_intent(state: ConditionalState) -> ConditionalState:
+    """Classify user intent"""
+    input_lower = state.user_input.lower()
+    
+    if any(word in input_lower for word in ["question", "what", "how", "why"]):
+        state.intent = "question"
+        state.confidence = 0.9
+    elif any(word in input_lower for word in ["task", "do", "help", "assist"]):
+        state.intent = "task"
+        state.confidence = 0.8
+    else:
+        state.intent = "general"
+        state.confidence = 0.5
+    
+    return state
+
+def handle_question(state: ConditionalState) -> ConditionalState:
+    """Handle question intent"""
+    state.response = f"Answering your question: {state.user_input}"
+    return state
+
+def handle_task(state: ConditionalState) -> ConditionalState:
+    """Handle task intent"""
+    state.response = f"Helping you with this task: {state.user_input}"
+    return state
+
+def handle_general(state: ConditionalState) -> ConditionalState:
+    """Handle general intent"""
+    state.response = f"General response to: {state.user_input}"
+    return state
+
+def route_intent(state: ConditionalState) -> str:
+    """Route based on intent"""
+    return state.intent
+
+# Build conditional workflow
+conditional_workflow = StateGraph(ConditionalState)
+
+conditional_workflow.add_node("classify", classify_intent)
+conditional_workflow.add_node("question_handler", handle_question)
+conditional_workflow.add_node("task_handler", handle_task)
+conditional_workflow.add_node("general_handler", handle_general)
+
+conditional_workflow.add_edge("classify", "route")
+conditional_workflow.add_conditional_edges(
+    "classify",
+    route_intent,
+    {
+        "question": "question_handler",
+        "task": "task_handler",
+        "general": "general_handler"
+    }
+)
+conditional_workflow.add_edge("question_handler", END)
+conditional_workflow.add_edge("task_handler", END)
+conditional_workflow.add_edge("general_handler", END)
+
+conditional_app = conditional_workflow.compile()
+
+def conditional_agent(user_input: str) -> Dict[str, Any]:
+    """Conditional workflow entrypoint"""
+    initial_state = ConditionalState(
+        user_input=user_input,
+        intent="",
+        response="",
+        confidence=0.0
+    )
+    
+    result = conditional_app.invoke(initial_state)
+    
+    return {
+        "response": result.response,
+        "intent": result.intent,
+        "confidence": result.confidence,
+        "status": "success"
+    }
+```
+
+## Streaming with LangGraph
+
+LangGraph agents can also provide streaming responses:
+
+```python streaming_agent.py
+from typing import Iterator, Dict, Any
+from langgraph import StateGraph, END
+
+def streaming_langgraph_agent(user_input: str) -> Iterator[str]:
+    """Streaming LangGraph agent"""
+    yield f"🤖 Starting LangGraph workflow for: {user_input}\n\n"
+    
+    # Simulate workflow steps
+    steps = [
+        "📝 Processing input...",
+        "🧠 Analyzing context...",
+        "🔍 Gathering information...",
+        "💭 Reasoning through solution...",
+        "✍️ Generating response...",
+        "✅ Finalizing output..."
+    ]
+    
+    for i, step in enumerate(steps):
+        yield f"Step {i+1}: {step}\n"
+        # Simulate processing time
+        import time
+        time.sleep(0.5)
+    
+    yield f"\n🎉 Workflow complete! Response: {user_input} processed successfully."
+```
+
+## Configuration for Multiple Entrypoints
+
+Update your `runagent.config.json` to include multiple LangGraph workflows:
+
+```json
+{
+  "agent_name": "advanced-langgraph-agent",
+  "description": "Advanced LangGraph agent with multiple workflows",
+  "framework": "langgraph",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agents.py",
+        "module": "langgraph_agent",
+        "tag": "basic"
+      },
+      {
+        "file": "multi_agent.py",
+        "module": "multi_agent_workflow",
+        "tag": "multi_agent"
+      },
+      {
+        "file": "conditional_workflow.py",
+        "module": "conditional_agent",
+        "tag": "conditional"
+      },
+      {
+        "file": "streaming_agent.py",
+        "module": "streaming_langgraph_agent",
+        "tag": "streaming"
+      }
+    ]
+  }
+}
+```
+
+## Testing Your LangGraph Agent
+
+### Python Client
+
+```python test_langgraph.py
+from runagent import RunAgentClient
+
+# Connect to your LangGraph agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="basic",
+    local=True
+)
+
+# Test basic workflow
+result = client.run(user_input="What is the capital of France?")
+print(f"Response: {result['response']}")
+print(f"Steps: {result['step_count']}")
+
+# Test multi-agent workflow
+multi_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="multi_agent",
+    local=True
+)
+
+multi_result = multi_client.run(user_input="Explain quantum computing")
+print(f"Multi-agent response: {multi_result['response']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="streaming",
+    local=True
+)
+
+print("Streaming response:")
+for chunk in stream_client.run(user_input="Process this data"):
+    print(chunk, end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript test_langgraph.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'basic',
+    local: true
+});
+
+await client.initialize();
+
+const result = await client.run({
+    user_input: 'What is the capital of France?'
+});
+
+console.log('Response:', result.response);
+console.log('Steps:', result.step_count);
+```
+
+## Best Practices
+
+### 1. **State Management**
+- Keep state objects simple and focused
+- Use clear naming conventions
+- Avoid deep nesting in state
+
+### 2. **Error Handling**
+- Wrap workflow execution in try-catch blocks
+- Provide meaningful error messages
+- Log errors for debugging
+
+### 3. **Performance Optimization**
+- Use conditional edges to avoid unnecessary steps
+- Implement early termination when possible
+- Cache expensive operations
+
+### 4. **Testing**
+- Test each node independently
+- Test the complete workflow
+- Use mock data for testing
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Research and Writing Workflow">
+    Use LangGraph to create agents that research topics and then write about them.
+  </Accordion>
+  <Accordion title="Multi-Step Problem Solving">
+    Break complex problems into smaller steps with conditional logic.
+  </Accordion>
+  <Accordion title="Agent Collaboration">
+    Create multiple specialized agents that work together.
+  </Accordion>
+  <Accordion title="Human-in-the-Loop">
+    Add human approval steps for critical decisions.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **State Serialization Errors**
+   - Ensure all state fields are serializable
+   - Use simple data types when possible
+
+2. **Graph Compilation Errors**
+   - Check that all nodes are properly defined
+   - Verify edge connections are correct
+
+3. **Memory Issues**
+   - Limit the number of messages in state
+   - Implement state cleanup for long conversations
+
+### Debug Tips
+
+```python
+# Add debugging to your workflows
+def debug_node(state: AgentState) -> AgentState:
+    print(f"Debug: Current state = {state}")
+    return state
+
+# Add debug node to your workflow
+workflow.add_node("debug", debug_node)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Patterns" icon="cog" href="/how-to/advanced-tasks">
+    Learn advanced LangGraph patterns and techniques
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your LangGraph agent to production
+  </Card>
+  <Card title="Multi-Language Access" icon="globe" href="/tutorials/multi-language-wrapper">
+    Access your LangGraph agent from different languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your LangGraph workflows for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great job!** You've learned how to deploy LangGraph agents with RunAgent. LangGraph's powerful workflow capabilities combined with RunAgent's multi-language access make for a powerful combination!
+</Note>
+
+<NeedHelp context="LangGraph Integration" />

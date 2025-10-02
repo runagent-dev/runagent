@@ -1,0 +1,1186 @@
+---
+title: 'Call from Go'
+description: 'Use RunAgent agents from Go applications'
+icon: 'golang'
+---
+
+<Info>
+  **Prerequisites**: Go 1.19+ and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+The Go SDK provides idiomatic access to RunAgent agents with context-aware operations, channel-based streaming, and concurrent processing. It's designed to work seamlessly with Go's concurrency model and error handling patterns.
+
+## Installation
+
+```bash
+go get github.com/runagent-dev/runagent-go
+```
+
+## Basic Usage
+
+### Synchronous Calls
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    // Create client
+    c, err := client.NewWithAddress(
+        "your_agent_id_here",
+        "main",
+        true, // local
+        "localhost",
+        8451,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    // Create context with timeout
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    // Call your agent
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": "Hello, how are you?",
+        "userId":  "go_user",
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+### Asynchronous Calls
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    c, err := client.NewWithAddress(
+        "your_agent_id_here",
+        "main",
+        true,
+        "localhost",
+        8451,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    // Run multiple requests concurrently
+    var wg sync.WaitGroup
+    results := make(chan string, 5)
+
+    for i := 0; i < 5; i++ {
+        wg.Add(1)
+        go func(i int) {
+            defer wg.Done()
+            
+            ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+            defer cancel()
+
+            result, err := c.Run(ctx, map[string]interface{}{
+                "message": fmt.Sprintf("Request %d", i),
+                "userId":  "go_user",
+            })
+            if err != nil {
+                log.Printf("Request %d failed: %v", i, err)
+                return
+            }
+
+            results <- fmt.Sprintf("Request %d: %v", i, result)
+        }(i)
+    }
+
+    // Close results channel when all goroutines are done
+    go func() {
+        wg.Wait()
+        close(results)
+    }()
+
+    // Print results
+    for result := range results {
+        fmt.Println(result)
+    }
+}
+```
+
+## Advanced Features
+
+### 1. Streaming Responses
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    c, err := client.NewWithAddress(
+        "your_agent_id_here",
+        "streaming", // Note: tag ends with _stream
+        true,
+        "localhost",
+        8451,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    // Stream responses
+    stream, err := c.RunStream(ctx, map[string]interface{}{
+        "message": "Tell me a story",
+        "userId":  "go_user",
+    })
+    if err != nil {
+        log.Fatalf("Failed to start stream: %v", err)
+    }
+    defer stream.Close()
+
+    // Process stream
+    for {
+        data, hasMore, err := stream.Next(ctx)
+        if err != nil {
+            log.Fatalf("Stream error: %v", err)
+        }
+        if !hasMore {
+            break
+        }
+        fmt.Print(data)
+    }
+}
+```
+
+### 2. Error Handling
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    c, err := client.NewWithAddress(
+        "your_agent_id_here",
+        "main",
+        true,
+        "localhost",
+        8451,
+    )
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": "Test message",
+    })
+    if err != nil {
+        // Handle different error types
+        switch err.(type) {
+        case *client.AuthenticationError:
+            log.Fatal("Authentication failed. Check your API key.")
+        case *client.AgentNotFoundError:
+            log.Fatal("Agent not found. Check your agent ID.")
+        case *client.ValidationError:
+            log.Fatalf("Validation error: %v", err)
+        case *client.RateLimitError:
+            log.Fatal("Rate limit exceeded. Please wait and try again.")
+        case *client.TimeoutError:
+            log.Fatal("Request timed out. Please try again.")
+        case *client.NetworkError:
+            log.Fatal("Network error. Check your connection.")
+        default:
+            log.Fatalf("Unexpected error: %v", err)
+        }
+    }
+
+    fmt.Printf("Success: %v\n", result)
+}
+```
+
+### 3. Custom Headers and Metadata
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    // Create client with custom configuration
+    c, err := client.NewWithConfig(client.Config{
+        AgentID:       "your_agent_id_here",
+        EntrypointTag: "main",
+        Local:         true,
+        Host:          "localhost",
+        Port:          8451,
+        Headers: map[string]string{
+            "X-Request-ID": "unique-request-id",
+            "X-User-ID":    "go_user",
+        },
+        Timeout: 30 * time.Second,
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": "Hello with custom headers",
+        "metadata": map[string]interface{}{
+            "source":  "go_app",
+            "version": "1.0.0",
+        },
+    })
+    if err != nil {
+        log.Fatalf("Failed to run agent: %v", err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Set API key
+export RUNAGENT_API_KEY="your-api-key"
+
+# Set API URL
+export RUNAGENT_API_URL="https://api.run-agent.ai"
+
+# Set default agent ID
+export RUNAGENT_AGENT_ID="your-agent-id"
+```
+
+### Configuration File
+
+Create `~/.runagent/config.json`:
+
+```json
+{
+  "apiKey": "your-api-key",
+  "apiUrl": "https://api.run-agent.ai",
+  "defaultAgentId": "your-agent-id",
+  "timeout": 30000,
+  "retryAttempts": 3
+}
+```
+
+### Programmatic Configuration
+
+```go
+package main
+
+import (
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    c, err := client.NewWithConfig(client.Config{
+        AgentID:       "your_agent_id_here",
+        EntrypointTag: "main",
+        Local:         true,
+        APIKey:        "your-api-key",
+        APIURL:        "https://api.run-agent.ai",
+        Timeout:       30 * time.Second,
+        RetryAttempts: 3,
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+}
+```
+
+## Best Practices
+
+### 1. **Connection Management**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type AgentManager struct {
+    client *client.Client
+    mu     sync.RWMutex
+}
+
+func NewAgentManager(agentID, entrypointTag string) (*AgentManager, error) {
+    c, err := client.NewWithAddress(agentID, entrypointTag, true, "localhost", 8451)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &AgentManager{client: c}, nil
+}
+
+func (am *AgentManager) Run(ctx context.Context, message string, options map[string]interface{}) (interface{}, error) {
+    am.mu.RLock()
+    defer am.mu.RUnlock()
+    
+    params := map[string]interface{}{
+        "message": message,
+    }
+    
+    // Merge options
+    for k, v := range options {
+        params[k] = v
+    }
+    
+    return am.client.Run(ctx, params)
+}
+
+func (am *AgentManager) Close() error {
+    am.mu.Lock()
+    defer am.mu.Unlock()
+    
+    if am.client != nil {
+        am.client.Close()
+        am.client = nil
+    }
+    return nil
+}
+
+// Usage
+func main() {
+    manager, err := NewAgentManager("your_agent_id", "main")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer manager.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := manager.Run(ctx, "Hello", map[string]interface{}{
+        "userId": "go_user",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+### 2. **Retry Logic**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "math"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func runWithRetry(c *client.Client, ctx context.Context, message string, maxRetries int) (interface{}, error) {
+    var lastErr error
+    
+    for attempt := 0; attempt < maxRetries; attempt++ {
+        result, err := c.Run(ctx, map[string]interface{}{
+            "message": message,
+        })
+        
+        if err == nil {
+            return result, nil
+        }
+        
+        lastErr = err
+        
+        if attempt < maxRetries-1 {
+            // Exponential backoff
+            backoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+            time.Sleep(backoff)
+        }
+    }
+    
+    return nil, lastErr
+}
+
+func main() {
+    c, err := client.NewWithAddress("your_agent_id", "main", true, "localhost", 8451)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+    defer cancel()
+
+    result, err := runWithRetry(c, ctx, "Hello with retry", 3)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+### 3. **Logging and Monitoring**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type MonitoredAgent struct {
+    client *client.Client
+    logger *log.Logger
+}
+
+func NewMonitoredAgent(agentID, entrypointTag string, logger *log.Logger) (*MonitoredAgent, error) {
+    c, err := client.NewWithAddress(agentID, entrypointTag, true, "localhost", 8451)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &MonitoredAgent{
+        client: c,
+        logger: logger,
+    }, nil
+}
+
+func (ma *MonitoredAgent) Run(ctx context.Context, message string) (interface{}, error) {
+    ma.logger.Printf("Starting request: %s", message)
+    startTime := time.Now()
+    
+    result, err := ma.client.Run(ctx, map[string]interface{}{
+        "message": message,
+    })
+    
+    duration := time.Since(startTime)
+    
+    if err != nil {
+        ma.logger.Printf("Request failed after %v: %v", duration, err)
+        return nil, err
+    }
+    
+    ma.logger.Printf("Request completed in %v", duration)
+    return result, nil
+}
+
+func (ma *MonitoredAgent) Close() {
+    ma.client.Close()
+}
+
+// Usage
+func main() {
+    logger := log.New(os.Stdout, "[AGENT] ", log.LstdFlags)
+    
+    agent, err := NewMonitoredAgent("your_agent_id", "main", logger)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer agent.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := agent.Run(ctx, "Hello with monitoring")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+## Common Patterns
+
+### 1. **Agent Factory Pattern**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type AgentFactory struct {
+    baseConfig client.Config
+}
+
+func NewAgentFactory(baseConfig client.Config) *AgentFactory {
+    return &AgentFactory{baseConfig: baseConfig}
+}
+
+func (af *AgentFactory) GetAgent(agentID, entrypointTag string) (*client.Client, error) {
+    config := af.baseConfig
+    config.AgentID = agentID
+    config.EntrypointTag = entrypointTag
+    
+    return client.NewWithConfig(config)
+}
+
+func (af *AgentFactory) GetChatAgent(agentID string) (*client.Client, error) {
+    return af.GetAgent(agentID, "chat")
+}
+
+func (af *AgentFactory) GetAnalysisAgent(agentID string) (*client.Client, error) {
+    return af.GetAgent(agentID, "analyze")
+}
+
+// Usage
+func main() {
+    factory := NewAgentFactory(client.Config{
+        Local:   true,
+        Timeout: 30 * time.Second,
+    })
+    
+    chatAgent, err := factory.GetChatAgent("your_agent_id")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer chatAgent.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := chatAgent.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+### 2. **Agent Wrapper Pattern**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type AgentWrapper struct {
+    client       *client.Client
+    agentID      string
+    entrypointTag string
+}
+
+func NewAgentWrapper(agentID, entrypointTag string, options client.Config) (*AgentWrapper, error) {
+    c, err := client.NewWithConfig(options)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &AgentWrapper{
+        client:       c,
+        agentID:      agentID,
+        entrypointTag: entrypointTag,
+    }, nil
+}
+
+func (aw *AgentWrapper) Call(ctx context.Context, options map[string]interface{}) (interface{}, error) {
+    return aw.client.Run(ctx, options)
+}
+
+func (aw *AgentWrapper) Chat(ctx context.Context, message, userID string) (string, error) {
+    result, err := aw.client.Run(ctx, map[string]interface{}{
+        "message": message,
+        "userId":  userID,
+    })
+    if err != nil {
+        return "", err
+    }
+    
+    // Extract response from result
+    if response, ok := result.(map[string]interface{})["response"]; ok {
+        return fmt.Sprintf("%v", response), nil
+    }
+    
+    return fmt.Sprintf("%v", result), nil
+}
+
+func (aw *AgentWrapper) Analyze(ctx context.Context, data, analysisType string) (interface{}, error) {
+    return aw.client.Run(ctx, map[string]interface{}{
+        "data":          data,
+        "analysisType": analysisType,
+    })
+}
+
+func (aw *AgentWrapper) Stream(ctx context.Context, message string) (string, error) {
+    stream, err := aw.client.RunStream(ctx, map[string]interface{}{
+        "message": message,
+    })
+    if err != nil {
+        return "", err
+    }
+    defer stream.Close()
+
+    var response string
+    for {
+        data, hasMore, err := stream.Next(ctx)
+        if err != nil {
+            return "", err
+        }
+        if !hasMore {
+            break
+        }
+        response += fmt.Sprintf("%v", data)
+    }
+    
+    return response, nil
+}
+
+func (aw *AgentWrapper) Close() {
+    aw.client.Close()
+}
+
+// Usage
+func main() {
+    agent, err := NewAgentWrapper("your_agent_id", "main", client.Config{
+        Local:   true,
+        Timeout: 30 * time.Second,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer agent.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    response, err := agent.Chat(ctx, "Hello, how are you?", "go_user")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %s\n", response)
+}
+```
+
+### 3. **Agent Pool Pattern**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type AgentPool struct {
+    agents []*client.Client
+    mu     sync.RWMutex
+    index  int
+}
+
+func NewAgentPool(agentConfigs []client.Config) (*AgentPool, error) {
+    agents := make([]*client.Client, len(agentConfigs))
+    
+    for i, config := range agentConfigs {
+        agent, err := client.NewWithConfig(config)
+        if err != nil {
+            return nil, err
+        }
+        agents[i] = agent
+    }
+    
+    return &AgentPool{agents: agents}, nil
+}
+
+func (ap *AgentPool) GetAgent() *client.Client {
+    ap.mu.Lock()
+    defer ap.mu.Unlock()
+    
+    agent := ap.agents[ap.index]
+    ap.index = (ap.index + 1) % len(ap.agents)
+    return agent
+}
+
+func (ap *AgentPool) Call(ctx context.Context, options map[string]interface{}) (interface{}, error) {
+    agent := ap.GetAgent()
+    return agent.Run(ctx, options)
+}
+
+func (ap *AgentPool) Close() {
+    ap.mu.Lock()
+    defer ap.mu.Unlock()
+    
+    for _, agent := range ap.agents {
+        agent.Close()
+    }
+}
+
+// Usage
+func main() {
+    pool, err := NewAgentPool([]client.Config{
+        {AgentID: "agent1", EntrypointTag: "main", Local: true},
+        {AgentID: "agent2", EntrypointTag: "main", Local: true},
+        {AgentID: "agent3", EntrypointTag: "main", Local: true},
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer pool.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := pool.Call(ctx, map[string]interface{}{
+        "message": "Hello from pool",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+## Error Handling
+
+### Common Error Types
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func handleErrors(c *client.Client, ctx context.Context, message string) {
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": message,
+    })
+    
+    if err != nil {
+        switch err.(type) {
+        case *client.AuthenticationError:
+            log.Fatal("Authentication failed. Check your API key.")
+        case *client.AgentNotFoundError:
+            log.Fatal("Agent not found. Check your agent ID.")
+        case *client.ValidationError:
+            log.Fatalf("Validation error: %v", err)
+        case *client.RateLimitError:
+            log.Fatal("Rate limit exceeded. Please wait and try again.")
+        case *client.TimeoutError:
+            log.Fatal("Request timed out. Please try again.")
+        case *client.NetworkError:
+            log.Fatal("Network error. Check your connection.")
+        default:
+            log.Fatalf("Unexpected error: %v", err)
+        }
+    }
+    
+    fmt.Printf("Success: %v\n", result)
+}
+```
+
+## Performance Optimization
+
+### 1. **Connection Pooling**
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type ConnectionPool struct {
+    pool  []*client.Client
+    mu    sync.RWMutex
+    index int
+}
+
+func NewConnectionPool(agentID, entrypointTag string, poolSize int) (*ConnectionPool, error) {
+    pool := make([]*client.Client, poolSize)
+    
+    for i := 0; i < poolSize; i++ {
+        c, err := client.NewWithAddress(agentID, entrypointTag, true, "localhost", 8451)
+        if err != nil {
+            return nil, err
+        }
+        pool[i] = c
+    }
+    
+    return &ConnectionPool{pool: pool}, nil
+}
+
+func (cp *ConnectionPool) GetClient() *client.Client {
+    cp.mu.Lock()
+    defer cp.mu.Unlock()
+    
+    client := cp.pool[cp.index]
+    cp.index = (cp.index + 1) % len(cp.pool)
+    return client
+}
+
+func (cp *ConnectionPool) Run(ctx context.Context, options map[string]interface{}) (interface{}, error) {
+    client := cp.GetClient()
+    return client.Run(ctx, options)
+}
+
+func (cp *ConnectionPool) Close() {
+    cp.mu.Lock()
+    defer cp.mu.Unlock()
+    
+    for _, client := range cp.pool {
+        client.Close()
+    }
+}
+
+// Usage
+func main() {
+    pool, err := NewConnectionPool("your_agent_id", "main", 5)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer pool.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := pool.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+### 2. **Caching**
+
+```go
+package main
+
+import (
+    "context"
+    "crypto/md5"
+    "fmt"
+    "log"
+    "sync"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+type CachedAgent struct {
+    client *client.Client
+    cache  map[string]interface{}
+    mu     sync.RWMutex
+}
+
+func NewCachedAgent(agentID, entrypointTag string) (*CachedAgent, error) {
+    c, err := client.NewWithAddress(agentID, entrypointTag, true, "localhost", 8451)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &CachedAgent{
+        client: c,
+        cache:  make(map[string]interface{}),
+    }, nil
+}
+
+func (ca *CachedAgent) cacheKey(options map[string]interface{}) string {
+    // Simple cache key generation (in production, use a proper hash)
+    key := fmt.Sprintf("%v", options)
+    hash := md5.Sum([]byte(key))
+    return fmt.Sprintf("%x", hash)
+}
+
+func (ca *CachedAgent) Run(ctx context.Context, options map[string]interface{}) (interface{}, error) {
+    cacheKey := ca.cacheKey(options)
+    
+    ca.mu.RLock()
+    if result, exists := ca.cache[cacheKey]; exists {
+        ca.mu.RUnlock()
+        return result, nil
+    }
+    ca.mu.RUnlock()
+    
+    result, err := ca.client.Run(ctx, options)
+    if err != nil {
+        return nil, err
+    }
+    
+    ca.mu.Lock()
+    ca.cache[cacheKey] = result
+    ca.mu.Unlock()
+    
+    return result, nil
+}
+
+func (ca *CachedAgent) Close() {
+    ca.client.Close()
+}
+
+// Usage
+func main() {
+    cachedAgent, err := NewCachedAgent("your_agent_id", "main")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer cachedAgent.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := cachedAgent.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Response: %v\n", result)
+}
+```
+
+## Testing
+
+### Unit Testing
+
+```go
+package main
+
+import (
+    "context"
+    "testing"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func TestAgentClient(t *testing.T) {
+    c, err := client.NewWithAddress("test_agent", "main", true, "localhost", 8451)
+    if err != nil {
+        t.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        t.Fatalf("Failed to run agent: %v", err)
+    }
+
+    if result == nil {
+        t.Error("Expected non-nil result")
+    }
+}
+
+func TestAgentClientError(t *testing.T) {
+    c, err := client.NewWithAddress("invalid_agent", "main", true, "localhost", 8451)
+    if err != nil {
+        t.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    _, err = c.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err == nil {
+        t.Error("Expected error for invalid agent")
+    }
+}
+```
+
+### Integration Testing
+
+```go
+package main
+
+import (
+    "context"
+    "testing"
+    "time"
+    
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func TestAgentIntegration(t *testing.T) {
+    c, err := client.NewWithAddress("test_agent", "main", true, "localhost", 8451)
+    if err != nil {
+        t.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    result, err := c.Run(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        t.Fatalf("Failed to run agent: %v", err)
+    }
+
+    if result == nil {
+        t.Error("Expected non-nil result")
+    }
+}
+
+func TestAgentStreaming(t *testing.T) {
+    c, err := client.NewWithAddress("test_agent", "streaming", true, "localhost", 8451)
+    if err != nil {
+        t.Fatalf("Failed to create client: %v", err)
+    }
+    defer c.Close()
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    stream, err := c.RunStream(ctx, map[string]interface{}{
+        "message": "Hello",
+    })
+    if err != nil {
+        t.Fatalf("Failed to start stream: %v", err)
+    }
+    defer stream.Close()
+
+    var response string
+    for {
+        data, hasMore, err := stream.Next(ctx)
+        if err != nil {
+            t.Fatalf("Stream error: %v", err)
+        }
+        if !hasMore {
+            break
+        }
+        response += fmt.Sprintf("%v", data)
+    }
+
+    if response == "" {
+        t.Error("Expected non-empty response")
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Concurrency Patterns" icon="async" href="/how-to/advanced-tasks">
+    Learn advanced concurrency patterns for Go
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your Go applications to production
+  </Card>
+  <Card title="Multi-Language Integration" icon="globe" href="/tutorials/multi-language-wrapper">
+    Integrate with other programming languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your Go applications for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You've learned how to use RunAgent agents from Go applications. The Go SDK provides idiomatic access with context-aware operations and channel-based streaming!
+</Note>
