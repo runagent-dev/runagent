@@ -1,0 +1,28 @@
+---
+title: 'Reference Overview'
+description: 'Canonical specs for API, SDKs, CLI, config and errors'
+icon: 'book'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+If you need **exact parameters**, this is the source of truth.
+
+<Cards num={3}>
+  <Card title="API Reference" href="./api/introduction" arrow>
+    Base URL, auth, endpoints, streaming protocol, status codes.
+  </Card>
+  <Card title="SDK Reference" href="./sdk/overview" arrow>
+    Python, JS, Go, Rust — with a parity matrix.
+  </Card>
+  <Card title="CLI Reference" href="./cli" />
+  <Card title="Config schema" href="./config-schema" />
+  <Card title="Error catalog" href="./errors" />
+  <Card title="(Soon) Rate limits" href="./api/rate-limits" />
+</Cards>
+
+<Note>
+Reference pages should be **exhaustive** and **de-duplicated**. Link here from tutorials/how-tos.
+</Note>
+
+<NeedHelp context="Reference" />
