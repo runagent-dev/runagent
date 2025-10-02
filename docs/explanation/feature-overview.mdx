@@ -1,0 +1,66 @@
+---
+title: 'Feature Overview'
+description: 'A high-level map of what RunAgent can do today — and what is coming'
+icon: 'rocket'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+> See what RunAgent supports — from sandbox microVM deployment to streaming SDKs, security, observability, and agent workflows.
+
+## Start Small, Scale Big
+
+<Cards num={3}>
+  <Card title="Deploy & Call in Minutes" href="/tutorials/deploy-your-first-agent" arrow>
+    Write one Python function, deploy it, and call it from any language.
+  </Card>
+  <Card title="Frameworks & Integration" href="/explanation/frameworks-overview" arrow>
+    Use LangGraph, CrewAI, or your own custom agent.
+  </Card>
+  <Card title="SDKs & API" href="/reference/sdk/overview" arrow>
+    Full SDKs in Python, JS, Go, Rust; REST/WS APIs with streaming.
+  </Card>
+</Cards>
+
+---
+
+## Capabilities at a Glance
+
+| Feature | What It Enables |
+|---|---|
+| **Sandboxed MicroVMs** | Each agent runs in isolation (Firecracker-based), for security and containment |
+| **Autoscaling & Concurrency** | RunAgent scales agents automatically under load, handles cold starts |
+| **Streaming Token Responses** | Clients receive tokens as they are generated — ideal for chat UIs |
+| **Cross-Language Access** | Call the same agent from JS, Go, Python, Rust without extra infra |
+| **State & Memory** *(coming soon)* | Agents can optionally hold memory across calls for richer behavior |
+| **Security & Auth** *(in progress)* | Agent-scoped API keys, role scopes, sandbox limits |
+| **Telemetry & Observability** *(future)* | Logs, metrics, traces to monitor latency, errors, usage |
+| **Agent-to-Agent (A2A)** *(vision)* | Agents can call and coordinate with other agents |
+| **Versioning, Rollbacks, Rate Limits** *(roadmap)* | Control agent versions, limit usage, revert if needed |
+
+---
+
+## How It Works (High Level)
+
+1. **Write an agent** (one Python function with entrypoint configuration)  
+2. **Deploy to microVMs** — RunAgent handles sandboxing + autoscaling  
+3. **Call via SDK / REST / WS** — streaming, sync calls, multi-language  
+4. **Monitor & scale** — logs, metrics, retries, rate limits  
+5. **Iterate & evolve** — new versions, memory, agent communication  
+
+---
+
+## Next Steps
+
+- 👉 Start with **Deploy your first agent**  
+- 🧭 Explore **Frameworks & How-tos**  
+- 📖 Dive into **SDK / API Reference**  
+- 🔒 Or read about **Architecture & Concepts**
+
+---
+
+<Note>
+This page is a **landing overview**. For detailed instructions, go to the linked pages above.
+</Note>
+
+<NeedHelp context="Features" />
