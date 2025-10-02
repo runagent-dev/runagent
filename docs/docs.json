@@ -28,39 +28,63 @@
     },
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Introduction",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Introduction",
             "pages": [
-              "get-started/introduction",
-              "get-started/installation",
-              "get-started/quickstart",
-              "get-started/core-concepts"
+              "explanation/introduction",
+              "explanation/installation",
+              "explanation/key-concepts-at-a-glance",
+              "explanation/why-runagent",
+              "explanation/feature-overview",
+              "explanation/frameworks-overview",
+              "explanation/quickstart-map"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Tutorials",
+        "groups": [
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/overview",
+              "tutorials/deploy-your-first-agent",
+              "tutorials/customer-support-agent",
+              "tutorials/multi-language-wrapper",
+              "tutorials/internal-qa-agent"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "How-to Guides",
+        "groups": [
+          {
+            "group": "How-to Guides",
+            "pages": [
+              "how-to/overview"
             ]
           },
           {
             "group": "Frameworks",
             "pages": [
-              "frameworks/overview",
-              "frameworks/langgraph",
-              "frameworks/crewai",
-              "frameworks/agno",
-              "frameworks/letta",
-              "frameworks/custom"
+              "how-to/frameworks/langgraph",
+              "how-to/frameworks/crewai",
+              "how-to/frameworks/letta",
+              "how-to/frameworks/agno",
+              "how-to/frameworks/custom"
             ]
           },
           {
-            "group": "Configuration Overview",
+            "group": "Call from Different Languages",
             "pages": [
-              {
-                "group": "Configuration",
-                "pages": [
-                  "configuration/project-structure",
-                  "configuration/config-file",
-                  "configuration/environment"
-                ]
-              }
+              "how-to/call-from-python",
+              "how-to/call-from-javascript",
+              "how-to/call-from-go",
+              "how-to/call-from-rust"
             ]
           },
           {
@@ -71,18 +95,49 @@
             ]
           },
           {
-            "group": "Resources",
+            "group": "Advanced Tasks",
             "pages": [
-              "resources/examples",
-              "resources/troubleshooting",
-              "resources/faq"
+              "how-to/advanced-tasks"
             ]
           }
         ]
       },
       {
-        "tab": "CLI Reference",
+        "tab": "Reference",
         "groups": [
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/overview"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/endpoints/invoke",
+              "api-reference/endpoints/stream",
+              "api-reference/endpoints/health",
+              "api-reference/webhooks",
+              "api-reference/rate-limits",
+              "api-reference/errors"
+            ]
+          },
+          {
+            "group": "SDK Reference",
+            "pages": [
+              "sdk/overview",
+              "sdk/python/getting-started",
+              "sdk/python/sync-client",
+              "sdk/python/async-client",
+              "sdk/python/streaming",
+              "sdk/python/api-reference",
+              "sdk/javascript/getting-started",
+              "sdk/go/getting-started",
+              "sdk/rust/getting-started"
+            ]
+          },
           {
             "group": "CLI Reference",
             "pages": [
@@ -105,91 +160,44 @@
               },
               "cli/examples"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "SDK Reference",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": [
-              "sdk/overview"
-            ]
           },
           {
-            "group": "Python SDK",
+            "group": "Configuration",
             "pages": [
-              "sdk/python/getting-started",
-              "sdk/python/sync-client",
-              "sdk/python/async-client",
-              "sdk/python/streaming",
-              "sdk/python/api-reference"
-            ]
-          },
-          {
-            "group": "Rust SDK",
-            "pages": [
-              "sdk/rust/getting-started",
-              "sdk/rust/async-operations", 
-              "sdk/rust/streaming",
-              "sdk/rust/local-server",
-              "sdk/rust/api-reference"
-              ]
-          },
-          {
-            "group": "Go SDK",
-            "pages": [
-              "sdk/go/getting-started",
-              "sdk/go/langgraph",
-              "sdk/go/ag2_agno",
-              "sdk/go/crewai",
-              "sdk/go/autogen"
-            ]
-          },
-          {
-            "group": "Coming Soon",
-            "pages": [
-              "sdk/coming-soon"
+              "configuration/project-structure",
+              "configuration/config-file",
+              "configuration/environment"
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Explanation",
         "groups": [
           {
-            "group": "Getting Started",
+            "group": "Explanation",
             "pages": [
-              "api-reference/introduction",
-              "api-reference/authentication",
-              "api-reference/errors"
-            ]
-          },
-          {
-            "group": "Agent Endpoints",
-            "pages": [
-              "api-reference/endpoints/invoke",
-              "api-reference/endpoints/stream",
-              "api-reference/endpoints/health"
-            ]
-          },
-          {
-            "group": "Advanced",
-            "pages": [
-              "api-reference/webhooks",
-              "api-reference/rate-limits"
+              "explanation/overview",
+              "explanation/core-concepts",
+              "explanation/architecture-overview",
+              "explanation/production-considerations",
+              "explanation/security",
+              "explanation/changelog",
+              "explanation/roadmap"
             ]
           }
         ]
       },
       {
-        "tab": "Examples",
+        "tab": "Resources",
         "groups": [
           {
-            "group": "Examples",
+            "group": "Resources",
             "pages": [
-              "examples/overview"
+              "resources/overview",
+              "resources/examples",
+              "resources/troubleshooting",
+              "resources/faq"
             ]
           }
         ]

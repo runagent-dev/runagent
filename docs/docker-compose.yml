@@ -1,13 +1,13 @@
 services:
   mintlify:
-    image: node:24.3-slim
+    image: node:24-alpine3.21
     working_dir: /app
     volumes:
       - ./:/app  # Mount your local Mintlify project folder
       - node_modules:/app/node_modules  # Named volume for node_modules
     ports:
       - "3000:3000"  # Expose port 3000
-    command: sh -c "npm install -g mintlify && mintlify dev"
+    command: sh -c "npm install -g mintlify && mintlify dev --port 3333"
     environment:
       - NODE_ENV=development
     restart: unless-stopped
