@@ -1,0 +1,585 @@
+---
+title: 'CrewAI Integration'
+description: 'Deploy CrewAI multi-agent systems with RunAgent'
+icon: 'users'
+---
+
+<Info>
+  **Prerequisites**: Basic understanding of CrewAI and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+CrewAI is a framework for building multi-agent systems where different AI agents collaborate to solve complex tasks. RunAgent makes it easy to deploy CrewAI crews and access them from any programming language.
+
+## Quick Start
+
+### 1. Create a CrewAI Agent
+
+```bash
+runagent init my-crewai-agent --framework crewai
+cd my-crewai-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Your Agent
+
+The generated `runagent.config.json` will be pre-configured for CrewAI:
+
+```json
+{
+  "agent_name": "my-crewai-agent",
+  "description": "CrewAI multi-agent system",
+  "framework": "crewai",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "crew.py",
+        "module": "research_crew",
+        "tag": "research"
+      }
+    ]
+  }
+}
+```
+
+## Basic CrewAI Agent
+
+Here's a simple CrewAI crew that demonstrates the core concepts:
+
+```python crew.py
+from crewai import Agent, Task, Crew, Process
+from langchain_openai import ChatOpenAI
+from typing import Dict, Any, List
+
+# Initialize the LLM
+llm = ChatOpenAI(model="gpt-4", temperature=0.7)
+
+# Define agents
+researcher = Agent(
+    role='Research Analyst',
+    goal='Gather comprehensive information on given topics',
+    backstory='You are an expert research analyst with years of experience in data collection and analysis.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+writer = Agent(
+    role='Content Writer',
+    goal='Create engaging and informative content based on research',
+    backstory='You are a skilled content writer who can transform research into compelling narratives.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+reviewer = Agent(
+    role='Content Reviewer',
+    goal='Review and improve content for accuracy and quality',
+    backstory='You are a meticulous reviewer who ensures content meets high standards.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+def research_crew(topic: str) -> Dict[str, Any]:
+    """Main entrypoint for the research crew"""
+    try:
+        # Define tasks
+        research_task = Task(
+            description=f'Research the topic: {topic}. Gather key facts, statistics, and insights.',
+            agent=researcher,
+            expected_output='A comprehensive research report with key findings'
+        )
+        
+        writing_task = Task(
+            description='Write an engaging article based on the research findings',
+            agent=writer,
+            expected_output='A well-structured article with introduction, body, and conclusion'
+        )
+        
+        review_task = Task(
+            description='Review the article for accuracy, clarity, and quality',
+            agent=reviewer,
+            expected_output='A polished, publication-ready article'
+        )
+        
+        # Create crew
+        crew = Crew(
+            agents=[researcher, writer, reviewer],
+            tasks=[research_task, writing_task, review_task],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        # Execute the crew
+        result = crew.kickoff()
+        
+        return {
+            "topic": topic,
+            "result": str(result),
+            "status": "success",
+            "agents_used": ["researcher", "writer", "reviewer"]
+        }
+        
+    except Exception as e:
+        return {
+            "topic": topic,
+            "result": f"Error: {str(e)}",
+            "status": "error",
+            "agents_used": []
+        }
+```
+
+## Advanced CrewAI Patterns
+
+### 1. Hierarchical Crew Structure
+
+```python hierarchical_crew.py
+from crewai import Agent, Task, Crew, Process
+from typing import Dict, Any, List
+
+# Manager agent
+manager = Agent(
+    role='Project Manager',
+    goal='Coordinate team efforts and ensure project completion',
+    backstory='You are an experienced project manager who excels at team coordination.',
+    verbose=True,
+    allow_delegation=True,
+    llm=llm
+)
+
+# Specialized agents
+data_analyst = Agent(
+    role='Data Analyst',
+    goal='Analyze data and extract insights',
+    backstory='You are a data expert with strong analytical skills.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+content_creator = Agent(
+    role='Content Creator',
+    goal='Create engaging content based on data insights',
+    backstory='You are a creative content creator who makes data accessible.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+quality_assurance = Agent(
+    role='Quality Assurance',
+    goal='Ensure content quality and accuracy',
+    backstory='You are a detail-oriented QA specialist.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+def hierarchical_crew(project_description: str) -> Dict[str, Any]:
+    """Hierarchical crew with manager delegation"""
+    try:
+        # Manager task
+        management_task = Task(
+            description=f'Manage the project: {project_description}. Delegate tasks to appropriate team members.',
+            agent=manager,
+            expected_output='Project plan and task assignments'
+        )
+        
+        # Data analysis task
+        analysis_task = Task(
+            description='Analyze relevant data for the project',
+            agent=data_analyst,
+            expected_output='Data analysis report with key insights'
+        )
+        
+        # Content creation task
+        content_task = Task(
+            description='Create content based on data analysis',
+            agent=content_creator,
+            expected_output='High-quality content ready for review'
+        )
+        
+        # QA task
+        qa_task = Task(
+            description='Review and improve the content',
+            agent=quality_assurance,
+            expected_output='Final, polished content'
+        )
+        
+        # Create crew
+        crew = Crew(
+            agents=[manager, data_analyst, content_creator, quality_assurance],
+            tasks=[management_task, analysis_task, content_task, qa_task],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        result = crew.kickoff()
+        
+        return {
+            "project": project_description,
+            "result": str(result),
+            "status": "success",
+            "structure": "hierarchical"
+        }
+        
+    except Exception as e:
+        return {
+            "project": project_description,
+            "result": f"Error: {str(e)}",
+            "status": "error",
+            "structure": "hierarchical"
+        }
+```
+
+### 2. Parallel Processing Crew
+
+```python parallel_crew.py
+from crewai import Agent, Task, Crew, Process
+from typing import Dict, Any, List
+
+# Parallel processing agents
+market_researcher = Agent(
+    role='Market Researcher',
+    goal='Research market trends and opportunities',
+    backstory='You are a market research expert.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+competitor_analyst = Agent(
+    role='Competitor Analyst',
+    goal='Analyze competitor strategies and positioning',
+    backstory='You are a competitive intelligence specialist.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+customer_researcher = Agent(
+    role='Customer Researcher',
+    goal='Understand customer needs and preferences',
+    backstory='You are a customer insights expert.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+synthesis_agent = Agent(
+    role='Synthesis Agent',
+    goal='Combine insights from all research areas',
+    backstory='You are an expert at synthesizing complex information.',
+    verbose=True,
+    allow_delegation=False,
+    llm=llm
+)
+
+def parallel_crew(research_topic: str) -> Dict[str, Any]:
+    """Parallel processing crew for comprehensive research"""
+    try:
+        # Parallel research tasks
+        market_task = Task(
+            description=f'Research market trends for: {research_topic}',
+            agent=market_researcher,
+            expected_output='Market analysis report'
+        )
+        
+        competitor_task = Task(
+            description=f'Analyze competitors in: {research_topic}',
+            agent=competitor_analyst,
+            expected_output='Competitive analysis report'
+        )
+        
+        customer_task = Task(
+            description=f'Research customer needs for: {research_topic}',
+            agent=customer_researcher,
+            expected_output='Customer insights report'
+        )
+        
+        # Synthesis task
+        synthesis_task = Task(
+            description='Synthesize all research findings into a comprehensive report',
+            agent=synthesis_agent,
+            expected_output='Comprehensive research synthesis'
+        )
+        
+        # Create crew with parallel processing
+        crew = Crew(
+            agents=[market_researcher, competitor_analyst, customer_researcher, synthesis_agent],
+            tasks=[market_task, competitor_task, customer_task, synthesis_task],
+            process=Process.sequential,  # Synthesis happens after parallel tasks
+            verbose=True
+        )
+        
+        result = crew.kickoff()
+        
+        return {
+            "topic": research_topic,
+            "result": str(result),
+            "status": "success",
+            "process": "parallel"
+        }
+        
+    except Exception as e:
+        return {
+            "topic": research_topic,
+            "result": f"Error: {str(e)}",
+            "status": "error",
+            "process": "parallel"
+        }
+```
+
+### 3. Streaming CrewAI Agent
+
+```python streaming_crew.py
+from typing import Iterator, Dict, Any
+from crewai import Agent, Task, Crew, Process
+
+def streaming_crew_agent(topic: str) -> Iterator[str]:
+    """Streaming CrewAI agent with progress updates"""
+    yield f"🚀 Starting CrewAI workflow for: {topic}\n\n"
+    
+    # Simulate crew setup
+    yield "👥 Setting up research crew...\n"
+    yield "  • Research Analyst: Ready\n"
+    yield "  • Content Writer: Ready\n"
+    yield "  • Content Reviewer: Ready\n\n"
+    
+    # Simulate task execution
+    tasks = [
+        "📊 Research Analyst: Gathering information...",
+        "📊 Research Analyst: Analyzing data...",
+        "📊 Research Analyst: Compiling findings...",
+        "✍️ Content Writer: Creating article structure...",
+        "✍️ Content Writer: Writing content...",
+        "✍️ Content Writer: Refining narrative...",
+        "🔍 Content Reviewer: Checking accuracy...",
+        "🔍 Content Reviewer: Improving clarity...",
+        "🔍 Content Reviewer: Finalizing quality...",
+        "✅ Crew: Workflow complete!"
+    ]
+    
+    for i, task in enumerate(tasks):
+        yield f"Step {i+1}: {task}\n"
+        # Simulate processing time
+        import time
+        time.sleep(0.3)
+    
+    yield f"\n🎉 CrewAI workflow complete! Topic '{topic}' processed successfully."
+```
+
+## Configuration for Multiple Crews
+
+Update your `runagent.config.json` to include multiple CrewAI crews:
+
+```json
+{
+  "agent_name": "advanced-crewai-agent",
+  "description": "Advanced CrewAI multi-agent system",
+  "framework": "crewai",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "crew.py",
+        "module": "research_crew",
+        "tag": "research"
+      },
+      {
+        "file": "hierarchical_crew.py",
+        "module": "hierarchical_crew",
+        "tag": "hierarchical"
+      },
+      {
+        "file": "parallel_crew.py",
+        "module": "parallel_crew",
+        "tag": "parallel"
+      },
+      {
+        "file": "streaming_crew.py",
+        "module": "streaming_crew_agent",
+        "tag": "streaming"
+      }
+    ]
+  }
+}
+```
+
+## Testing Your CrewAI Agent
+
+### Python Client
+
+```python test_crewai.py
+from runagent import RunAgentClient
+
+# Connect to your CrewAI agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="research",
+    local=True
+)
+
+# Test research crew
+result = client.run(topic="Artificial Intelligence in Healthcare")
+print(f"Research Result: {result['result']}")
+print(f"Agents Used: {result['agents_used']}")
+
+# Test hierarchical crew
+hierarchical_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="hierarchical",
+    local=True
+)
+
+hierarchical_result = hierarchical_client.run(project_description="Develop a marketing strategy for a new product")
+print(f"Hierarchical Result: {hierarchical_result['result']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="streaming",
+    local=True
+)
+
+print("Streaming CrewAI workflow:")
+for chunk in stream_client.run(topic="Climate Change Solutions"):
+    print(chunk, end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript test_crewai.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'research',
+    local: true
+});
+
+await client.initialize();
+
+const result = await client.run({
+    topic: 'Artificial Intelligence in Healthcare'
+});
+
+console.log('Research Result:', result.result);
+console.log('Agents Used:', result.agents_used);
+```
+
+## Best Practices
+
+### 1. **Agent Design**
+- Give agents clear, specific roles
+- Use descriptive backstories
+- Set appropriate delegation permissions
+
+### 2. **Task Definition**
+- Make tasks specific and measurable
+- Set clear expected outputs
+- Consider task dependencies
+
+### 3. **Crew Organization**
+- Choose appropriate process (sequential vs hierarchical)
+- Balance agent specialization with collaboration
+- Monitor crew performance
+
+### 4. **Error Handling**
+- Implement try-catch blocks
+- Provide meaningful error messages
+- Log errors for debugging
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Research and Analysis Crew">
+    Use multiple agents to research topics from different angles and synthesize findings.
+  </Accordion>
+  <Accordion title="Content Creation Pipeline">
+    Create a pipeline of agents for content creation, editing, and review.
+  </Accordion>
+  <Accordion title="Problem-Solving Crew">
+    Deploy specialized agents to tackle different aspects of complex problems.
+  </Accordion>
+  <Accordion title="Quality Assurance Workflow">
+    Use multiple reviewers to ensure high-quality outputs.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Agent Communication Errors**
+   - Check agent delegation settings
+   - Ensure proper task dependencies
+   - Verify agent roles are clear
+
+2. **Task Execution Failures**
+   - Review task descriptions
+   - Check expected outputs
+   - Verify agent capabilities
+
+3. **Memory Issues**
+   - Limit conversation history
+   - Use appropriate context windows
+   - Implement memory management
+
+### Debug Tips
+
+```python
+# Add debugging to your crews
+def debug_crew(topic: str) -> Dict[str, Any]:
+    print(f"Debug: Starting crew for topic: {topic}")
+    
+    # Your crew logic here
+    
+    print(f"Debug: Crew completed for topic: {topic}")
+    return result
+```
+
+## Performance Optimization
+
+### 1. **Parallel Processing**
+- Use parallel tasks when possible
+- Avoid unnecessary dependencies
+- Optimize agent communication
+
+### 2. **Resource Management**
+- Monitor memory usage
+- Implement timeout handling
+- Use appropriate LLM models
+
+### 3. **Caching**
+- Cache expensive operations
+- Reuse agent instances
+- Implement result caching
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Patterns" icon="cog" href="/how-to/advanced-tasks">
+    Learn advanced CrewAI patterns and techniques
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your CrewAI system to production
+  </Card>
+  <Card title="Multi-Language Access" icon="globe" href="/tutorials/multi-language-wrapper">
+    Access your CrewAI crews from different languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your CrewAI system for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Excellent work!** You've learned how to deploy CrewAI multi-agent systems with RunAgent. CrewAI's collaborative agent approach combined with RunAgent's multi-language access creates powerful distributed AI systems!
+</Note>

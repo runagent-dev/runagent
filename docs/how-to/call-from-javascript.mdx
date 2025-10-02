@@ -1,0 +1,724 @@
+---
+title: 'Call from JavaScript'
+description: 'Use RunAgent agents from JavaScript/Node.js applications'
+icon: 'js'
+---
+
+<Info>
+  **Prerequisites**: Node.js 16+ and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+The JavaScript SDK provides native-feeling access to RunAgent agents with full TypeScript support, async/await patterns, and streaming capabilities. It's designed to work seamlessly in both Node.js and browser environments.
+
+## Installation
+
+```bash
+npm install runagent
+```
+
+## Basic Usage
+
+### Synchronous Calls
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+// Connect to your agent
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true // Set to false for production
+});
+
+// Call your agent
+const result = await client.run({
+    message: 'Hello, how are you?',
+    userId: 'javascript_user'
+});
+
+console.log(`Response: ${result.response}`);
+```
+
+### Asynchronous Calls
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+async function main() {
+    // Connect to your agent
+    const client = new RunAgentClient({
+        agentId: 'your_agent_id_here',
+        entrypointTag: 'main',
+        local: true
+    });
+    
+    // Call your agent asynchronously
+    const result = await client.run({
+        message: 'Hello, how are you?',
+        userId: 'javascript_user'
+    });
+    
+    console.log(`Response: ${result.response}`);
+}
+
+// Run the async function
+main().catch(console.error);
+```
+
+## Advanced Features
+
+### 1. Streaming Responses
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+// Connect to streaming entrypoint
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'streaming', // Note: tag ends with _stream
+    local: true
+});
+
+// Stream responses
+const stream = await client.run({
+    message: 'Tell me a story'
+});
+
+for await (const chunk of stream) {
+    process.stdout.write(chunk);
+}
+```
+
+### 2. Batch Processing
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+async function batchProcessing() {
+    const client = new RunAgentClient({
+        agentId: 'your_agent_id_here',
+        entrypointTag: 'main',
+        local: true
+    });
+    
+    // Process multiple requests concurrently
+    const promises = Array.from({ length: 10 }, (_, i) =>
+        client.run({
+            message: `Process item ${i}`,
+            userId: 'batch_user'
+        })
+    );
+    
+    const results = await Promise.all(promises);
+    
+    results.forEach((result, i) => {
+        console.log(`Item ${i}: ${result.response}`);
+    });
+}
+
+batchProcessing().catch(console.error);
+```
+
+### 3. Error Handling
+
+```javascript
+import { RunAgentClient, RunAgentError } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true
+});
+
+try {
+    const result = await client.run({ message: 'Test message' });
+    console.log(`Success: ${result.response}`);
+} catch (error) {
+    if (error instanceof RunAgentError) {
+        console.error(`RunAgent error: ${error.message}`);
+    } else {
+        console.error(`Unexpected error: ${error.message}`);
+    }
+}
+```
+
+### 4. Custom Headers and Metadata
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true,
+    headers: {
+        'X-Request-ID': 'unique-request-id',
+        'X-User-ID': 'javascript_user'
+    }
+});
+
+const result = await client.run({
+    message: 'Hello with custom headers',
+    metadata: {
+        source: 'javascript_app',
+        version: '1.0.0'
+    }
+});
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Set API key
+export RUNAGENT_API_KEY="your-api-key"
+
+# Set API URL
+export RUNAGENT_API_URL="https://api.run-agent.ai"
+
+# Set default agent ID
+export RUNAGENT_AGENT_ID="your-agent-id"
+```
+
+### Configuration File
+
+Create `~/.runagent/config.json`:
+
+```json
+{
+  "apiKey": "your-api-key",
+  "apiUrl": "https://api.run-agent.ai",
+  "defaultAgentId": "your-agent-id",
+  "timeout": 30000,
+  "retryAttempts": 3
+}
+```
+
+### Programmatic Configuration
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true,
+    apiKey: 'your-api-key',
+    apiUrl: 'https://api.run-agent.ai',
+    timeout: 30000,
+    retryAttempts: 3
+});
+```
+
+## Best Practices
+
+### 1. **Connection Management**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class AgentManager {
+    constructor(agentId, entrypointTag) {
+        this.agentId = agentId;
+        this.entrypointTag = entrypointTag;
+        this.client = null;
+    }
+    
+    async getClient() {
+        if (!this.client) {
+            this.client = new RunAgentClient({
+                agentId: this.agentId,
+                entrypointTag: this.entrypointTag,
+                local: true
+            });
+        }
+        return this.client;
+    }
+    
+    async run(message, options = {}) {
+        const client = await this.getClient();
+        return client.run({ message, ...options });
+    }
+}
+
+// Usage
+const agentManager = new AgentManager('your_agent_id', 'main');
+const result = await agentManager.run('Hello');
+```
+
+### 2. **Retry Logic**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+async function runWithRetry(client, message, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await client.run({ message });
+        } catch (error) {
+            if (attempt === maxRetries - 1) {
+                throw error;
+            }
+            // Exponential backoff
+            await new Promise(resolve => 
+                setTimeout(resolve, Math.pow(2, attempt) * 1000)
+            );
+        }
+    }
+}
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id',
+    entrypointTag: 'main',
+    local: true
+});
+
+const result = await runWithRetry(client, 'Hello with retry');
+```
+
+### 3. **Logging and Monitoring**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class MonitoredAgent {
+    constructor(agentId, entrypointTag) {
+        this.client = new RunAgentClient({
+            agentId,
+            entrypointTag,
+            local: true
+        });
+    }
+    
+    async run(message) {
+        console.log(`Starting request: ${message}`);
+        const startTime = Date.now();
+        
+        try {
+            const result = await this.client.run({ message });
+            const duration = Date.now() - startTime;
+            console.log(`Request completed in ${duration}ms`);
+            return result;
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            console.error(`Request failed after ${duration}ms: ${error.message}`);
+            throw error;
+        }
+    }
+}
+
+// Usage
+const monitoredAgent = new MonitoredAgent('your_agent_id', 'main');
+const result = await monitoredAgent.run('Hello with monitoring');
+```
+
+## Common Patterns
+
+### 1. **Agent Factory Pattern**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class AgentFactory {
+    constructor(baseConfig) {
+        this.baseConfig = baseConfig;
+    }
+    
+    getAgent(agentId, entrypointTag) {
+        return new RunAgentClient({
+            ...this.baseConfig,
+            agentId,
+            entrypointTag
+        });
+    }
+    
+    getChatAgent(agentId) {
+        return this.getAgent(agentId, 'chat');
+    }
+    
+    getAnalysisAgent(agentId) {
+        return this.getAgent(agentId, 'analyze');
+    }
+}
+
+// Usage
+const factory = new AgentFactory({
+    local: true,
+    timeout: 30000
+});
+
+const chatAgent = factory.getChatAgent('your_agent_id');
+const result = await chatAgent.run({ message: 'Hello' });
+```
+
+### 2. **Agent Wrapper Pattern**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class AgentWrapper {
+    constructor(agentId, entrypointTag, options = {}) {
+        this.client = new RunAgentClient({
+            agentId,
+            entrypointTag,
+            ...options
+        });
+        this.agentId = agentId;
+        this.entrypointTag = entrypointTag;
+    }
+    
+    async call(options) {
+        return this.client.run(options);
+    }
+    
+    async chat(message, userId = 'default') {
+        const result = await this.client.run({ message, userId });
+        return result.response || '';
+    }
+    
+    async analyze(data, analysisType = 'summary') {
+        return this.client.run({ data, analysisType });
+    }
+    
+    async stream(message) {
+        let response = '';
+        const stream = await this.client.run({ message });
+        
+        for await (const chunk of stream) {
+            response += chunk;
+        }
+        
+        return response;
+    }
+}
+
+// Usage
+const agent = new AgentWrapper('your_agent_id', 'main', { local: true });
+const response = await agent.chat('Hello, how are you?');
+```
+
+### 3. **Agent Pool Pattern**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class AgentPool {
+    constructor(agentConfigs) {
+        this.agents = agentConfigs.map(config => new RunAgentClient(config));
+        this.currentIndex = 0;
+    }
+    
+    getAgent() {
+        const agent = this.agents[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % this.agents.length;
+        return agent;
+    }
+    
+    async call(options) {
+        const agent = this.getAgent();
+        return agent.run(options);
+    }
+}
+
+// Usage
+const pool = new AgentPool([
+    { agentId: 'agent1', entrypointTag: 'main', local: true },
+    { agentId: 'agent2', entrypointTag: 'main', local: true },
+    { agentId: 'agent3', entrypointTag: 'main', local: true }
+]);
+
+const result = await pool.call({ message: 'Hello from pool' });
+```
+
+## Error Handling
+
+### Common Error Types
+
+```javascript
+import { 
+    RunAgentError,
+    AuthenticationError,
+    AgentNotFoundError,
+    ValidationError,
+    RateLimitError,
+    TimeoutError,
+    NetworkError
+} from 'runagent';
+
+async function handleErrors(client, message) {
+    try {
+        return await client.run({ message });
+    } catch (error) {
+        if (error instanceof AuthenticationError) {
+            console.error('Authentication failed. Check your API key.');
+        } else if (error instanceof AgentNotFoundError) {
+            console.error('Agent not found. Check your agent ID.');
+        } else if (error instanceof ValidationError) {
+            console.error(`Validation error: ${error.message}`);
+        } else if (error instanceof RateLimitError) {
+            console.error('Rate limit exceeded. Please wait and try again.');
+        } else if (error instanceof TimeoutError) {
+            console.error('Request timed out. Please try again.');
+        } else if (error instanceof NetworkError) {
+            console.error('Network error. Check your connection.');
+        } else if (error instanceof RunAgentError) {
+            console.error(`RunAgent error: ${error.message}`);
+        } else {
+            console.error(`Unexpected error: ${error.message}`);
+        }
+        throw error;
+    }
+}
+```
+
+## Performance Optimization
+
+### 1. **Connection Pooling**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+
+class ConnectionPool {
+    constructor(agentId, entrypointTag, poolSize = 5) {
+        this.pool = [];
+        this.agentId = agentId;
+        this.entrypointTag = entrypointTag;
+        
+        // Pre-populate pool
+        for (let i = 0; i < poolSize; i++) {
+            const client = new RunAgentClient({
+                agentId,
+                entrypointTag,
+                local: true
+            });
+            this.pool.push(client);
+        }
+        
+        this.currentIndex = 0;
+    }
+    
+    getClient() {
+        const client = this.pool[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % this.pool.length;
+        return client;
+    }
+    
+    async run(options) {
+        const client = this.getClient();
+        return client.run(options);
+    }
+}
+
+// Usage
+const pool = new ConnectionPool('your_agent_id', 'main', 5);
+const result = await pool.run({ message: 'Hello' });
+```
+
+### 2. **Caching**
+
+```javascript
+import { RunAgentClient } from 'runagent';
+import crypto from 'crypto';
+
+class CachedAgent {
+    constructor(agentId, entrypointTag) {
+        this.client = new RunAgentClient({
+            agentId,
+            entrypointTag,
+            local: true
+        });
+        this.cache = new Map();
+    }
+    
+    _cacheKey(options) {
+        const keyData = JSON.stringify(options, Object.keys(options).sort());
+        return crypto.createHash('md5').update(keyData).digest('hex');
+    }
+    
+    async run(options) {
+        const cacheKey = this._cacheKey(options);
+        
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+        
+        const result = await this.client.run(options);
+        this.cache.set(cacheKey, result);
+        return result;
+    }
+}
+
+// Usage
+const cachedAgent = new CachedAgent('your_agent_id', 'main');
+const result = await cachedAgent.run({ message: 'Hello' });
+```
+
+## Testing
+
+### Unit Testing
+
+```javascript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { RunAgentClient } from 'runagent';
+
+describe('RunAgentClient', () => {
+    let client;
+    
+    beforeEach(() => {
+        client = new RunAgentClient({
+            agentId: 'test_agent',
+            entrypointTag: 'main',
+            local: true
+        });
+    });
+    
+    it('should run successfully', async () => {
+        // Mock successful response
+        vi.spyOn(client, 'run').mockResolvedValue({
+            response: 'Hello',
+            status: 'success'
+        });
+        
+        const result = await client.run({ message: 'Hello' });
+        
+        expect(result.response).toBe('Hello');
+        expect(client.run).toHaveBeenCalledWith({ message: 'Hello' });
+    });
+    
+    it('should handle errors', async () => {
+        // Mock error response
+        vi.spyOn(client, 'run').mockRejectedValue(new Error('Test error'));
+        
+        await expect(client.run({ message: 'Hello' })).rejects.toThrow('Test error');
+    });
+});
+```
+
+### Integration Testing
+
+```javascript
+import { describe, it, expect } from 'vitest';
+import { RunAgentClient } from 'runagent';
+
+describe('Agent Integration', () => {
+    let client;
+    
+    beforeEach(() => {
+        client = new RunAgentClient({
+            agentId: 'test_agent',
+            entrypointTag: 'main',
+            local: true
+        });
+    });
+    
+    it('should respond to messages', async () => {
+        const result = await client.run({ message: 'Hello' });
+        
+        expect(result).toHaveProperty('response');
+        expect(result).toHaveProperty('status');
+        expect(result.status).toBe('success');
+    });
+    
+    it('should stream responses', async () => {
+        const stream = await client.run({ message: 'Hello' });
+        let response = '';
+        
+        for await (const chunk of stream) {
+            response += chunk;
+        }
+        
+        expect(response.length).toBeGreaterThan(0);
+    });
+});
+```
+
+## Browser Usage
+
+### HTML Integration
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RunAgent JavaScript Example</title>
+</head>
+<body>
+    <div id="chat-container"></div>
+    <input type="text" id="message-input" placeholder="Type your message...">
+    <button id="send-button">Send</button>
+
+    <script type="module">
+        import { RunAgentClient } from 'https://unpkg.com/runagent@latest/dist/index.js';
+        
+        const client = new RunAgentClient({
+            agentId: 'your_agent_id_here',
+            entrypointTag: 'main',
+            local: true
+        });
+        
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            const userDiv = document.createElement('div');
+            userDiv.textContent = `You: ${message}`;
+            chatContainer.appendChild(userDiv);
+            
+            // Clear input
+            messageInput.value = '';
+            
+            try {
+                // Get agent response
+                const result = await client.run({ message });
+                
+                // Add agent response to chat
+                const agentDiv = document.createElement('div');
+                agentDiv.textContent = `Agent: ${result.response}`;
+                chatContainer.appendChild(agentDiv);
+            } catch (error) {
+                console.error('Error:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.textContent = `Error: ${error.message}`;
+                chatContainer.appendChild(errorDiv);
+            }
+        }
+        
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Async Patterns" icon="async" href="/how-to/advanced-tasks">
+    Learn advanced async patterns for JavaScript
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your JavaScript applications to production
+  </Card>
+  <Card title="Multi-Language Integration" icon="globe" href="/tutorials/multi-language-wrapper">
+    Integrate with other programming languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your JavaScript applications for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You've learned how to use RunAgent agents from JavaScript applications. The JavaScript SDK provides native-feeling access with full TypeScript support and async/await patterns!
+</Note>

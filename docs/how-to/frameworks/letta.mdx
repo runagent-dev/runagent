@@ -1,0 +1,576 @@
+---
+title: 'Letta Integration'
+description: 'Deploy Letta memory-enabled agents with RunAgent'
+icon: 'message'
+---
+
+<Info>
+  **Prerequisites**: Basic understanding of Letta and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+Letta is a framework for building conversational AI agents with persistent memory and context awareness. RunAgent makes it easy to deploy Letta agents and access them from any programming language while maintaining conversation state.
+
+## Quick Start
+
+### 1. Create a Letta Agent
+
+```bash
+runagent init my-letta-agent --framework letta
+cd my-letta-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Your Agent
+
+The generated `runagent.config.json` will be pre-configured for Letta:
+
+```json
+{
+  "agent_name": "my-letta-agent",
+  "description": "Letta conversational agent with memory",
+  "framework": "letta",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_agent",
+        "tag": "chat"
+      }
+    ]
+  }
+}
+```
+
+## Basic Letta Agent
+
+Here's a simple Letta agent that demonstrates memory and conversation capabilities:
+
+```python agent.py
+from letta import Agent, Memory, Tool
+from typing import Dict, Any, List, Optional
+import json
+from datetime import datetime
+
+# Initialize memory
+memory = Memory()
+
+# Define tools
+def get_weather(location: str) -> str:
+    """Get weather information for a location"""
+    # Simulate weather API call
+    return f"Weather in {location}: 72°F, partly cloudy"
+
+def get_time() -> str:
+    """Get current time"""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def remember_fact(fact: str) -> str:
+    """Remember a fact about the user"""
+    memory.store(fact)
+    return f"I'll remember that: {fact}"
+
+def recall_memory(query: str) -> str:
+    """Recall information from memory"""
+    results = memory.search(query)
+    if results:
+        return f"From my memory: {', '.join(results)}"
+    else:
+        return "I don't have that information in my memory."
+
+# Create tools
+tools = [
+    Tool(name="get_weather", function=get_weather, description="Get weather for a location"),
+    Tool(name="get_time", function=get_time, description="Get current time"),
+    Tool(name="remember_fact", function=remember_fact, description="Remember a fact about the user"),
+    Tool(name="recall_memory", function=recall_memory, description="Recall information from memory")
+]
+
+# Create Letta agent
+letta_agent = Agent(
+    name="Assistant",
+    memory=memory,
+    tools=tools,
+    system_message="You are a helpful assistant with memory capabilities. You can remember facts about users and recall them later."
+)
+
+def letta_agent(message: str, user_id: str = "default", session_id: str = None) -> Dict[str, Any]:
+    """Main entrypoint for the Letta agent"""
+    try:
+        # Create or get session
+        if not session_id:
+            session_id = f"session_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Process message
+        response = letta_agent.process_message(
+            message=message,
+            user_id=user_id,
+            session_id=session_id
+        )
+        
+        return {
+            "response": response,
+            "user_id": user_id,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "user_id": user_id,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "error"
+        }
+```
+
+## Advanced Letta Patterns
+
+### 1. Multi-Session Memory Management
+
+```python multi_session_agent.py
+from letta import Agent, Memory, Tool
+from typing import Dict, Any, List, Optional
+import json
+from datetime import datetime, timedelta
+
+class SessionManager:
+    def __init__(self):
+        self.sessions = {}
+        self.session_timeout = timedelta(hours=24)
+    
+    def get_session(self, session_id: str) -> Memory:
+        """Get or create a session"""
+        if session_id not in self.sessions:
+            self.sessions[session_id] = Memory()
+        return self.sessions[session_id]
+    
+    def cleanup_expired_sessions(self):
+        """Clean up expired sessions"""
+        current_time = datetime.now()
+        expired_sessions = []
+        
+        for session_id, memory in self.sessions.items():
+            if hasattr(memory, 'last_accessed'):
+                if current_time - memory.last_accessed > self.session_timeout:
+                    expired_sessions.append(session_id)
+        
+        for session_id in expired_sessions:
+            del self.sessions[session_id]
+
+# Initialize session manager
+session_manager = SessionManager()
+
+def multi_session_agent(message: str, user_id: str, session_id: str) -> Dict[str, Any]:
+    """Multi-session Letta agent with memory management"""
+    try:
+        # Get session memory
+        memory = session_manager.get_session(session_id)
+        memory.last_accessed = datetime.now()
+        
+        # Create agent with session memory
+        agent = Agent(
+            name="MultiSessionAssistant",
+            memory=memory,
+            tools=tools,
+            system_message="You are a helpful assistant with persistent memory across sessions."
+        )
+        
+        # Process message
+        response = agent.process_message(
+            message=message,
+            user_id=user_id,
+            session_id=session_id
+        )
+        
+        # Cleanup expired sessions
+        session_manager.cleanup_expired_sessions()
+        
+        return {
+            "response": response,
+            "user_id": user_id,
+            "session_id": session_id,
+            "memory_size": len(memory.get_all()),
+            "timestamp": datetime.now().isoformat(),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "user_id": user_id,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "error"
+        }
+```
+
+### 2. Streaming Letta Agent
+
+```python streaming_letta.py
+from typing import Iterator, Dict, Any
+from letta import Agent, Memory, Tool
+
+def streaming_letta_agent(message: str, user_id: str = "default") -> Iterator[str]:
+    """Streaming Letta agent with memory"""
+    yield f"🧠 Letta Agent starting conversation with {user_id}...\n\n"
+    
+    # Initialize memory and agent
+    memory = Memory()
+    agent = Agent(
+        name="StreamingAssistant",
+        memory=memory,
+        tools=tools,
+        system_message="You are a helpful assistant with memory capabilities."
+    )
+    
+    yield f"💭 Processing message: {message}\n\n"
+    
+    # Simulate thinking process
+    yield "🔍 Analyzing message...\n"
+    yield "🧠 Checking memory for context...\n"
+    yield "🛠️ Selecting appropriate tools...\n"
+    yield "💬 Generating response...\n\n"
+    
+    # Process message
+    response = agent.process_message(
+        message=message,
+        user_id=user_id,
+        session_id=f"stream_{user_id}"
+    )
+    
+    yield f"🤖 Response: {response}\n\n"
+    yield f"💾 Memory updated with {len(memory.get_all())} items\n"
+    yield "✅ Conversation complete!"
+```
+
+### 3. Specialized Letta Agents
+
+```python specialized_agents.py
+from letta import Agent, Memory, Tool
+from typing import Dict, Any, List
+
+# Customer Support Agent
+def customer_support_agent(message: str, user_id: str) -> Dict[str, Any]:
+    """Customer support agent with memory"""
+    memory = Memory()
+    
+    # Customer support tools
+    support_tools = [
+        Tool(name="check_order", function=lambda x: f"Order {x} status: Shipped", description="Check order status"),
+        Tool(name="create_ticket", function=lambda x: f"Ticket created: {x}", description="Create support ticket"),
+        Tool(name="escalate_issue", function=lambda x: f"Issue escalated: {x}", description="Escalate to human agent")
+    ]
+    
+    agent = Agent(
+        name="CustomerSupport",
+        memory=memory,
+        tools=support_tools,
+        system_message="You are a customer support agent. Help users with their issues and remember their preferences."
+    )
+    
+    response = agent.process_message(message, user_id, f"support_{user_id}")
+    
+    return {
+        "response": response,
+        "agent_type": "customer_support",
+        "user_id": user_id,
+        "status": "success"
+    }
+
+# Personal Assistant Agent
+def personal_assistant_agent(message: str, user_id: str) -> Dict[str, Any]:
+    """Personal assistant agent with memory"""
+    memory = Memory()
+    
+    # Personal assistant tools
+    pa_tools = [
+        Tool(name="schedule_meeting", function=lambda x: f"Meeting scheduled: {x}", description="Schedule a meeting"),
+        Tool(name="set_reminder", function=lambda x: f"Reminder set: {x}", description="Set a reminder"),
+        Tool(name="get_calendar", function=lambda x: "Calendar events for today", description="Get calendar events")
+    ]
+    
+    agent = Agent(
+        name="PersonalAssistant",
+        memory=memory,
+        tools=pa_tools,
+        system_message="You are a personal assistant. Help users manage their tasks and remember their preferences."
+    )
+    
+    response = agent.process_message(message, user_id, f"pa_{user_id}")
+    
+    return {
+        "response": response,
+        "agent_type": "personal_assistant",
+        "user_id": user_id,
+        "status": "success"
+    }
+
+# Educational Agent
+def educational_agent(message: str, user_id: str) -> Dict[str, Any]:
+    """Educational agent with memory"""
+    memory = Memory()
+    
+    # Educational tools
+    edu_tools = [
+        Tool(name="explain_concept", function=lambda x: f"Explanation of {x}", description="Explain a concept"),
+        Tool(name="quiz_question", function=lambda x: f"Quiz question about {x}", description="Generate quiz question"),
+        Tool(name="track_progress", function=lambda x: f"Progress tracked: {x}", description="Track learning progress")
+    ]
+    
+    agent = Agent(
+        name="EducationalAssistant",
+        memory=memory,
+        tools=edu_tools,
+        system_message="You are an educational assistant. Help users learn and remember their progress."
+    )
+    
+    response = agent.process_message(message, user_id, f"edu_{user_id}")
+    
+    return {
+        "response": response,
+        "agent_type": "educational",
+        "user_id": user_id,
+        "status": "success"
+    }
+```
+
+## Configuration for Multiple Agents
+
+Update your `runagent.config.json` to include multiple Letta agents:
+
+```json
+{
+  "agent_name": "advanced-letta-agent",
+  "description": "Advanced Letta multi-agent system",
+  "framework": "letta",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_agent",
+        "tag": "chat"
+      },
+      {
+        "file": "multi_session_agent.py",
+        "module": "multi_session_agent",
+        "tag": "multi_session"
+      },
+      {
+        "file": "streaming_letta.py",
+        "module": "streaming_letta_agent",
+        "tag": "streaming"
+      },
+      {
+        "file": "specialized_agents.py",
+        "module": "customer_support_agent",
+        "tag": "support"
+      },
+      {
+        "file": "specialized_agents.py",
+        "module": "personal_assistant_agent",
+        "tag": "assistant"
+      },
+      {
+        "file": "specialized_agents.py",
+        "module": "educational_agent",
+        "tag": "education"
+      }
+    ]
+  }
+}
+```
+
+## Testing Your Letta Agent
+
+### Python Client
+
+```python test_letta.py
+from runagent import RunAgentClient
+
+# Connect to your Letta agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="chat",
+    local=True
+)
+
+# Test basic conversation
+result1 = client.run(message="Hello, my name is John", user_id="john_doe")
+print(f"Response 1: {result1['response']}")
+
+# Test memory recall
+result2 = client.run(message="What's my name?", user_id="john_doe")
+print(f"Response 2: {result2['response']}")
+
+# Test multi-session
+multi_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="multi_session",
+    local=True
+)
+
+session_result = multi_client.run(
+    message="Remember I like pizza",
+    user_id="john_doe",
+    session_id="session_123"
+)
+print(f"Session Response: {session_result['response']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="streaming",
+    local=True
+)
+
+print("Streaming conversation:")
+for chunk in stream_client.run(message="Tell me about the weather", user_id="john_doe"):
+    print(chunk, end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript test_letta.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'chat',
+    local: true
+});
+
+await client.initialize();
+
+// Test conversation with memory
+const result1 = await client.run({
+    message: 'Hello, my name is John',
+    user_id: 'john_doe'
+});
+
+console.log('Response 1:', result1.response);
+
+const result2 = await client.run({
+    message: "What's my name?",
+    user_id: 'john_doe'
+});
+
+console.log('Response 2:', result2.response);
+```
+
+## Best Practices
+
+### 1. **Memory Management**
+- Use appropriate memory storage strategies
+- Implement memory cleanup for long-running agents
+- Consider memory size limits
+
+### 2. **Session Handling**
+- Implement proper session management
+- Use unique session IDs
+- Handle session timeouts
+
+### 3. **Tool Design**
+- Create focused, single-purpose tools
+- Provide clear tool descriptions
+- Handle tool errors gracefully
+
+### 4. **Conversation Flow**
+- Design natural conversation patterns
+- Handle context switching
+- Implement conversation state management
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Conversational Memory">
+    Use Letta's memory capabilities to maintain context across conversations.
+  </Accordion>
+  <Accordion title="Multi-Session Support">
+    Implement session management for multiple concurrent users.
+  </Accordion>
+  <Accordion title="Specialized Agents">
+    Create domain-specific agents with specialized tools and memory.
+  </Accordion>
+  <Accordion title="Tool Integration">
+    Integrate external tools and APIs with Letta agents.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Memory Persistence**
+   - Check memory storage configuration
+   - Verify session management
+   - Monitor memory usage
+
+2. **Tool Execution**
+   - Verify tool definitions
+   - Check tool permissions
+   - Handle tool errors
+
+3. **Session Management**
+   - Ensure unique session IDs
+   - Check session timeout settings
+   - Monitor session cleanup
+
+### Debug Tips
+
+```python
+# Add debugging to your Letta agents
+def debug_letta_agent(message: str, user_id: str) -> Dict[str, Any]:
+    print(f"Debug: Processing message from {user_id}: {message}")
+    
+    # Your agent logic here
+    
+    print(f"Debug: Response generated: {response}")
+    return result
+```
+
+## Performance Optimization
+
+### 1. **Memory Optimization**
+- Use efficient memory storage
+- Implement memory compression
+- Monitor memory usage
+
+### 2. **Session Management**
+- Optimize session cleanup
+- Use connection pooling
+- Implement session caching
+
+### 3. **Tool Performance**
+- Cache tool results
+- Optimize tool execution
+- Use async tools when possible
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Patterns" icon="cog" href="/how-to/advanced-tasks">
+    Learn advanced Letta patterns and techniques
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your Letta agents to production
+  </Card>
+  <Card title="Multi-Language Access" icon="globe" href="/tutorials/multi-language-wrapper">
+    Access your Letta agents from different languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your Letta agents for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You've learned how to deploy Letta memory-enabled agents with RunAgent. Letta's conversational memory capabilities combined with RunAgent's multi-language access create powerful, context-aware AI systems!
+</Note>
