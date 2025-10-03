@@ -1,20 +1,22 @@
----
-title: 'Call from Rust'
-description: 'Use RunAgent agents from Rust applications'
-icon: 'rust'
----
+Use RunAgent agents from Rust applications with high-performance, type-safe execution.
 
-<Info>
-  **Prerequisites**: Rust 1.70+ and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
-</Info>
+## Prerequisites
+
+- Rust 1.70 or higher
+- Completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
 
 ## Overview
 
-The Rust SDK provides high-performance access to RunAgent agents with zero-cost abstractions, futures-based async operations, and compile-time type safety. It's designed to work seamlessly with Rust's ownership model and error handling.
+The Rust SDK provides production-ready access to RunAgent agents with:
+
+- **Zero-cost abstractions** for optimal performance
+- **Futures-based async operations** powered by Tokio
+- **Compile-time type safety** with comprehensive error handling
+- **Seamless integration** with Rust's ownership model
 
 ## Installation
 
-Add to your `Cargo.toml`:
+Add the following dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -26,7 +28,9 @@ serde_json = "1.0"
 
 ## Basic Usage
 
-### Synchronous Calls
+### Synchronous Execution
+
+Execute an agent and wait for the complete response:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -34,14 +38,14 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create client
+    // Create client connection
     let client = RunAgentClient::new(
         "your_agent_id_here",
         "main",
-        true, // local
+        true, // local deployment
     ).await?;
 
-    // Call your agent
+    // Execute agent with parameters
     let result = client.run(&[
         ("message", json!("Hello, how are you?")),
         ("userId", json!("rust_user")),
@@ -52,7 +56,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Asynchronous Calls
+### Asynchronous Execution
+
+Process multiple requests concurrently for improved throughput:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -67,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         true,
     ).await?;
 
-    // Run multiple requests concurrently
+    // Create concurrent requests
     let futures = (0..5).map(|i| {
         let client = client.clone();
         async move {
@@ -78,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // Execute all requests concurrently
     let results = join_all(futures).await;
     
     for (i, result) in results.into_iter().enumerate() {
@@ -93,7 +100,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Advanced Features
 
-### 1. Streaming Responses
+### Streaming Responses
+
+Process responses as they arrive for real-time applications:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -104,29 +113,38 @@ use futures::StreamExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = RunAgentClient::new(
         "your_agent_id_here",
-        "streaming", // Note: tag ends with _stream
+        "streaming", // Entrypoint tag must end with _stream
         true,
     ).await?;
 
-    // Stream responses
+    // Create streaming connection
     let mut stream = client.run_stream(&[
         ("message", json!("Tell me a story")),
         ("userId", json!("rust_user")),
     ]).await?;
 
+    // Process chunks as they arrive
     while let Some(chunk) = stream.next().await {
-        print!("{}", chunk?);
+        match chunk {
+            Ok(data) => print!("{}", data),
+            Err(e) => {
+                eprintln!("Stream error: {}", e);
+                break;
+            }
+        }
     }
 
     Ok(())
 }
 ```
 
-### 2. Error Handling
+### Error Handling
+
+Handle different error types with Rust's type-safe error handling:
 
 ```rust
 use runagent::client::RunAgentClient;
-use runagent::errors::*;
+use runagent::types::{RunAgentError, RunAgentResult};
 use serde_json::json;
 
 #[tokio::main]
@@ -142,23 +160,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]).await;
 
     match result {
-        Ok(response) => println!("Success: {}", response),
+        Ok(response) => {
+            println!("Success: {}", response);
+        }
         Err(e) => {
             match e {
-                RunAgentError::AuthenticationError => {
+                RunAgentError::Authentication { .. } => {
                     eprintln!("Authentication failed. Check your API key.");
                 }
                 RunAgentError::AgentNotFoundError => {
-                    eprintln!("Agent not found. Check your agent ID.");
+                    eprintln!("Agent not found. Verify the agent ID.");
                 }
-                RunAgentError::ValidationError(msg) => {
-                    eprintln!("Validation error: {}", msg);
+                RunAgentError::Validation { message } => {
+                    eprintln!("Validation error: {}", message);
                 }
                 RunAgentError::RateLimitError => {
-                    eprintln!("Rate limit exceeded. Please wait and try again.");
+                    eprintln!("Rate limit exceeded. Please retry later.");
                 }
                 RunAgentError::TimeoutError => {
-                    eprintln!("Request timed out. Please try again.");
+                    eprintln!("Request timed out.");
                 }
                 RunAgentError::NetworkError => {
                     eprintln!("Network error. Check your connection.");
@@ -174,7 +194,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 3. Custom Headers and Metadata
+### Custom Configuration
+
+Configure the client with custom headers and timeouts:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -183,10 +205,12 @@ use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Prepare custom headers
     let mut headers = HashMap::new();
     headers.insert("X-Request-ID".to_string(), "unique-request-id".to_string());
     headers.insert("X-User-ID".to_string(), "rust_user".to_string());
 
+    // Create client with configuration
     let client = RunAgentClient::new_with_config(
         "your_agent_id_here",
         "main",
@@ -212,14 +236,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Environment Variables
 
+Configure the SDK using environment variables:
+
 ```bash
-# Set API key
+# API authentication
 export RUNAGENT_API_KEY="your-api-key"
 
-# Set API URL
+# API endpoint
 export RUNAGENT_API_URL="https://api.run-agent.ai"
 
-# Set default agent ID
+# Default agent
 export RUNAGENT_AGENT_ID="your-agent-id"
 ```
 
@@ -239,6 +265,8 @@ Create `~/.runagent/config.json`:
 
 ### Programmatic Configuration
 
+Configure the client directly in code:
+
 ```rust
 use runagent::client::RunAgentClient;
 use std::collections::HashMap;
@@ -253,17 +281,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "main",
         true,
         Some(headers),
-        Some(30),
+        Some(30), // timeout in seconds
     ).await?;
 
-    // Use client...
     Ok(())
 }
 ```
 
 ## Best Practices
 
-### 1. **Connection Management**
+### Connection Management
+
+Implement a connection manager for efficient resource usage:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -276,20 +305,27 @@ struct AgentManager {
 }
 
 impl AgentManager {
-    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_id: &str, 
+        entrypoint_tag: &str
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
         Ok(Self {
             client: Arc::new(Mutex::new(client)),
         })
     }
 
-    async fn run(&self, message: &str, options: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+    async fn run(
+        &self, 
+        message: &str, 
+        options: &[(&str, serde_json::Value)]
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let client = self.client.lock().await;
         let mut params = vec![("message", json!(message))];
         params.extend(options.iter().map(|(k, v)| (*k, v.clone())));
         
         let result = client.run(&params).await?;
-        Ok(result)
+        Ok(result.to_string())
     }
 }
 
@@ -302,7 +338,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 2. **Retry Logic**
+### Retry Logic
+
+Implement exponential backoff for resilient operations:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -318,11 +356,10 @@ async fn run_with_retry(
     
     for attempt in 0..max_retries {
         match client.run(&[("message", json!(message))]).await {
-            Ok(result) => return Ok(result),
+            Ok(result) => return Ok(result.to_string()),
             Err(e) => {
                 last_error = Some(e);
                 if attempt < max_retries - 1 {
-                    // Exponential backoff
                     let backoff = Duration::from_secs(2_u64.pow(attempt as u32));
                     sleep(backoff).await;
                 }
@@ -342,20 +379,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 3. **Logging and Monitoring**
+### Logging and Monitoring
+
+Add observability to your agent interactions:
 
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, error, warn};
+use tracing::{info, error};
 
 struct MonitoredAgent {
     client: RunAgentClient,
 }
 
 impl MonitoredAgent {
-    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_id: &str, 
+        entrypoint_tag: &str
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
         Ok(Self { client })
     }
@@ -368,7 +410,7 @@ impl MonitoredAgent {
             Ok(result) => {
                 let duration = start_time.elapsed();
                 info!("Request completed in {:?}", duration);
-                Ok(result)
+                Ok(result.to_string())
             }
             Err(e) => {
                 let duration = start_time.elapsed();
@@ -392,7 +434,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Common Patterns
 
-### 1. **Agent Factory Pattern**
+### Agent Factory Pattern
+
+Create agents with consistent configuration:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -415,7 +459,11 @@ impl AgentFactory {
         Self { base_config }
     }
 
-    async fn get_agent(&self, agent_id: &str, entrypoint_tag: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+    async fn get_agent(
+        &self, 
+        agent_id: &str, 
+        entrypoint_tag: &str
+    ) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
         RunAgentClient::new_with_config(
             agent_id,
             entrypoint_tag,
@@ -425,11 +473,17 @@ impl AgentFactory {
         ).await.map_err(|e| e.into())
     }
 
-    async fn get_chat_agent(&self, agent_id: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+    async fn get_chat_agent(
+        &self, 
+        agent_id: &str
+    ) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
         self.get_agent(agent_id, "chat").await
     }
 
-    async fn get_analysis_agent(&self, agent_id: &str) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
+    async fn get_analysis_agent(
+        &self, 
+        agent_id: &str
+    ) -> Result<RunAgentClient, Box<dyn std::error::Error>> {
         self.get_agent(agent_id, "analyze").await
     }
 }
@@ -449,11 +503,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 2. **Agent Wrapper Pattern**
+### Agent Wrapper Pattern
+
+Encapsulate agent functionality with a clean interface:
 
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
+use futures::StreamExt;
 
 struct AgentWrapper {
     client: RunAgentClient,
@@ -462,7 +519,10 @@ struct AgentWrapper {
 }
 
 impl AgentWrapper {
-    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_id: &str, 
+        entrypoint_tag: &str
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
         Ok(Self {
             client,
@@ -471,32 +531,45 @@ impl AgentWrapper {
         })
     }
 
-    async fn call(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
-        self.client.run(params).await.map_err(|e| e.into())
+    async fn call(
+        &self, 
+        params: &[(&str, serde_json::Value)]
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        self.client.run(params).await.map(|v| v.to_string()).map_err(|e| e.into())
     }
 
-    async fn chat(&self, message: &str, user_id: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn chat(
+        &self, 
+        message: &str, 
+        user_id: &str
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let result = self.client.run(&[
             ("message", json!(message)),
             ("userId", json!(user_id)),
         ]).await?;
-        Ok(result)
+        Ok(result.to_string())
     }
 
-    async fn analyze(&self, data: &str, analysis_type: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn analyze(
+        &self, 
+        data: &str, 
+        analysis_type: &str
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let result = self.client.run(&[
             ("data", json!(data)),
             ("analysisType", json!(analysis_type)),
         ]).await?;
-        Ok(result)
+        Ok(result.to_string())
     }
 
     async fn stream(&self, message: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let mut stream = self.client.run_stream(&[("message", json!(message))]).await?;
-        let mut response = String::new();
+        let mut stream = self.client.run_stream(&[
+            ("message", json!(message))
+        ]).await?;
         
+        let mut response = String::new();
         while let Some(chunk) = stream.next().await {
-            response.push_str(&chunk?);
+            response.push_str(&chunk?.to_string());
         }
         
         Ok(response)
@@ -512,7 +585,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 3. **Agent Pool Pattern**
+### Agent Pool Pattern
+
+Distribute load across multiple agent instances:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -526,7 +601,9 @@ struct AgentPool {
 }
 
 impl AgentPool {
-    async fn new(agent_configs: Vec<AgentConfig>) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_configs: Vec<AgentConfig>
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut agents = Vec::new();
         
         for config in agent_configs {
@@ -553,10 +630,13 @@ impl AgentPool {
         agent
     }
 
-    async fn call(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+    async fn call(
+        &self, 
+        params: &[(&str, serde_json::Value)]
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let agent = self.get_agent().await;
         let client = agent.lock().await;
-        client.run(params).await.map_err(|e| e.into())
+        client.run(params).await.map(|v| v.to_string()).map_err(|e| e.into())
     }
 }
 
@@ -586,13 +666,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             headers: None,
             timeout: None,
         },
-        AgentConfig {
-            agent_id: "agent3".to_string(),
-            entrypoint_tag: "main".to_string(),
-            local: true,
-            headers: None,
-            timeout: None,
-        },
     ]).await?;
 
     let result = pool.call(&[("message", json!("Hello from pool"))]).await?;
@@ -601,56 +674,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Error Handling
-
-### Common Error Types
-
-```rust
-use runagent::client::RunAgentClient;
-use runagent::errors::*;
-use serde_json::json;
-
-async fn handle_errors(client: &RunAgentClient, message: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let result = client.run(&[("message", json!(message))]).await;
-    
-    match result {
-        Ok(response) => {
-            println!("Success: {}", response);
-        }
-        Err(e) => {
-            match e {
-                RunAgentError::AuthenticationError => {
-                    eprintln!("Authentication failed. Check your API key.");
-                }
-                RunAgentError::AgentNotFoundError => {
-                    eprintln!("Agent not found. Check your agent ID.");
-                }
-                RunAgentError::ValidationError(msg) => {
-                    eprintln!("Validation error: {}", msg);
-                }
-                RunAgentError::RateLimitError => {
-                    eprintln!("Rate limit exceeded. Please wait and try again.");
-                }
-                RunAgentError::TimeoutError => {
-                    eprintln!("Request timed out. Please try again.");
-                }
-                RunAgentError::NetworkError => {
-                    eprintln!("Network error. Check your connection.");
-                }
-                _ => {
-                    eprintln!("Unexpected error: {}", e);
-                }
-            }
-        }
-    }
-    
-    Ok(())
-}
-```
-
 ## Performance Optimization
 
-### 1. **Connection Pooling**
+### Connection Pooling
+
+Reuse connections for improved performance:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -664,7 +692,11 @@ struct ConnectionPool {
 }
 
 impl ConnectionPool {
-    async fn new(agent_id: &str, entrypoint_tag: &str, pool_size: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_id: &str, 
+        entrypoint_tag: &str, 
+        pool_size: usize
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut pool = Vec::new();
         
         for _ in 0..pool_size {
@@ -685,10 +717,13 @@ impl ConnectionPool {
         client
     }
 
-    async fn run(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+    async fn run(
+        &self, 
+        params: &[(&str, serde_json::Value)]
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let client = self.get_client().await;
         let client = client.lock().await;
-        client.run(params).await.map_err(|e| e.into())
+        client.run(params).await.map(|v| v.to_string()).map_err(|e| e.into())
     }
 }
 
@@ -701,7 +736,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 2. **Caching**
+### Response Caching
+
+Cache responses for frequently requested data:
 
 ```rust
 use runagent::client::RunAgentClient;
@@ -716,7 +753,10 @@ struct CachedAgent {
 }
 
 impl CachedAgent {
-    async fn new(agent_id: &str, entrypoint_tag: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn new(
+        agent_id: &str, 
+        entrypoint_tag: &str
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let client = RunAgentClient::new(agent_id, entrypoint_tag, true).await?;
         Ok(Self {
             client,
@@ -725,11 +765,13 @@ impl CachedAgent {
     }
 
     fn cache_key(&self, params: &[(&str, serde_json::Value)]) -> String {
-        // Simple cache key generation (in production, use a proper hash)
         format!("{:?}", params)
     }
 
-    async fn run(&self, params: &[(&str, serde_json::Value)]) -> Result<String, Box<dyn std::error::Error>> {
+    async fn run(
+        &self, 
+        params: &[(&str, serde_json::Value)]
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let cache_key = self.cache_key(params);
         
         // Check cache
@@ -740,8 +782,8 @@ impl CachedAgent {
             }
         }
         
-        // Call agent
-        let result = self.client.run(params).await?;
+        // Execute agent
+        let result = self.client.run(params).await?.to_string();
         
         // Store in cache
         {
@@ -766,13 +808,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Unit Testing
 
+Test your agent interactions:
+
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
 
 #[tokio::test]
 async fn test_agent_client() {
-    let client = RunAgentClient::new("test_agent", "main", true).await.unwrap();
+    let client = RunAgentClient::new("test_agent", "main", true)
+        .await
+        .unwrap();
     
     let result = client.run(&[("message", json!("Hello"))]).await;
     assert!(result.is_ok());
@@ -780,7 +826,9 @@ async fn test_agent_client() {
 
 #[tokio::test]
 async fn test_agent_client_error() {
-    let client = RunAgentClient::new("invalid_agent", "main", true).await.unwrap();
+    let client = RunAgentClient::new("invalid_agent", "main", true)
+        .await
+        .unwrap();
     
     let result = client.run(&[("message", json!("Hello"))]).await;
     assert!(result.is_err());
@@ -789,6 +837,8 @@ async fn test_agent_client_error() {
 
 ### Integration Testing
 
+Test complete workflows:
+
 ```rust
 use runagent::client::RunAgentClient;
 use serde_json::json;
@@ -796,7 +846,9 @@ use futures::StreamExt;
 
 #[tokio::test]
 async fn test_agent_integration() {
-    let client = RunAgentClient::new("test_agent", "main", true).await.unwrap();
+    let client = RunAgentClient::new("test_agent", "main", true)
+        .await
+        .unwrap();
     
     let result = client.run(&[("message", json!("Hello"))]).await;
     assert!(result.is_ok());
@@ -804,13 +856,17 @@ async fn test_agent_integration() {
 
 #[tokio::test]
 async fn test_agent_streaming() {
-    let client = RunAgentClient::new("test_agent", "streaming", true).await.unwrap();
+    let client = RunAgentClient::new("test_agent", "streaming", true)
+        .await
+        .unwrap();
     
-    let mut stream = client.run_stream(&[("message", json!("Hello"))]).await.unwrap();
+    let mut stream = client.run_stream(&[("message", json!("Hello"))])
+        .await
+        .unwrap();
+    
     let mut response = String::new();
-    
     while let Some(chunk) = stream.next().await {
-        response.push_str(&chunk.unwrap());
+        response.push_str(&chunk.unwrap().to_string());
     }
     
     assert!(!response.is_empty());
@@ -819,21 +875,13 @@ async fn test_agent_streaming() {
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Async Patterns" icon="async" href="/how-to/advanced-tasks">
-    Learn advanced async patterns for Rust
-  </Card>
-  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
-    Deploy your Rust applications to production
-  </Card>
-  <Card title="Multi-Language Integration" icon="globe" href="/tutorials/multi-language-wrapper">
-    Integrate with other programming languages
-  </Card>
-  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
-    Optimize your Rust applications for production
-  </Card>
-</CardGroup>
+Continue your journey with RunAgent:
 
-<Note>
-**🎉 Great work!** You've learned how to use RunAgent agents from Rust applications. The Rust SDK provides high-performance access with zero-cost abstractions and compile-time type safety!
-</Note>
+- **[Async Patterns](/how-to/advanced-tasks)** - Learn advanced async patterns for Rust
+- **[Production Deployment](/how-to/deployment/cloud-deployment)** - Deploy your Rust applications to production
+- **[Multi-Language Integration](/tutorials/multi-language-wrapper)** - Integrate with other programming languages
+- **[Performance Tuning](/explanation/production-considerations)** - Optimize your Rust applications
+
+## Summary
+
+You have learned how to use RunAgent agents from Rust applications. The Rust SDK provides high-performance access with zero-cost abstractions and compile-time type safety, making it ideal for production deployments requiring maximum performance and reliability.

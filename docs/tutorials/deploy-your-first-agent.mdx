@@ -179,7 +179,7 @@ Now comes the mind-blowing part. Your Python agent is now accessible from any su
     **What just happened?** You called your Python function from the command line with zero setup!
   </Tab>
 
-  <Tab title="🐍 Python SDK - Native Feel">
+  <Tab title="Python SDK - Native Feel">
     ```python
     from runagent import RunAgentClient
     
@@ -201,7 +201,7 @@ Now comes the mind-blowing part. Your Python agent is now accessible from any su
     **The magic**: This feels like calling a local Python function, but it's actually making network calls to your deployed agent!
   </Tab>
   
-  <Tab title="🟨 JavaScript SDK - Promise Paradise">
+  <Tab title="JavaScript SDK - Promise Paradise">
     First, install in your JS project:
     ```bash
     npm install runagent
@@ -288,7 +288,7 @@ Watch your Python agent stream responses in real-time to any language:
     **What's happening**: Your Python generator function is streaming across the network in real-time!
   </Tab>
 
-  <Tab title="🐍 Python SDK - Pythonic Streaming">
+  <Tab title="Python SDK - Pythonic Streaming">
     ```python
     from runagent import RunAgentClient
     
@@ -309,7 +309,7 @@ Watch your Python agent stream responses in real-time to any language:
     **The beauty**: This looks like a normal Python iterator, but chunks are streaming from your deployed agent in real-time!
   </Tab>
   
-  <Tab title="🟨 JavaScript - Async Iterator Magic">
+  <Tab title="JavaScript - Async Iterator Magic">
     ```javascript
     import { RunAgentClient } from 'runagent';
     
@@ -334,7 +334,7 @@ Watch your Python agent stream responses in real-time to any language:
     **Mind-blown moment**: JavaScript developers are consuming real-time streams from your Python agent using native async iterators!
   </Tab>
   
-  <Tab title="🦀 Rust - High-Performance Streaming">
+  <Tab title="Rust - High-Performance Streaming">
     ```rust
     use runagent::client::RunAgentClient;
     use serde_json::json;
@@ -359,7 +359,7 @@ Watch your Python agent stream responses in real-time to any language:
     **Performance revelation**: Rust developers get zero-copy streaming from your Python agent with full type safety!
   </Tab>
 
-  <Tab title="🦀 Go - Streaming">
+  <Tab title="Go - Streaming">
     ```go
     package main
 
@@ -423,7 +423,7 @@ Ready to move beyond mock responses? RunAgent works with any Python AI framework
     **What you get**: Multi-step reasoning agents with state management, accessible from any language!
   </Tab>
   
-  <Tab title="👥 CrewAI - Multi-Agent Teams">
+  <Tab title="CrewAI - Multi-Agent Teams">
     ```bash
     runagent init my_crew_agent --crewai
     cd my_crew_agent
@@ -472,12 +472,6 @@ graph TD
     ROUTER --> PY
     ROUTER --> JS
     ROUTER --> RS
-    
-    style FUNC fill:#e8f5e8
-    style ROUTER fill:#f0f8ff
-    style PY fill:#ffe8cc
-    style JS fill:#fff9cc
-    style RS fill:#ffe8e8
 ```
 
 **The Revolutionary Insight**: Your Python function signature automatically defines the API contract for all programming languages. Change the Python function, and all language SDKs automatically adapt!
