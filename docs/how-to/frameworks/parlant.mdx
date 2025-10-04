@@ -1,0 +1,1066 @@
+# Parlant Integration
+
+Deploy Parlant guideline-driven conversational agents with RunAgent
+
+---
+
+## Prerequisites
+
+- Basic understanding of Parlant
+- Completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+- Python 3.10 or higher
+
+---
+
+## Overview
+
+Parlant is a framework for building guideline-driven conversational AI agents with structured behavior management. RunAgent makes it easy to deploy Parlant agents and access them from any programming language.
+
+---
+
+## Installation & Setup
+
+### 1. Install Parlant
+
+```bash
+pip install parlant
+```
+
+### 2. Set Environment Variables
+
+Parlant requires API keys for LLM providers:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+export PARLANT_LOG_LEVEL=INFO  # Optional
+```
+
+### 3. Start Parlant Server
+
+The Parlant server must be running before deploying RunAgent agents:
+
+```bash
+parlant-server run
+```
+
+The server will start on `http://localhost:8800`. Keep this terminal window open.
+
+**Note**: If you need to use a different port:
+```bash
+parlant-server run --port 8801
+```
+
+### 4. Quick Start with RunAgent
+
+```bash
+runagent init my-parlant-agent --framework parlant
+cd my-parlant-agent
+```
+
+---
+
+## Quick Start
+
+### 1. Project Structure
+
+After initialization:
+
+```
+my-parlant-agent/
+├── agent.py                 # Main agent code
+├── .env                     # Environment variables
+├── requirements.txt         # Python dependencies
+└── runagent.config.json     # RunAgent configuration
+```
+
+### 2. Configuration
+
+The generated `runagent.config.json`:
+
+```json
+{
+  "agent_name": "parlant-assistant",
+  "description": "Parlant-based conversational AI assistant",
+  "framework": "parlant",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "simple_chat",
+        "tag": "parlant_simple"
+      },
+      {
+        "file": "agent.py",
+        "module": "chat_stream",
+        "tag": "parlant_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "",
+    "PARLANT_LOG_LEVEL": "INFO"
+  }
+}
+```
+
+### 3. Create `.env` File
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+PARLANT_LOG_LEVEL=INFO
+```
+
+---
+
+## Basic Parlant Agent
+
+Here's a complete Parlant agent with tools and guidelines:
+
+```python
+# agent.py
+import asyncio
+from parlant.client import AsyncParlantClient
+from typing import Dict, Any, AsyncGenerator
+import time
+
+# Global client and agent_id for reuse
+_parlant_client = None
+_agent_id = None
+
+
+async def get_parlant_client():
+    """Get or create the Parlant client instance."""
+    global _parlant_client
+    
+    if _parlant_client is None:
+        _parlant_client = AsyncParlantClient(base_url="http://localhost:8800")
+        
+        # Test connection
+        try:
+            await _parlant_client.agents.list()
+        except Exception as e:
+            raise Exception(
+                f"Failed to connect to Parlant server at http://localhost:8800. "
+                f"Make sure it's running with 'parlant-server run'. Error: {e}"
+            )
+    
+    return _parlant_client
+
+
+async def create_agent_with_tools(client: AsyncParlantClient):
+    """Create an agent with calculator, time, and weather tools."""
+    
+    # Check if agent already exists
+    agents = await client.agents.list()
+    for agent in agents:
+        if agent.name == "RunAgent Assistant":
+            print(f"✅ Found existing agent: {agent.name}")
+            return agent.id
+    
+    # Create new agent
+    agent = await client.agents.create(
+        name="RunAgent Assistant",
+        description="A helpful assistant that can provide information, perform calculations, tell time, and check weather."
+    )
+    
+    print(f"✅ Created new agent: {agent.name}")
+    
+    # Add calculator tool
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="calculator",
+        description="Calculate mathematical expressions. Supports +, -, *, /, **, sqrt(), sin(), cos(), etc.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Mathematical expression to calculate"
+                }
+            },
+            "required": ["expression"]
+        },
+        implementation="""
+try:
+    import math
+    allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
+    allowed_names.update({"abs": abs, "round": round, "min": min, "max": max, "sum": sum, "pow": pow})
+    
+    expression = expression.replace("^", "**")
+    result = eval(expression, {"__builtins__": {}}, allowed_names)
+    return f"Result: {result}"
+except Exception as e:
+    return f"Error calculating '{expression}': {str(e)}"
+"""
+    )
+    
+    # Add time tool
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="get_current_time",
+        description="Get the current date and time",
+        parameters={"type": "object", "properties": {}, "required": []},
+        implementation="""
+from datetime import datetime
+current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+return f"Current time: {current_time}"
+"""
+    )
+    
+    # Add weather tool (mock implementation)
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="weather_info",
+        description="Get weather information for a city",
+        parameters={
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "Name of the city to get weather for"
+                }
+            },
+            "required": ["city"]
+        },
+        implementation="""
+# Mock weather data
+weather_data = {
+    "paris": "Partly cloudy, 18°C",
+    "london": "Rainy, 12°C", 
+    "new york": "Sunny, 22°C",
+    "tokyo": "Cloudy, 16°C",
+    "berlin": "Overcast, 15°C",
+    "sydney": "Clear, 25°C"
+}
+
+city_lower = city.lower()
+weather = weather_data.get(city_lower, f"Weather data not available for {city}")
+return f"Weather in {city}: {weather}"
+"""
+    )
+    
+    # Add guidelines
+    guidelines = [
+        {
+            "condition": "User asks for the current time or date",
+            "action": "Get the current time and provide it in a friendly manner",
+            "tools": ["get_current_time"]
+        },
+        {
+            "condition": "User asks to calculate something or provides a math expression",
+            "action": "Use the calculator tool to solve the mathematical expression and explain the result",
+            "tools": ["calculator"]
+        },
+        {
+            "condition": "User asks about weather",
+            "action": "Get weather information using the weather_info tool and provide a helpful response",
+            "tools": ["weather_info"]
+        },
+        {
+            "condition": "User greets or says hello",
+            "action": "Respond with a warm greeting and explain what you can help with"
+        },
+        {
+            "condition": "User asks what you can do or for help",
+            "action": "Explain that you can perform calculations, provide time, check weather, and answer questions"
+        },
+        {
+            "condition": "User says goodbye or thanks",
+            "action": "Respond politely and invite them to ask if they need anything else"
+        }
+    ]
+    
+    for guideline in guidelines:
+        await client.agents.guidelines.create(
+            agent_id=agent.id,
+            **guideline
+        )
+    
+    print(f"✅ Added {len(guidelines)} guidelines and 3 tools")
+    return agent.id
+
+
+async def get_or_create_agent():
+    """Get or create the agent with full tools and guidelines setup."""
+    global _agent_id
+    
+    if _agent_id is not None:
+        return _agent_id
+    
+    client = await get_parlant_client()
+    _agent_id = await create_agent_with_tools(client)
+    return _agent_id
+
+
+async def chat_with_agent(message: str, agent_id: str) -> str:
+    """Send a message to the agent and get response."""
+    client = await get_parlant_client()
+    
+    try:
+        # Create a chat session
+        session = await client.sessions.create(
+            agent_id=agent_id,
+            allow_greeting=False
+        )
+        
+        # Send message
+        event = await client.sessions.create_event(
+            session_id=session.id,
+            kind="message",
+            source="customer",
+            message=message,
+        )
+        
+        # Get response
+        agent_messages = await client.sessions.list_events(
+            session_id=session.id,
+            min_offset=event.offset,
+            source="ai_agent",
+            kinds="message",
+            wait_for_data=30,
+        )
+        
+        if agent_messages:
+            response_data = agent_messages[0].model_dump()
+            return response_data.get("data", {}).get("message", "No response received")
+        else:
+            return "No response from agent"
+            
+    except Exception as e:
+        return f"Error processing message: {str(e)}"
+
+
+async def simple_chat(message: str) -> Dict[str, Any]:
+    """
+    Simple chat function that processes messages through Parlant.
+    
+    Args:
+        message: The user's message
+        
+    Returns:
+        Dict containing the response and metadata
+    """
+    try:
+        # Ensure agent is available with full setup
+        agent_id = await get_or_create_agent()
+        
+        # Get response from agent
+        response = await chat_with_agent(message, agent_id)
+        
+        return {
+            "content": response,
+            "type": "parlant_response", 
+            "agent_id": agent_id,
+            "message_received": message,
+            "timestamp": time.time(),
+            "framework": "parlant"
+        }
+        
+    except Exception as e:
+        return {
+            "content": f"Error: {str(e)}",
+            "type": "error",
+            "error": str(e),
+            "message_received": message,
+            "framework": "parlant"
+        }
+
+
+async def chat_stream(message: str) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Streaming chat function.
+    
+    Args:
+        message: The user's message
+        
+    Yields:
+        Dict containing streaming response chunks
+    """
+    try:
+        # Get the response first
+        response = await simple_chat(message)
+        
+        if response["type"] == "error":
+            yield response
+            return
+        
+        # Simulate streaming by breaking up the response
+        content = response["content"]
+        words = content.split()
+        
+        for word in words:
+            yield {
+                "content": word + " "
+            }
+            await asyncio.sleep(0.05)
+        
+        # Final chunk
+        yield {
+            "content": "",
+            "type": "completion",
+            "agent_id": response.get("agent_id"),
+            "is_final": True,
+            "framework": "parlant"
+        }
+                
+    except Exception as e:
+        yield {
+            "content": f"Error: {str(e)}",
+            "type": "error",
+            "error": str(e),
+            "framework": "parlant"
+        }
+```
+
+---
+
+## Advanced Patterns
+
+### 1. Custom Guidelines System
+
+```python
+# advanced_guidelines.py
+from parlant.client import AsyncParlantClient
+from typing import List, Dict
+
+async def create_customer_support_agent(client: AsyncParlantClient):
+    """Create a customer support agent with specialized guidelines."""
+    
+    agent = await client.agents.create(
+        name="Customer Support Assistant",
+        description="Specialized customer support agent with escalation protocols"
+    )
+    
+    # Support tools
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="check_order_status",
+        description="Check the status of an order",
+        parameters={
+            "type": "object",
+            "properties": {
+                "order_id": {"type": "string", "description": "Order ID to check"}
+            },
+            "required": ["order_id"]
+        },
+        implementation="""
+# Mock order status check
+order_statuses = {
+    "ORD123": "Shipped - Arriving tomorrow",
+    "ORD456": "Processing - Expected to ship today",
+    "ORD789": "Delivered on 2025-01-15"
+}
+return order_statuses.get(order_id, f"Order {order_id} not found in system")
+"""
+    )
+    
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="create_support_ticket",
+        description="Create a support ticket for complex issues",
+        parameters={
+            "type": "object",
+            "properties": {
+                "issue": {"type": "string", "description": "Description of the issue"},
+                "priority": {"type": "string", "enum": ["low", "medium", "high"]}
+            },
+            "required": ["issue", "priority"]
+        },
+        implementation="""
+ticket_id = f"TKT{hash(issue) % 10000}"
+return f"Support ticket {ticket_id} created with {priority} priority. A team member will contact you within 24 hours."
+"""
+    )
+    
+    # Customer support guidelines
+    support_guidelines = [
+        {
+            "condition": "User asks about order status",
+            "action": "Use check_order_status tool to get current status and provide helpful tracking information",
+            "tools": ["check_order_status"]
+        },
+        {
+            "condition": "User reports a problem or complaint",
+            "action": "Acknowledge the issue empathetically, gather details, and create a support ticket",
+            "tools": ["create_support_ticket"]
+        },
+        {
+            "condition": "User asks about refund or return policy",
+            "action": "Explain that refunds are available within 30 days and guide them through the process"
+        },
+        {
+            "condition": "User is frustrated or angry",
+            "action": "Respond with empathy, apologize for inconvenience, and escalate by creating high-priority ticket"
+        }
+    ]
+    
+    for guideline in support_guidelines:
+        await client.agents.guidelines.create(agent_id=agent.id, **guideline)
+    
+    return agent.id
+
+
+async def support_chat(message: str) -> Dict:
+    """Customer support conversation handler."""
+    client = AsyncParlantClient(base_url="http://localhost:8800")
+    agent_id = await create_customer_support_agent(client)
+    
+    # Create session and get response
+    session = await client.sessions.create(agent_id=agent_id, allow_greeting=False)
+    
+    await client.sessions.create_event(
+        session_id=session.id,
+        kind="message",
+        source="customer",
+        message=message
+    )
+    
+    response = await client.sessions.list_events(
+        session_id=session.id,
+        source="ai_agent",
+        kinds="message",
+        wait_for_data=30
+    )
+    
+    return {
+        "response": response[0].data.get("message") if response else "No response",
+        "agent_type": "customer_support"
+    }
+```
+
+### 2. Multi-Domain Agent
+
+```python
+# multi_domain_agent.py
+from parlant.client import AsyncParlantClient
+
+async def create_multi_domain_agent(client: AsyncParlantClient):
+    """Create agent that handles multiple domains."""
+    
+    agent = await client.agents.create(
+        name="Multi-Domain Assistant",
+        description="Assistant capable of handling finance, health, and travel queries"
+    )
+    
+    # Finance tools
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="currency_converter",
+        description="Convert between currencies",
+        parameters={
+            "type": "object",
+            "properties": {
+                "amount": {"type": "number"},
+                "from_currency": {"type": "string"},
+                "to_currency": {"type": "string"}
+            },
+            "required": ["amount", "from_currency", "to_currency"]
+        },
+        implementation="""
+# Mock conversion rates
+rates = {"USD": 1.0, "EUR": 0.85, "GBP": 0.73, "JPY": 110.0}
+result = amount * (rates.get(to_currency, 1) / rates.get(from_currency, 1))
+return f"{amount} {from_currency} = {result:.2f} {to_currency}"
+"""
+    )
+    
+    # Health tools
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="bmi_calculator",
+        description="Calculate Body Mass Index",
+        parameters={
+            "type": "object",
+            "properties": {
+                "weight_kg": {"type": "number"},
+                "height_m": {"type": "number"}
+            },
+            "required": ["weight_kg", "height_m"]
+        },
+        implementation="""
+bmi = weight_kg / (height_m ** 2)
+category = "Underweight" if bmi < 18.5 else "Normal" if bmi < 25 else "Overweight" if bmi < 30 else "Obese"
+return f"BMI: {bmi:.1f} - Category: {category}"
+"""
+    )
+    
+    # Travel tools
+    await client.agents.tools.create(
+        agent_id=agent.id,
+        name="flight_time",
+        description="Get approximate flight duration between cities",
+        parameters={
+            "type": "object",
+            "properties": {
+                "from_city": {"type": "string"},
+                "to_city": {"type": "string"}
+            },
+            "required": ["from_city", "to_city"]
+        },
+        implementation="""
+# Mock flight times
+flights = {
+    ("new york", "london"): "7 hours",
+    ("paris", "tokyo"): "12 hours",
+    ("sydney", "singapore"): "8 hours"
+}
+key = (from_city.lower(), to_city.lower())
+return flights.get(key, "Flight time not available")
+"""
+    )
+    
+    # Domain-specific guidelines
+    guidelines = [
+        {
+            "condition": "User asks about currency conversion or exchange rates",
+            "action": "Use currency_converter tool to provide accurate conversion",
+            "tools": ["currency_converter"]
+        },
+        {
+            "condition": "User asks about BMI or body mass index",
+            "action": "Use bmi_calculator to calculate and explain the result",
+            "tools": ["bmi_calculator"]
+        },
+        {
+            "condition": "User asks about flight duration or travel time",
+            "action": "Use flight_time tool to provide estimated duration",
+            "tools": ["flight_time"]
+        }
+    ]
+    
+    for guideline in guidelines:
+        await client.agents.guidelines.create(agent_id=agent.id, **guideline)
+    
+    return agent.id
+```
+
+### 3. Contextual Conversation Agent
+
+```python
+# contextual_agent.py
+from parlant.client import AsyncParlantClient
+from typing import Dict, Optional
+
+class ContextualAgent:
+    def __init__(self):
+        self.client = None
+        self.agent_id = None
+        self.active_sessions = {}
+    
+    async def initialize(self):
+        """Initialize the agent with context-aware capabilities."""
+        self.client = AsyncParlantClient(base_url="http://localhost:8800")
+        
+        agent = await self.client.agents.create(
+            name="Contextual Assistant",
+            description="Agent that maintains conversation context across interactions"
+        )
+        self.agent_id = agent.id
+        
+        # Add memory tool
+        await self.client.agents.tools.create(
+            agent_id=self.agent_id,
+            name="remember_preference",
+            description="Remember user preferences",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string"},
+                    "value": {"type": "string"}
+                },
+                "required": ["key", "value"]
+            },
+            implementation="""
+# In production, use proper database
+return f"Remembered: {key} = {value}"
+"""
+        )
+        
+        # Context-aware guidelines
+        await self.client.agents.guidelines.create(
+            agent_id=self.agent_id,
+            condition="User mentions a preference or personal information",
+            action="Use remember_preference to store it for future reference",
+            tools=["remember_preference"]
+        )
+        
+        await self.client.agents.guidelines.create(
+            agent_id=self.agent_id,
+            condition="User refers to previous conversation ('as I said', 'earlier')",
+            action="Acknowledge the reference and build upon the previous context"
+        )
+    
+    async def chat(self, user_id: str, message: str) -> str:
+        """Chat with context awareness per user."""
+        # Get or create session for user
+        if user_id not in self.active_sessions:
+            session = await self.client.sessions.create(
+                agent_id=self.agent_id,
+                allow_greeting=True
+            )
+            self.active_sessions[user_id] = session.id
+        
+        session_id = self.active_sessions[user_id]
+        
+        # Send message
+        await self.client.sessions.create_event(
+            session_id=session_id,
+            kind="message",
+            source="customer",
+            message=message
+        )
+        
+        # Get response
+        events = await self.client.sessions.list_events(
+            session_id=session_id,
+            source="ai_agent",
+            kinds="message",
+            wait_for_data=30
+        )
+        
+        if events:
+            return events[0].data.get("message", "No response")
+        return "No response from agent"
+
+
+# Usage
+async def contextual_chat(user_id: str, message: str) -> Dict:
+    """Handle contextual conversation."""
+    agent = ContextualAgent()
+    await agent.initialize()
+    
+    response = await agent.chat(user_id, message)
+    
+    return {
+        "response": response,
+        "user_id": user_id,
+        "has_context": True
+    }
+```
+
+---
+
+## Testing Your Parlant Agent
+
+### Python Client
+
+```python
+# test_parlant.py
+from runagent import RunAgentClient
+import asyncio
+
+# Ensure Parlant server is running on port 8800
+
+# Test simple chat
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="parlant_simple",
+    local=True
+)
+
+result = client.run(message="What time is it?")
+print(f"Response: {result['content']}")
+
+# Test with calculation
+result2 = client.run(message="Calculate 25 * 4 + 10")
+print(f"Calculation result: {result2['content']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="parlant_stream",
+    local=True
+)
+
+print("\nStreaming conversation:")
+for chunk in stream_client.run(message="What's the weather in Tokyo?"):
+    if chunk.get("content"):
+        print(chunk["content"], end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript
+// test_parlant.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'parlant_simple',
+    local: true
+});
+
+await client.initialize();
+
+// Test conversation
+const result = await client.run({
+    message: 'Can you help me with a calculation?'
+});
+
+console.log('Response:', result.content);
+
+// Test streaming
+const streamClient = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'parlant_stream',
+    local: true
+});
+
+await streamClient.initialize();
+
+for await (const chunk of streamClient.run({
+    message: 'Tell me about the weather'
+})) {
+    if (chunk.content) {
+        process.stdout.write(chunk.content);
+    }
+}
+```
+
+### Rust Client
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Non-streaming test
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "parlant_simple",
+        true
+    ).await?;
+    
+    let result = client.run(&[
+        ("message", json!("What can you help me with?"))
+    ]).await?;
+    
+    println!("Response: {}", result);
+    
+    // Streaming test
+    let stream_client = RunAgentClient::new(
+        "your_agent_id_here",
+        "parlant_stream",
+        true
+    ).await?;
+    
+    let mut stream = stream_client.run_stream(&[
+        ("message", json!("Calculate 100 + 250"))
+    ]).await?;
+    
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(data) => print!("{}", data),
+            Err(e) => eprintln!("Error: {}", e)
+        }
+    }
+    
+    Ok(())
+}
+```
+
+---
+
+## Best Practices
+
+### 1. **Guideline Design**
+- Write clear, specific conditions
+- Define concrete actions for agents to take
+- Associate appropriate tools with guidelines
+- Test guidelines with various inputs
+
+### 2. **Tool Implementation**
+- Keep tools focused and single-purpose
+- Handle errors gracefully within tool code
+- Use type-safe parameters
+- Provide clear descriptions for LLM understanding
+
+### 3. **Session Management**
+- Create sessions per user for context
+- Clean up old sessions periodically
+- Handle session timeouts appropriately
+- Store session metadata when needed
+
+### 4. **Error Handling**
+- Always wrap async operations in try-catch
+- Return structured error responses
+- Log errors for debugging
+- Provide helpful error messages to users
+
+### 5. **Performance**
+- Reuse client connections
+- Cache agent IDs
+- Implement connection pooling for high traffic
+- Monitor API usage and latency
+
+---
+
+## Common Patterns
+
+### Guideline-Driven Routing
+Route user requests based on guidelines:
+```python
+condition → action → tool_usage
+```
+
+### Tool Composition
+Combine multiple tools for complex tasks:
+```python
+calculator + weather + time → comprehensive_response
+```
+
+### Context Preservation
+Maintain conversation history:
+```python
+session_per_user → contextual_responses
+```
+
+### Escalation Pattern
+Handle complex requests:
+```python
+simple_query → agent_response
+complex_query → escalation → support_ticket
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Server Connection Failed**
+- **Solution**: Ensure Parlant server is running with `parlant-server run`
+- Check server URL (default: `http://localhost:8800`)
+- Verify no firewall blocking port 8800
+
+**2. Agent Not Found**
+- **Solution**: Agent is created on first run
+- Check agent creation logs
+- Verify client connection is successful
+
+**3. Tool Execution Fails**
+- **Solution**: Check tool implementation code
+- Verify parameter types match specification
+- Test tools independently before integration
+
+**4. Guidelines Not Triggering**
+- **Solution**: Make conditions more specific
+- Test with various phrasings
+- Review guideline condition matching
+
+**5. Session Timeout**
+- **Solution**: Increase `wait_for_data` timeout
+- Check server responsiveness
+- Monitor server logs for errors
+
+### Debug Tips
+
+Enable debug logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+async def simple_chat(message: str):
+    print(f"Debug: Processing message: {message}")
+    # ... rest of code
+```
+
+Test Parlant server connection:
+
+```python
+from parlant.client import AsyncParlantClient
+import asyncio
+
+async def test_connection():
+    try:
+        client = AsyncParlantClient(base_url="http://localhost:8800")
+        agents = await client.agents.list()
+        print(f"✅ Connected! Found {len(agents)} agents")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+
+asyncio.run(test_connection())
+```
+
+---
+
+## Performance Optimization
+
+### 1. **Client Reuse**
+Reuse client connections:
+
+```python
+_global_client = None
+
+async def get_client():
+    global _global_client
+    if _global_client is None:
+        _global_client = AsyncParlantClient(base_url="http://localhost:8800")
+    return _global_client
+```
+
+### 2. **Agent Caching**
+Cache agent IDs:
+
+```python
+_agent_cache = {}
+
+async def get_or_create_agent(agent_type: str):
+    if agent_type not in _agent_cache:
+        client = await get_client()
+        agent_id = await create_agent(client, agent_type)
+        _agent_cache[agent_type] = agent_id
+    return _agent_cache[agent_type]
+```
+
+### 3. **Session Pooling**
+Manage session lifecycle:
+
+```python
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+class SessionPool:
+    def __init__(self, ttl_minutes=30):
+        self.sessions = defaultdict(dict)
+        self.ttl = timedelta(minutes=ttl_minutes)
+    
+    def get_session(self, user_id: str):
+        session_data = self.sessions.get(user_id)
+        if session_data and datetime.now() - session_data['created'] < self.ttl:
+            return session_data['session_id']
+        return None
+    
+    def add_session(self, user_id: str, session_id: str):
+        self.sessions[user_id] = {
+            'session_id': session_id,
+            'created': datetime.now()
+        }
+```
+
+---
+
+## Next Steps
+
+- **[Advanced Patterns](/how-to/advanced-tasks)** - Learn advanced Parlant patterns
+- **[Production Deployment](/how-to/deployment/cloud-deployment)** - Deploy to production
+- **[Multi-Language Access](/tutorials/multi-language-wrapper)** - Access from different languages
+- **[Performance Tuning](/explanation/production-considerations)** - Optimize for production
+
+---
+
+## Additional Resources
+
+- [Parlant Documentation](https://docs.parlant.io)
+- [Parlant GitHub](https://github.com/emcie-co/parlant)
+- [Parlant Discord](https://discord.gg/parlant)
+- [RunAgent Discord Community](https://discord.gg/Q9P9AdHVHz)
+- [RunAgent Documentation](https://docs.run-agent.ai)
+
+---
+
+**🎉 Great work!** You've learned how to deploy Parlant guideline-driven agents with RunAgent. Parlant's structured behavior system combined with RunAgent's multi-language access creates powerful, controllable conversational AI systems!
