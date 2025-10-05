@@ -3,217 +3,285 @@ title: 'Cloud Deployment'
 description: 'Deploy agents to RunAgent cloud infrastructure'
 ---
 
-<Info>
-  Cloud deployment is coming soon. This guide covers the planned features and deployment process.
-</Info>
+Deploy agents to RunAgent cloud infrastructure for production use with automatic scaling, monitoring, and global availability.
 
-## Overview
+## Prerequisites
 
-RunAgent's cloud deployment provides a serverless, scalable infrastructure for running your agents in production. With automatic scaling, monitoring, and global distribution, you can focus on building agents while we handle the operations.
+Before deploying to the cloud, you need:
 
-## Deployment Process
+1. **RunAgent Account** - Sign up at [run-agent.ai](https://run-agent.ai)
+2. **API Key** - Get your API key from the dashboard
+3. **Configured CLI** - Authenticate your CLI with your API key
 
-### Quick Deploy
+## Authentication Setup
+
+Configure your CLI with your API key:
 
 ```bash
-# Deploy to cloud
-runagent deploy .
+# Setup authentication
+runagent setup --api-key <your-api-key>
 
-# Deploy with custom name
-runagent deploy . --name production-agent
-
-# Deploy to specific environment
-runagent deploy . --env staging
+# Verify configuration
+runagent setup --api-key <your-api-key>
 ```
 
-### Deployment Steps
+The setup command will:
+- Validate your API key with the RunAgent middleware
+- Store credentials securely in `~/.runagent/config.json`
+- Display your account information and tier
+- Show middleware sync status
 
-<Steps>
-  <Step title="Validation">
-    RunAgent validates your configuration and code
-  </Step>
-  <Step title="Build">
-    Creates optimized container with dependencies
-  </Step>
-  <Step title="Upload">
-    Securely uploads to RunAgent infrastructure
-  </Step>
-  <Step title="Deploy">
-    Starts agent with auto-scaling enabled
-  </Step>
-  <Step title="Health Check">
-    Verifies agent is responding correctly
-  </Step>
-</Steps>
+### Teardown Configuration
 
-## Environments
+Remove stored credentials:
 
-### Development
 ```bash
-runagent deploy . --env development
+runagent teardown
 ```
-- Lower cost tier
-- Detailed logging
-- Relaxed rate limits
 
-### Staging
+## Deployment Methods
+
+### Method 1: Quick Deploy (Upload + Start)
+
+Deploy your agent in a single command:
+
 ```bash
-runagent deploy . --env staging
-```
-- Production-like environment
-- Full monitoring
-- Same limits as production
+# Deploy to cloud (combines upload + start)
+runagent deploy --folder <agent-folder>
 
-### Production
+# Example
+runagent deploy --folder ./my-agent
+```
+
+This command will:
+1. Validate your agent configuration
+2. Upload agent code and metadata to the cloud
+3. Start the agent automatically
+4. Return the deployment endpoint
+
+**Output:**
+```
+✅ Full deployment successful!
+🆔 Agent ID: abc-123-def-456
+🌐 Endpoint: https://api.run-agent.ai/api/v1/agents/abc-123-def-456
+```
+
+### Method 2: Two-Step Deploy (Upload Then Start)
+
+For more control, upload and start separately:
+
+#### Step 1: Upload Agent
+
 ```bash
-runagent deploy . --env production
+# Upload agent to cloud
+runagent upload --folder <agent-folder>
+
+# Specify framework explicitly (optional)
+runagent upload --folder <agent-folder> --framework langgraph
 ```
-- High availability
-- Auto-scaling
-- Full monitoring and alerting
 
-## Configuration
+**Upload Process:**
+1. Agent validation (checks for required files)
+2. Fingerprint generation (for duplicate detection)
+3. Metadata upload (config + entrypoints)
+4. Source code packaging and upload
+5. Local database tracking
 
-### Deployment Settings
+**Output:**
+```
+📤 Uploading agent from: ./my-agent
+🔍 Validating agent...
+✅ Agent validation passed
+📋 Agent config loaded successfully
+🔍 Agent fingerprint: a1b2c3d4...
 
+📦 Uploading to: https://api.run-agent.ai/api/v1
+🌐 Uploading agent metadata...
+   Metadata uploaded successfully
+📦 Creating upload package...
+   Created upload package: agent_abc12345.zip
+   Uploading agent_abc12345.zip (1,234,567 bytes)...
+   Processing upload...
+   Upload completed!
+
+✅ Upload successful!
+🆔 Agent ID: abc-123-def-456
+🌐 Server: https://api.run-agent.ai/api/v1
+🔍 Fingerprint: a1b2c3d4...
+
+💡 Next step: runagent start --id abc-123-def-456
+```
+
+#### Step 2: Start Agent
+
+```bash
+# Start uploaded agent
+runagent start --id <agent-id>
+
+# With custom configuration
+runagent start --id <agent-id> --config '{"env": "production"}'
+```
+
+**Output:**
+```
+Starting agent: abc-123-def-456
+
+✅ Agent started successfully!
+🆔 Agent ID: abc-123-def-456
+🌐 Endpoint: https://api.run-agent.ai/api/v1/agents/abc-123-def-456/execute
+```
+
+## Agent Validation
+
+Before upload, RunAgent validates your agent:
+
+### Required Files
+- `runagent.config.json` - Agent configuration
+- `main.py` or `agent.py` - Entry point file
+- `requirements.txt` - Python dependencies (optional)
+
+### Validation Checks
+- ✅ Configuration file exists and is valid JSON
+- ✅ Entry point file exists
+- ✅ Entrypoints are properly defined
+- ✅ Framework is supported
+- ✅ No syntax errors in configuration
+
+**Example Valid Configuration:**
 ```json
 {
-  "deployment": {
-    "memory": "1GB",
-    "timeout": 60,
-    "min_instances": 1,
-    "max_instances": 10,
-    "regions": ["us-east-1", "eu-west-1"],
-    "environment_variables": {
-      "LOG_LEVEL": "INFO"
+  "agent_name": "my-agent",
+  "version": "1.0.0",
+  "framework": "langgraph",
+  "entrypoints": [
+    {
+      "tag": "chat",
+      "file": "main.py",
+      "module": "agent.chat"
     }
-  }
+  ]
 }
 ```
 
-### Scaling Configuration
+## Duplicate Detection
 
-```json
-{
-  "scaling": {
-    "metric": "concurrent_requests",
-    "target": 10,
-    "scale_up_cooldown": 60,
-    "scale_down_cooldown": 300
-  }
-}
+RunAgent uses fingerprinting to detect duplicate agents:
+
+### How It Works
+1. **Fingerprint Generation**: Creates a unique hash of your agent's content
+2. **Duplicate Check**: Compares with existing agents in your account
+3. **User Prompt**: If duplicate found, asks whether to overwrite or create new
+
+**Example Scenarios:**
+
+**Scenario 1: Identical Content**
+```
+⚠️ Agent with identical content already exists!
+🆔 Existing Agent ID: abc-123-def-456
+📊 Status: deployed
+📍 Type: Remote
+
+Do you want to overwrite the existing agent? [y/N]: 
 ```
 
-## Monitoring
+**Scenario 2: Modified Content**
+```
+⚠️ Agent content has changed!
+🆔 Existing Agent ID: abc-123-def-456
+📊 Status: deployed
+📍 Type: Remote
+🔍 Content fingerprint changed (modified files detected)
 
-### Metrics Available
+What would you like to do?
+  [overwrite] - Overwrite existing agent (coming soon)
+  [new] - Create new agent
+  [cancel] - Cancel upload
+```
 
-- Request count and latency
-- Error rates and types
-- Token usage
-- Memory and CPU utilization
-- Concurrent executions
+## Running Cloud Agents
 
-### Accessing Metrics
+Execute your deployed agents:
+
+### Basic Execution
 
 ```bash
-# View real-time metrics
-runagent metrics <deployment-id>
+# Run with entrypoint tag
+runagent run --id <agent-id> --tag <entrypoint> --param1=value1 --param2=value2
 
-# Get specific metric
-runagent metrics <deployment-id> --metric latency
-
-# Export metrics
-runagent metrics <deployment-id> --export csv
+# Examples
+runagent run --id abc-123 --tag chat --message="Hello"
+runagent run --id abc-123 --tag process --data='{"key": "value"}'
 ```
 
-## Security
-
-### Data Encryption
-- TLS 1.3 for all API traffic
-- Encryption at rest for stored data
-- Encrypted environment variables
-
-### Network Security
-- Private VPC per deployment
-- No direct internet access
-- API Gateway with rate limiting
-
-### Compliance
-- SOC 2 Type II (coming soon)
-- GDPR compliant
-- HIPAA ready (Enterprise)
-
-## Cost Management
-
-### Pricing Model
-- Pay per request
-- No charge for idle time
-- Volume discounts available
-
-### Cost Optimization
-
-```json
-{
-  "optimization": {
-    "cache_responses": true,
-    "compress_payloads": true,
-    "batch_requests": true
-  }
-}
-```
-
-### Monitoring Costs
+### Using Input Files
 
 ```bash
-# View current usage
-runagent usage <deployment-id>
-
-# Set spending alerts
-runagent alerts create --threshold 100 --type cost
+# Run with JSON input file
+runagent run --id <agent-id> --tag <entrypoint> --input config.json
 ```
 
-## Advanced Features
-
-### Multi-Region Deployment
-
+**Example input.json:**
 ```json
 {
-  "deployment": {
-    "regions": ["us-east-1", "eu-west-1", "ap-southeast-1"],
-    "routing": "latency"  // or "geolocation"
+  "message": "Hello, world!",
+  "config": {
+    "temperature": 0.7,
+    "max_tokens": 100
   }
 }
 ```
 
-### Custom Domains
+### Streaming Execution
+
+For streaming entrypoints (must end with `_stream`):
 
 ```bash
-# Add custom domain
-runagent domain add api.mycompany.com --deployment <id>
-
-# Configure SSL
-runagent domain ssl api.mycompany.com --cert-arn <arn>
+# Run streaming endpoint
+runagent run --id <agent-id> --tag chat_stream --message="Tell me a story"
 ```
 
-### Webhook Integration
+## Cloud vs Local Deployment
 
-```json
-{
-  "webhooks": {
-    "on_success": "https://api.mycompany.com/success",
-    "on_error": "https://api.mycompany.com/error",
-    "on_timeout": "https://api.mycompany.com/timeout"
-  }
-}
+| Feature | Local | Cloud |
+|---------|-------|-------|
+| **Setup** | `runagent serve` | `runagent deploy` |
+| **Infrastructure** | Your machine | RunAgent cloud |
+| **Scaling** | Manual | Automatic |
+| **Uptime** | While running | 24/7 |
+| **Monitoring** | Local logs only | Full monitoring dashboard |
+| **URL** | localhost:port | Global endpoint |
+| **Authentication** | None | API key required |
+| **Cost** | Free | Usage-based pricing |
+
+## Deployment Workflow
+
+### Complete Example
+
+```bash
+# 1. Create and test agent locally
+runagent init my-agent --framework langgraph --template default
+cd my-agent
+
+# 2. Test locally
+runagent serve
+
+# 3. Authenticate (if not already done)
+runagent setup --api-key <your-key>
+
+# 4. Deploy to cloud
+runagent deploy --folder .
+
+# 5. Test cloud deployment
+runagent run --id <agent-id> --tag chat --message="Hello"
 ```
 
-## CI/CD Integration
+### CI/CD Integration
 
-### GitHub Actions
+#### GitHub Actions
 
 ```yaml
-name: Deploy to RunAgent
+name: Deploy to RunAgent Cloud
+
 on:
   push:
     branches: [main]
@@ -221,6 +289,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v3
       
@@ -232,140 +301,231 @@ jobs:
       - name: Install RunAgent
         run: pip install runagent
       
-      - name: Deploy
+      - name: Deploy Agent
         env:
           RUNAGENT_API_KEY: ${{ secrets.RUNAGENT_API_KEY }}
         run: |
-          runagent deploy . --env production --name my-agent
+          runagent setup --api-key $RUNAGENT_API_KEY
+          runagent deploy --folder .
 ```
 
-### GitLab CI
+#### GitLab CI
 
 ```yaml
 deploy:
   stage: deploy
+  image: python:3.9
+  
   script:
     - pip install runagent
-    - runagent deploy . --env $CI_COMMIT_BRANCH
+    - runagent setup --api-key $RUNAGENT_API_KEY
+    - runagent deploy --folder .
+  
   only:
     - main
-    - staging
 ```
 
-## Rollback and Versioning
+## Monitoring and Management
 
-### Version Management
+### View Agent Status
 
 ```bash
-# List versions
-runagent versions <deployment-id>
-
-# Deploy specific version
-runagent deploy . --version 1.2.3
-
-# Rollback to previous
-runagent rollback <deployment-id>
-
-# Rollback to specific version
-runagent rollback <deployment-id> --version 1.2.0
+# Check if agent is running
+runagent start --id <agent-id>
 ```
 
-### Blue-Green Deployment
+### Local Deployment Info
 
+Deployment information is saved locally in `.deployments/`:
+
+```json
+{
+  "agent_id": "abc-123-def-456",
+  "remote": true,
+  "base_url": "https://api.run-agent.ai/api/v1",
+  "fingerprint": "a1b2c3d4...",
+  "source_folder": "/path/to/my-agent",
+  "saved_at": "2025-01-15 10:30:00",
+  "client_version": "1.0"
+}
+```
+
+## Troubleshooting
+
+### Authentication Errors
+
+**Error:** `Not authenticated. Run 'runagent setup --api-key <key>' first`
+
+**Solution:**
 ```bash
-# Deploy new version without switching
-runagent deploy . --strategy blue-green --no-switch
+# Setup authentication
+runagent setup --api-key <your-api-key>
 
-# Test new version
-runagent test <deployment-id> --version new
-
-# Switch traffic
-runagent switch <deployment-id> --to new
+# Verify setup worked
+runagent setup --api-key <your-api-key>
 ```
 
-## Troubleshooting Deployments
+### Upload Failures
 
-### Deployment Failures
+**Error:** `Agent validation failed`
 
+**Solution:**
+1. Check that `runagent.config.json` exists and is valid
+2. Verify entry point file exists (`main.py` or `agent.py`)
+3. Ensure all required dependencies are in `requirements.txt`
+4. Run `runagent serve` locally to test first
+
+**Error:** `Failed to upload agent: HTTP 413`
+
+**Solution:** Your agent folder is too large. Remove unnecessary files:
+- Remove `__pycache__` directories
+- Remove `.pyc` files
+- Remove large data files (use cloud storage instead)
+- Add `.gitignore` patterns to exclude files
+
+### Deployment Fails But Upload Succeeds
+
+**Error:** `Upload succeeded but start failed`
+
+**Solution:**
 ```bash
-# Check deployment status
-runagent status <deployment-id>
-
-# View deployment logs
-runagent logs <deployment-id> --deployment
-
-# Get detailed error
-runagent describe <deployment-id>
+# Agent is uploaded, just needs to be started
+runagent start --id <agent-id>
 ```
 
-### Performance Issues
+### Connection Issues
 
-```bash
-# View performance metrics
-runagent performance <deployment-id>
+**Error:** `Cannot connect to middleware server`
 
-# Enable profiling
-runagent config <deployment-id> --set profiling=true
-
-# Download profile
-runagent profile <deployment-id> --download
-```
+**Solution:**
+1. Check your internet connection
+2. Verify the base URL is correct
+3. Check if middleware server is accessible
+4. Try with explicit base URL: `runagent setup --api-key <key> --base-url https://api.run-agent.ai`
 
 ## Best Practices
 
-1. **Test Thoroughly**
-   - Use staging environment
-   - Run integration tests
-   - Monitor initial deployment
+### 1. Test Locally First
 
-2. **Resource Optimization**
-   - Right-size memory allocation
-   - Set appropriate timeouts
-   - Use caching where possible
-
-3. **Security**
-   - Rotate API keys regularly
-   - Use least privilege principle
-   - Enable audit logging
-
-4. **Monitoring**
-   - Set up alerts
-   - Track key metrics
-   - Regular performance reviews
-
-## Migration Guide
-
-### From Local to Cloud
-
-1. Test in staging first
-2. Update environment variables
-3. Verify all dependencies
-4. Deploy with same configuration
-5. Monitor closely after deployment
-
-### From Other Platforms
+Always test your agent locally before deploying:
 
 ```bash
-# Import from existing service
-runagent import --from heroku --app my-app
+# Test locally
+runagent serve
+runagent run --id <local-agent-id> --tag chat --local --message="test"
 
-# Validate imported configuration
-runagent validate .
-
-# Deploy
-runagent deploy .
+# Deploy after successful local testing
+runagent deploy --folder .
 ```
 
-## Coming Soon
+### 2. Version Control
 
-- Auto-scaling based on custom metrics
-- A/B testing support
-- Edge deployment options
-- Advanced caching strategies
-- WebSocket support
+Include deployment info in version control:
 
-## See Also
+```bash
+# Add to .gitignore
+.deployments/*.json
+.runagent/
 
-- [Local Development](/deployment/local-development) - Test locally first
-- [Monitoring Guide](/api-reference/webhooks) - Set up monitoring
-- [Security Best Practices](/resources/troubleshooting) - Secure your deployment
+# But track your agent code
+git add runagent.config.json main.py requirements.txt
+git commit -m "feat: add chat agent"
+```
+
+### 3. Environment Variables
+
+Use environment variables for sensitive data:
+
+```json
+{
+  "env_vars": {
+    "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+    "DATABASE_URL": "${DATABASE_URL}"
+  }
+}
+```
+
+Set them before deploying:
+```bash
+export OPENAI_API_KEY="sk-..."
+runagent deploy --folder .
+```
+
+### 4. Incremental Updates
+
+For agent updates:
+
+```bash
+# Upload new version
+runagent upload --folder .
+
+# Test before switching
+runagent run --id <new-agent-id> --tag chat --message="test"
+
+# If good, can use new agent ID
+```
+
+### 5. Monitor Performance
+
+After deployment:
+- Test all entrypoints
+- Check response times
+- Verify outputs are correct
+- Monitor error rates
+
+## Security
+
+### API Key Management
+
+**Best Practices:**
+- ✅ Store API keys in environment variables
+- ✅ Use different keys for development and production
+- ✅ Rotate keys regularly
+- ✅ Never commit API keys to version control
+- ❌ Don't share API keys
+- ❌ Don't hardcode keys in agent code
+
+### Secure Deployment
+
+```bash
+# Use environment variables
+export RUNAGENT_API_KEY="your-key"
+runagent deploy --folder .
+
+# Or use secure config file
+runagent setup --api-key $RUNAGENT_API_KEY
+```
+
+## Limits and Quotas
+
+### Free Tier
+- 5 local agents
+- Cloud deployment available
+- Standard execution limits
+
+### Enhanced Limits
+Contact sales for:
+- Unlimited local agents
+- Higher execution limits
+- Priority support
+- Custom SLAs
+
+Check your current limits:
+```bash
+runagent db status --capacity
+```
+
+## Next Steps
+
+- [Local Development](/deployment/local-development) - Test agents locally
+- [SDK Overview](/sdk/overview) - Use Python SDK for deployment
+- [API Reference](/api-reference) - Direct API access
+- [Monitoring Guide](/monitoring) - Track agent performance
+
+## Support
+
+Need help with cloud deployment?
+- 📖 [Documentation](https://docs.run-agent.ai)
+- 💬 [Discord Community](https://discord.gg/runagent)
+- 📧 [Email Support](mailto:support@run-agent.ai)
+- 🐛 [Report Issues](https://github.com/runagent/runagent/issues)
