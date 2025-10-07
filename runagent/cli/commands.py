@@ -28,6 +28,18 @@ from runagent.utils.enums.framework import Framework
 console = Console()
 
 
+def format_error_message(error_info):
+    """Format error information from API responses"""
+    if isinstance(error_info, dict) and "message" in error_info:
+        # New format with ErrorDetail object
+        error_message = error_info.get("message", "Unknown error")
+        error_code = error_info.get("code", "UNKNOWN_ERROR")
+        return f"[{error_code}] {error_message}"
+    else:
+        # Fallback to old format for backward compatibility
+        return str(error_info) if error_info else "Unknown error"
+
+
 def print_version(ctx, param, value):
     """Custom version callback with colored output"""
     if not value or ctx.resilient_parsing:
@@ -77,6 +89,8 @@ def setup(api_key, base_url, force):
             sdk.configure(api_key=api_key, base_url=base_url, save=True)
             console.print("✅ [green]Setup completed successfully![/green]")
         except AuthenticationError as auth_err:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
             console.print(f"❌ [red]Authentication failed:[/red] {auth_err}")
             
             # Provide specific troubleshooting based on error message
@@ -242,14 +256,16 @@ def delete(agent_id, yes):
             capacity_info = sdk.db_service.get_database_capacity_info()
             console.print(f"📊 Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
         else:
-            console.print(f"❌ [red]Failed to delete agent: {result.get('error')}[/red]")
-            raise click.ClickException("Deletion failed")
+            console.print(f"❌ [red]Failed to delete agent:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
     
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
         console.print(f"❌ [red]Delete error:[/red] {e}")
-        raise click.ClickException("Delete failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
@@ -506,110 +522,26 @@ def template(action_list, action_info, framework, template, filter_framework, fo
                     )
 
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Template error:[/red] {e}")
         raise click.ClickException("Template operation failed")
 
 
 @click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-@click.option("--replace", help="Agent ID to replace (for capacity management)")
-@click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
-@click.option("--host", default="127.0.0.1", help="Preferred host")
-def deploy_local(folder, framework, replace, port, host):
-    """Deploy agent locally for testing with automatic port allocation"""
-
-    try:
-        sdk = RunAgent()
-
-        # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
-
-        console.print(f"🚀 [bold]Deploying agent locally with auto port allocation...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
-
-        if replace:
-            # Replace existing agent
-            result = sdk.db_service.replace_agent(
-                old_agent_id=replace,
-                new_agent_id=str(uuid.uuid4()),  # Generate new ID
-                agent_path=folder,
-                host=host,
-                port=port,
-                framework=framework or detect_framework(folder),
-            )
-        else:
-            # Add new agent with auto port allocation
-            import uuid
-            agent_id = str(uuid.uuid4())
-            result = sdk.db_service.add_agent_with_auto_port(
-                agent_id=agent_id,
-                agent_path=folder,
-                framework=framework or detect_framework(folder),
-                status="deployed",
-                preferred_host=host,
-                preferred_port=port,
-            )
-
-        if result.get("success"):
-            agent_id = result.get("new_agent_id") if replace else result.get("agent_id")
-            allocated_host = result.get("allocated_host", host)
-            allocated_port = result.get("allocated_port", port)
-            
-            console.print(f"\n✅ [green]Local deployment successful![/green]")
-            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
-            console.print(f"🔌 Allocated Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
-            console.print(f"🌐 Endpoint: [link]http://{allocated_host}:{allocated_port}[/link]")
-
-            if replace:
-                console.print(f"🔄 Replaced agent: [yellow]{replace}[/yellow]")
-
-            # Show capacity info
-            # capacity = sdk.get_local_capacity()
-            capacity_info = sdk.db_service.get_database_capacity_info()
-
-            console.print(
-                f"📊 Capacity: [cyan]{capacity.get('current_count', 1)}/5[/cyan] slots used"
-            )
-
-            console.print(f"\n💡 [bold]Next steps:[/bold]")
-            console.print(f"  • Start server: [cyan]runagent serve {folder}[/cyan]")
-            console.print(f"  • Test agent: [cyan]runagent run --id {agent_id} --local[/cyan]")
-            console.print(f"  • Or use Python SDK:")
-            console.print(f"    [dim]from runagent import RunAgentClient[/dim]")
-            console.print(f"    [dim]client = RunAgentClient(agent_id='{agent_id}', local=True)[/dim]")
-        else:
-            error_code = result.get("error_code")
-            if error_code == "DATABASE_FULL":
-                capacity_info = result.get("capacity_info", {})
-                console.print(f"\n❌ [red]Database at full capacity![/red]")
-                console.print(
-                    f"📊 Current: {capacity_info.get('current_count', 0)}/5 agents"
-                )
-
-                oldest_agent = capacity_info.get("oldest_agent", {}).get("agent_id")
-                if oldest_agent:
-                    console.print(f"\n💡 [yellow]Suggested command:[/yellow]")
-                    console.print(
-                        f"[cyan]runagent deploy-local --folder {folder} --replace {oldest_agent}[/cyan]"
-                    )
-
-                raise click.ClickException(result.get("error"))
-            else:
-                raise click.ClickException(result.get("error"))
-
-    except ValidationError as e:
-        console.print(f"❌ [red]Validation error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
-    except Exception as e:
-        console.print(f"❌ [red]Deployment error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
-
-@click.command()
-@click.option("--folder", required=True, help="Folder containing agent files")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-def upload(folder, framework):
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def upload(path: Path):
     """Upload agent to remote server"""
 
     try:
@@ -623,14 +555,14 @@ def upload(folder, framework):
             raise click.ClickException("Authentication required")
 
         # Validate folder
-        if not Path(folder).exists():
-            raise click.ClickException(f"Folder not found: {folder}")
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
         console.print(f"📤 [bold]Uploading agent...[/bold]")
-        console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-        # Upload agent
-        result = sdk.upload_agent(folder=folder, framework=framework)
+        # Upload agent (framework auto-detected)
+        result = sdk.upload_agent(folder=path)
 
         if result.get("success"):
             agent_id = result["agent_id"]
@@ -639,14 +571,22 @@ def upload(folder, framework):
             console.print(f"\n💡 [bold]Next step:[/bold]")
             console.print(f"[cyan]runagent start --id {agent_id}[/cyan]")
         else:
-            raise click.ClickException(result.get("error"))
+            console.print(f"❌ [red]Upload failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
     except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Authentication error:[/red] {e}")
-        raise click.ClickException("Upload failed")
+        import sys
+        sys.exit(1)
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Upload error:[/red] {e}")
-        raise click.ClickException("Upload failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
@@ -685,91 +625,81 @@ def start(agent_id, config):
             console.print(f"\n✅ [green]Agent started successfully![/green]")
             console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
-            raise click.ClickException(result.get("error"))
+            console.print(f"❌ [red]Start failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
     except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Authentication error:[/red] {e}")
-        raise click.ClickException("Start failed")
+        import sys
+        sys.exit(1)
     except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
         console.print(f"❌ [red]Start error:[/red] {e}")
-        raise click.ClickException("Start failed")
+        import sys
+        sys.exit(1)
 
 
 @click.command()
-@click.option("--folder", help="Folder containing agent files (for upload + start)")
-@click.option("--id", "agent_id", help="Agent ID (for start only)")
-@click.option("--local", is_flag=True, help="Deploy locally instead of remote server")
-@click.option("--framework", help="Framework type (auto-detected if not specified)")
-@click.option("--config", help="JSON configuration for deployment")
-def deploy(folder, agent_id, local, framework, config):
-    """Deploy agent (upload + start) or deploy locally"""
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def deploy(path: Path):
+    """Deploy agent (upload + start) to remote server"""
 
     try:
         sdk = RunAgent()
 
-        if local:
-            # Local deployment
-            if not folder:
-                raise click.ClickException("--folder is required for local deployment")
-
-            # Use deploy_local command logic
-            ctx = click.get_current_context()
-            ctx.invoke(deploy_local, folder=folder, framework=framework)
-            return
-
-        # Remote deployment
+        # Check authentication
         if not sdk.is_configured():
             console.print(
                 "❌ [red]Not authenticated.[/red] Run [cyan]'runagent setup --api-key <key>'[/cyan] first"
             )
             raise click.ClickException("Authentication required")
 
-        # Parse config
-        config_dict = {}
-        if config:
-            try:
-                config_dict = json.loads(config)
-            except json.JSONDecodeError:
-                if os.getenv('DISABLE_TRY_CATCH'):
-                    raise
-                raise click.ClickException("Invalid JSON in config parameter")
+        # Validate folder
+        if not Path(path).exists():
+            raise click.ClickException(f"Folder not found: {path}")
 
-        if folder:
-            # Full deployment (upload + start)
-            if not Path(folder).exists():
-                raise click.ClickException(f"Folder not found: {folder}")
+        console.print(f"🎯 [bold]Deploying agent (upload + start)...[/bold]")
+        console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
-            console.print(f"🎯 [bold]Full deployment (upload + start)...[/bold]")
-            console.print(f"📁 Source: [cyan]{folder}[/cyan]")
+        # Deploy agent (framework auto-detected)
+        result = sdk.deploy_remote(folder=str(path))
 
-            result = sdk.deploy_remote(
-                folder=folder, framework=framework, config=config_dict
-            )
-
-            if result.get("success"):
-                console.print(f"\n✅ [green]Full deployment successful![/green]")
-                console.print(
-                    f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]"
-                )
-                console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
-            else:
-                raise click.ClickException(result.get("error"))
-
-        elif agent_id:
-            # Start existing agent
-            ctx = click.get_current_context()
-            ctx.invoke(start, agent_id=agent_id, config=config)
-
+        if result.get("success"):
+            console.print(f"\n✅ [green]Deployment successful![/green]")
+            console.print(f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
+            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
-            raise click.ClickException(
-                "Either --folder (for upload+start) or --id (for start only) is required"
-            )
+            console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(result.get('error'))}")
+            import sys
+            sys.exit(1)
 
+    except AuthenticationError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"❌ [red]Authentication error:[/red] {e}")
+        import sys
+        sys.exit(1)
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
         console.print(f"❌ [red]Deployment error:[/red] {e}")
-        raise click.ClickException("Deployment failed")
+        import sys
+        sys.exit(1)
 
 
 
@@ -916,6 +846,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                     else:
                         console.print(f"   Connection: [red]❌ Failed to connect: {test_result.get('error', 'Unknown error')}[/red]")
                 except Exception as e:
+                    if os.getenv('DISABLE_TRY_CATCH'):
+                        raise
                     console.print(f"   Connection: [red]❌ Connection test failed: {e}[/red]")
             else:
                 console.print(f"   Status: [yellow]⚠️ DISABLED[/yellow]")
@@ -974,8 +906,11 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         # Using host/port with input file
         runagent run --host localhost --port 8080 --input config.json
         
-        # Generic streaming mode with extra params
-        runagent run --agent-id my-agent --generic-stream --debug=true --retries=3
+        # local agent
+        runagent run --id d33c497d-d3f5-462e-8ff4-c28d819b92d6  --tag minimal  --local --message=something
+
+        # remote agent
+        runagent run --id d33c497d-d3f5-462e-8ff4-c28d819b92d6  --tag minimal  --message=something
     """
     
     # ============================================
@@ -1002,17 +937,12 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         )
     
     # ============================================
-    # # VALIDATION 2: Generic mode selection
+    # # VALIDATION 2: tag validation
     # # ============================================
-    # if generic and generic_stream:
-    #     raise click.UsageError(
-    #         "Cannot specify both --generic and --generic-stream. Choose one."
-    #     )
+    if tag.endswith("_stream"):
+        console.print(f"❌ [bold red]Execution failed:[/bold red] Cannot use streaming Entrypoint tag `{tag}` through non-streaming endpoint.")
+        return
     
-    # # Default to generic mode if neither specified
-    # if not generic and not generic_stream:
-    #     generic = True
-    #     console.print("🔧 Defaulting to --generic mode")
     
     # ============================================
     # VALIDATION 3: Input file OR extra params
@@ -1126,7 +1056,167 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        raise click.ClickException(f"Execution failed: {e}")
+        # Display error with red ❌ symbol
+        console.print(f"❌ [bold red]Execution failed:[/bold red] {e}")
+        # Exit with error code 1 instead of raising ClickException to avoid duplicate message
+        import sys
+        sys.exit(1)
+
+
+@click.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ))
+@click.option("--id", "agent_id", help="Agent ID to run")
+@click.option("--host", help="Host to connect to (use with --port)")
+@click.option("--port", type=int, help="Port to connect to (use with --host)")
+@click.option(
+    "--input",
+    "input_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, path_type=Path),
+    help="Path to input JSON file"
+)
+@click.option("--local", is_flag=True, help="Run agent locally")
+@click.option("--tag", required=True, help="Entrypoint tag to be used")
+@click.option("--timeout", type=int, help="Timeout in seconds")
+@click.pass_context
+def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
+    """
+    Stream agent execution results in real-time.
+    
+    This command connects to an agent via WebSocket and streams the execution results
+    as they become available, providing real-time feedback.
+    
+    Examples:
+        # Local streaming agent
+        runagent run-stream --id d33c497d-d3f5-462e-8ff4-c28d819b92d6 --tag minimal_stream --local --message=something
+        
+        # Remote streaming agent
+        runagent run-stream --id d33c497d-d3f5-462e-8ff4-c28d819b92d6 --tag minimal_stream --message=something
+        
+        # With input file
+        runagent run-stream --id d33c497d-d3f5-462e-8ff4-c28d819b92d6 --tag minimal_stream --local --input config.json
+    """
+    
+    # ============================================
+    # PARAMETER PARSING
+    # ============================================
+    
+    extra_params = {}
+    for item in ctx.args:
+        if '=' in item:
+            key, value = item.split('=', 1)
+            # Remove leading dashes
+            key = key.lstrip('-')
+            extra_params[key] = value
+        else:
+            # Handle boolean flags
+            key = item.lstrip('-')
+            extra_params[key] = True
+    
+    # ============================================
+    # VALIDATION
+    # ============================================
+    
+    # VALIDATION 1: Agent ID or host/port required
+    if not agent_id and not (host and port):
+        console.print(f"❌ [bold red]Execution failed:[/bold red] Either --id or both --host and --port are required")
+        import sys
+        sys.exit(1)
+    
+    # VALIDATION 2: tag validation for streaming
+    if not tag.endswith("_stream"):
+        console.print(f"❌ [bold red]Execution failed:[/bold red] Streaming command requires entrypoint tag ending with '_stream'. Got: {tag}")
+        import sys
+        sys.exit(1)
+    
+    # ============================================
+    # DISPLAY CONFIGURATION
+    # ============================================
+    
+    console.print("🚀 RunAgent Streaming Configuration:")
+    
+    # Connection info
+    if agent_id:
+        console.print(f"   Agent ID: [cyan]{agent_id}[/cyan]")
+    else:
+        console.print(f"   Host: [cyan]{host}[/cyan]")
+        console.print(f"   Port: [cyan]{port}[/cyan]")
+    
+    # Tag
+    console.print(f"   Tag: [magenta]{tag}[/magenta]")
+    
+    # Local execution
+    if local:
+        console.print("   Local: [green]Yes[/green]")
+    else:
+        console.print("   Local: [red]No (Deployed to RunAgent Cloud)[/red]")
+    
+    # Timeout
+    if timeout:
+        console.print(f"   Timeout: [yellow]{timeout}s[/yellow]")
+    
+    # Input configuration
+    if input_file:
+        console.print(f"   Input file: [blue]{input_file}[/blue]")
+        # Load and validate JSON file here
+        try:
+            import json
+            with open(input_file, 'r') as f:
+                input_params = json.load(f)
+            console.print(f"   Config keys: [dim]{list(input_params.keys())}[/dim]")
+        except json.JSONDecodeError:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            console.print(f"❌ [bold red]Execution failed:[/bold red] Invalid JSON in input file: {input_file}")
+            import sys
+            sys.exit(1)
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            console.print(f"❌ [bold red]Execution failed:[/bold red] Error reading input file: {e}")
+            import sys
+            sys.exit(1)
+    
+    elif extra_params:
+        console.print("   Extra parameters:")
+        for key, value in extra_params.items():
+            console.print(f"     --{key} = {value}")
+        input_params = extra_params
+    
+    else:
+        input_params = {}
+    
+    # ============================================
+    # EXECUTION LOGIC
+    # ============================================
+    
+    try:
+        ra_client = RunAgentClient(
+            agent_id=agent_id,
+            local=local,
+            host=host,
+            port=port,
+            entrypoint_tag=tag
+        )
+
+        console.print(f"\n🔄 [bold]Starting streaming execution...[/bold]")
+        console.print(f"📡 [dim]Connected to agent via WebSocket[/dim]")
+        console.print(f"📤 [dim]Streaming results:[/dim]\n")
+        
+        # Stream the results
+        for chunk in ra_client.run_stream(**input_params):
+            console.print(chunk)
+            
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        # Display error with red ❌ symbol
+        console.print(f"❌ [bold red]Streaming failed:[/bold red] {e}")
+        # Exit with error code 1 instead of raising ClickException to avoid duplicate message
+        import sys
+        sys.exit(1)
 
 
 @click.group()

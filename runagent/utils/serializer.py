@@ -68,12 +68,13 @@ class CoreSerializer:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
             self.logger.error(f"JSON deserialization failed: {e}")
-            raise ValueError(f"Invalid JSON string: {e}")
-        except Exception as e:
-            if os.getenv('DISABLE_TRY_CATCH'):
-                raise
-            self.logger.error(f"Deserialization failed: {e}")
-            raise
+            return json_str
+        #     raise ValueError(f"Invalid JSON string: {e}")
+        # except Exception as e:
+        #     if os.getenv('DISABLE_TRY_CATCH'):
+        #         raise
+        #     self.logger.error(f"Deserialization failed: {e}")
+        #     raise
 
     def serialize_message(self, message: SafeMessage) -> str:
         """
