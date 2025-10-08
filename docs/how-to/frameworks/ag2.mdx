@@ -1,0 +1,746 @@
+# AG2 Integration
+
+Deploy AG2 (AutoGen 2.0) multi-agent systems with RunAgent
+
+---
+
+## Prerequisites
+
+- Basic understanding of AG2/AutoGen
+- Completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+- Python 3.8 or higher
+
+---
+
+## Overview
+
+AG2 (AutoGen 2.0) is a framework for building multi-agent conversational systems with automated agent collaboration. RunAgent makes it easy to deploy AG2 agents and access them from any programming language while maintaining conversation flow.
+
+---
+
+## Installation & Setup
+
+### 1. Install AG2
+
+```bash
+pip install ag2>=0.9.6
+```
+
+### 2. Set Environment Variables
+
+AG2 requires API keys for LLM providers:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 3. Quick Start with RunAgent
+
+```bash
+runagent init my-ag2-agent --framework ag2
+cd my-ag2-agent
+```
+
+---
+
+## Quick Start
+
+### 1. Project Structure
+
+After initialization, your project will have:
+
+```
+my-ag2-agent/
+├── conversation.py          # Main agent code
+├── .env                     # Environment variables
+├── requirements.txt         # Python dependencies
+└── runagent.config.json     # RunAgent configuration
+```
+
+### 2. Configuration
+
+The generated `runagent.config.json`:
+
+```json
+{
+  "agent_name": "my-ag2-agent",
+  "description": "AG2 multi-agent conversation system",
+  "framework": "ag2",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "conversation.py",
+        "module": "invoke",
+        "tag": "ag2_invoke"
+      },
+      {
+        "file": "conversation.py",
+        "module": "stream",
+        "tag": "ag2_stream"
+      }
+    ]
+  }
+}
+```
+
+### 3. Create `.env` File
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+---
+
+## Basic AG2 Agent
+
+Here's a simple AG2 agent with two conversational agents:
+
+```python
+# conversation.py
+from autogen import ConversableAgent, LLMConfig
+
+# Configure LLM using environment variables
+llm_config = LLMConfig(
+    api_type="openai",
+    model="gpt-4o-mini"
+)
+
+# Create agents within the LLM config context
+with llm_config:
+    assistant = ConversableAgent(
+        name="assistant",
+        system_message="You are a helpful assistant that responds concisely and accurately.",
+    )
+
+    fact_checker = ConversableAgent(
+        name="fact_checker",
+        system_message="You are a fact-checking assistant. Verify claims and provide accurate corrections when needed.",
+    )
+
+
+def invoke(message: str, max_turns: int = 5):
+    """
+    Non-streaming conversation between assistant and fact checker.
+    
+    Args:
+        message: The user's message to start the conversation
+        max_turns: Maximum number of conversation turns (default: 5)
+        
+    Returns:
+        Conversation result with chat history
+    """
+    try:
+        result = assistant.initiate_chat(
+            recipient=fact_checker,
+            message=message,
+            max_turns=max_turns
+        )
+        
+        return {
+            "status": "success",
+            "result": result,
+            "message": "Conversation completed successfully"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": f"Error in AG2 conversation: {str(e)}"
+        }
+
+
+def stream(message: str, max_turns: int = 5):
+    """
+    Streaming conversation between assistant and fact checker.
+    
+    Args:
+        message: The user's message to start the conversation
+        max_turns: Maximum number of conversation turns (default: 5)
+        
+    Yields:
+        Conversation events as they occur
+    """
+    try:
+        # Start the conversation
+        response = assistant.run(
+            recipient=fact_checker,
+            message=message,
+            max_turns=max_turns
+        )
+        
+        # Stream events
+        for event in response.events:
+            if event.type == "text":
+                yield {
+                    "type": "text",
+                    "content": event.content,
+                    "sender": getattr(event, 'sender', 'unknown')
+                }
+            else:
+                yield {
+                    "type": event.type,
+                    "data": event.model_dump() if hasattr(event, 'model_dump') else str(event)
+                }
+                
+    except Exception as e:
+        yield {
+            "type": "error",
+            "error": str(e),
+            "message": f"Error in AG2 streaming: {str(e)}"
+        }
+```
+
+---
+
+## Advanced AG2 Patterns
+
+### 1. Multi-Agent Collaboration
+
+```python
+# advanced_conversation.py
+from autogen import ConversableAgent, LLMConfig
+
+llm_config = LLMConfig(api_type="openai", model="gpt-4o-mini")
+
+with llm_config:
+    # Research agent
+    researcher = ConversableAgent(
+        name="researcher",
+        system_message="You are a research specialist. Gather and present factual information.",
+    )
+    
+    # Analyst agent
+    analyst = ConversableAgent(
+        name="analyst",
+        system_message="You are a data analyst. Analyze information and provide insights.",
+    )
+    
+    # Writer agent
+    writer = ConversableAgent(
+        name="writer",
+        system_message="You are a technical writer. Synthesize information into clear, concise reports.",
+    )
+
+
+def research_workflow(topic: str, max_turns: int = 10):
+    """
+    Multi-agent research workflow.
+    
+    Flow: User → Researcher → Analyst → Writer
+    """
+    try:
+        # Stage 1: Research
+        research_result = researcher.initiate_chat(
+            recipient=analyst,
+            message=f"Research the following topic: {topic}",
+            max_turns=max_turns // 2
+        )
+        
+        # Stage 2: Analysis and Writing
+        final_result = analyst.initiate_chat(
+            recipient=writer,
+            message="Based on the research, create a comprehensive report.",
+            max_turns=max_turns // 2
+        )
+        
+        return {
+            "status": "success",
+            "research": research_result,
+            "final_report": final_result,
+            "topic": topic
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "topic": topic
+        }
+```
+
+### 2. Agent with Custom Tools
+
+```python
+# tool_agent.py
+from autogen import ConversableAgent, LLMConfig
+from typing import Annotated
+
+llm_config = LLMConfig(api_type="openai", model="gpt-4o-mini")
+
+
+def calculate(
+    expression: Annotated[str, "Mathematical expression to evaluate"]
+) -> str:
+    """Calculate a mathematical expression."""
+    try:
+        # Safe evaluation with limited scope
+        import math
+        allowed = {
+            "abs": abs, "round": round, "min": min, "max": max,
+            "sum": sum, "pow": pow, **{k: v for k, v in math.__dict__.items() if not k.startswith("__")}
+        }
+        result = eval(expression, {"__builtins__": {}}, allowed)
+        return f"Result: {result}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+def search_info(
+    query: Annotated[str, "Search query"]
+) -> str:
+    """Search for information (mock implementation)."""
+    # In production, integrate with actual search API
+    return f"Search results for '{query}': [Mock data - integrate with real search API]"
+
+
+with llm_config:
+    # Tool-enabled assistant
+    assistant = ConversableAgent(
+        name="assistant",
+        system_message="You are a helpful assistant with access to tools. Use them when appropriate.",
+    )
+    
+    # Register tools
+    assistant.register_function(calculate)
+    assistant.register_function(search_info)
+    
+    # User proxy
+    user_proxy = ConversableAgent(
+        name="user",
+        system_message="You represent the user.",
+        human_input_mode="NEVER",  # Automated for RunAgent
+    )
+
+
+def invoke_with_tools(message: str, max_turns: int = 5):
+    """Conversation with tool access."""
+    try:
+        result = user_proxy.initiate_chat(
+            recipient=assistant,
+            message=message,
+            max_turns=max_turns
+        )
+        
+        return {
+            "status": "success",
+            "result": result,
+            "tools_used": ["calculate", "search_info"]
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+```
+
+### 3. Conditional Conversation Flow
+
+```python
+# conditional_flow.py
+from autogen import ConversableAgent, LLMConfig
+
+llm_config = LLMConfig(api_type="openai", model="gpt-4o-mini")
+
+with llm_config:
+    classifier = ConversableAgent(
+        name="classifier",
+        system_message="Classify user queries into categories: technical, general, urgent.",
+    )
+    
+    technical_expert = ConversableAgent(
+        name="technical_expert",
+        system_message="You are a technical expert. Provide detailed technical answers.",
+    )
+    
+    general_assistant = ConversableAgent(
+        name="general_assistant",
+        system_message="You are a general assistant. Provide helpful, friendly responses.",
+    )
+
+
+def smart_route(message: str, max_turns: int = 5):
+    """Route queries to appropriate agents based on classification."""
+    try:
+        # First, classify the query
+        classification = classifier.initiate_chat(
+            recipient=general_assistant,
+            message=f"Classify this query: {message}",
+            max_turns=2
+        )
+        
+        # Route based on classification (simplified)
+        if "technical" in str(classification).lower():
+            agent = technical_expert
+        else:
+            agent = general_assistant
+        
+        # Handle the query with appropriate agent
+        result = agent.initiate_chat(
+            recipient=classifier,
+            message=message,
+            max_turns=max_turns
+        )
+        
+        return {
+            "status": "success",
+            "classification": str(classification),
+            "result": result,
+            "handler": agent.name
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+```
+
+---
+
+## Testing Your AG2 Agent
+
+### Python Client
+
+```python
+# test_ag2.py
+from runagent import RunAgentClient
+
+# Test non-streaming
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="ag2_invoke",
+    local=True
+)
+
+result = client.run(
+    message="The solar system has 8 planets.",
+    max_turns=3
+)
+
+print(f"Conversation result: {result}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="ag2_stream",
+    local=True
+)
+
+print("\nStreaming conversation:")
+for chunk in stream_client.run(
+    message="Explain quantum computing",
+    max_turns=4
+):
+    if chunk.get("type") == "text":
+        print(f"{chunk.get('sender', 'Agent')}: {chunk.get('content')}")
+```
+
+### JavaScript Client
+
+```javascript
+// test_ag2.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'ag2_invoke',
+    local: true
+});
+
+await client.initialize();
+
+// Test conversation
+const result = await client.run({
+    message: 'What is artificial intelligence?',
+    max_turns: 3
+});
+
+console.log('Result:', result);
+
+// Test streaming
+const streamClient = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'ag2_stream',
+    local: true
+});
+
+await streamClient.initialize();
+
+for await (const chunk of streamClient.run({
+    message: 'Explain machine learning',
+    max_turns: 3
+})) {
+    if (chunk.type === 'text') {
+        console.log(`${chunk.sender}: ${chunk.content}`);
+    }
+}
+```
+
+### Go Client
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/runagent-dev/runagent-go/pkg/client"
+    "encoding/json"
+)
+
+func main() {
+    client, _ := client.New(
+        "your_agent_id_here",
+        "ag2_invoke",
+        true,
+    )
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    result, _ := client.Run(ctx, map[string]interface{}{
+        "message": "Explain neural networks",
+        "max_turns": 3,
+    })
+    
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+---
+
+## Configuration Examples
+
+### Single Conversation Agent
+
+```json
+{
+  "agent_name": "ag2-assistant",
+  "framework": "ag2",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "conversation.py",
+        "module": "invoke",
+        "tag": "ag2_invoke"
+      },
+      {
+        "file": "conversation.py",
+        "module": "stream",
+        "tag": "ag2_stream"
+      }
+    ]
+  }
+}
+```
+
+### Multi-Agent Workflow
+
+```json
+{
+  "agent_name": "ag2-research-team",
+  "framework": "ag2",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "conversation.py",
+        "module": "invoke",
+        "tag": "simple_chat"
+      },
+      {
+        "file": "advanced_conversation.py",
+        "module": "research_workflow",
+        "tag": "research"
+      },
+      {
+        "file": "tool_agent.py",
+        "module": "invoke_with_tools",
+        "tag": "tools"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Best Practices
+
+### 1. **Agent Design**
+- Keep system messages clear and specific
+- Define roles explicitly for each agent
+- Use appropriate max_turns to prevent infinite loops
+
+### 2. **Conversation Management**
+- Set reasonable max_turns (typically 3-10)
+- Handle conversation state appropriately
+- Implement timeout mechanisms for long conversations
+
+### 3. **Error Handling**
+- Always wrap AG2 operations in try-catch blocks
+- Return structured error responses
+- Log conversation failures for debugging
+
+### 4. **Tool Integration**
+- Register tools explicitly with agents
+- Use type annotations for tool parameters
+- Implement safe tool execution with proper validation
+
+### 5. **Performance**
+- Reuse agent instances when possible
+- Monitor conversation length and token usage
+- Implement caching for repeated queries
+
+---
+
+## Common Patterns
+
+### Fact-Checking Pattern
+Use multiple agents to verify information:
+```python
+assistant → fact_checker → validator
+```
+
+### Research Pattern
+Multi-stage information gathering:
+```python
+researcher → analyst → writer
+```
+
+### Routing Pattern
+Direct queries to specialized agents:
+```python
+classifier → [technical_expert | general_assistant]
+```
+
+### Tool-Augmented Pattern
+Agents with external capabilities:
+```python
+assistant + [calculator, search, database]
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. API Key Not Found**
+- **Solution**: Ensure `OPENAI_API_KEY` is set in environment
+- Check `.env` file exists and is loaded
+- Verify key is valid and has credits
+
+**2. Conversation Hangs**
+- **Solution**: Set appropriate `max_turns` parameter
+- Reduce conversation complexity
+- Implement timeout mechanisms
+
+**3. Agent Not Responding**
+- **Solution**: Check system messages are clear
+- Verify LLM config is correct
+- Review agent initialization code
+
+**4. Tool Execution Fails**
+- **Solution**: Verify tool registration
+- Check tool function signatures
+- Ensure type annotations are correct
+
+**5. Streaming Not Working**
+- **Solution**: Use `assistant.run()` instead of `initiate_chat()`
+- Check event handling in streaming loop
+- Verify client supports streaming
+
+### Debug Tips
+
+Enable verbose logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+def invoke(message, max_turns):
+    print(f"Debug: Starting conversation with message: {message}")
+    print(f"Debug: Max turns: {max_turns}")
+    # ... rest of code
+```
+
+Test conversation locally:
+
+```python
+# test_local.py
+from conversation import invoke
+
+result = invoke("Test message", max_turns=2)
+print(f"Result: {result}")
+```
+
+---
+
+## Performance Optimization
+
+### 1. **Agent Reuse**
+Create agents once and reuse:
+
+```python
+# Global agent instances
+_assistant = None
+_fact_checker = None
+
+def get_agents():
+    global _assistant, _fact_checker
+    
+    if _assistant is None:
+        llm_config = LLMConfig(api_type="openai", model="gpt-4o-mini")
+        with llm_config:
+            _assistant = ConversableAgent(...)
+            _fact_checker = ConversableAgent(...)
+    
+    return _assistant, _fact_checker
+```
+
+### 2. **Conversation Limits**
+Set appropriate limits:
+
+```python
+def invoke(message, max_turns=5):
+    # Reasonable max_turns prevents runaway conversations
+    if max_turns > 20:
+        max_turns = 20
+    # ... rest of code
+```
+
+### 3. **Caching**
+Implement response caching for repeated queries:
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+def invoke_cached(message, max_turns):
+    return invoke(message, max_turns)
+```
+
+---
+
+## Next Steps
+
+- **[Advanced Patterns](/how-to/advanced-tasks)** - Learn advanced AG2 patterns
+- **[Production Deployment](/how-to/deployment/cloud-deployment)** - Deploy to production
+- **[Multi-Language Access](/tutorials/multi-language-wrapper)** - Access from different languages
+- **[Performance Tuning](/explanation/production-considerations)** - Optimize for production
+
+---
+
+## Additional Resources
+
+- [AG2 Documentation](https://ag2.ai/docs)
+- [AG2 GitHub](https://github.com/ag2ai/ag2)
+- [RunAgent Discord Community](https://discord.gg/Q9P9AdHVHz)
+- [RunAgent Documentation](https://docs.run-agent.ai)
+
+---
+
+**🎉 Great work!** You've learned how to deploy AG2 multi-agent systems with RunAgent. AG2's collaborative agent architecture combined with RunAgent's multi-language access creates powerful, flexible conversational AI systems!

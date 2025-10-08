@@ -75,6 +75,9 @@
               "how-to/frameworks/crewai",
               "how-to/frameworks/letta",
               "how-to/frameworks/agno",
+              "how-to/frameworks/ag2",
+              "how-to/frameworks/llamaindex",
+              "how-to/frameworks/parlant",
               "how-to/frameworks/custom"
             ]
           },

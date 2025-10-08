@@ -11,17 +11,17 @@ import NeedHelp from '/snippets/need-help.mdx';
 ## The Magic in 4 Bullets
 
 <Cards num={2}>
-  <Card title="🔥 Firecracker MicroVMs" icon="shield">
-    **Sandboxed isolation** - Each agent runs in its own secure container, preventing resource conflicts and security issues.
+  <Card title="Secure Isolation" icon="shield">
+    **Sandboxed execution** - Each agent runs in its own secure, isolated environment, preventing resource conflicts and security issues.
   </Card>
-  <Card title="⚡ Autoscaling" icon="chart-line">
-    **Serverless style** - Automatically scales from 0 to thousands of requests without manual configuration.
+  <Card title="Automatic Scaling" icon="chart-line">
+    **Serverless architecture** - Automatically scales from zero to thousands of requests without manual configuration.
   </Card>
-  <Card title="🌐 Cross-Language SDKs" icon="code">
+  <Card title="Cross-Language SDKs" icon="code">
     **Native APIs** - Call the same agent from Python, JavaScript, Go, Rust with language-idiomatic interfaces.
   </Card>
-  <Card title="📡 Streaming by Default" icon="stream">
-    **Real-time responses** - Built-in token streaming for interactive applications and long-form generation.
+  <Card title="Real-Time Streaming" icon="stream">
+    **Built-in streaming** - Token-by-token streaming for interactive applications and long-form generation.
   </Card>
 </Cards>
 
@@ -30,7 +30,7 @@ import NeedHelp from '/snippets/need-help.mdx';
 ## Traditional Approach vs RunAgent
 
 <AccordionGroup>
-  <Accordion title="❌ Traditional: Build Everything Yourself">
+  <Accordion title="Traditional: Build Everything Yourself">
     - Spin up FastAPI server
     - Build WebSocket handlers for streaming
     - Set up authentication and rate limiting
@@ -41,11 +41,11 @@ import NeedHelp from '/snippets/need-help.mdx';
     - **Result**: Weeks of infrastructure work before you can use your agent
   </Accordion>
   
-  <Accordion title="✅ RunAgent: Deploy in One Command">
+  <Accordion title="RunAgent: Deploy in One Command">
     - Write Python function
     - Run `runagent serve .`
     - Call from any language immediately
-    - **Result**: Agent is live and accessible in minutes
+    - **Result**: Agent is live and accessible in seconds
   </Accordion>
 </AccordionGroup>
 
@@ -58,7 +58,7 @@ import NeedHelp from '/snippets/need-help.mdx';
 | **Entrypoints** | Python functions exposed as API endpoints | Your business logic becomes accessible from any language |
 | **Tags** | Nicknames for your functions (e.g., "chat", "analyze") | Clean, memorable API names instead of function names |
 | **Streaming** | Real-time token delivery as they are generated | Interactive UIs, progress indicators, better UX |
-| **MicroVMs** | Lightweight, isolated containers for each agent | Security, resource isolation, fast cold starts |
+| **Isolation** | Secure, containerized execution environments | Security, resource isolation, fast cold starts |
 | **SDKs** | Language-native clients that feel like local functions | No need to learn REST APIs or WebSocket protocols |
 | **Config** | `runagent.config.json` defines your agent's interface | Single source of truth for what your agent can do |
 
@@ -101,16 +101,16 @@ import NeedHelp from '/snippets/need-help.mdx';
 ## What Makes This Different
 
 <CardGroup cols={2}>
-  <Card title="🎯 Agent-First Design" icon="robot">
+  <Card title="Agent-First Design" icon="robot">
     Built specifically for AI agents, not generic microservices. Handles streaming, state, and agent patterns out of the box.
   </Card>
-  <Card title="🚀 Zero Infrastructure" icon="cloud">
+  <Card title="Zero Infrastructure" icon="cloud">
     No Docker, Kubernetes, or cloud configuration needed. Focus on your agent logic, not deployment.
   </Card>
-  <Card title="🔒 Production Ready" icon="shield">
+  <Card title="Production Ready" icon="shield">
     Security, scaling, monitoring, and error handling built-in from day one.
   </Card>
-  <Card title="🌍 Language Agnostic" icon="globe">
+  <Card title="Language Agnostic" icon="globe">
     Your Python agent becomes a first-class citizen in every supported language ecosystem.
   </Card>
 </CardGroup>
@@ -120,13 +120,13 @@ import NeedHelp from '/snippets/need-help.mdx';
 ## Ready to Dive Deeper?
 
 <Cards num={3}>
-  <Card title="🚀 Deploy Your First Agent" href="/tutorials/deploy-your-first-agent" arrow>
+  <Card title="Deploy Your First Agent" href="/tutorials/deploy-your-first-agent" arrow>
     See the magic in action with a 5-minute tutorial
   </Card>
-  <Card title="🧠 Core Concepts Deep Dive" href="/explanation/core-concepts" arrow>
+  <Card title="Core Concepts Deep Dive" href="/explanation/core-concepts" arrow>
     Understand entrypoints, streaming, and configuration in detail
   </Card>
-  <Card title="🏗️ Architecture Overview" href="/explanation/architecture-overview" arrow>
+  <Card title="Architecture Overview" href="/explanation/architecture-overview" arrow>
     Learn how RunAgent works under the hood
   </Card>
 </Cards>
