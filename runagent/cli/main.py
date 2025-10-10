@@ -1,8 +1,15 @@
+import os
 import click
+import warnings
 
 from . import commands
 from .branding import print_logo
 
+if not os.getenv('DISABLE_TRY_CATCH'):
+    warnings.filterwarnings(
+        "ignore",
+        message=".*Pydantic serializer warnings.*"
+    )
 
 def show_help_with_logo(ctx, param, value):
     """Custom help callback that shows logo before help text"""

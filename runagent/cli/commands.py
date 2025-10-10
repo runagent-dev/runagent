@@ -1148,11 +1148,11 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                     clone_start = time.time()
                     status.update("[cyan]Cloning template repository...[/cyan]")
                     
-                    templates = sdk.list_templates(framework.value)
-                    clone_time = time.time() - clone_start
-                    
-                    status.update(f"[cyan]Templates fetched ({clone_time:.1f}s)[/cyan]")
-                    template_list = templates.get(framework.value, ["default"])
+                templates = sdk.list_templates(framework.value)
+                clone_time = time.time() - clone_start
+                
+                status.update(f"[cyan]Templates fetched ({clone_time:.1f}s)[/cyan]")
+                template_list = templates.get(framework.value, ["default"])
                 
                 fetch_time = time.time() - fetch_start
                 
@@ -1252,6 +1252,12 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
         
         # Update config file with name and description
         try:
+            import warnings
+            from datetime import datetime
+            
+            # Suppress Pydantic datetime warnings during config update
+            warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
+            
             config_path = project_path / "runagent.config.json"
             if config_path.exists():
                 with open(config_path, 'r') as f:
@@ -1259,6 +1265,16 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                 
                 config_data['name'] = agent_name
                 config_data['description'] = agent_description
+                
+                # Fix created_at format if it exists and is a string in wrong format
+                if 'created_at' in config_data and isinstance(config_data['created_at'], str):
+                    try:
+                        # Try to parse and convert to ISO format
+                        dt = datetime.strptime(config_data['created_at'], "%Y-%m-%d %H:%M:%S")
+                        config_data['created_at'] = dt.isoformat()
+                    except:
+                        # If parsing fails, use current time in ISO format
+                        config_data['created_at'] = datetime.now().isoformat()
                 
                 with open(config_path, 'w') as f:
                     json.dump(config_data, f, indent=2)
@@ -1291,14 +1307,36 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
     except TemplateError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        console.print(f"❌ [red]Template error:[/red] {e}")
-        raise click.ClickException("Project initialization failed")
+        console.print(Panel(
+            f"[bold red]Template Error[/bold red]\n\n"
+            f"{str(e)}\n\n"
+            f"[dim]Please check that the selected framework and template are valid.[/dim]",
+            title="[bold red]❌ Failed[/bold red]",
+            border_style="red"
+        ))
+        import sys
+        sys.exit(1)
     except FileExistsError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        console.print(f"❌ [red]Path exists:[/red] {e}")
-        console.print("💡 Use [cyan]--overwrite[/cyan] to force initialization")
-        raise click.ClickException("Project initialization failed")
+        
+        # Extract just the path from the error message
+        path_match = str(e).split("'")
+        folder_path = path_match[1] if len(path_match) > 1 else "the specified path"
+        
+        console.print(Panel(
+            f"[bold yellow]Directory Already Exists[/bold yellow]\n\n"
+            f"[dim]Path:[/dim] [cyan]{folder_path}[/cyan]\n\n"
+            f"The directory already exists and is not empty.\n\n"
+            f"[bold]Options:[/bold]\n"
+            f"  • Choose a different path\n"
+            f"  • Use [cyan]--overwrite[/cyan] flag to replace existing files\n"
+            f"  • Remove the directory manually",
+            title="[bold yellow]⚠️  Path Conflict[/bold yellow]",
+            border_style="yellow"
+        ))
+        import sys
+        sys.exit(1)
     except click.UsageError:
         # Re-raise UsageError as-is for proper click handling
         raise
