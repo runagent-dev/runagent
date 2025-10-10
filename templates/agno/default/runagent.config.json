@@ -14,19 +14,6 @@
     "entrypoints": [
       {
         "file": "simple_assistant.py",
-        "module": "agent.run",
-        "tag": "agno_assistant"
-      },
-      {
-        "file": "simple_assistant.py",
-        "module": "agent_run_stream",
-        "tag": "agno_stream",
-        "extractor": {
-          "content": "$.content"
-        }
-      },
-      {
-        "file": "simple_assistant.py",
         "module": "agent_print_response",
         "tag": "agno_print_response"
       },

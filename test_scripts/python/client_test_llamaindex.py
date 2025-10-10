@@ -1,7 +1,7 @@
 # from runagent import RunAgentClient
 
 # ra = RunAgentClient(
-#     agent_id="408db172-a58b-41f3-b396-0e182784749d",
+#     agent_id="583d497b-cb6b-4558-b489-cba8f66e57a1",
 #     entrypoint_tag="math_run",
 #     local=True
 #     )
@@ -17,12 +17,13 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="c843839d-4597-405f-9c5a-c532364edce4",
-    entrypoint_tag="main_stream",
+    agent_id="583d497b-cb6b-4558-b489-cba8f66e57a1",
+    entrypoint_tag="math_stream",
     local=True
     )
 
-for chunk in ra.run(
+agent_result = ra.run(
     "What is 2 * 3?"
-):
+)
+for chunk in agno_result:
     print(chunk)
