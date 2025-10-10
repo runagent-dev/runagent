@@ -22,8 +22,8 @@ ra = RunAgentClient(
     local=True
     )
 
-agent_result = ra.run(
+
+for chunk in ra.run(
     "What is 2 * 3?"
-)
-for chunk in agno_result:
+):
     print(chunk)
