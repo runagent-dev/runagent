@@ -1200,11 +1200,13 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                 default="My AI agent"
             )
             
-            # Step 4: Get path
+            # Step 4: Get path (default based on agent name)
             console.print()
+            # Convert agent name to valid directory name (replace spaces with hyphens, lowercase)
+            default_path = agent_name.lower().replace(" ", "-").replace("_", "-")
             path_input = Prompt.ask(
                 "[cyan]Project path[/cyan]",
-                default="."
+                default=default_path
             )
             path = Path(path_input)
         

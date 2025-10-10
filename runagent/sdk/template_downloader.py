@@ -192,7 +192,7 @@ class TemplateDownloader:
         logger = logging.getLogger(__name__)
         
         # Only show debug info if explicitly enabled
-        debug_enabled = os.getenv('RUNAGENT_DEBUG') == '1'
+        debug_enabled = os.getenv('DISABLE_TRY_CATCH') == '1'
         
         with tempfile.TemporaryDirectory(dir="/tmp") as temp_dir:
             temp_path = Path(temp_dir)
