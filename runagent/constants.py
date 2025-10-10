@@ -16,16 +16,15 @@ DEFAULT_TEMPLATE = "basic"
 
 # Environment Variables
 ENV_RUNAGENT_API_KEY = "RUNAGENT_API_KEY"
-# UPDATED: Change default port to match your middleware (8333)
-ENV_RUNAGENT_BASE_URL = "http://52.237.88.147:8333/"
+ENV_RUNAGENT_BASE_URL = "RUNAGENT_BASE_URL"
 ENV_LOCAL_CACHE_DIRECTORY = "RUNAGENT_CACHE_DIR"
 ENV_RUNAGENT_LOGGING_LEVEL = "RUNAGENT_LOGGING_LEVEL"
 
 # Local Configuration
 LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
-USER_DATA_FILE_NAME = "user_data.json"
-DEFAULT_BASE_URL = "http://52.237.88.147:8333/"
+DEFAULT_BASE_URL = "https://runagent-middleware-v2.onrender.com/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
+DATABASE_FILE_NAME = "runagent_local.db"
 
 # Rest of the file remains the same...
 _cache_dir = os.environ.get(ENV_LOCAL_CACHE_DIRECTORY)

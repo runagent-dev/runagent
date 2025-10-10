@@ -12,7 +12,6 @@ from ..constants import (
     ENV_RUNAGENT_API_KEY,
     ENV_RUNAGENT_BASE_URL,
     LOCAL_CACHE_DIRECTORY,
-    USER_DATA_FILE_NAME,
 )
 from .exceptions import AuthenticationError, ValidationError
 
@@ -48,22 +47,43 @@ class SDKConfig:
             self._config["base_url"] = base_url
 
     def _get_default_config_path(self) -> Path:
-        """Get default config file path"""
+        """Get default config file path (legacy - for migration only)"""
         config_dir = Path(LOCAL_CACHE_DIRECTORY)
         config_dir.mkdir(exist_ok=True)
-        return config_dir / USER_DATA_FILE_NAME
+        return config_dir / "user_data.json"  # Legacy file
 
     def _load_config(self) -> t.Dict[str, t.Any]:
-        """Load configuration from all sources"""
+        """Load configuration from database and environment variables"""
         config = {}
 
-        # 1. Load from config file
-        if self.config_file.exists():
-            try:
-                with open(self.config_file, "r") as f:
-                    config.update(json.load(f))
-            except (json.JSONDecodeError, IOError):
-                pass
+        # 1. Load from database
+        try:
+            from .db import DBService
+            db_service = DBService()
+            db_config = db_service.get_all_user_metadata()
+            
+            if db_config:
+                config.update(db_config)
+            elif self.config_file.exists():
+                # One-time migration from JSON file if database is empty
+                try:
+                    with open(self.config_file, "r") as f:
+                        json_config = json.load(f)
+                    config.update(json_config)
+                    
+                    # Migrate to database
+                    if json_config:
+                        for key, value in json_config.items():
+                            db_service.set_user_metadata(key, value)
+                        
+                        # Backup old file
+                        backup_file = self.config_file.with_suffix('.json.backup')
+                        self.config_file.rename(backup_file)
+                except (json.JSONDecodeError, IOError):
+                    pass
+        except Exception:
+            # If database fails, just continue with empty config
+            pass
 
         # 2. Override with environment variables
         if os.getenv(ENV_RUNAGENT_API_KEY):
@@ -77,13 +97,18 @@ class SDKConfig:
         return config
 
     def save_config(self) -> bool:
-        """Save current configuration to file"""
+        """Save current configuration to database"""
         try:
-            self.config_file.parent.mkdir(exist_ok=True)
-            with open(self.config_file, "w") as f:
-                json.dump(self._config, f, indent=2)
-            return True
-        except (IOError, OSError):
+            from .db import DBService
+            db_service = DBService()
+            
+            success = True
+            for key, value in self._config.items():
+                if not db_service.set_user_metadata(key, value):
+                    success = False
+            
+            return success
+        except Exception:
             return False
 
     def setup(
@@ -146,7 +171,11 @@ class SDKConfig:
             
             # Test connection using the token validation endpoint
             api_key = self._config.get("api_key")
-            response = client.http.post(f"/tokens/validate?token={api_key}", timeout=10)
+            response = client.http.post(
+                f"/tokens/validate?token={api_key}", 
+                data={},  # Send empty body (required by endpoint)
+                timeout=10
+            )
             
             if response.status_code == 200:
                 token_data = response.json()
@@ -158,7 +187,9 @@ class SDKConfig:
                     user_info = {
                         "email": data.get("user_email"),
                         "user_id": data.get("user_id"),
-                        "tier": data.get("user_tier", "Free")
+                        "tier": data.get("user_tier", "Free"),
+                        "active_project_name": data.get("default_project_name"),
+                        "active_project_id": data.get("default_project_id"),
                     }
                     
                     # Store user info for later display
@@ -166,6 +197,8 @@ class SDKConfig:
                         "user_email": user_info["email"],
                         "user_id": user_info["user_id"],
                         "user_tier": user_info["tier"],
+                        "active_project_id": user_info["active_project_id"],
+                        "active_project_name": user_info["active_project_name"],
                         "auth_validated": True
                     })
                     

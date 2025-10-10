@@ -133,12 +133,52 @@ class TemplateDownloader:
                 # Copy file
                 shutil.copy2(item, target_item)
 
-    def list_available_templates(self, prepath: str) -> t.Dict[str, t.List[str]]:
+    def _scan_framework_templates(self, framework_dir: Path, template_list: list, debug_enabled: bool = False):
+        """
+        Helper to scan templates in a framework directory.
+        
+        Args:
+            framework_dir: Path to framework directory
+            template_list: List to append valid template names to
+            debug_enabled: Whether to log debug information
+        """
+        import time
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        for template_dir in framework_dir.iterdir():
+            if template_dir.is_dir() and not template_dir.name.startswith("."):
+                # Verify this is a valid template
+                # Skip templates that fail validation (e.g., test directories without config)
+                template_name = template_dir.name
+                try:
+                    validate_start = time.time()
+                    if debug_enabled:
+                        logger.debug(f"[PERF]   Validating template: {template_name}")
+                    is_valid, _ = validate_agent(template_dir)
+                    validate_time = time.time() - validate_start
+                    
+                    if is_valid:
+                        if debug_enabled:
+                            logger.debug(f"[PERF]   ✓ {template_name} valid ({validate_time:.3f}s)")
+                        template_list.append(template_name)
+                    else:
+                        if debug_enabled:
+                            logger.debug(f"[PERF]   ✗ {template_name} invalid ({validate_time:.3f}s)")
+                except Exception as e:
+                    if debug_enabled:
+                        validate_time = time.time() - validate_start
+                        logger.debug(f"[PERF]   ✗ {template_name} error ({validate_time:.3f}s): {e}")
+                    # Skip invalid templates silently (e.g., test dirs, incomplete templates)
+                    pass
+    
+    def list_available_templates(self, prepath: str, framework_filter: str = None) -> t.Dict[str, t.List[str]]:
         """
         List all available templates in the repository
 
         Args:
             prepath: Pre-path before framework directory
+            framework_filter: Optional specific framework to scan (much faster)
 
         Returns:
             Dictionary mapping framework names to list of template names
@@ -146,17 +186,35 @@ class TemplateDownloader:
         Raises:
             TemplateDownloadError: If listing fails
         """
+        import time
+        import logging
+        import os
+        logger = logging.getLogger(__name__)
+        
+        # Only show debug info if explicitly enabled
+        debug_enabled = os.getenv('RUNAGENT_DEBUG') == '1'
+        
         with tempfile.TemporaryDirectory(dir="/tmp") as temp_dir:
             temp_path = Path(temp_dir)
 
             try:
                 # Shallow clone for listing
+                start_time = time.time()
+                if debug_enabled:
+                    logger.info(f"[PERF] Starting git clone from {self.repo_url}")
+                
                 repo = Repo.clone_from(
                     self.repo_url, temp_path, branch=self.branch, depth=1
                 )
+                
+                clone_time = time.time() - start_time
+                if debug_enabled:
+                    logger.info(f"[PERF] Git clone completed in {clone_time:.2f}s")
+                
                 templates = {}
 
                 # Navigate to the prepath directory
+                scan_start = time.time()
                 prepath_dir = temp_path / prepath if prepath else temp_path
 
                 if not prepath_dir.exists():
@@ -164,29 +222,42 @@ class TemplateDownloader:
                         f"Pre-path '{prepath}' not found in repository branch '{self.branch}'"
                     )
 
-                # Scan for framework directories
+                # If framework filter specified, only scan that framework's directory
+                if framework_filter:
+                    if debug_enabled:
+                        logger.info(f"[PERF] Scanning framework: {framework_filter}")
+                    framework_dir = prepath_dir / framework_filter
+                    if framework_dir.exists() and framework_dir.is_dir():
+                        templates[framework_filter] = []
+                        fw_start = time.time()
+                        self._scan_framework_templates(framework_dir, templates[framework_filter], debug_enabled)
+                        fw_time = time.time() - fw_start
+                        if debug_enabled:
+                            logger.info(f"[PERF] Scanned {framework_filter} in {fw_time:.2f}s - found {len(templates[framework_filter])} templates")
+                    return templates
+
+                # Scan all framework directories
                 for framework_dir in prepath_dir.iterdir():
-                    if framework_dir.is_dir() and not framework_dir.name.startswith(
-                        "."
-                    ):
+                    if framework_dir.is_dir() and not framework_dir.name.startswith("."):
                         framework_name = framework_dir.name
+                        if debug_enabled:
+                            logger.info(f"[PERF] Scanning framework: {framework_name}")
                         templates[framework_name] = []
+                        fw_start = time.time()
+                        self._scan_framework_templates(framework_dir, templates[framework_name], debug_enabled)
+                        fw_time = time.time() - fw_start
+                        if debug_enabled:
+                            logger.info(f"[PERF] Scanned {framework_name} in {fw_time:.2f}s - found {len(templates[framework_name])} templates")
 
-                        # Scan for template directories
-                        for template_dir in framework_dir.iterdir():
-                            if (
-                                template_dir.is_dir()
-                                and not template_dir.name.startswith(".")
-                            ):
-                                # Verify this is a valid template (has main.py)
-                                if validate_agent(template_dir):
-                                    templates[framework_name].append(template_dir.name)
-
+                scan_time = time.time() - scan_start
+                if debug_enabled:
+                    logger.info(f"[PERF] Total scanning time: {scan_time:.2f}s")
                 return templates
 
             except git.exc.GitCommandError as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
                     raise
+                
                 raise TemplateDownloadError(f"Git error while listing templates: {e}")
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):

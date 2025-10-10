@@ -46,48 +46,735 @@ def print_version(ctx, param, value):
         return
     try:
         from runagent.__version__ import __version__
-        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
+        from runagent.cli.branding import print_compact_logo
+        print_compact_logo(brand_color="cyan")
+        console.print(f"\n[bold white]Version:[/bold white] [bold cyan]{__version__}[/bold cyan]")
+        console.print(f"[dim]Deploy and manage AI agents with ease 🚀[/dim]\n")
     except ImportError:
         console.print("[red]runagent version unknown[/red]")
     ctx.exit()
 
 
-@click.command()
-def version():
-    """Show version information"""
-    try:
-        from runagent.__version__ import __version__
-        console.print(f"[bold cyan]runagent {__version__}[/bold cyan]")
-    except ImportError:
-        console.print("[red]runagent version unknown[/red]")
+# ============================================================================
+# Config Command Group
+# ============================================================================
 
-@click.command()
-@click.option("--api-key", required=True, help="Your API key")
-@click.option("--base-url", help="API base URL")
-@click.option("--force", is_flag=True, help="Force reconfiguration")
-def setup(api_key, base_url, force):
-    """Setup RunAgent authentication"""
+@click.group(invoke_without_command=True)
+@click.option("--set-api-key", help="Set API key directly (e.g., runagent config --set-api-key YOUR_KEY)")
+@click.option("--set-base-url", help="Set base URL directly (e.g., runagent config --set-base-url https://api.example.com)")
+@click.pass_context
+def config(ctx, set_api_key, set_base_url):
+    """
+    Manage RunAgent configuration
+    
+    \b
+    Interactive mode (for humans):
+      $ runagent config
+    
+    \b
+    Direct flags (for scripts/agents):
+      $ runagent config --set-api-key YOUR_KEY
+      $ runagent config --set-base-url https://api.example.com
+    
+    \b
+    Subcommands:
+      $ runagent config status
+      $ runagent config reset
+    """
+    
+    # Handle direct flag options
+    if set_api_key:
+        _set_api_key_direct(set_api_key)
+        return
+    
+    if set_base_url:
+        _set_base_url_direct(set_base_url)
+        return
+    
+    # If no subcommand and no flags, show interactive menu
+    if ctx.invoked_subcommand is None:
+        show_interactive_config_menu()
+
+
+def _set_api_key_direct(api_key: str):
+    """Set API key directly (for --set-api-key flag) with validation"""
+    from rich.panel import Panel
+    from rich.status import Status
+    from runagent.constants import DEFAULT_BASE_URL
+    
+    if not api_key or not api_key.strip():
+        console.print(Panel(
+            "[red]❌ API key cannot be empty[/red]",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+        raise click.ClickException("Invalid API key")
+    
+    # Validate and fetch user info
     try:
         sdk = RunAgent()
+        base_url = Config.get_base_url() or DEFAULT_BASE_URL
+        
+        with Status("[bold cyan]Validating credentials...", spinner="dots"):
+            sdk.configure(api_key=api_key, base_url=base_url, save=True)
+        
+        # Get user info
+        user_config = Config.get_user_config()
+        
+        # Build success message
+        success_msg = (
+            "[bold green]✅ API key updated successfully![/bold green]\n\n"
+            f"[dim]User:[/dim] [cyan]{user_config.get('user_email', 'N/A')}[/cyan]\n"
+            f"[dim]Tier:[/dim] [yellow]{user_config.get('user_tier', 'N/A')}[/yellow]"
+        )
+        
+        # Add project if available
+        if user_config.get('active_project_name'):
+            success_msg += f"\n[dim]Project:[/dim] [green]{user_config.get('active_project_name')}[/green]"
+        
+        console.print(Panel(
+            success_msg,
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+        
+    except AuthenticationError as e:
+        console.print(Panel(
+            f"[red]❌ Authentication failed[/red]\n\n"
+            f"[dim]Error:[/dim] {str(e)}\n\n"
+            "[yellow]Please check your API key and try again[/yellow]",
+            title="[bold red]Validation Error[/bold red]",
+            border_style="red"
+        ))
+        raise click.ClickException("Authentication failed")
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(Panel(
+            f"[red]❌ Failed to save API key[/red]\n\n"
+            f"[dim]Error:[/dim] {str(e)}",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+        raise click.ClickException("Failed to save configuration")
+
+
+def _set_base_url_direct(base_url: str):
+    """Set base URL directly (for --set-base-url flag)"""
+    from rich.panel import Panel
+    
+    # Validate URL format
+    if not base_url.startswith(('http://', 'https://')):
+        base_url = f"https://{base_url}"
+    
+    success = Config.set_base_url(base_url)
+    
+    if success:
+        console.print(Panel(
+            f"[bold green]✅ Base URL updated successfully![/bold green]\n\n"
+            f"[dim]New URL:[/dim] [cyan]{base_url}[/cyan]",
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            "[red]❌ Failed to save base URL[/red]",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+        raise click.ClickException("Failed to save configuration")
+
+
+def show_interactive_config_menu():
+    """Show interactive configuration menu"""
+    try:
+        from rich.panel import Panel
+        from runagent.cli.branding import print_header
+        import inquirer
+        
+        print_header("Configuration")
+        
+        questions = [
+            inquirer.List(
+                'config_option',
+                message="What would you like to configure?",
+                choices=[
+                    ('🔑 API Key', 'api_key'),
+                    ('🌐 Base URL', 'base_url'),
+                    ('📁 Active Project', 'project'),
+                    ('🔄 Sync Settings', 'sync'),
+                    ('📊 View Status', 'status'),
+                    ('🔃 Reset Configuration', 'reset'),
+                ],
+                carousel=True
+            ),
+        ]
+        
+        answers = inquirer.prompt(questions)
+        if not answers:
+            console.print("[dim]Configuration cancelled.[/dim]")
+            return
+        
+        option = answers['config_option']
+        
+        # Route to appropriate handler
+        if option == 'api_key':
+            _interactive_set_api_key()
+        elif option == 'base_url':
+            _interactive_set_base_url()
+        elif option == 'project':
+            _interactive_set_project()
+        elif option == 'sync':
+            _interactive_sync_settings()
+        elif option == 'status':
+            _show_config_status()
+        elif option == 'reset':
+            _interactive_reset_config()
+            
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"[red]Error:[/red] {e}")
+
+
+def _interactive_set_api_key():
+    """Interactive API key setup with validation"""
+    from rich.prompt import Prompt
+    from rich.panel import Panel
+    from rich.status import Status
+    from runagent.constants import DEFAULT_BASE_URL
+    
+    api_key = Prompt.ask("[cyan]Enter your API key[/cyan]", password=True)
+    
+    if not api_key or not api_key.strip():
+        console.print(Panel(
+            "[red]❌ API key cannot be empty[/red]",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+        return
+    
+    # Validate and fetch user info
+    try:
+        sdk = RunAgent()
+        base_url = Config.get_base_url() or DEFAULT_BASE_URL
+        
+        with Status("[bold cyan]Validating credentials...", spinner="dots"):
+            sdk.configure(api_key=api_key, base_url=base_url, save=True)
+        
+        # Get user info
+        user_config = Config.get_user_config()
+        
+        # Build success message
+        success_msg = (
+            "[bold green]✅ API key updated successfully![/bold green]\n\n"
+            f"[dim]User:[/dim] [cyan]{user_config.get('user_email', 'N/A')}[/cyan]\n"
+            f"[dim]Tier:[/dim] [yellow]{user_config.get('user_tier', 'N/A')}[/yellow]"
+        )
+        
+        # Add project if available
+        if user_config.get('active_project_name'):
+            success_msg += f"\n[dim]Project:[/dim] [green]{user_config.get('active_project_name')}[/green]"
+        
+        console.print(Panel(
+            success_msg,
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+        
+    except AuthenticationError as e:
+        console.print(Panel(
+            f"[red]❌ Authentication failed[/red]\n\n"
+            f"[dim]Error:[/dim] {str(e)}\n\n"
+            "[yellow]Please check your API key and try again[/yellow]",
+            title="[bold red]Validation Error[/bold red]",
+            border_style="red"
+        ))
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(Panel(
+            f"[red]❌ Failed to save API key[/red]\n\n"
+            f"[dim]Error:[/dim] {str(e)}",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+
+
+def _interactive_set_base_url():
+    """Interactive base URL setup"""
+    from rich.prompt import Prompt
+    from rich.panel import Panel
+    from runagent.constants import DEFAULT_BASE_URL
+    
+    console.print(f"[dim]Current: {Config.get_base_url()}[/dim]")
+    console.print(f"[dim]Default: {DEFAULT_BASE_URL}[/dim]\n")
+    
+    base_url = Prompt.ask(
+        "[cyan]Enter base URL[/cyan]",
+        default=DEFAULT_BASE_URL
+    )
+    
+    if not base_url.startswith(('http://', 'https://')):
+        base_url = f"https://{base_url}"
+    
+    success = Config.set_base_url(base_url)
+    
+    if success:
+        console.print(Panel(
+            f"[bold green]✅ Base URL updated successfully![/bold green]\n\n"
+            f"[dim]New URL:[/dim] [cyan]{base_url}[/cyan]",
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            "[red]❌ Failed to save base URL[/red]",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
+
+
+def _interactive_sync_settings():
+    """Interactive sync settings configuration"""
+    try:
+        from rich.panel import Panel
+        import inquirer
+        
+        # Get current status
+        user_config = Config.get_user_config()
+        current_status = user_config.get('local_sync_enabled', True)
+        
+        # Show current status
+        if current_status:
+            status_text = "[green]Currently: ENABLED[/green]"
+        else:
+            status_text = "[red]Currently: DISABLED[/red]"
+        
+        console.print(f"\n📡 Middleware Sync {status_text}\n")
+        
+        # Ask what to do
+        questions = [
+            inquirer.List(
+                'sync_action',
+                message="Select sync preference",
+                choices=[
+                    ('✅ Enable Sync (sync local runs to middleware)', 'enable'),
+                    ('❌ Disable Sync (local only)', 'disable'),
+                ],
+                default=('✅ Enable Sync (sync local runs to middleware)', 'enable') if current_status else ('❌ Disable Sync (local only)', 'disable'),
+                carousel=True
+            ),
+        ]
+        
+        answers = inquirer.prompt(questions)
+        if not answers:
+            console.print("[dim]Sync configuration cancelled.[/dim]")
+            return
+        
+        action = answers['sync_action']
+        
+        # Set the preference
+        new_status = (action == 'enable')
+        Config.set_user_config('local_sync_enabled', new_status)
+        
+        if new_status:
+            console.print(Panel(
+                "[bold green]✅ Middleware sync enabled![/bold green]\n\n"
+                "[dim]Local agent runs will now sync to middleware.[/dim]\n"
+                "[dim]Requires valid API key.[/dim]",
+                title="[bold green]Success[/bold green]",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel(
+                "[bold yellow]⚠️  Middleware sync disabled[/bold yellow]\n\n"
+                "[dim]Local agents will only store data locally.[/dim]\n"
+                "[dim]Your runs won't appear in the middleware dashboard.[/dim]",
+                title="[bold]Sync Disabled[/bold]",
+                border_style="yellow"
+            ))
+        
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"[red]Error:[/red] {e}")
+
+
+def _interactive_set_project():
+    """Interactive project selection from API"""
+    try:
+        from rich.panel import Panel
+        from rich.status import Status
+        import inquirer
+        
+        # Get API key
+        api_key = Config.get_api_key()
+        if not api_key:
+            console.print(Panel(
+                "[red]❌ No API key configured[/red]\n\n"
+                "[dim]Run 'runagent setup' first[/dim]",
+                title="[bold red]Error[/bold red]",
+                border_style="red"
+            ))
+            return
+        
+        # Fetch projects from API
+        console.print("\n[cyan]📁 Fetching your projects...[/cyan]\n")
+        
+        from runagent.sdk.rest_client import RestClient
+        
+        with Status("[bold cyan]Loading projects...", spinner="dots"):
+            rest_client = RestClient(
+                api_key=api_key,
+                base_url=Config.get_base_url()
+            )
+            
+            try:
+                response = rest_client.http.get("/projects?page=1&per_page=20&include_stats=false")
+                
+                if response.status_code != 200:
+                    console.print(Panel(
+                        f"[red]❌ Failed to fetch projects (Status: {response.status_code})[/red]",
+                        title="[bold red]Error[/bold red]",
+                        border_style="red"
+                    ))
+                    return
+                
+                projects_data = response.json()
+                
+                if not projects_data.get("success"):
+                    console.print(Panel(
+                        f"[red]❌ {projects_data.get('error', 'Failed to fetch projects')}[/red]",
+                        title="[bold red]Error[/bold red]",
+                        border_style="red"
+                    ))
+                    return
+                
+                projects = projects_data.get("data", {}).get("projects", [])
+                
+                if not projects:
+                    console.print(Panel(
+                        "[yellow]⚠️  No projects found[/yellow]\n\n"
+                        "[dim]Create a project in the dashboard first[/dim]",
+                        title="[bold]No Projects[/bold]",
+                        border_style="yellow"
+                    ))
+                    return
+                
+            except Exception as e:
+                console.print(Panel(
+                    f"[red]❌ Error fetching projects: {str(e)}[/red]",
+                    title="[bold red]Error[/bold red]",
+                    border_style="red"
+                ))
+                return
+        
+        # Show project selection
+        current_project_id = Config.get_user_config().get('active_project_id')
+        
+        project_choices = []
+        default_choice = None
+        
+        for project in projects:
+            project_id = project.get('id')
+            project_name = project.get('name', 'Unnamed')
+            is_default = project.get('is_default', False)
+            
+            # Mark current and default projects
+            label = f"📁 {project_name}"
+            if project_id == current_project_id:
+                label = f"✓ {label} [current]"
+                default_choice = (label, project_id)
+            elif is_default:
+                label = f"{label} [default]"
+            
+            choice_tuple = (label, project_id)
+            project_choices.append(choice_tuple)
+            
+            if not default_choice and is_default:
+                default_choice = choice_tuple
+        
+        questions = [
+            inquirer.List(
+                'project',
+                message="Select active project",
+                choices=project_choices,
+                default=default_choice,
+                carousel=True
+            ),
+        ]
+        
+        answers = inquirer.prompt(questions)
+        if not answers:
+            console.print("[dim]Project selection cancelled.[/dim]")
+            return
+        
+        selected_project_id = answers['project']
+        
+        # Find selected project details
+        selected_project = next(
+            (p for p in projects if p.get('id') == selected_project_id),
+            None
+        )
+        
+        if not selected_project:
+            console.print("[red]Error: Project not found[/red]")
+            return
+        
+        # Save to database
+        Config.set_user_config('active_project_id', selected_project_id)
+        Config.set_user_config('active_project_name', selected_project.get('name'))
+        
+        console.print(Panel(
+            f"[bold green]✅ Active project updated![/bold green]\n\n"
+            f"[dim]Project:[/dim] [cyan]{selected_project.get('name')}[/cyan]",
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+        
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"[red]Error:[/red] {e}")
+
+
+def _show_config_status():
+    """Show configuration status (helper for interactive menu and status command)"""
+    from rich.panel import Panel
+    from rich.table import Table
+    
+    user_config = Config.get_user_config()
+    api_key = Config.get_api_key()
+    base_url = Config.get_base_url()
+    
+    # Create status table
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("Setting", style="dim")
+    table.add_column("Value", style="cyan")
+    
+    # API Key status
+    if api_key:
+        masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+        table.add_row("🔑 API Key", f"[green]✓[/green] {masked_key}")
+    else:
+        table.add_row("🔑 API Key", "[red]✗ Not set[/red]")
+    
+    # Base URL
+    table.add_row("🌐 Base URL", base_url or "[yellow]Using default[/yellow]")
+    
+    # User info
+    if user_config.get('user_email'):
+        table.add_row("✉️  Email", user_config.get('user_email'))
+    
+    if user_config.get('user_tier'):
+        table.add_row("🎯 Tier", user_config.get('user_tier'))
+    
+    # Active project
+    if user_config.get('active_project_name'):
+        table.add_row("📁 Active Project", user_config.get('active_project_name'))
+    
+    # Sync status
+    sync_enabled = user_config.get('local_sync_enabled', True)
+    if sync_enabled:
+        table.add_row("🔄 Middleware Sync", "[green]✓ Enabled[/green]")
+    else:
+        table.add_row("🔄 Middleware Sync", "[yellow]⚠ Disabled[/yellow]")
+    
+    console.print(Panel(
+        table,
+        title="[bold cyan]RunAgent Configuration[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    # Show helpful info
+    console.print("\n[dim]💡 Use arrow keys in interactive mode: 'runagent config'[/dim]")
+    console.print("[dim]💡 Direct flags for automation: 'runagent config --set-api-key <key>'[/dim]\n")
+
+
+def _interactive_reset_config():
+    """Interactive reset configuration (helper for interactive menu)"""
+    from rich.prompt import Confirm
+    from rich.panel import Panel
+    
+    console.print("[yellow]⚠️  This will remove all your configuration including API key[/yellow]")
+    if not Confirm.ask("\n[bold]Are you sure you want to reset?[/bold]", default=False):
+        console.print("[dim]Reset cancelled.[/dim]")
+        return
+    
+    sdk = RunAgent()
+    sdk.config.clear()
+    
+    console.print(Panel(
+        "[bold green]✅ Configuration reset successfully![/bold green]\n\n"
+        "[dim]Run 'runagent setup' to configure again.[/dim]",
+        title="[bold green]Success[/bold green]",
+        border_style="green"
+    ))
+
+
+
+
+@config.command("status")
+def config_status_cmd():
+    """Show current configuration status"""
+    _show_config_status()
+
+
+@config.command("reset")
+@click.option("--yes", is_flag=True, help="Skip confirmation")
+def config_reset_cmd(yes):
+    """Reset configuration to defaults"""
+    if yes:
+        _reset_config_without_prompt()
+    else:
+        _interactive_reset_config()
+
+
+def _reset_config_without_prompt():
+    """Reset config without confirmation (for --yes flag)"""
+    from rich.panel import Panel
+    
+    try:
+        sdk = RunAgent()
+        sdk.config.clear()
+        
+        console.print(Panel(
+            "[bold green]✅ Configuration reset successfully![/bold green]\n\n"
+            "[dim]Run 'runagent setup' to configure again.[/dim]",
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+    except Exception as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"[red]Error:[/red] {e}")
+        raise click.ClickException("Reset failed")
+
+@click.command()
+@click.option("--again", is_flag=True, help="Reconfigure even if already setup")
+def setup(again):
+    """
+    Setup RunAgent authentication
+    
+    \b
+    First-time setup:
+      $ runagent setup
+    
+    \b
+    Reconfigure:
+      $ runagent setup --again
+    
+    \b
+    Change specific settings later:
+      $ runagent config set-api-key
+      $ runagent config set-base-url
+    """
+    try:
+        from runagent.cli.branding import print_setup_banner
+        from rich.prompt import Prompt, Confirm
+        from rich.panel import Panel
+        
+        sdk = RunAgent()
+        api_key = Config.get_api_key()
 
         # Check if already configured
-        if sdk.is_configured() and not force:
+        if api_key and not again:
             config_status = sdk.get_config_status()
-            console.print("⚠️ RunAgent is already configured:")
-            console.print(f"   Base URL: [blue]{config_status.get('base_url')}[/blue]")
-            user_info = config_status.get('user_info', {})
-            if user_info.get('email'):
-                console.print(f"   User: [green]{user_info.get('email')}[/green]")
+            user_email = config_status.get('user_info', {}).get('email', 'N/A')
+            
+            console.print(Panel(
+                "[bold cyan]✅ RunAgent is already configured![/bold cyan]\n\n"
+                f"[dim]User:[/dim] [green]{user_email}[/green]\n"
+                f"[dim]Base URL:[/dim] [cyan]{config_status.get('base_url')}[/cyan]\n\n"
+                "[dim]To reconfigure, run:[/dim] [white]runagent setup --again[/white]\n"
+                "[dim]To view config:[/dim] [white]runagent config status[/white]",
+                title="[bold]Already Setup[/bold]",
+                border_style="cyan"
+            ))
+            return
 
-            if not click.confirm("Do you want to reconfigure?"):
+        # Show welcome banner for new setup
+        if not api_key or again:
+            if not api_key:
+                print_setup_banner()
+            else:
+                console.print("\n[bold cyan]🔄 Reconfiguring RunAgent[/bold cyan]\n")
+        
+        # Show setup method options with arrow-key selection
+        console.print("[bold cyan]Choose your setup method:[/bold cyan]\n")
+        
+        import inquirer
+        
+        questions = [
+            inquirer.List(
+                'setup_method',
+                message="Select setup method",
+                choices=[
+                    ('🪄 Express Setup (Browser login - Coming Soon!)', 'express'),
+                    ('🔑 Manual Setup (Enter API key)', 'manual'),
+                ],
+                default=('🔑 Manual Setup (Enter API key)', 'manual'),
+                carousel=True
+            ),
+        ]
+        
+        answers = inquirer.prompt(questions)
+        if not answers:
+            console.print("[dim]Setup cancelled.[/dim]")
+            return
+        
+        choice = answers['setup_method']
+        
+        if choice == "express":
+            # Express setup - coming soon
+            console.print(Panel(
+                "[bold cyan]🚀 Express Setup - Coming Soon![/bold cyan]\n\n"
+                "This feature will allow you to authenticate via your browser.\n\n"
+                "[dim]For now, please use Manual Setup[/dim]\n\n"
+                "📚 [link=https://docs.runagent.dev/setup]Learn more[/link]",
+                title="[bold]Feature Preview[/bold]",
+                border_style="cyan"
+            ))
+            
+            if not Confirm.ask("\n[bold]Continue with Manual Setup?[/bold]", default=True):
+                console.print("[dim]Setup cancelled.[/dim]")
                 return
-
-        console.print("🔑 [cyan]Setting up RunAgent authentication...[/cyan]")
+        
+        # Manual setup - prompt for API key
+        console.print("\n[bold white]📝 Manual Setup[/bold white]\n")
+        api_key = Prompt.ask(
+            "[cyan]Enter your API key[/cyan]",
+            password=True
+        )
+        
+        if not api_key or not api_key.strip():
+            console.print(Panel(
+                "[red]❌ API key cannot be empty[/red]",
+                title="[bold red]Error[/bold red]",
+                border_style="red"
+            ))
+            raise click.ClickException("Invalid API key")
+        
+        console.print("\n🔑 [cyan]Configuring RunAgent...[/cyan]")
 
         # Configure SDK with validation
         try:
-            sdk.configure(api_key=api_key, base_url=base_url, save=True)
-            console.print("✅ [green]Setup completed successfully![/green]")
+            from rich.status import Status
+            from runagent.constants import DEFAULT_BASE_URL
+            
+            # Use default base URL from constants
+            base_url = Config.get_base_url() or DEFAULT_BASE_URL
+            
+            with Status("[bold cyan]Validating credentials...", spinner="dots", console=console) as status:
+                sdk.configure(api_key=api_key, base_url=base_url, save=True)
+            
+            console.print(Panel(
+                "[bold green]✅ Setup completed successfully![/bold green]\n\n"
+                "[dim]Your credentials have been saved securely.[/dim]",
+                title="[bold green]Success[/bold green]",
+                border_style="green"
+            ))
         except AuthenticationError as auth_err:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
@@ -104,7 +791,9 @@ def setup(api_key, base_url, force):
             elif "connection" in error_msg or "timeout" in error_msg:
                 console.print("   • Check your internet connection")
                 console.print("   • Verify the middleware server is accessible")
-                console.print(f"   • Trying to connect to: {base_url or sdk.config.base_url}")
+                from runagent.constants import DEFAULT_BASE_URL
+                display_url = base_url if 'base_url' in locals() else DEFAULT_BASE_URL
+                console.print(f"   • Trying to connect to: {display_url}")
             else:
                 console.print("   • Check your API key and network connection")
                 console.print("   • Contact support if the issue persists")
@@ -116,12 +805,28 @@ def setup(api_key, base_url, force):
         user_info = config_status.get('user_info', {})
         
         if user_info and user_info.get('email'):
-            console.print("\n👤 [bold]User Information:[/bold]")
-            console.print(f"   Email: [cyan]{user_info.get('email')}[/cyan]")
-            if user_info.get('user_id'):
-                console.print(f"   User ID: [dim]{user_info.get('user_id')}[/dim]")
-            if user_info.get('tier'):
-                console.print(f"   Tier: [yellow]{user_info.get('tier')}[/yellow]")
+            from rich.panel import Panel
+            from rich.table import Table
+            
+            # Create info table
+            info_table = Table(show_header=False, box=None, padding=(0, 2))
+            info_table.add_column("", style="dim", no_wrap=True)
+            info_table.add_column("", style="cyan")
+            
+            info_table.add_row("✉️  Email", user_info.get('email'))
+            info_table.add_row("🎯 Tier", user_info.get('tier', 'Free'))
+            
+            # Show active project
+            user_config = Config.get_user_config()
+            active_project = user_config.get('active_project_name')
+            if active_project:
+                info_table.add_row("📁 Active Project", active_project)
+            
+            console.print(Panel(
+                info_table,
+                title="[bold]👤 User Information[/bold]",
+                border_style="cyan"
+            ))
 
         # Show sync status (simplified)
         console.print("\n🔄 [bold]Middleware Sync Status:[/bold]")
@@ -139,11 +844,11 @@ def setup(api_key, base_url, force):
         except Exception as e:
             console.print(f"   Status: [yellow]Unknown - {e}[/yellow]")
 
-        # Show next steps
+        # Show next steps - Simple workflow
         console.print("\n💡 [bold]Next Steps:[/bold]")
-        console.print("   • Test with a local agent: [cyan]runagent serve <path>[/cyan]")
-        console.print("   • Check middleware sync: [cyan]runagent local-sync --status[/cyan]")
-        console.print("   • Upload agent to middleware: [cyan]runagent upload --folder <path>[/cyan]")
+        console.print("   1️⃣  Initialize a new agent: [cyan]runagent init[/cyan]")
+        console.print("   2️⃣  Serve it locally: [cyan]runagent serve <path>[/cyan]")
+        console.print("   3️⃣  Invoke your agent: [cyan]runagent run --id <agent-id> --tag <tag>[/cyan]")
 
     except AuthenticationError:
         # Already handled above
@@ -159,39 +864,82 @@ def setup(api_key, base_url, force):
 @click.command()
 @click.option("--yes", is_flag=True, help="Skip confirmation")
 def teardown(yes):
-    """Remove RunAgent configuration"""
+    """Complete teardown - Remove RunAgent configuration AND database"""
     try:
+        from runagent.cli.branding import print_header
+        from rich.panel import Panel
+        from rich.prompt import Confirm
+        from runagent.constants import LOCAL_CACHE_DIRECTORY, DATABASE_FILE_NAME
+        from pathlib import Path
+        
+        print_header("Complete Teardown")
+        
         sdk = RunAgent()
 
         if not yes:
             config_status = sdk.get_config_status()
+            db_stats = sdk.db_service.get_database_stats()
+            
+            # Show what will be deleted
+            console.print(Panel(
+                "[bold red]⚠️  COMPLETE TEARDOWN[/bold red]\n\n"
+                "This will permanently delete:\n"
+                "  • All configuration (API key, user info, settings)\n"
+                "  • Complete database (all agents, runs, logs, history)\n"
+                "  • All local agent data\n\n"
+                "[yellow]This action CANNOT be undone![/yellow]",
+                title="[bold red]Warning[/bold red]",
+                border_style="red"
+            ))
+            
+            console.print("\n📊 [bold]Current data:[/bold]")
             if config_status.get("configured"):
-                console.print("📋 [bold]Current configuration:[/bold]")
-                console.print(
-                    f"   Base URL: [blue]{config_status.get('base_url')}[/blue]"
-                )
-                user_info = config_status.get("user_info", {})
-                if user_info.get("email"):
-                    console.print(f"   User: [green]{user_info.get('email')}[/green]")
+                console.print(f"   User: [cyan]{config_status.get('user_info', {}).get('email', 'N/A')}[/cyan]")
+            console.print(f"   Total agents: [yellow]{db_stats.get('total_agents', 0)}[/yellow]")
+            console.print(f"   Total runs: [yellow]{db_stats.get('total_runs', 0)}[/yellow]")
+            console.print(f"   Database size: [yellow]{db_stats.get('database_size_mb', 0)} MB[/yellow]\n")
 
-            if not click.confirm(
-                "⚠️ This will remove all RunAgent configuration. Continue?"
+            if not Confirm.ask(
+                "[bold red]Are you absolutely sure you want to proceed?[/bold red]",
+                default=False
             ):
-                console.print("Teardown cancelled.")
+                console.print("[dim]Teardown cancelled.[/dim]")
                 return
 
-        # Clear configuration
+        # Clear configuration from database
         sdk.config.clear()
 
-        console.print("✅ [green]RunAgent teardown completed successfully![/green]")
-        console.print(
-            "💡 Run [cyan]'runagent setup --api-key <key>'[/cyan] to reconfigure"
-        )
+        # Close database connections
+        sdk.db_service.close()
+        
+        # Delete database file
+        db_path = Path(LOCAL_CACHE_DIRECTORY) / DATABASE_FILE_NAME
+        if db_path.exists():
+            db_path.unlink()
+            console.print(f"🗑️  [dim]Deleted database: {db_path}[/dim]")
+        
+        # Delete legacy JSON file if exists
+        json_file = Path(LOCAL_CACHE_DIRECTORY) / "user_data.json"
+        if json_file.exists():
+            json_file.unlink()
+            console.print(f"🗑️  [dim]Deleted legacy config: {json_file}[/dim]")
+
+        console.print(Panel(
+            "[bold green]✅ RunAgent teardown completed successfully![/bold green]\n\n"
+            "All configuration and data have been removed.\n\n"
+            "[dim]To start fresh, run:[/dim] [cyan]runagent setup[/cyan]",
+            title="[bold green]Complete[/bold green]",
+            border_style="green"
+        ))
 
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
-        console.print(f"❌ [red]Teardown error:[/red] {e}")
+        console.print(Panel(
+            f"[red]❌ Teardown error:[/red] {str(e)}",
+            title="[bold red]Error[/bold red]",
+            border_style="red"
+        ))
         raise click.ClickException("Teardown failed")
 
 
@@ -201,6 +949,9 @@ def teardown(yes):
 def delete(agent_id, yes):
     """Delete an agent from the local database"""
     try:
+        from runagent.cli.branding import print_header
+        print_header("Delete Agent")
+        
         sdk = RunAgent()
         
         # Get agent info first
@@ -269,10 +1020,12 @@ def delete(agent_id, yes):
 
 
 @click.command()
-@click.option("--template", default="default", help="Template variant (basic, advanced, default)")
-@click.option("--interactive", "-i", is_flag=True, help="Enable interactive prompts")
+@click.option("--template", help="Template variant (default, advanced, etc.) - for non-interactive")
+@click.option("--blank", is_flag=True, help="Start from blank template - for non-interactive")
+@click.option("--name", help="Agent name - for non-interactive")
+@click.option("--description", help="Agent description - for non-interactive")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
-@add_framework_options  # This automatically adds all framework options!
+@add_framework_options  # Adds framework flags for non-interactive
 @click.argument(
     "path",
     type=click.Path(
@@ -285,54 +1038,179 @@ def delete(agent_id, yes):
     default=".",
     required=False,
 )
-def init(template, interactive, overwrite, path, **kwargs):
-    """Initialize a new RunAgent project"""
+def init(template, blank, name, description, overwrite, path, **kwargs):
+    """
+    Initialize a new RunAgent project
+    
+    \b
+    Interactive mode (default - recommended):
+      $ runagent init
+    
+    \b
+    Non-interactive with template:
+      $ runagent init --framework langgraph --template advanced --name "My Agent" --description "Does XYZ" ./my-agent
+    
+    \b
+    Non-interactive blank:
+      $ runagent init --blank --name "Custom Agent" --description "My custom implementation"
+    """
     
     try:
+        from runagent.cli.branding import print_header
+        from rich.prompt import Prompt
+        from rich.panel import Panel
+        import inquirer
+        
+        print_header("Initialize Project")
+        
         sdk = RunAgent()
         
-        # Extract selected framework using our helper
+        # Determine if interactive mode
         selected_framework = get_selected_framework(kwargs)
-        framework = selected_framework if selected_framework else Framework.DEFAULT
+        has_required_non_interactive = (
+            (selected_framework or blank) and name and description
+        )
+        is_interactive = not has_required_non_interactive
         
-        if interactive:
-            if framework == Framework.DEFAULT:
-                console.print("🎯 [bold]Available frameworks:[/bold]")
+        # Variables to collect
+        agent_name = name
+        agent_description = description
+        use_blank = blank
+        framework = selected_framework
+        selected_template = template or "default"
+        
+        if is_interactive:
+            # Step 1: Choose blank or template
+            console.print("[bold cyan]How would you like to start?[/bold cyan]\n")
+            
+            start_questions = [
+                inquirer.List(
+                    'start_type',
+                    message="Select starting point",
+                    choices=[
+                        ('📦 From Template (recommended)', 'template'),
+                        ('📄 Blank Project (advanced)', 'blank'),
+                    ],
+                    default=('📦 From Template (recommended)', 'template'),
+                    carousel=True
+                ),
+            ]
+            
+            start_answer = inquirer.prompt(start_questions)
+            if not start_answer:
+                console.print("[dim]Initialization cancelled.[/dim]")
+                return
+            
+            use_blank = (start_answer['start_type'] == 'blank')
+            
+            # Step 2: If template, select framework and template
+            if not use_blank:
+                # Select framework
+                console.print("\n[bold]Select framework:[/bold]\n")
                 selectable_frameworks = Framework.get_selectable_frameworks()
                 
-                for i, fw in enumerate(selectable_frameworks, 1):
+                framework_choices = []
+                for fw in selectable_frameworks:
                     category_emoji = "🐍" if fw.is_pythonic() else "🌐" if fw.is_webhook() else "❓"
-                    console.print(f"  {i}. {category_emoji} {fw.value} ({fw.category})")
+                    label = f"{category_emoji} {fw.value} ({fw.category})"
+                    framework_choices.append((label, fw))
                 
-                choice = click.prompt(
-                    "Select framework", 
-                    type=click.IntRange(1, len(selectable_frameworks)), 
-                    default=1
-                )
-                framework = selectable_frameworks[choice - 1]
+                fw_questions = [
+                    inquirer.List(
+                        'framework',
+                        message="Choose framework",
+                        choices=framework_choices,
+                        carousel=True
+                    ),
+                ]
+                
+                fw_answer = inquirer.prompt(fw_questions)
+                if not fw_answer:
+                    console.print("[dim]Initialization cancelled.[/dim]")
+                    return
+                
+                framework = fw_answer['framework']
+                
+                # Select template for chosen framework
+                console.print(f"\n[bold]Select template for {framework.value}:[/bold]")
+                
+                # Fetch templates with real progress feedback
+                from rich.status import Status
+                import time
+                
+                fetch_start = time.time()
+                
+                with Status(
+                    "[cyan]Fetching available templates...[/cyan]",
+                    console=console,
+                    spinner="dots"
+                ) as status:
+                    clone_start = time.time()
+                    status.update("[cyan]Cloning template repository...[/cyan]")
+                    
+                    templates = sdk.list_templates(framework.value)
+                    clone_time = time.time() - clone_start
+                    
+                    status.update(f"[cyan]Templates fetched ({clone_time:.1f}s)[/cyan]")
+                    template_list = templates.get(framework.value, ["default"])
+                
+                fetch_time = time.time() - fetch_start
+                
+                console.print(f"[dim]✓ Found {len(template_list)} template(s) in {fetch_time:.1f}s[/dim]")
+                
+                # Auto-select if only one template available
+                if len(template_list) == 1:
+                    selected_template = template_list[0]
+                    console.print(f"[dim]→ Using template: {selected_template}[/dim]\n")
+                else:
+                    # Show dropdown for multiple templates
+                    console.print()
+                    template_choices = [(f"🧱 {tmpl}", tmpl) for tmpl in template_list]
+                    
+                    tmpl_questions = [
+                        inquirer.List(
+                            'template',
+                            message="Choose template",
+                            choices=template_choices,
+                            carousel=True
+                        ),
+                    ]
+                    
+                    tmpl_answer = inquirer.prompt(tmpl_questions)
+                    if not tmpl_answer:
+                        console.print("[dim]Initialization cancelled.[/dim]")
+                        return
+                    
+                    selected_template = tmpl_answer['template']
+            else:
+                # Blank project uses default framework
+                framework = Framework.DEFAULT
+                selected_template = "default"
             
-            if template == "default":
-                templates = sdk.list_templates(framework.value)
-                template_list = templates.get(framework.value, ["default"])
-                
-                console.print(f"\n🧱 [bold]Available templates for {framework.value}:[/bold]")
-                for i, tmpl in enumerate(template_list, 1):
-                    console.print(f"  {i}. {tmpl}")
-                
-                choice = click.prompt(
-                    "Select template", 
-                    type=click.IntRange(1, len(template_list)), 
-                    default=1
-                )
-                template = template_list[choice - 1]
+            # Step 3: Get agent name and description (for both blank and template)
+            console.print("\n[bold]Agent Details:[/bold]\n")
             
-            if path.resolve() == Path.cwd():
-                project_name = click.prompt(
-                    "Enter project name",
-                    type=str,
-                    default="runagent-project"
-                )
-                path = Path.cwd() / project_name
+            agent_name = Prompt.ask(
+                "[cyan]Agent name[/cyan]",
+                default="my-agent"
+            )
+            
+            agent_description = Prompt.ask(
+                "[cyan]Agent description[/cyan]",
+                default="My AI agent"
+            )
+            
+            # Step 4: Get path
+            console.print()
+            path_input = Prompt.ask(
+                "[cyan]Project path[/cyan]",
+                default="."
+            )
+            path = Path(path_input)
+        
+        # Ensure framework is set
+        if not framework:
+            framework = Framework.DEFAULT
         
         # Validate framework if it came from string input
         if isinstance(framework, str):
@@ -343,54 +1221,70 @@ def init(template, interactive, overwrite, path, **kwargs):
         
         # Use the path as the project location
         project_path = path.resolve()
-        relative_project_path = project_path.relative_to(Path.cwd())
         
         # Ensure the path exists
         project_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Show configuration with enhanced formatting
-        console.print(f"\n🚀 [bold]Initializing project:[/bold]")
-        console.print(f"   Path: [cyan]{relative_project_path}[/cyan]")
-        
-        # Enhanced framework display with category
-        framework_display = framework.value
-        if not framework.is_default():
-            category_emoji = "🐍" if framework.is_pythonic() else "🌐" if framework.is_webhook() else "❓"
-            framework_display = f"{category_emoji} {framework.value} ({framework.category})"
-        
-        console.print(f"   Framework: [magenta]{framework_display}[/magenta]")
-        console.print(f"   Template: [yellow]{template}[/yellow]")
+        # Show configuration summary
+        console.print(Panel(
+            f"[bold]Project Configuration:[/bold]\n\n"
+            f"[dim]Name:[/dim] [cyan]{agent_name}[/cyan]\n"
+            f"[dim]Description:[/dim] [white]{agent_description}[/white]\n"
+            f"[dim]Framework:[/dim] [magenta]{framework.value}[/magenta]\n"
+            f"[dim]Template:[/dim] [yellow]{selected_template}[/yellow]\n"
+            f"[dim]Path:[/dim] [blue]{project_path}[/blue]",
+            title="[bold cyan]Creating Agent[/bold cyan]",
+            border_style="cyan"
+        ))
         
         # Initialize project
         success = sdk.init_project(
             folder_path=project_path,
-            framework=framework.value,  # Pass the string value
-            template=template,
+            framework=framework.value,
+            template=selected_template,
             overwrite=overwrite
         )
         
-        if success:
-            console.print(f"\n✅ [green]Project initialized successfully![/green]")
-            console.print(f"📁 Created at: [cyan]{relative_project_path}[/cyan]")
-            
-            # Enhanced next steps with framework-specific guidance
-            console.print("\n📝 [bold]Next steps:[/bold]")
-            console.print(f"  1. [cyan]cd {relative_project_path}[/cyan]")
-            console.print(f"  2. Update your API keys in [yellow].env[/yellow] file")
-            
-            # Framework-specific guidance
-            if framework.is_pythonic():
-                console.print(f"  3. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
-                console.print(f"  4. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
-            elif framework.is_webhook():
-                console.print(f"  3. Configure webhook endpoints in your workflow")
-                console.print(f"  4. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
-            else:
-                console.print(f"  3. Deploy locally: [cyan]runagent serve {relative_project_path}[/cyan]")
-            
-            console.print(
-                f"  5. Test: [cyan]Test the agent with any of our SDKs. For more details, refer to: [link]https://docs.run-agent.ai/sdk/overview[/link][/cyan]"
-            )
+        if not success:
+            raise Exception("Project initialization failed")
+        
+        # Update config file with name and description
+        try:
+            config_path = project_path / "runagent.config.json"
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                
+                config_data['name'] = agent_name
+                config_data['description'] = agent_description
+                
+                with open(config_path, 'w') as f:
+                    json.dump(config_data, f, indent=2)
+                
+                console.print("\n[dim]✓ Updated agent name and description in config[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]⚠️  Could not update config: {e}[/yellow]")
+        
+        # Success message
+        relative_path = project_path.relative_to(Path.cwd()) if project_path != Path.cwd() else Path(".")
+        
+        console.print(Panel(
+            f"[bold green]✅ Agent '{agent_name}' created successfully![/bold green]\n\n"
+            f"[dim]Location:[/dim] [cyan]{relative_path}[/cyan]\n"
+            f"[dim]Framework:[/dim] [magenta]{framework.value}[/magenta]",
+            title="[bold green]Success[/bold green]",
+            border_style="green"
+        ))
+        
+        # Simple next steps
+        console.print("\n💡 [bold]Next Steps:[/bold]")
+        if relative_path != Path("."):
+            console.print(f"   1️⃣  [cyan]cd {relative_path}[/cyan]")
+            console.print(f"   2️⃣  Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
+            console.print(f"   3️⃣  Serve locally: [cyan]runagent serve .[/cyan]")
+        else:
+            console.print(f"   1️⃣  Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
+            console.print(f"   2️⃣  Serve locally: [cyan]runagent serve .[/cyan]")
     
     except TemplateError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
@@ -431,6 +1325,8 @@ def init(template, interactive, overwrite, path, **kwargs):
 )
 def template(action_list, action_info, framework, template, filter_framework, format):
     """Manage project templates"""
+    from runagent.cli.branding import print_header
+    print_header("Templates")
 
     if not action_list and not action_info:
         console.print(
@@ -545,6 +1441,9 @@ def upload(path: Path):
     """Upload agent to remote server"""
 
     try:
+        from runagent.cli.branding import print_header
+        print_header("Upload Agent")
+        
         sdk = RunAgent()
 
         # Check authentication
@@ -596,6 +1495,9 @@ def start(agent_id, config):
     """Start an uploaded agent on remote server"""
 
     try:
+        from runagent.cli.branding import print_header
+        print_header("Start Remote Agent")
+        
         sdk = RunAgent()
 
         # Check authentication
@@ -660,6 +1562,9 @@ def deploy(path: Path):
     """Deploy agent (upload + start) to remote server"""
 
     try:
+        from runagent.cli.branding import print_header
+        print_header("Deploy Agent")
+        
         sdk = RunAgent()
 
         # Check authentication
@@ -729,6 +1634,9 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
     """Start local FastAPI server with subtle robotic runner animation"""
 
     try:
+        from runagent.cli.branding import print_header
+        print_header("Serve Agent Locally")
+        
         # Show subtle startup animation
         if not no_animation:
             console.print("\n")
@@ -912,6 +1820,8 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         # remote agent
         runagent run --id d33c497d-d3f5-462e-8ff4-c28d819b92d6  --tag minimal  --message=something
     """
+    from runagent.cli.branding import print_header
+    print_header("Run Agent")
     
     # ============================================
     # VALIDATION 1: Either agent-id OR host/port
@@ -1098,6 +2008,8 @@ def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
         # With input file
         runagent run-stream --id d33c497d-d3f5-462e-8ff4-c28d819b92d6 --tag minimal_stream --local --input config.json
     """
+    from runagent.cli.branding import print_header
+    print_header("Stream Agent Output")
     
     # ============================================
     # PARAMETER PARSING
@@ -1690,105 +2602,8 @@ def cleanup(days, agent_runs, yes):
         raise click.ClickException("Cleanup failed")
 
 
-@click.command()
-@click.option("--status", is_flag=True, help="Show sync status")
-@click.option("--test", is_flag=True, help="Test middleware connection")
-def local_sync(status, test):
-    """Manage local agent sync with middleware - ENHANCED"""
-    try:
-        sdk = RunAgent()
-        
-        if not sdk.config.is_configured():
-            console.print("❌ [red]RunAgent not configured[/red]")
-            console.print("💡 Run: [cyan]runagent setup --api-key <your-key>[/cyan]")
-            raise click.ClickException("Setup required")
-        
-        from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
-        sync_service = MiddlewareSyncService(sdk.config)
-        
-        if status or (not test):
-            # Show detailed sync status
-            console.print("\n📡 [bold]Middleware Sync Status[/bold]")
-            console.print("=" * 40)
-            
-            # API Key status
-            if sync_service.api_key:
-                console.print("🔑 [green]API Key: CONFIGURED[/green]")
-                console.print(f"   Key: [dim]{sync_service.api_key[:16]}...[/dim]")
-            else:
-                console.print("🔑 [red]API Key: NOT CONFIGURED[/red]")
-            
-            # Base URL
-            console.print(f"🌐 Base URL: [blue]{sync_service.config.base_url}[/blue]")
-            
-            # Authentication status
-            if sync_service.auth_validated:
-                console.print("🔐 [green]Authentication: VALID[/green]")
-            else:
-                console.print("🔐 [red]Authentication: INVALID[/red]")
-            
-            # Overall sync status
-            if sync_service.sync_enabled:
-                console.print("✅ [green]Sync Status: ENABLED[/green]")
-                console.print(" Local agent runs will sync to middleware")
-            else:
-                console.print("❌ [red]Sync Status: DISABLED[/red]")
-                console.print("⚠️ Local agents will only be stored locally")
-            
-            if not sync_service.sync_enabled:
-                console.print("\n [yellow]To enable sync:[/yellow]")
-                console.print("   1. Get API key from middleware dashboard")
-                console.print("   2. Run: [cyan]runagent setup --api-key <your-key>[/cyan]")
-        
-        if test:
-            console.print("\n [bold]Testing Connection...[/bold]")
-            
-            if not sync_service.api_key:
-                console.print("❌ [red]No API key configured[/red]")
-                raise click.ClickException("API key required for testing")
-            
-            # Test basic connection
-            console.print("1. Testing basic connectivity...")
-            connection_result = sync_service._test_middleware_connection()
-            if connection_result:
-                console.print("   ✅ [green]Basic connection: SUCCESS[/green]")
-            else:
-                console.print("   ❌ [red]Basic connection: FAILED[/red]")
-                raise click.ClickException("Cannot connect to middleware")
-            
-            # Test authentication
-            console.print("2. Testing authentication...")
-            auth_result = sync_service._test_supabase_authentication()
-            if auth_result:
-                console.print("   ✅ [green]Authentication: SUCCESS[/green]")
-            else:
-                console.print("   ❌ [red]Authentication: FAILED[/red]")
-                console.print("    Check your API key")
-                raise click.ClickException("Authentication failed")
-            
-            # Test user info endpoint
-            console.print("3. Testing user info endpoint...")
-            try:
-                response = sync_service.rest_client.http.get("/users/auth-user-info", timeout=10)
-                if response.status_code == 200:
-                    user_data = response.json()
-                    user_info = user_data.get("user", {})
-                    console.print("   ✅ [green]User info: SUCCESS[/green]")
-                    console.print(f"   👤 Email: [cyan]{user_info.get('email', 'Unknown')}[/cyan]")
-                    if user_info.get('id'):
-                        console.print(f"   🆔 User ID: [dim]{user_info.get('id')}[/dim]")
-                else:
-                    console.print(f"   ❌ [red]User info: FAILED (HTTP {response.status_code})[/red]")
-            except Exception as e:
-                console.print(f"   ❌ [red]User info: ERROR ({e})[/red]")
-            
-            console.print("\n✅ [bold green]All tests passed! Middleware sync is working.[/bold green]")
-    
-    except Exception as e:
-        if os.getenv('DISABLE_TRY_CATCH'):
-            raise
-        console.print(f"❌ [red]Local sync error: {e}[/red]")
-        raise click.ClickException("Local sync command failed")
+# local-sync command removed - sync settings now managed via 'runagent config'
+# Use: runagent config > Select "🔄 Sync Settings"
 
 
 # Add this simplified logs command to the db group in runagent/cli/commands.py
