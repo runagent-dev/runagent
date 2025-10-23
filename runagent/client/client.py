@@ -14,6 +14,9 @@ class RunAgentClient:
         self.local = local
         self.agent_id = agent_id
         self.entrypoint_tag = entrypoint_tag
+        
+        # FIXED: Detect if this is a streaming entrypoint
+        self.is_streaming = entrypoint_tag.endswith("_stream")
 
         if local:
             if host and port:
@@ -40,19 +43,16 @@ class RunAgentClient:
             self.rest_client = RestClient(is_local=False)
             self.socket_client = SocketClient(is_local=False)
 
-        # self.agent_architecture = self.rest_client.get_agent_architecture(agent_id)
-
-        # selected_entrypoint = next(
-        #     (
-        #         entrypoint for entrypoint in self.agent_architecture['entrypoints']
-        #         if entrypoint['tag'] == entrypoint_tag
-        #     ), None)
-
-        # if not selected_entrypoint:
-        #     raise ValueError(f"Entrypoint `{entrypoint_tag}` not found in agent {agent_id}")
-
     def run(self, *input_args, **input_kwargs):
-
+        """
+        FIXED: Smart execution - automatically uses streaming or non-streaming based on entrypoint
+        """
+        # FIXED: If this is a streaming entrypoint, automatically use run_stream
+        if self.is_streaming:
+            console.print(f"[cyan]Detected streaming entrypoint, using WebSocket streaming[/cyan]")
+            return self.run_stream(*input_args, **input_kwargs)
+        
+        # Non-streaming execution (HTTP POST)
         response = self.rest_client.run_agent(
             self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
         )
@@ -80,6 +80,7 @@ class RunAgentClient:
     def run_stream(self, *input_args, **input_kwargs):
         """Stream agent execution results in real-time via WebSocket"""
         try:
+            # FIXED: Return the generator directly, don't try to iterate here
             return self.socket_client.run_stream(
                 self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
             )

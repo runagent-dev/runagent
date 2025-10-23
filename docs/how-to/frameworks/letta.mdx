@@ -1,0 +1,753 @@
+# Letta Integration
+
+Deploy Letta memory-enabled agents with RunAgent
+
+---
+
+## Prerequisites
+
+- Basic understanding of Letta
+- Completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+- Python 3.8 or higher
+
+---
+
+## Overview
+
+Letta is a framework for building conversational AI agents with persistent memory and context awareness. RunAgent makes it easy to deploy Letta agents and access them from any programming language while maintaining conversation state.
+
+---
+
+## Installation & Setup
+
+### 1. Install Letta Server
+
+```bash
+pip install -U letta
+```
+
+### 2. Set Environment Variables
+
+Letta requires API keys for LLM providers. Set them before starting the server:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 3. Start Letta Server
+
+The Letta server must be running before deploying RunAgent agents:
+
+```bash
+letta server
+```
+
+The server will start on `http://localhost:8283`. Keep this terminal window open.
+
+**Note**: If you need to use a different port, you can specify it with:
+```bash
+letta server --port 8284
+```
+
+### 4. Install Letta Client (Optional)
+
+For Python SDK usage, install the client package:
+
+```bash
+pip install letta-client
+```
+
+---
+
+## Quick Start with RunAgent
+
+### 1. Create a Letta Agent Project
+
+```bash
+runagent init my-letta-agent --framework letta
+cd my-letta-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+The generated `requirements.txt` will include:
+```
+letta-client
+python-dotenv
+```
+
+### 3. Configure Environment
+
+Create a `.env` file in your project directory:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+LETTA_SERVER_URL=http://localhost:8283
+```
+
+### 4. Review Configuration
+
+The generated `runagent.config.json` will be pre-configured for Letta:
+
+```json
+{
+  "agent_name": "my-letta-agent",
+  "description": "Letta conversational agent with memory",
+  "framework": "letta",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_run",
+        "tag": "chat"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_stream",
+        "tag": "chat_stream"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Basic Letta Agent
+
+Here's a simple Letta agent demonstrating conversational capabilities:
+
+```python
+# agent.py
+import os
+from dotenv import load_dotenv
+from letta_client import CreateBlock, Letta
+
+# Load environment variables
+load_dotenv()
+
+
+def _extract_message_from_input(*input_args, **input_kwargs) -> str:
+    """Extract message text from various input formats"""
+    # Try direct message parameter
+    if input_kwargs.get("message"):
+        return str(input_kwargs["message"])
+    
+    # Try messages list format
+    if input_kwargs.get("messages"):
+        messages = input_kwargs["messages"]
+        if isinstance(messages, list) and messages:
+            last_message = messages[-1]
+            if isinstance(last_message, dict) and "content" in last_message:
+                return last_message["content"]
+    
+    # Try first positional argument as string
+    if input_args and isinstance(input_args[0], str):
+        return input_args[0]
+    
+    # Try first positional argument as dict with messages
+    if input_args and isinstance(input_args[0], dict):
+        data = input_args[0]
+        if "messages" in data:
+            messages = data["messages"]
+            if isinstance(messages, list) and messages:
+                last_message = messages[-1]
+                if isinstance(last_message, dict) and "content" in last_message:
+                    return last_message["content"]
+        if "message" in data:
+            return str(data["message"])
+    
+    return "Hello"
+
+
+def letta_run(*input_args, **input_kwargs):
+    """Main entrypoint for the Letta agent"""
+    try:
+        # Initialize Letta client
+        letta_url = os.getenv("LETTA_SERVER_URL", "http://localhost:8283")
+        client = Letta(base_url=letta_url)
+        
+        # Create memory blocks
+        memory_blocks = [
+            CreateBlock(
+                label="human",
+                value="You are talking to a user through RunAgent framework",
+            ),
+            CreateBlock(
+                label="persona",
+                value="You are a helpful AI assistant. Be friendly and concise.",
+            ),
+        ]
+
+        # Create agent
+        agent = client.agents.create(
+            name=f"runagent-letta-{os.getpid()}",
+            memory_blocks=memory_blocks,
+            system="You are a helpful AI assistant integrated with RunAgent. Respond naturally and helpfully.",
+            model="openai/gpt-4o-mini",
+            embedding="openai/text-embedding-ada-002",
+            include_base_tools=True
+        )
+
+        print(f"✅ Letta agent created with ID: {agent.id}")
+        
+        # Extract message from input
+        message = _extract_message_from_input(*input_args, **input_kwargs)
+        
+        # Send message to Letta agent
+        response = client.agents.messages.create(
+            agent_id=agent.id,
+            messages=[{
+                "role": "user",
+                "content": message
+            }]
+        )
+        
+        # Clean up agent after use
+        try:
+            client.agents.delete(agent.id)
+            print(f"🗑️ Cleaned up agent: {agent.id}")
+        except:
+            pass
+        
+        return response
+        
+    except Exception as e:
+        return {"error": f"Letta execution error: {str(e)}"}
+
+
+def letta_run_stream(*input_args, **input_kwargs):
+    """Streaming entrypoint for the Letta agent"""
+    try:
+        # Initialize Letta client
+        letta_url = os.getenv("LETTA_SERVER_URL", "http://localhost:8283")
+        client = Letta(base_url=letta_url)
+        
+        # Create memory blocks
+        memory_blocks = [
+            CreateBlock(
+                label="human",
+                value="You are talking to a user through RunAgent framework",
+            ),
+            CreateBlock(
+                label="persona",
+                value="You are a helpful AI assistant. Be friendly and concise.",
+            ),
+        ]
+
+        # Create agent
+        agent = client.agents.create(
+            name=f"runagent-letta-stream-{os.getpid()}",
+            memory_blocks=memory_blocks,
+            system="You are a helpful AI assistant integrated with RunAgent. Respond naturally and helpfully.",
+            model="openai/gpt-4o-mini",
+            embedding="openai/text-embedding-ada-002",
+            include_base_tools=True
+        )
+
+        print(f"✅ Letta streaming agent created with ID: {agent.id}")
+        
+        # Extract message from input
+        message = _extract_message_from_input(*input_args, **input_kwargs)
+        
+        # Create streaming response
+        stream = client.agents.messages.create_stream(
+            agent_id=agent.id,
+            messages=[{
+                "role": "user",
+                "content": message
+            }],
+            stream_tokens=True,
+        )
+        
+        # Yield chunks
+        for chunk in stream:
+            yield chunk
+        
+        # Clean up agent after streaming completes
+        try:
+            client.agents.delete(agent.id)
+            print(f"🗑️ Cleaned up streaming agent: {agent.id}")
+        except:
+            pass
+            
+    except Exception as e:
+        yield {"error": f"Letta streaming error: {str(e)}"}
+```
+
+---
+
+## Advanced: Letta Agent with Custom Tools
+
+Here's an example with custom tools (keyword extraction, RAG):
+
+```python
+# agent.py (Advanced with Tools)
+import os
+from typing import Dict
+from dotenv import load_dotenv
+from letta_client import CreateBlock, Letta
+
+# Load environment variables
+load_dotenv()
+
+
+def _register_tools(client: Letta) -> Dict[str, str]:
+    """Register custom tools with Letta client"""
+    from keyword_tool import extract_keywords
+    from rag_tool import rag_tool
+    
+    tool_fns = [extract_keywords, rag_tool]
+    tool_map: Dict[str, str] = {}
+    
+    for fn in tool_fns:
+        try:
+            print(f"  📝 Registering {fn.__name__}...")
+            tool = client.tools.upsert_from_function(func=fn)
+            tool_map[tool.name] = tool.id
+            print(f"  ✅ Successfully registered: {tool.name}")
+        except Exception as e:
+            print(f"  ❌ Failed to register tool {fn.__name__}: {e}")
+    
+    return tool_map
+
+
+def letta_run(message: str):
+    """Advanced Letta agent with custom tools"""
+    try:
+        # Initialize Letta client
+        letta_url = os.getenv("LETTA_SERVER_URL", "http://localhost:8283")
+        client = Letta(base_url=letta_url)
+        
+        # Register tools
+        print("🔧 Registering tools...")
+        tool_map = _register_tools(client)
+        
+        # Create memory blocks
+        memory_blocks = [
+            CreateBlock(
+                label="human",
+                value="You are talking to a user through RunAgent framework",
+            ),
+            CreateBlock(
+                label="persona",
+                value="You are an expert assistant with access to research tools.",
+            ),
+        ]
+
+        # Create agent with tools
+        agent = client.agents.create(
+            name=f"runagent-letta-tools-{os.getpid()}",
+            memory_blocks=memory_blocks,
+            system="You are an expert assistant with access to keyword extraction and RAG tools. When users ask for research or information, use the rag_tool. When they need keywords extracted, use extract_keywords.",
+            model="openai/gpt-4o-mini",
+            embedding="openai/text-embedding-ada-002",
+            tool_ids=list(tool_map.values()),
+            include_base_tools=True
+        )
+
+        print(f"✅ Letta agent created with {len(tool_map)} tools")
+        
+        # Send message to Letta agent
+        response = client.agents.messages.create(
+            agent_id=agent.id,
+            messages=[{
+                "role": "user",
+                "content": message
+            }]
+        )
+        
+        # Clean up
+        try:
+            client.agents.delete(agent.id)
+        except:
+            pass
+        
+        return response
+        
+    except Exception as e:
+        return {"error": f"Letta execution error: {str(e)}"}
+```
+
+### Custom Tool Example: Keyword Extraction
+
+```python
+# keyword_tool.py
+def extract_keywords(text: str, num_keywords: int = 5) -> dict:
+    """
+    Extract keywords from input text.
+
+    Args:
+        text (str): The input text to extract keywords from
+        num_keywords (int): Number of keywords to extract (default: 5)
+
+    Returns:
+        dict: Dictionary containing the extracted keywords
+    """
+    from langchain_openai import ChatOpenAI
+    from langchain.prompts import PromptTemplate
+
+    try:
+        # Initialize the language model
+        llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.2)
+
+        # Create prompt template
+        prompt_template = """
+        Extract exactly {num_keywords} relevant keywords from the following text. 
+        Return them as a comma-separated list without numbering or bullet points.
+        Only include the keywords, no additional information or explanation.
+
+        Text: {input_text}
+
+        Keywords:
+        """
+
+        prompt = PromptTemplate(
+            input_variables=["input_text", "num_keywords"],
+            template=prompt_template
+        )
+        
+        # Create chain
+        chain = prompt | llm
+
+        # Run the chain
+        result = chain.invoke({"input_text": text, "num_keywords": num_keywords})
+
+        # Extract content
+        content = result.content if hasattr(result, 'content') else str(result)
+        keywords = [kw.strip() for kw in content.split(',')]
+
+        return {
+            "status": "success",
+            "keywords": keywords,
+            "message": f"Successfully extracted {len(keywords)} keywords."
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "keywords": [],
+            "message": f"Error extracting keywords: {str(e)}"
+        }
+```
+
+---
+
+## Testing Your Letta Agent
+
+### Python Client
+
+```python
+# test_letta.py
+from runagent import RunAgentClient
+
+# Ensure Letta server is running on port 8283
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="chat",
+    local=True
+)
+
+# Test basic conversation
+result = client.run(message="Hello, I'm interested in AI agents")
+print(f"Response: {result}")
+
+# Test with message dict format
+result2 = client.run({
+    "messages": [
+        {"role": "user", "content": "What can you help me with?"}
+    ]
+})
+print(f"Response 2: {result2}")
+```
+
+### JavaScript Client
+
+```javascript
+// test_letta.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'chat',
+    local: true
+});
+
+await client.initialize();
+
+// Test conversation
+const result = await client.run({
+    message: 'Tell me about Letta agents'
+});
+
+console.log('Response:', result);
+```
+
+### Streaming Example
+
+```python
+# test_letta_stream.py
+from runagent import RunAgentClient
+
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="chat_stream",
+    local=True
+)
+
+print("Streaming conversation:")
+for chunk in stream_client.run(message="Explain the benefits of AI memory"):
+    print(chunk, end="", flush=True)
+```
+
+---
+
+## Project Structure
+
+```
+my-letta-agent/
+├── agent.py                 # Main agent code
+├── keyword_tool.py          # Optional: Custom keyword tool
+├── rag_tool.py             # Optional: Custom RAG tool
+├── .env                    # Environment variables
+├── requirements.txt        # Python dependencies
+└── runagent.config.json    # RunAgent configuration
+```
+
+---
+
+## Configuration Options
+
+### Multiple Entrypoints
+
+You can expose multiple entrypoints for different use cases:
+
+```json
+{
+  "agent_name": "advanced-letta-agent",
+  "description": "Advanced Letta multi-entrypoint system",
+  "framework": "letta",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "letta_run",
+        "tag": "chat"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_stream",
+        "tag": "chat_stream"
+      },
+      {
+        "file": "agent.py",
+        "module": "letta_run_with_tools",
+        "tag": "research"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Best Practices
+
+### 1. **Memory Management**
+- Use appropriate memory blocks for context
+- Clean up agents after use to prevent memory leaks
+- Consider session-based memory for multi-user scenarios
+
+### 2. **Tool Design**
+- Create focused, single-purpose tools
+- Provide clear docstrings for tool functions
+- Handle tool errors gracefully with try-catch blocks
+- Return structured dictionaries from tools
+
+### 3. **Error Handling**
+- Always wrap Letta operations in try-catch blocks
+- Return meaningful error messages to users
+- Log errors for debugging purposes
+
+### 4. **Server Management**
+- Ensure Letta server is running before deploying agents
+- Use environment variables for server URL configuration
+- Monitor server logs for debugging
+
+### 5. **Agent Cleanup**
+- Delete temporary agents after use
+- Implement cleanup in both success and error paths
+- Use context managers for resource management
+
+---
+
+## Common Patterns
+
+### Conversational Memory
+Use Letta's memory blocks to maintain context across interactions:
+
+```python
+memory_blocks = [
+    CreateBlock(
+        label="human",
+        value="User preferences: prefers technical explanations, interested in AI"
+    ),
+    CreateBlock(
+        label="persona",
+        value="You are a technical AI expert. Provide detailed, accurate information."
+    ),
+]
+```
+
+### Tool Integration
+Register custom tools for specialized functionality:
+
+```python
+def _register_tools(client: Letta) -> Dict[str, str]:
+    tool_fns = [search_tool, calculate_tool, analyze_tool]
+    tool_map = {}
+    
+    for fn in tool_fns:
+        tool = client.tools.upsert_from_function(func=fn)
+        tool_map[tool.name] = tool.id
+    
+    return tool_map
+```
+
+### Session Management
+For multi-user scenarios, create agents per session:
+
+```python
+def create_session_agent(user_id: str, session_id: str):
+    agent = client.agents.create(
+        name=f"user-{user_id}-session-{session_id}",
+        memory_blocks=load_user_memory(user_id),
+        # ... other configuration
+    )
+    return agent
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Connection Error: "Cannot connect to Letta server"**
+- **Solution**: Ensure Letta server is running (`letta server`)
+- Check the server URL in your `.env` file
+- Verify the server is accessible at `http://localhost:8283`
+
+**2. API Key Error**
+- **Solution**: Set `OPENAI_API_KEY` in your environment
+- Verify the key is valid and has sufficient credits
+- Check that the key is loaded in the Letta server environment
+
+**3. Tool Registration Fails**
+- **Solution**: Ensure tool functions have proper docstrings
+- Check that tool function signatures are compatible with Letta
+- Verify all tool dependencies are installed
+
+**4. Memory Persistence Issues**
+- **Solution**: Agents are ephemeral by default in this setup
+- Implement custom session storage if needed
+- Use Letta's built-in persistence features for production
+
+**5. Streaming Not Working**
+- **Solution**: Ensure you're using `create_stream` method
+- Check that `stream_tokens=True` is set
+- Verify the entrypoint is correctly configured for streaming
+
+### Debug Tips
+
+Enable verbose logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+def letta_run(message: str):
+    print(f"Debug: Processing message: {message}")
+    # ... rest of code
+```
+
+Test Letta server connection:
+
+```python
+from letta_client import Letta
+
+try:
+    client = Letta(base_url="http://localhost:8283")
+    print("✅ Successfully connected to Letta server")
+except Exception as e:
+    print(f"❌ Connection failed: {e}")
+```
+
+---
+
+## Performance Optimization
+
+### 1. **Connection Pooling**
+Reuse Letta client connections when possible:
+
+```python
+# Initialize once
+_letta_client = None
+
+def get_letta_client():
+    global _letta_client
+    if _letta_client is None:
+        _letta_client = Letta(base_url=os.getenv("LETTA_SERVER_URL"))
+    return _letta_client
+```
+
+### 2. **Tool Caching**
+Register tools once and reuse:
+
+```python
+_tool_registry = None
+
+def get_tools(client: Letta):
+    global _tool_registry
+    if _tool_registry is None:
+        _tool_registry = _register_tools(client)
+    return _tool_registry
+```
+
+### 3. **Memory Management**
+Clean up agents promptly:
+
+```python
+finally:
+    try:
+        client.agents.delete(agent.id)
+    except:
+        pass
+```
+
+---
+
+## Next Steps
+
+- **[Advanced Patterns](/how-to/advanced-tasks)** - Learn advanced Letta patterns
+- **[Production Deployment](/how-to/deployment/cloud-deployment)** - Deploy to production
+- **[Multi-Language Access](/tutorials/multi-language-wrapper)** - Access from different languages
+- **[Performance Tuning](/explanation/production-considerations)** - Optimize for production
+
+---
+
+## Additional Resources
+
+- [Letta Documentation](https://docs.letta.ai)
+- [Letta GitHub](https://github.com/letta-ai/letta)
+- [RunAgent Discord Community](https://discord.gg/Q9P9AdHVHz)
+- [RunAgent Documentation](https://docs.run-agent.ai)
+
+---
+
+**🎉 Great work!** You've learned how to deploy Letta memory-enabled agents with RunAgent. Letta's conversational memory capabilities combined with RunAgent's multi-language access create powerful, context-aware AI systems!

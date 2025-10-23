@@ -1,0 +1,390 @@
+---
+title: 'Core Concepts'
+description: 'Understand the fundamental concepts that make RunAgent work'
+icon: 'lightbulb'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Basic understanding of AI agents and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+RunAgent is built on several core concepts that work together to create a seamless multi-language AI agent deployment platform. Understanding these concepts will help you build more effective agents and troubleshoot issues.
+
+## Entrypoints
+
+### What are Entrypoints?
+
+Entrypoints are Python functions that define how your agent can be invoked. They serve as the bridge between your agent's logic and the universal API that RunAgent creates.
+
+```python
+def my_agent(message: str, user_id: str = "default") -> str:
+    """This is an entrypoint function"""
+    return f"Hello {user_id}, you said: {message}"
+```
+
+### Entrypoint Characteristics
+
+- **Function Signature**: Defines the API contract for all languages
+- **Parameters**: Automatically become API parameters
+- **Return Value**: Becomes the response sent to clients
+- **Documentation**: Function docstrings become API documentation
+
+### Entrypoint Types
+
+#### Synchronous Entrypoints
+Return a single value immediately:
+
+```python
+def sync_agent(query: str) -> Dict[str, Any]:
+    """Synchronous agent that returns complete response"""
+    return {
+        "response": f"Processed: {query}",
+        "status": "success",
+        "timestamp": datetime.now().isoformat()
+    }
+```
+
+#### Streaming Entrypoints
+Return an iterator for real-time responses:
+
+```python
+def stream_agent(query: str) -> Iterator[str]:
+    """Streaming agent that yields response chunks"""
+    yield f"Starting to process: {query}\n"
+    yield "Analyzing your request...\n"
+    yield "Generating response...\n"
+    yield f"Final result: {query.upper()}\n"
+```
+
+### Entrypoint Naming Convention
+
+- **Synchronous**: Use descriptive names like `chat`, `analyze`, `process`
+- **Streaming**: End with `_stream` suffix like `chat_stream`, `analyze_stream`
+
+## Tags
+
+### What are Tags?
+
+Tags are identifiers that map entrypoint functions to API endpoints. They allow you to have multiple entrypoints in the same agent and call them by name.
+
+```json
+{
+  "entrypoints": [
+    {
+      "file": "main.py",
+      "module": "chat_agent",
+      "tag": "chat"
+    },
+    {
+      "file": "main.py", 
+      "module": "chat_agent_stream",
+      "tag": "chat_stream"
+    }
+  ]
+}
+```
+
+### Tag Best Practices
+
+- Use descriptive, lowercase names
+- Avoid special characters and spaces
+- Use underscores for multi-word tags
+- Keep tags consistent across environments
+
+## Agent Lifecycle
+
+### 1. Initialization
+When you run `runagent serve .`:
+
+1. **Configuration Loading**: Reads `runagent.config.json`
+2. **Entrypoint Discovery**: Imports and validates entrypoint functions
+3. **Server Startup**: Starts REST and WebSocket servers
+4. **Health Check**: Verifies all entrypoints are callable
+
+### 2. Request Processing
+When a client makes a request:
+
+1. **Request Validation**: Validates parameters against function signature
+2. **Function Invocation**: Calls the appropriate entrypoint function
+3. **Response Processing**: Handles return value or streaming
+4. **Client Response**: Sends response back to client
+
+### 3. Shutdown
+When you stop the agent:
+
+1. **Graceful Shutdown**: Finishes processing current requests
+2. **Resource Cleanup**: Closes connections and frees resources
+3. **Server Stop**: Shuts down REST and WebSocket servers
+
+## Multi-Language Translation
+
+### How Function Signatures Become APIs
+
+RunAgent automatically translates Python function signatures into language-specific APIs:
+
+```python
+# Python function
+def process_data(data: List[Dict], analysis_type: str = "summary") -> Dict[str, Any]:
+    pass
+```
+
+Becomes:
+
+```python
+# Python SDK
+result = client.run(data=[{"key": "value"}], analysis_type="summary")
+```
+
+```javascript
+// JavaScript SDK
+const result = await client.run({
+    data: [{"key": "value"}],
+    analysisType: "summary"
+});
+```
+
+```go
+// Go SDK
+result, err := client.Run(ctx, map[string]interface{}{
+    "data": []map[string]interface{}{{"key": "value"}},
+    "analysisType": "summary",
+})
+```
+
+```rust
+// Rust SDK
+let result = client.run(&[
+    ("data", json!([{"key": "value"}])),
+    ("analysis_type", json!("summary")),
+]).await?;
+```
+
+### Type Translation Rules
+
+| Python Type | JavaScript | Go | Rust |
+|-------------|------------|----|----- |
+| `str` | `string` | `string` | `String` |
+| `int` | `number` | `int` | `i64` |
+| `float` | `number` | `float64` | `f64` |
+| `bool` | `boolean` | `bool` | `bool` |
+| `List[T]` | `T[]` | `[]T` | `Vec<T>` |
+| `Dict[str, Any]` | `object` | `map[string]interface{}` | `HashMap<String, Value>` |
+
+## Streaming Architecture
+
+### How Streaming Works
+
+1. **Client Request**: Client calls streaming entrypoint
+2. **WebSocket Connection**: Establishes real-time connection
+3. **Iterator Processing**: Python generator yields chunks
+4. **Real-time Transmission**: Chunks sent immediately to client
+5. **Native Iteration**: Client receives chunks in language-appropriate way
+
+### Streaming Patterns
+
+#### Python Generator
+```python
+def stream_agent(query: str) -> Iterator[str]:
+    yield f"Processing: {query}\n"
+    yield "Step 1: Analyzing...\n"
+    yield "Step 2: Generating...\n"
+    yield f"Result: {query.upper()}\n"
+```
+
+#### JavaScript Async Iterator
+```javascript
+const stream = await client.run({query: "Hello"});
+for await (const chunk of stream) {
+    console.log(chunk);
+}
+```
+
+#### Rust Futures Stream
+```rust
+let mut stream = client.run_stream(&[("query", json!("Hello"))]).await?;
+while let Some(chunk) = stream.next().await {
+    print!("{}", chunk?);
+}
+```
+
+## Configuration System
+
+### runagent.config.json Structure
+
+```json
+{
+  "agent_name": "my-agent",
+  "description": "A description of what this agent does",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "function_name",
+        "tag": "endpoint_name"
+      }
+    ]
+  }
+}
+```
+
+### Configuration Validation
+
+RunAgent validates your configuration by:
+
+1. **File Existence**: Checking that specified files exist
+2. **Module Import**: Verifying modules can be imported
+3. **Function Existence**: Confirming functions exist in modules
+4. **Signature Validation**: Ensuring functions are callable
+5. **Tag Uniqueness**: Verifying tags are unique
+
+## Error Handling
+
+### Error Types
+
+#### Client-Side Errors
+- **AuthenticationError**: Invalid or missing API key
+- **AgentNotFoundError**: Agent doesn't exist
+- **ValidationError**: Invalid request parameters
+- **RateLimitError**: Too many requests
+- **TimeoutError**: Request timed out
+- **NetworkError**: Connection issues
+
+#### Server-Side Errors
+- **ImportError**: Cannot import entrypoint module
+- **FunctionError**: Entrypoint function raised exception
+- **ConfigurationError**: Invalid configuration
+- **ServerError**: Internal server error
+
+### Error Propagation
+
+Errors flow from Python functions through RunAgent to client SDKs:
+
+```python
+def my_agent(query: str) -> str:
+    if not query:
+        raise ValueError("Query cannot be empty")
+    return f"Processed: {query}"
+```
+
+Becomes:
+
+```python
+# Python SDK
+try:
+    result = client.run(query="")
+except ValidationError as e:
+    print(f"Validation error: {e}")
+```
+
+## Security Model
+
+### Sandboxing
+
+RunAgent provides multiple layers of security:
+
+1. **Process Isolation**: Each agent runs in its own process
+2. **Resource Limits**: CPU and memory constraints
+3. **Network Isolation**: Controlled network access
+4. **File System**: Restricted file system access
+
+### API Security
+
+- **Authentication**: API key-based authentication
+- **Authorization**: Role-based access control
+- **Rate Limiting**: Request rate limiting
+- **Input Validation**: Parameter validation and sanitization
+
+## Performance Considerations
+
+### Scalability
+
+RunAgent is designed to scale:
+
+1. **Horizontal Scaling**: Multiple agent instances
+2. **Load Balancing**: Automatic request distribution
+3. **Auto-scaling**: Dynamic instance management
+4. **Caching**: Response caching for performance
+
+### Optimization Tips
+
+1. **Efficient Entrypoints**: Keep functions focused and fast
+2. **Streaming**: Use streaming for long-running operations
+3. **Caching**: Cache expensive computations
+4. **Resource Management**: Monitor memory and CPU usage
+
+## Common Patterns
+
+### 1. **Simple Chat Agent**
+```python
+def chat_agent(message: str, user_id: str = "default") -> str:
+    """Simple chat agent"""
+    return f"Hello {user_id}, you said: {message}"
+```
+
+### 2. **Data Processing Agent**
+```python
+def process_data(data: List[Dict], operation: str = "sum") -> Dict[str, Any]:
+    """Process data with different operations"""
+    if operation == "sum":
+        return {"result": sum(item.get("value", 0) for item in data)}
+    elif operation == "count":
+        return {"result": len(data)}
+    else:
+        return {"error": "Unknown operation"}
+```
+
+### 3. **Streaming Analysis Agent**
+```python
+def analyze_stream(data: str) -> Iterator[str]:
+    """Streaming analysis agent"""
+    yield "Starting analysis...\n"
+    yield f"Processing {len(data)} characters\n"
+    yield "Analyzing content...\n"
+    yield f"Analysis complete: {data.upper()}\n"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Import Errors**: Check Python path and dependencies
+2. **Function Not Found**: Verify module and function names
+3. **Type Errors**: Ensure parameter types match
+4. **Streaming Issues**: Check iterator return type
+5. **Configuration Errors**: Validate JSON syntax
+
+### Debug Tips
+
+1. **Enable Logging**: Use verbose logging for debugging
+2. **Test Locally**: Test functions before deploying
+3. **Check Dependencies**: Ensure all imports are available
+4. **Validate Configuration**: Use configuration validation tools
+5. **Monitor Performance**: Track response times and resource usage
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="diagram" href="/explanation/architecture-overview">
+    Learn about RunAgent's system architecture
+  </Card>
+  <Card title="Production Considerations" icon="gauge" href="/explanation/production-considerations">
+    Understand production deployment requirements
+  </Card>
+  <Card title="Security" icon="shield" href="/explanation/security">
+    Learn about RunAgent's security model
+  </Card>
+  <Card title="Advanced Tasks" icon="cog" href="/how-to/advanced-tasks">
+    Explore advanced agent development patterns
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Great work!** You now understand the core concepts that make RunAgent work. These concepts form the foundation for building powerful, multi-language AI agents!
+</Note>
+
+<NeedHelp context="Core Concepts" />

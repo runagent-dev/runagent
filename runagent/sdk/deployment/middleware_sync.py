@@ -54,17 +54,16 @@ class MiddlewareSyncService:
         return getattr(self, 'sync_enabled', False)
     
     async def sync_agent_startup(self, agent_id: str, agent_data: Dict[str, Any]) -> bool:
-        """Sync agent data when local server starts - FIXED for simplified ID structure"""
+        """Sync agent data when local server starts"""
         if not self.is_sync_enabled():
             console.print("[dim]Middleware sync disabled - agent will run in local-only mode[/dim]")
             return False
             
         try:
-            console.print(f"Syncing agent {agent_id} to middleware...")
+            console.print(f"[cyan]Syncing agent {agent_id[:8]}... to middleware...[/cyan]")
             
-            # FIXED: Use simplified structure - agent_id becomes the main ID
             sync_data = {
-                "local_agent_id": agent_id,  # This becomes the main agent ID in middleware
+                "local_agent_id": agent_id,
                 "name": agent_data.get("name", "Local Agent"),
                 "framework": agent_data.get("framework", "unknown"),
                 "version": agent_data.get("version", "1.0.0"),
@@ -76,67 +75,110 @@ class MiddlewareSyncService:
                 "sync_source": "local_server"
             }
             
-            response = await self._make_async_request("POST", "/local-agents", sync_data)
+            console.print(f"[dim]Sending POST to /local-agents[/dim]")
+            console.print(f"[dim]Full URL: {self.rest_client.base_url}/local-agents[/dim]")
             
-            if response.get("success"):
-                console.print("Agent synced successfully to middleware")
-                return True
-            else:
-                console.print(f"Agent sync failed: {response.get('error', 'Unknown error')}")
+            # Make direct HTTP call instead of using _make_async_request
+            try:
+                response = self.rest_client.http.post("/local-agents", data=sync_data, timeout=30)
+                result = response.json() if hasattr(response, 'json') else response
+                
+                console.print(f"[cyan]Response status: {response.status_code if hasattr(response, 'status_code') else 'N/A'}[/cyan]")
+                console.print(f"[cyan]Response: {result}[/cyan]")
+                
+                if result.get("success"):
+                    console.print("[green]✅ Agent synced successfully[/green]")
+                    return True
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    console.print(f"[yellow]⚠️ Agent sync failed: {error_msg}[/yellow]")
+                    return False
+                    
+            except Exception as e:
+                console.print(f"[red]❌ HTTP request failed: {str(e)}[/red]")
                 return False
                 
         except Exception as e:
-            console.print(f"Agent sync error: {str(e)}")
+            console.print(f"[red]❌ Agent sync error: {str(e)}[/red]")
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
             return False
 
+
     async def sync_invocation_start(self, invocation_data: Dict[str, Any]) -> Optional[str]:
-        """Sync invocation start to middleware - FIXED for simplified ID structure"""
+        """Sync invocation start to middleware"""
         if not self.is_sync_enabled():
             return None
             
         try:
-            # FIXED: Use simplified structure
+            console.print(f"[cyan]📡 Syncing invocation start...[/cyan]")
+            
             sync_payload = {
-                "agent_id": invocation_data.get("agent_id"),  # Main agent ID (no separate local_agent_id)
-                "local_execution_id": invocation_data.get("local_execution_id"),  # This becomes main execution ID
+                "agent_id": invocation_data.get("agent_id"),
+                "local_execution_id": invocation_data.get("local_execution_id"),
                 "input_data": invocation_data.get("input_data", {}),
                 "entrypoint_tag": invocation_data.get("entrypoint_tag", ""),
                 "sdk_type": invocation_data.get("sdk_type", "local_server"),
                 "client_info": invocation_data.get("client_info", {})
             }
             
-            response = await self._make_async_request(
-                "POST", 
-                "/local-agents/invocations", 
-                sync_payload
-            )
+            console.print(f"[dim]POST to /local-agents/invocations[/dim]")
             
-            if response.get("success"):
-                # Return the execution ID (which is now the main ID)
-                return response.get("id")
+            response = self.rest_client.http.post("/local-agents/invocations", data=sync_payload, timeout=30)
+            result = response.json() if hasattr(response, 'json') else response
+            
+            console.print(f"[cyan]Response: {result}[/cyan]")
+            
+            if result.get("success"):
+                execution_id = result.get("data", {}).get("id")
+                if execution_id:
+                    console.print(f"[green]✅ Invocation synced: {execution_id[:8]}...[/green]")
+                    return execution_id
+            
+            return None
             
         except Exception as e:
-            console.print(f"Invocation start sync error: {str(e)}")
-        
-        return None
+            console.print(f"[red]❌ Invocation sync error: {str(e)}[/red]")
+            return None
+
 
     async def sync_invocation_complete(self, execution_id: str, completion_data: Dict[str, Any]) -> bool:
-        """Sync invocation completion to middleware - FIXED for simplified ID structure"""
+        """Sync invocation completion to middleware"""
         if not self.is_sync_enabled() or not execution_id:
             return False
             
         try:
-            # FIXED: Use main execution ID directly (no separate local_execution_id)
-            response = await self._make_async_request(
-                "PUT", 
-                f"/local-agents/invocations/{execution_id}",  # execution_id is now the main ID
-                completion_data
-            )
+            console.print(f"[cyan]📡 Syncing completion: {execution_id[:8]}...[/cyan]")
             
-            return response.get("success", False)
+            update_payload = {}
+            
+            if completion_data.get("output_data"):
+                update_payload["output_data"] = completion_data["output_data"]
+            
+            if completion_data.get("error_detail"):
+                update_payload["error_detail"] = completion_data["error_detail"]
+            
+            if completion_data.get("execution_time_ms"):
+                update_payload["execution_time_ms"] = completion_data["execution_time_ms"]
+            
+            if completion_data.get("status"):
+                update_payload["status"] = completion_data["status"]
+            
+            console.print(f"[dim]PUT to /local-agents/invocations/{execution_id[:8]}...[/dim]")
+            
+            response = self.rest_client.http.put(f"/local-agents/invocations/{execution_id}", data=update_payload, timeout=30)
+            result = response.json() if hasattr(response, 'json') else response
+            
+            console.print(f"[cyan]Response: {result}[/cyan]")
+            
+            if result.get("success"):
+                console.print(f"[green]✅ Completion synced[/green]")
+                return True
+            
+            return False
             
         except Exception as e:
-            console.print(f"Invocation completion sync error: {str(e)}")
+            console.print(f"[red]❌ Completion sync error: {str(e)}[/red]")
             return False
 
     def get_sync_status(self) -> Dict[str, Any]:

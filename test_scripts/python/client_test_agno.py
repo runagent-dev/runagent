@@ -1,8 +1,8 @@
 # from runagent import RunAgentClient
 
 # ra = RunAgentClient(
-#     agent_id="c7a08c39-9086-436b-b64e-399779f5a7e8",
-#     entrypoint_tag="agno_assistant",
+#     agent_id="27f68f00-e8cd-4965-9b91-fac501e132e3",
+#     entrypoint_tag="agno_print_response",
 #     local=True
 #     )
 
@@ -17,12 +17,12 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="c7a08c39-9086-436b-b64e-399779f5a7e8",
-    entrypoint_tag="agno_stream",
+    agent_id="27f68f00-e8cd-4965-9b91-fac501e132e3",
+    entrypoint_tag="agno_print_response_stream",
     local=True
     )
 
 for chunk in ra.run(
     "Benefits of a long drive"
 ):
-    print(chunk['content'], end="")
+    print(chunk)

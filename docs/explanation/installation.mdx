@@ -1,0 +1,229 @@
+---
+title: 'Installation'
+description: 'Install RunAgent CLI and SDK on your system'
+icon: 'download'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+RunAgent provides Python, JavaScript, Rust, and Go SDKs along with a powerful CLI for deploying and managing AI agents across multiple frameworks.
+
+## Install RunAgent CLI
+
+<Tabs>
+  <Tab title="Python">
+  Before installing RunAgent, ensure you have Python 3.8+.
+  <Steps>
+  <Step title="Install RunAgent CLI & Python SDK">
+  <CodeGroup>
+    ```pip pip
+    pip install runagent
+    ```
+    ```uv uv
+    uv add runagent
+    ```
+  </CodeGroup>
+  The CLI comes bundled with the Python SDK for seamless local development.
+  </Step>
+  <Step title="Verify Installation">
+    Check that RunAgent is installed correctly:
+    ```bash
+    runagent --version
+    ```
+  </Step>
+  <Step title="Login (Optional)">
+    For cloud deployment features (coming soon), login to get your API key:
+    ```bash
+    runagent login
+    ```
+    </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Install RunAgent SDK
+
+<Tabs>
+  <Tab title="Python">
+  When RunAgent CLI is installed, the Python SDK is installed as a dependency. You can install it manually as well.
+  <Steps>
+  <Step title="Install RunAgent Python SDK">
+  <CodeGroup>
+    ```pip pip
+    pip install runagent
+    ```
+    ```uv uv
+    uv add runagent
+    ```
+  </CodeGroup>
+  The CLI comes bundled with the Python SDK for seamless local development.
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="JavaScript">
+Before installing the SDK, ensure you have Node.js 16+.
+  <Steps>
+  <Step title="Install RunAgent SDK">
+  <CodeGroup>
+    ```npm npm
+    npm install runagent
+    ```
+    ```pnpm pnpm
+    pnpm add runagent
+    ```
+    ```bun bun
+    bun add runagent
+    ```
+    ```yarn yarn
+    yarn add runagent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="TypeScript Support">
+  The JavaScript SDK comes with full TypeScript support out of the box:
+  - Native async/await and Promise support
+  - Streaming response handling
+  - Type-safe agent invocation
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Rust">
+Before installing the SDK, ensure you have Rust 1.70+.
+  <Steps>
+  <Step title="Add RunAgent to Cargo.toml">
+  <CodeGroup>
+    ```toml Cargo.toml
+    [dependencies]
+    runagent = "0.1.0"
+    tokio = { version = "1.0", features = ["full"] }
+    serde_json = "1.0"
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Install via Cargo">
+  <CodeGroup>
+    ```bash cargo
+    cargo add runagent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Features">
+  The Rust SDK provides:
+  - High-performance async operations
+  - Streaming support with futures
+  - Memory-safe agent interactions
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Go">
+Before installing the SDK, ensure you have Go 1.19+.
+  <Steps>
+  <Step title="Install RunAgent SDK">
+  <CodeGroup>
+    ```bash go
+    go get github.com/runagent-dev/runagent-go
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Import in your project">
+  <CodeGroup>
+    ```go main.go
+    import "github.com/runagent-dev/runagent-go/pkg/client"
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="Features (Coming Soon)">
+  The Go SDK will provide:
+  - Idiomatic Go interfaces
+  - Goroutine-based streaming
+  - Context-aware operations
+  </Step>
+  </Steps>
+  </Tab>
+</Tabs>
+
+## Framework Templates
+
+RunAgent provides pre-built templates for popular AI frameworks to get you started quickly:
+
+<Tabs>
+  <Tab title="LangGraph">
+  <Steps>
+  <Step title="Initialize LangGraph Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_langgraph_agent --langgraph
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Pre-configured LangGraph agent setup
+  - Streaming and non-streaming entrypoints
+  - Sample state management examples
+  - Ready-to-deploy configuration
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="LangChain">
+  <Steps>
+  <Step title="Initialize LangChain Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_langchain_agent --langchain
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - LangChain agent with tool support
+  - Memory and conversation handling
+  - Streaming response capabilities
+  - Production-ready configuration
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="CrewAI">
+  <Steps>
+  <Step title="Initialize CrewAI Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_crew_agent --crewai
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Multi-agent crew setup
+  - Task coordination examples
+  - Role-based agent configuration
+  - Collaborative workflow templates
+  </Step>
+  </Steps>
+  </Tab>
+  <Tab title="Custom">
+  <Steps>
+  <Step title="Initialize Blank Project">
+  <CodeGroup>
+    ```bash CLI
+    runagent init my_custom_agent
+    ```
+  </CodeGroup>
+  </Step>
+  <Step title="What's Included">
+  - Minimal agent template
+  - Basic entrypoint examples
+  - Configuration file template
+  - Development server setup
+  </Step>
+  </Steps>
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+After installation, you can:
+
+1. **Initialize your first agent**: `runagent init my_agent`
+2. **Start the development server**: `runagent serve my_agent`
+3. **Connect from your application** using any of our SDKs
+4. **Deploy to production** (coming soon): `runagent deploy my_agent`
+
+<NeedHelp context="Installation" />

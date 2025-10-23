@@ -1,0 +1,1093 @@
+# LlamaIndex Integration
+
+Deploy LlamaIndex agent workflows with RunAgent
+
+---
+
+## Prerequisites
+
+- Basic understanding of LlamaIndex
+- Completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+- Python 3.8 or higher
+
+---
+
+## Overview
+
+LlamaIndex is a data framework for building LLM applications with advanced indexing, retrieval, and agent workflows. RunAgent makes it easy to deploy LlamaIndex agents and access them from any programming language.
+
+---
+
+## Installation & Setup
+
+### 1. Install LlamaIndex
+
+```bash
+pip install llama-index>=0.12.48
+```
+
+### 2. Set Environment Variables
+
+LlamaIndex requires API keys for LLM providers:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 3. Quick Start with RunAgent
+
+```bash
+runagent init my-llamaindex-agent --framework llamaindex
+cd my-llamaindex-agent
+```
+
+---
+
+## Quick Start
+
+### 1. Project Structure
+
+After initialization:
+
+```
+my-llamaindex-agent/
+├── math_genius.py           # Main agent code
+├── .env                     # Environment variables
+├── requirements.txt         # Python dependencies
+└── runagent.config.json     # RunAgent configuration
+```
+
+### 2. Configuration
+
+The generated `runagent.config.json`:
+
+```json
+{
+  "agent_name": "llamaindex-agent",
+  "description": "LlamaIndex agent with tool capabilities",
+  "framework": "llamaindex",
+  "version": "1.0.0",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "math_genius.py",
+        "module": "do_multiply",
+        "tag": "math_run"
+      },
+      {
+        "file": "math_genius.py",
+        "module": "stream_multiply",
+        "tag": "math_stream"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": ""
+  }
+}
+```
+
+### 3. Create `.env` File
+
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+---
+
+## Basic LlamaIndex Agent
+
+Here's a simple LlamaIndex agent with a calculator tool:
+
+```python
+# math_genius.py
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import AgentStream, FunctionAgent
+
+
+# Define calculator tools
+def multiply(a: float, b: float) -> float:
+    """Multiply two numbers together."""
+    return a * b
+
+
+def add(a: float, b: float) -> float:
+    """Add two numbers together."""
+    return a + b
+
+
+def subtract(a: float, b: float) -> float:
+    """Subtract b from a."""
+    return a - b
+
+
+def divide(a: float, b: float) -> float:
+    """Divide a by b. Returns error if b is zero."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+
+
+# Create an agent workflow with calculator tools
+agent = FunctionAgent(
+    tools=[multiply, add, subtract, divide],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="You are a helpful mathematical assistant. Use the provided tools to perform calculations.",
+)
+
+
+async def do_multiply(math_query: str):
+    """
+    Non-streaming math agent.
+    
+    Args:
+        math_query: The mathematical query or expression
+        
+    Returns:
+        The calculation result
+    """
+    try:
+        result = await agent.run(math_query)
+        return {
+            "status": "success",
+            "result": str(result),
+            "query": math_query
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "query": math_query
+        }
+
+
+async def stream_multiply(math_query: str):
+    """
+    Streaming math agent.
+    
+    Args:
+        math_query: The mathematical query or expression
+        
+    Yields:
+        Streaming events from the agent
+    """
+    try:
+        handler = agent.run(user_msg=math_query)
+        
+        async for event in handler.stream_events():
+            if isinstance(event, AgentStream):
+                yield {
+                    "type": "agent_stream",
+                    "content": str(event),
+                    "query": math_query
+                }
+            else:
+                yield {
+                    "type": "event",
+                    "data": str(event)
+                }
+                
+    except Exception as e:
+        yield {
+            "type": "error",
+            "error": str(e),
+            "query": math_query
+        }
+```
+
+---
+
+## Advanced LlamaIndex Patterns
+
+### 1. RAG Agent with Document Indexing
+
+```python
+# rag_agent.py
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import QueryEngineTool, ToolMetadata
+
+# Configure global settings
+Settings.llm = OpenAI(model="gpt-4o-mini", temperature=0.1)
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-ada-002")
+
+
+# Load and index documents
+def create_index(data_dir: str = "./data"):
+    """Create vector index from documents."""
+    try:
+        documents = SimpleDirectoryReader(data_dir).load_data()
+        index = VectorStoreIndex.from_documents(documents)
+        return index
+    except Exception as e:
+        print(f"Error creating index: {e}")
+        return None
+
+
+# Create query engine tool
+def create_rag_tools(index):
+    """Create RAG tools from index."""
+    query_engine = index.as_query_engine(similarity_top_k=3)
+    
+    query_tool = QueryEngineTool(
+        query_engine=query_engine,
+        metadata=ToolMetadata(
+            name="document_search",
+            description="Search through indexed documents to find relevant information. Use this for questions about the document content."
+        )
+    )
+    
+    return [query_tool]
+
+
+# Initialize index and agent
+index = create_index()
+if index:
+    tools = create_rag_tools(index)
+    rag_agent = ReActAgent.from_tools(
+        tools=tools,
+        llm=Settings.llm,
+        verbose=True
+    )
+else:
+    rag_agent = None
+
+
+async def rag_query(query: str):
+    """
+    Query documents using RAG.
+    
+    Args:
+        query: User question about documents
+        
+    Returns:
+        Answer based on document content
+    """
+    if rag_agent is None:
+        return {
+            "status": "error",
+            "error": "RAG agent not initialized. Check if documents exist in ./data directory."
+        }
+    
+    try:
+        response = await rag_agent.achat(query)
+        return {
+            "status": "success",
+            "response": str(response),
+            "query": query
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "query": query
+        }
+
+
+async def rag_query_stream(query: str):
+    """
+    Streaming RAG query.
+    
+    Args:
+        query: User question about documents
+        
+    Yields:
+        Streaming response chunks
+    """
+    if rag_agent is None:
+        yield {
+            "status": "error",
+            "error": "RAG agent not initialized"
+        }
+        return
+    
+    try:
+        response = await rag_agent.astream_chat(query)
+        
+        async for chunk in response.async_response_gen():
+            yield {
+                "type": "text",
+                "content": chunk
+            }
+            
+    except Exception as e:
+        yield {
+            "type": "error",
+            "error": str(e)
+        }
+```
+
+### 2. Multi-Tool Agent
+
+```python
+# multi_tool_agent.py
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import FunctionTool
+from typing import Dict, Any
+import json
+
+
+# Define multiple tools
+def get_weather(city: str) -> str:
+    """Get current weather for a city."""
+    # Mock weather data
+    weather_data = {
+        "new york": {"temp": 22, "condition": "Sunny"},
+        "london": {"temp": 15, "condition": "Rainy"},
+        "tokyo": {"temp": 18, "condition": "Cloudy"},
+        "paris": {"temp": 20, "condition": "Partly Cloudy"}
+    }
+    
+    city_lower = city.lower()
+    if city_lower in weather_data:
+        data = weather_data[city_lower]
+        return f"Weather in {city}: {data['temp']}°C, {data['condition']}"
+    return f"Weather data not available for {city}"
+
+
+def calculate_tip(bill_amount: float, tip_percentage: float = 15.0) -> str:
+    """Calculate tip amount and total bill."""
+    tip = bill_amount * (tip_percentage / 100)
+    total = bill_amount + tip
+    return f"Tip: ${tip:.2f}, Total: ${total:.2f}"
+
+
+def convert_currency(amount: float, from_curr: str, to_curr: str) -> str:
+    """Convert between currencies."""
+    # Mock conversion rates
+    rates = {"USD": 1.0, "EUR": 0.85, "GBP": 0.73, "JPY": 110.0}
+    
+    from_rate = rates.get(from_curr.upper(), 1.0)
+    to_rate = rates.get(to_curr.upper(), 1.0)
+    
+    result = amount * (to_rate / from_rate)
+    return f"{amount} {from_curr.upper()} = {result:.2f} {to_curr.upper()}"
+
+
+def search_definition(term: str) -> str:
+    """Search for term definition."""
+    # Mock definitions
+    definitions = {
+        "ai": "Artificial Intelligence: The simulation of human intelligence by machines",
+        "ml": "Machine Learning: A subset of AI that enables systems to learn from data",
+        "llm": "Large Language Model: AI models trained on vast amounts of text data"
+    }
+    
+    term_lower = term.lower()
+    return definitions.get(term_lower, f"Definition for '{term}' not found. This is a mock search.")
+
+
+# Create function tools
+weather_tool = FunctionTool.from_defaults(fn=get_weather)
+tip_tool = FunctionTool.from_defaults(fn=calculate_tip)
+currency_tool = FunctionTool.from_defaults(fn=convert_currency)
+definition_tool = FunctionTool.from_defaults(fn=search_definition)
+
+# Create multi-tool agent
+multi_agent = ReActAgent.from_tools(
+    tools=[weather_tool, tip_tool, currency_tool, definition_tool],
+    llm=OpenAI(model="gpt-4o-mini"),
+    verbose=True
+)
+
+
+async def multi_tool_query(query: str):
+    """
+    Query using multiple tools.
+    
+    Args:
+        query: User query that may require one or more tools
+        
+    Returns:
+        Response using appropriate tools
+    """
+    try:
+        response = await multi_agent.achat(query)
+        return {
+            "status": "success",
+            "response": str(response),
+            "query": query,
+            "tools_available": ["weather", "tip_calculator", "currency_converter", "definition_search"]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "query": query
+        }
+
+
+async def multi_tool_stream(query: str):
+    """
+    Streaming query with multiple tools.
+    
+    Args:
+        query: User query
+        
+    Yields:
+        Streaming response chunks
+    """
+    try:
+        response = await multi_agent.astream_chat(query)
+        
+        async for chunk in response.async_response_gen():
+            yield {
+                "type": "text",
+                "content": chunk
+            }
+            
+    except Exception as e:
+        yield {
+            "type": "error",
+            "error": str(e)
+        }
+```
+
+### 3. Workflow-Based Agent
+
+```python
+# workflow_agent.py
+from llama_index.core.workflow import (
+    Workflow,
+    StartEvent,
+    StopEvent,
+    step,
+    Event,
+    Context
+)
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent import FunctionAgent
+from typing import Any
+
+
+# Define workflow events
+class QueryEvent(Event):
+    query: str
+
+
+class AnalysisEvent(Event):
+    analysis: str
+
+
+class ResponseEvent(Event):
+    response: str
+
+
+# Create workflow
+class AgentWorkflow(Workflow):
+    """Custom workflow for agent processing."""
+    
+    def __init__(self):
+        super().__init__()
+        self.llm = OpenAI(model="gpt-4o-mini")
+    
+    @step
+    async def process_query(self, ctx: Context, ev: StartEvent) -> QueryEvent:
+        """Initial query processing step."""
+        query = ev.get("query", "")
+        print(f"Step 1: Processing query: {query}")
+        
+        # Store in context
+        await ctx.set("original_query", query)
+        
+        return QueryEvent(query=query)
+    
+    @step
+    async def analyze_query(self, ctx: Context, ev: QueryEvent) -> AnalysisEvent:
+        """Analyze query intent and requirements."""
+        print(f"Step 2: Analyzing query intent")
+        
+        analysis_prompt = f"Analyze this query and determine what tools or information are needed: {ev.query}"
+        response = await self.llm.acomplete(analysis_prompt)
+        
+        analysis = str(response)
+        await ctx.set("analysis", analysis)
+        
+        return AnalysisEvent(analysis=analysis)
+    
+    @step
+    async def generate_response(self, ctx: Context, ev: AnalysisEvent) -> StopEvent:
+        """Generate final response based on analysis."""
+        print(f"Step 3: Generating response")
+        
+        original_query = await ctx.get("original_query")
+        
+        response_prompt = f"Based on this analysis: {ev.analysis}\n\nAnswer this query: {original_query}"
+        response = await self.llm.acomplete(response_prompt)
+        
+        return StopEvent(result={
+            "query": original_query,
+            "analysis": ev.analysis,
+            "response": str(response),
+            "workflow": "completed"
+        })
+
+
+# Initialize workflow
+workflow = AgentWorkflow()
+
+
+async def workflow_query(query: str):
+    """
+    Process query through custom workflow.
+    
+    Args:
+        query: User query
+        
+    Returns:
+        Workflow result
+    """
+    try:
+        result = await workflow.run(query=query)
+        return {
+            "status": "success",
+            "result": result
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "query": query
+        }
+```
+
+### 4. Agent with Memory
+
+```python
+# memory_agent.py
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent import ReActAgent
+from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core.tools import FunctionTool
+from typing import Dict
+
+
+# Memory storage (in production, use proper database)
+user_memories = {}
+
+
+def remember_fact(user_id: str, key: str, value: str) -> str:
+    """Remember a fact about the user."""
+    if user_id not in user_memories:
+        user_memories[user_id] = {}
+    
+    user_memories[user_id][key] = value
+    return f"I'll remember that {key}: {value}"
+
+
+def recall_fact(user_id: str, key: str) -> str:
+    """Recall a fact about the user."""
+    if user_id not in user_memories:
+        return f"I don't have any information about {key}"
+    
+    value = user_memories[user_id].get(key)
+    if value:
+        return f"I remember that {key}: {value}"
+    return f"I don't have information about {key}"
+
+
+def list_memories(user_id: str) -> str:
+    """List all remembered facts for a user."""
+    if user_id not in user_memories or not user_memories[user_id]:
+        return "I don't have any memories stored yet."
+    
+    memories = user_memories[user_id]
+    return "Here's what I remember:\n" + "\n".join(
+        f"- {k}: {v}" for k, v in memories.items()
+    )
+
+
+# Create memory tools
+remember_tool = FunctionTool.from_defaults(fn=remember_fact)
+recall_tool = FunctionTool.from_defaults(fn=recall_fact)
+list_tool = FunctionTool.from_defaults(fn=list_memories)
+
+
+def create_memory_agent(user_id: str):
+    """Create an agent with memory for a specific user."""
+    # Create chat memory buffer
+    memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+    
+    # Create agent with memory
+    agent = ReActAgent.from_tools(
+        tools=[remember_tool, recall_tool, list_tool],
+        llm=OpenAI(model="gpt-4o-mini"),
+        memory=memory,
+        verbose=True,
+        system_prompt=f"You are a helpful assistant with memory capabilities for user {user_id}. "
+                     f"You can remember and recall information about the user."
+    )
+    
+    return agent
+
+
+# Agent cache
+agent_cache = {}
+
+
+async def memory_chat(user_id: str, message: str):
+    """
+    Chat with memory-enabled agent.
+    
+    Args:
+        user_id: Unique user identifier
+        message: User message
+        
+    Returns:
+        Agent response with memory context
+    """
+    try:
+        # Get or create agent for user
+        if user_id not in agent_cache:
+            agent_cache[user_id] = create_memory_agent(user_id)
+        
+        agent = agent_cache[user_id]
+        
+        # Chat with agent
+        response = await agent.achat(message)
+        
+        return {
+            "status": "success",
+            "response": str(response),
+            "user_id": user_id,
+            "has_memory": True
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "user_id": user_id
+        }
+
+
+async def memory_chat_stream(user_id: str, message: str):
+    """
+    Streaming chat with memory.
+    
+    Args:
+        user_id: Unique user identifier
+        message: User message
+        
+    Yields:
+        Streaming response chunks
+    """
+    try:
+        if user_id not in agent_cache:
+            agent_cache[user_id] = create_memory_agent(user_id)
+        
+        agent = agent_cache[user_id]
+        response = await agent.astream_chat(message)
+        
+        async for chunk in response.async_response_gen():
+            yield {
+                "type": "text",
+                "content": chunk,
+                "user_id": user_id
+            }
+            
+    except Exception as e:
+        yield {
+            "type": "error",
+            "error": str(e),
+            "user_id": user_id
+        }
+```
+
+---
+
+## Testing Your LlamaIndex Agent
+
+### Python Client
+
+```python
+# test_llamaindex.py
+from runagent import RunAgentClient
+import asyncio
+
+# Test basic math agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="math_run",
+    local=True
+)
+
+result = client.run(math_query="What is 25 * 4?")
+print(f"Math result: {result}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="math_stream",
+    local=True
+)
+
+print("\nStreaming calculation:")
+for chunk in stream_client.run(math_query="Calculate 100 + 250 - 50"):
+    if chunk.get("content"):
+        print(chunk["content"])
+
+# Test RAG agent (if configured)
+rag_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="rag_query",
+    local=True
+)
+
+rag_result = rag_client.run(query="What does the document say about AI?")
+print(f"\nRAG result: {rag_result}")
+```
+
+### JavaScript Client
+
+```javascript
+// test_llamaindex.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'math_run',
+    local: true
+});
+
+await client.initialize();
+
+// Test calculation
+const result = await client.run({
+    math_query: 'What is 15 * 8?'
+});
+
+console.log('Result:', result);
+
+// Test streaming
+const streamClient = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'math_stream',
+    local: true
+});
+
+await streamClient.initialize();
+
+console.log('\nStreaming:');
+for await (const chunk of streamClient.run({
+    math_query: 'Calculate the sum of 10, 20, and 30'
+})) {
+    if (chunk.content) {
+        process.stdout.write(chunk.content);
+    }
+}
+```
+
+### Go Client
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+    client, _ := client.New(
+        "your_agent_id_here",
+        "math_run",
+        true,
+    )
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    result, _ := client.Run(ctx, map[string]interface{}{
+        "math_query": "What is 2 * 2?",
+    })
+    
+    fmt.Printf("Result: %v\n", result)
+}
+```
+
+### Rust Client
+
+```rust
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RunAgentClient::new(
+        "your_agent_id_here",
+        "math_run",
+        true
+    ).await?;
+    
+    let result = client.run(&[
+        ("math_query", json!("What is 5 * 9?"))
+    ]).await?;
+    
+    println!("Result: {}", result);
+    
+    Ok(())
+}
+```
+
+---
+
+## Configuration Examples
+
+### Basic Math Agent
+
+```json
+{
+  "agent_name": "llamaindex-math",
+  "framework": "llamaindex",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "math_genius.py",
+        "module": "do_multiply",
+        "tag": "math_run"
+      },
+      {
+        "file": "math_genius.py",
+        "module": "stream_multiply",
+        "tag": "math_stream"
+      }
+    ]
+  }
+}
+```
+
+### Multi-Feature Agent
+
+```json
+{
+  "agent_name": "llamaindex-advanced",
+  "framework": "llamaindex",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "math_genius.py",
+        "module": "do_multiply",
+        "tag": "math"
+      },
+      {
+        "file": "rag_agent.py",
+        "module": "rag_query",
+        "tag": "rag"
+      },
+      {
+        "file": "multi_tool_agent.py",
+        "module": "multi_tool_query",
+        "tag": "multi_tool"
+      },
+      {
+        "file": "memory_agent.py",
+        "module": "memory_chat",
+        "tag": "memory"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Best Practices
+
+### 1. **Tool Design**
+- Keep tools simple and focused
+- Provide clear docstrings for LLM understanding
+- Handle errors gracefully within tools
+- Use type hints for parameters
+
+### 2. **Agent Configuration**
+- Choose appropriate LLM models for your use case
+- Set reasonable temperature values
+- Configure memory limits appropriately
+- Use verbose mode during development
+
+### 3. **RAG Implementation**
+- Index documents efficiently
+- Choose appropriate chunk sizes
+- Use optimal similarity thresholds
+- Implement caching for repeated queries
+
+### 4. **Memory Management**
+- Set appropriate token limits for memory
+- Clean up old agent instances
+- Implement user-based memory isolation
+- Persist important memories to database
+
+### 5. **Error Handling**
+- Always wrap async operations in try-catch
+- Return structured error responses
+- Log errors for debugging
+- Provide helpful error messages
+
+---
+
+## Common Patterns
+
+### Tool-Based Pattern
+Simple agents with specific capabilities:
+```python
+agent + [calculator, weather, search] → responses
+```
+
+### RAG Pattern
+Knowledge-augmented responses:
+```python
+query → document_search → llm_synthesis → answer
+```
+
+### Workflow Pattern
+Multi-step processing:
+```python
+query → analyze → process → generate → response
+```
+
+### Memory Pattern
+Context-aware conversations:
+```python
+user_memory + current_query → contextual_response
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. API Key Not Found**
+- **Solution**: Set `OPENAI_API_KEY` in environment
+- Verify key is valid and has credits
+- Check `.env` file is loaded properly
+
+**2. Import Errors**
+- **Solution**: Install correct LlamaIndex version
+- Check all required packages are installed
+- Verify virtual environment is activated
+
+**3. Agent Not Responding**
+- **Solution**: Check LLM configuration
+- Verify tools are properly registered
+- Review system prompts for clarity
+
+**4. RAG Returning Poor Results**
+- **Solution**: Adjust similarity thresholds
+- Review document chunking strategy
+- Check embedding model quality
+- Verify document indexing completed
+
+**5. Streaming Not Working**
+- **Solution**: Use `astream_chat` instead of `achat`
+- Check async implementation
+- Verify streaming is supported by the model
+
+### Debug Tips
+
+Enable verbose logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Enable LlamaIndex debug logging
+from llama_index.core import set_global_handler
+set_global_handler("simple")
+```
+
+Test agent locally:
+
+```python
+# test_local.py
+import asyncio
+from math_genius import do_multiply
+
+async def test():
+    result = await do_multiply("What is 5 * 3?")
+    print(f"Result: {result}")
+
+asyncio.run(test())
+```
+
+---
+
+## Performance Optimization
+
+### 1. **Agent Caching**
+Cache agent instances:
+
+```python
+_agent_cache = {}
+
+def get_agent(agent_type: str):
+    if agent_type not in _agent_cache:
+        _agent_cache[agent_type] = create_agent(agent_type)
+    return _agent_cache[agent_type]
+```
+
+### 2. **Index Optimization**
+Optimize RAG indexing:
+
+```python
+# Use persistent storage
+from llama_index.core import StorageContext, load_index_from_storage
+
+def get_or_create_index():
+    try:
+        storage_context = StorageContext.from_defaults(persist_dir="./storage")
+        index = load_index_from_storage(storage_context)
+    except:
+        documents = SimpleDirectoryReader("./data").load_data()
+        index = VectorStoreIndex.from_documents(documents)
+        index.storage_context.persist()
+    return index
+```
+
+### 3. **Memory Management**
+Implement memory limits:
+
+```python
+from llama_index.core.memory import ChatMemoryBuffer
+
+memory = ChatMemoryBuffer.from_defaults(
+    token_limit=2000,  # Reasonable limit
+    ttl=3600  # 1 hour TTL
+)
+```
+
+### 4. **Async Operations**
+Use async throughout:
+
+```python
+# Always use async methods
+response = await agent.achat(query)  # Good
+# response = agent.chat(query)  # Avoid blocking calls
+```
+
+---
+
+## Next Steps
+
+- **[Advanced Patterns](/how-to/advanced-tasks)** - Learn advanced LlamaIndex patterns
+- **[Production Deployment](/how-to/deployment/cloud-deployment)** - Deploy to production
+- **[Multi-Language Access](/tutorials/multi-language-wrapper)** - Access from different languages
+- **[Performance Tuning](/explanation/production-considerations)** - Optimize for production
+
+---
+
+## Additional Resources
+
+- [LlamaIndex Documentation](https://docs.llamaindex.ai)
+- [LlamaIndex GitHub](https://github.com/run-llama/llama_index)
+- [LlamaIndex Discord](https://discord.gg/llamaindex)
+- [RunAgent Discord Community](https://discord.gg/Q9P9AdHVHz)
+- [RunAgent Documentation](https://docs.run-agent.ai)
+
+---
+
+**🎉 Great work!** You've learned how to deploy LlamaIndex agents with RunAgent. LlamaIndex's powerful data framework combined with RunAgent's multi-language access creates sophisticated, knowledge-augmented AI systems!

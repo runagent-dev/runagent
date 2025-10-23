@@ -1,1 +1,1 @@
-llama-index>=0.12.48
+llama-index

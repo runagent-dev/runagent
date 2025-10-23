@@ -1,0 +1,531 @@
+---
+title: 'Agno'
+description: 'Deploy Agno AI agents with RunAgent'
+---
+
+<Info>
+  **Prerequisites**: Basic understanding of Agno and completed [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## Overview
+
+Agno is a framework for building AI agents with print response capabilities and streaming support. RunAgent makes it easy to deploy Agno agents and access them from any programming language while maintaining the framework's unique characteristics.
+
+## Quick Start
+
+### 1. Create an Agno Agent
+
+```bash
+runagent init my-agno-agent --framework agno
+cd my-agno-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Your Agent
+
+The generated `runagent.config.json` will be pre-configured for Agno:
+
+```json
+{
+  "agent_name": "my-agno-agent",
+  "description": "Agno AI agent with print capabilities",
+  "framework": "agno",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "agno_agent",
+        "tag": "main"
+      }
+    ]
+  }
+}
+```
+
+## Basic Agno Agent
+
+Here's a simple Agno agent that demonstrates the core concepts:
+
+```python agent.py
+from agno import Agent, Tool
+from typing import Dict, Any, List, Optional
+import json
+from datetime import datetime
+
+# Define tools
+def calculate(expression: str) -> str:
+    """Calculate mathematical expressions safely"""
+    try:
+        # Simple safe evaluation (in production, use a proper math parser)
+        allowed_chars = set('0123456789+-*/.() ')
+        if all(c in allowed_chars for c in expression):
+            result = eval(expression)
+            return f"Result: {result}"
+        else:
+            return "Error: Invalid characters in expression"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def get_current_time() -> str:
+    """Get current time"""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def format_text(text: str, format_type: str = "uppercase") -> str:
+    """Format text in different ways"""
+    if format_type == "uppercase":
+        return text.upper()
+    elif format_type == "lowercase":
+        return text.lower()
+    elif format_type == "title":
+        return text.title()
+    else:
+        return text
+
+# Create tools
+tools = [
+    Tool(name="calculate", function=calculate, description="Calculate mathematical expressions"),
+    Tool(name="get_time", function=get_current_time, description="Get current time"),
+    Tool(name="format_text", function=format_text, description="Format text in different ways")
+]
+
+# Create Agno agent
+agno_agent = Agent(
+    name="AgnoAssistant",
+    tools=tools,
+    system_message="You are a helpful Agno assistant. You can perform calculations, get time, and format text. Always show your work step by step."
+)
+
+def agno_agent(message: str, user_id: str = "default") -> Dict[str, Any]:
+    """Main entrypoint for the Agno agent"""
+    try:
+        # Process message with Agno
+        response = agno_agent.process_message(message)
+        
+        return {
+            "response": response,
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        return {
+            "response": f"Error: {str(e)}",
+            "user_id": user_id,
+            "timestamp": datetime.now().isoformat(),
+            "status": "error"
+        }
+```
+
+## Advanced Agno Patterns
+
+### 1. Streaming Agno Agent
+
+```python streaming_agno.py
+from typing import Iterator, Dict, Any
+from agno import Agent, Tool
+
+def streaming_agno_agent(message: str, user_id: str = "default") -> Iterator[str]:
+    """Streaming Agno agent with step-by-step output"""
+    yield f"🤖 Agno Agent starting processing...\n\n"
+    
+    # Initialize agent
+    agent = Agent(
+        name="StreamingAgnoAssistant",
+        tools=tools,
+        system_message="You are a helpful Agno assistant that shows your work step by step."
+    )
+    
+    yield f"📝 Processing message: {message}\n\n"
+    
+    # Simulate step-by-step processing
+    yield "🔍 Analyzing request...\n"
+    yield "🛠️ Selecting appropriate tools...\n"
+    yield "⚙️ Executing operations...\n"
+    yield "📊 Formatting results...\n\n"
+    
+    # Process message
+    response = agent.process_message(message)
+    
+    yield f"✅ Response: {response}\n\n"
+    yield "🎉 Processing complete!"
+```
+
+### 2. Specialized Agno Agents
+
+```python specialized_agno.py
+from agno import Agent, Tool
+from typing import Dict, Any
+
+# Math Agent
+def math_agent(problem: str, user_id: str) -> Dict[str, Any]:
+    """Math-focused Agno agent"""
+    math_tools = [
+        Tool(name="calculate", function=calculate, description="Calculate mathematical expressions"),
+        Tool(name="solve_equation", function=lambda x: f"Solving equation: {x}", description="Solve equations"),
+        Tool(name="convert_units", function=lambda x: f"Converting units: {x}", description="Convert between units")
+    ]
+    
+    agent = Agent(
+        name="MathAssistant",
+        tools=math_tools,
+        system_message="You are a math assistant. Show all steps and explain your reasoning."
+    )
+    
+    response = agent.process_message(problem)
+    
+    return {
+        "response": response,
+        "agent_type": "math",
+        "user_id": user_id,
+        "status": "success"
+    }
+
+# Text Processing Agent
+def text_agent(text: str, operation: str, user_id: str) -> Dict[str, Any]:
+    """Text processing Agno agent"""
+    text_tools = [
+        Tool(name="format_text", function=format_text, description="Format text in different ways"),
+        Tool(name="count_words", function=lambda x: f"Word count: {len(x.split())}", description="Count words"),
+        Tool(name="extract_keywords", function=lambda x: f"Keywords: {x.split()[:5]}", description="Extract keywords")
+    ]
+    
+    agent = Agent(
+        name="TextAssistant",
+        tools=text_tools,
+        system_message="You are a text processing assistant. Help with text manipulation and analysis."
+    )
+    
+    response = agent.process_message(f"Process this text: {text} with operation: {operation}")
+    
+    return {
+        "response": response,
+        "agent_type": "text",
+        "user_id": user_id,
+        "status": "success"
+    }
+
+# Data Analysis Agent
+def data_agent(data: str, analysis_type: str, user_id: str) -> Dict[str, Any]:
+    """Data analysis Agno agent"""
+    data_tools = [
+        Tool(name="calculate", function=calculate, description="Calculate mathematical expressions"),
+        Tool(name="statistics", function=lambda x: f"Statistics for: {x}", description="Calculate statistics"),
+        Tool(name="visualize", function=lambda x: f"Visualization: {x}", description="Create data visualizations")
+    ]
+    
+    agent = Agent(
+        name="DataAssistant",
+        tools=data_tools,
+        system_message="You are a data analysis assistant. Help analyze and visualize data."
+    )
+    
+    response = agent.process_message(f"Analyze this data: {data} with analysis type: {analysis_type}")
+    
+    return {
+        "response": response,
+        "agent_type": "data",
+        "user_id": user_id,
+        "status": "success"
+    }
+```
+
+### 3. Multi-Step Agno Workflow
+
+```python workflow_agno.py
+from agno import Agent, Tool
+from typing import Dict, Any, List
+
+def multi_step_agno_agent(task: str, user_id: str) -> Dict[str, Any]:
+    """Multi-step Agno workflow agent"""
+    
+    # Step 1: Planning Agent
+    planning_tools = [
+        Tool(name="break_down_task", function=lambda x: f"Breaking down: {x}", description="Break down complex tasks"),
+        Tool(name="identify_requirements", function=lambda x: f"Requirements: {x}", description="Identify requirements")
+    ]
+    
+    planning_agent = Agent(
+        name="PlanningAgent",
+        tools=planning_tools,
+        system_message="You are a planning agent. Break down complex tasks into manageable steps."
+    )
+    
+    # Step 2: Execution Agent
+    execution_tools = [
+        Tool(name="calculate", function=calculate, description="Calculate mathematical expressions"),
+        Tool(name="format_text", function=format_text, description="Format text in different ways"),
+        Tool(name="get_time", function=get_current_time, description="Get current time")
+    ]
+    
+    execution_agent = Agent(
+        name="ExecutionAgent",
+        tools=execution_tools,
+        system_message="You are an execution agent. Execute the planned steps."
+    )
+    
+    # Step 3: Review Agent
+    review_tools = [
+        Tool(name="check_accuracy", function=lambda x: f"Checking accuracy: {x}", description="Check accuracy"),
+        Tool(name="format_output", function=lambda x: f"Formatting output: {x}", description="Format final output")
+    ]
+    
+    review_agent = Agent(
+        name="ReviewAgent",
+        tools=review_tools,
+        system_message="You are a review agent. Review and improve the results."
+    )
+    
+    # Execute workflow
+    try:
+        # Planning phase
+        plan = planning_agent.process_message(f"Plan this task: {task}")
+        
+        # Execution phase
+        execution = execution_agent.process_message(f"Execute this plan: {plan}")
+        
+        # Review phase
+        review = review_agent.process_message(f"Review this result: {execution}")
+        
+        return {
+            "task": task,
+            "plan": plan,
+            "execution": execution,
+            "review": review,
+            "user_id": user_id,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        return {
+            "task": task,
+            "error": str(e),
+            "user_id": user_id,
+            "status": "error"
+        }
+```
+
+## Configuration for Multiple Agents
+
+Update your `runagent.config.json` to include multiple Agno agents:
+
+```json
+{
+  "agent_name": "advanced-agno-agent",
+  "description": "Advanced Agno multi-agent system",
+  "framework": "agno",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "agno_agent",
+        "tag": "main"
+      },
+      {
+        "file": "streaming_agno.py",
+        "module": "streaming_agno_agent",
+        "tag": "streaming"
+      },
+      {
+        "file": "specialized_agno.py",
+        "module": "math_agent",
+        "tag": "math"
+      },
+      {
+        "file": "specialized_agno.py",
+        "module": "text_agent",
+        "tag": "text"
+      },
+      {
+        "file": "specialized_agno.py",
+        "module": "data_agent",
+        "tag": "data"
+      },
+      {
+        "file": "workflow_agno.py",
+        "module": "multi_step_agno_agent",
+        "tag": "workflow"
+      }
+    ]
+  }
+}
+```
+
+## Testing Your Agno Agent
+
+### Python Client
+
+```python test_agno.py
+from runagent import RunAgentClient
+
+# Connect to your Agno agent
+client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="main",
+    local=True
+)
+
+# Test basic functionality
+result = client.run(message="Calculate 2 + 2 * 3", user_id="test_user")
+print(f"Math Result: {result['response']}")
+
+# Test text processing
+text_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="text",
+    local=True
+)
+
+text_result = text_client.run(
+    text="hello world",
+    operation="uppercase",
+    user_id="test_user"
+)
+print(f"Text Result: {text_result['response']}")
+
+# Test streaming
+stream_client = RunAgentClient(
+    agent_id="your_agent_id_here",
+    entrypoint_tag="streaming",
+    local=True
+)
+
+print("Streaming Agno workflow:")
+for chunk in stream_client.run(message="Calculate the area of a circle with radius 5", user_id="test_user"):
+    print(chunk, end="", flush=True)
+```
+
+### JavaScript Client
+
+```javascript test_agno.js
+import { RunAgentClient } from 'runagent';
+
+const client = new RunAgentClient({
+    agentId: 'your_agent_id_here',
+    entrypointTag: 'main',
+    local: true
+});
+
+await client.initialize();
+
+const result = await client.run({
+    message: 'Calculate 2 + 2 * 3',
+    user_id: 'test_user'
+});
+
+console.log('Math Result:', result.response);
+```
+
+## Best Practices
+
+### 1. **Tool Design**
+- Create focused, single-purpose tools
+- Provide clear tool descriptions
+- Handle tool errors gracefully
+
+### 2. **Agent Configuration**
+- Use appropriate system messages
+- Configure agent behavior clearly
+- Test agent responses
+
+### 3. **Error Handling**
+- Implement try-catch blocks
+- Provide meaningful error messages
+- Log errors for debugging
+
+### 4. **Performance**
+- Optimize tool execution
+- Use caching when appropriate
+- Monitor agent performance
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Mathematical Processing">
+    Use Agno agents for mathematical calculations and problem-solving.
+  </Accordion>
+  <Accordion title="Text Manipulation">
+    Create agents specialized in text processing and formatting.
+  </Accordion>
+  <Accordion title="Data Analysis">
+    Build agents for data analysis and visualization.
+  </Accordion>
+  <Accordion title="Multi-Step Workflows">
+    Implement complex workflows with multiple agent steps.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Tool Execution Errors**
+   - Check tool definitions
+   - Verify tool permissions
+   - Handle tool errors
+
+2. **Agent Configuration**
+   - Verify system messages
+   - Check agent settings
+   - Test agent responses
+
+3. **Performance Issues**
+   - Monitor tool execution time
+   - Optimize agent configuration
+   - Use caching when appropriate
+
+### Debug Tips
+
+```python
+# Add debugging to your Agno agents
+def debug_agno_agent(message: str, user_id: str) -> Dict[str, Any]:
+    print(f"Debug: Processing message from {user_id}: {message}")
+    
+    # Your agent logic here
+    
+    print(f"Debug: Response generated: {response}")
+    return result
+```
+
+## Performance Optimization
+
+### 1. **Tool Optimization**
+- Cache expensive tool results
+- Optimize tool execution
+- Use async tools when possible
+
+### 2. **Agent Configuration**
+- Optimize system messages
+- Configure appropriate timeouts
+- Use efficient agent settings
+
+### 3. **Workflow Optimization**
+- Minimize unnecessary steps
+- Use parallel processing when possible
+- Optimize data flow
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Patterns" icon="cog" href="/how-to/advanced-tasks">
+    Learn advanced Agno patterns and techniques
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/how-to/deployment/cloud-deployment">
+    Deploy your Agno agents to production
+  </Card>
+  <Card title="Multi-Language Access" icon="globe" href="/tutorials/multi-language-wrapper">
+    Access your Agno agents from different languages
+  </Card>
+  <Card title="Performance Tuning" icon="gauge" href="/explanation/production-considerations">
+    Optimize your Agno agents for production
+  </Card>
+</CardGroup>
+
+<Note>
+**🎉 Excellent work!** You've learned how to deploy Agno agents with RunAgent. Agno's unique print response capabilities combined with RunAgent's multi-language access create powerful, transparent AI systems!
+</Note>
