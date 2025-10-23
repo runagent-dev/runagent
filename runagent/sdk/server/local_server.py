@@ -785,17 +785,20 @@ class LocalServer:
 
             self.log_execution_start(invocation_id, request.entrypoint_tag)
 
-            # Sync invocation start to middleware - FIXED for simplified structure
+            # FIXED: Sync invocation start to middleware IMMEDIATELY after local creation
             middleware_invocation_id = None
             if (hasattr(self, 'middleware_sync') and 
                 self.middleware_sync and 
-                self.middleware_sync.is_sync_enabled()):
+                self.middleware_sync.is_sync_enabled() and
+                getattr(self, 'agent_synced_to_middleware', False)):  # Only if agent is synced
                 
                 try:
-                    # FIXED: Use simplified invocation structure
+                    console.print(f"📡 [cyan]Syncing invocation start to middleware...[/cyan]")
+                    
+                    # FIXED: Use correct structure matching middleware expectations
                     sync_payload = {
                         "agent_id": self.agent_id,  # Main agent ID
-                        "local_execution_id": invocation_id,  # This becomes main execution ID in middleware
+                        "local_execution_id": invocation_id,  # This becomes main execution ID
                         "input_data": {
                             "input_args": request.input_args,
                             "input_kwargs": request.input_kwargs
@@ -811,8 +814,16 @@ class LocalServer:
                     }
                     
                     middleware_invocation_id = await self.middleware_sync.sync_invocation_start(sync_payload)
+                    
+                    if middleware_invocation_id:
+                        console.print(f"✅ [green]Middleware invocation created: {middleware_invocation_id}[/green]")
+                    else:
+                        console.print(f"⚠️ [yellow]Middleware invocation sync returned None[/yellow]")
+                        
                 except Exception as e:
-                    console.print(f"Middleware sync start failed: {e}")
+                    console.print(f"❌ [red]Middleware sync start failed: {e}[/red]")
+                    import traceback
+                    traceback.print_exc()
 
             start_time = time.time()
             execution_success = False
@@ -840,7 +851,7 @@ class LocalServer:
                         output_data=serializable_output,  
                         execution_time_ms=execution_time * 1000
                     )
-                    console.print("Local invocation tracking completed successfully")
+                    console.print("✅ Local invocation tracking completed successfully")
                     
                 except Exception as e:
                     console.print(f"Failed to complete local invocation tracking: {str(e)}")
@@ -859,18 +870,30 @@ class LocalServer:
                     except Exception as e2:
                         console.print(f"Critical: Could not complete local invocation tracking: {str(e2)}")
 
-                # Sync invocation completion to middleware - FIXED for simplified structure
+                # FIXED: Sync invocation completion to middleware with proper error handling
                 if middleware_invocation_id:
                     try:
-                        await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,  # This is now the main execution ID in middleware
+                        console.print(f"📡 [cyan]Syncing completion to middleware...[/cyan]")
+                        completion_result = await self.middleware_sync.sync_invocation_complete(
+                            middleware_invocation_id,
                             {
                                 "output_data": serializable_output,
-                                "execution_time_ms": execution_time * 1000
+                                "execution_time_ms": execution_time * 1000,
+                                "status": "completed"
                             }
                         )
+                        
+                        if completion_result:
+                            console.print(f"✅ [green]Middleware completion synced successfully[/green]")
+                        else:
+                            console.print(f"⚠️ [yellow]Middleware completion sync returned False[/yellow]")
+                            
                     except Exception as e:
-                        console.print(f"Failed to sync completion to middleware: {e}")
+                        console.print(f"❌ [red]Failed to sync completion to middleware: {e}[/red]")
+                        import traceback
+                        traceback.print_exc()
+                elif self.middleware_sync and self.middleware_sync.is_sync_enabled():
+                    console.print(f"⚠️ [yellow]No middleware invocation ID to update (sync may have failed at start)[/yellow]")
 
                 # Record in original agent_runs table for backward compatibility
                 try:
@@ -898,8 +921,8 @@ class LocalServer:
                 execution_data = ExecutionData(
                     execution_id=invocation_id,
                     agent_id=self.agent_id,
-                    user_id=None,  # Not available in local mode
-                    deployment_id=None,  # Not available in local mode
+                    user_id=None,
+                    deployment_id=None,
                     entrypoint_id=request.entrypoint_tag,
                     status="completed",
                     started_at=datetime.fromtimestamp(start_time).isoformat(),
@@ -912,7 +935,7 @@ class LocalServer:
                     result_data={
                         "message": "",
                         "data": result_str,
-                        "vm_id": str(uuid.uuid4()),  # Mock VM ID for local execution
+                        "vm_id": str(uuid.uuid4()),
                         "type": "result",
                         "timestamp": datetime.now().isoformat()
                     },
@@ -922,7 +945,8 @@ class LocalServer:
                         "deployment_id": None,
                         "timeout_seconds": 60,
                         "async_execution": False,
-                        "execution_config": {}
+                        "execution_config": {},
+                        "middleware_synced": middleware_invocation_id is not None
                     },
                     error_message=None,
                     is_local=True,
@@ -963,18 +987,28 @@ class LocalServer:
                     execution_time_ms=execution_time * 1000
                 )
 
-                # Sync invocation error to middleware - FIXED for simplified structure
+                # FIXED: Sync invocation error to middleware with proper error handling
                 if middleware_invocation_id:
                     try:
-                        await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,  # This is now the main execution ID in middleware
+                        console.print(f"📡 [cyan]Syncing error to middleware...[/cyan]")
+                        error_result = await self.middleware_sync.sync_invocation_complete(
+                            middleware_invocation_id,
                             {
                                 "error_detail": error_detail,
-                                "execution_time_ms": execution_time * 1000
+                                "execution_time_ms": execution_time * 1000,
+                                "status": "failed"
                             }
                         )
+                        
+                        if error_result:
+                            console.print(f"✅ [green]Middleware error synced[/green]")
+                        else:
+                            console.print(f"⚠️ [yellow]Middleware error sync returned False[/yellow]")
+                            
                     except Exception as sync_error:
-                        console.print(f"Failed to sync error to middleware: {sync_error}")
+                        console.print(f"❌ [red]Failed to sync error to middleware: {sync_error}[/red]")
+                        import traceback
+                        traceback.print_exc()
 
                 # Record in original agent_runs table for backward compatibility
                 try:
@@ -1000,8 +1034,8 @@ class LocalServer:
                 execution_data = ExecutionData(
                     execution_id=invocation_id,
                     agent_id=self.agent_id,
-                    user_id=None,  # Not available in local mode
-                    deployment_id=None,  # Not available in local mode
+                    user_id=None,
+                    deployment_id=None,
                     entrypoint_id=request.entrypoint_tag,
                     status="failed",
                     started_at=datetime.fromtimestamp(start_time).isoformat(),
@@ -1018,7 +1052,8 @@ class LocalServer:
                         "deployment_id": None,
                         "timeout_seconds": 60,
                         "async_execution": False,
-                        "execution_config": {}
+                        "execution_config": {},
+                        "middleware_synced": middleware_invocation_id is not None
                     },
                     error_message=error_detail,
                     is_local=True,

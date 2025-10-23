@@ -23,8 +23,5 @@
         "tag": "math_stream"
       }
     ]
-  },
-  "env_vars": {
-    "OPENAI_API_KEY": "sk-proj-1234567890"
   }
 }
