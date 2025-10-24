@@ -1,0 +1,32 @@
+{
+  "agent_name": "StockAgent Multi-Agent Trading Simulator",
+  "description": "LLM-based multi-agent stock trading simulation with real-world market factors",
+  "framework": "default",
+  "template": "stockagent",
+  "version": "1.0.0",
+  "created_at": "2025-10-24 00:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/dhh1995/StockAgent",
+    "path": "templates/stockagent",
+    "author": "stockagent-team"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+
+      {
+        "file": "runagent_wrapper.py",
+        "module": "stream_simulation",
+        "tag": "simulate_stream"
+      },
+      {
+        "file": "runagent_wrapper.py",
+        "module": "get_simulation_status",
+        "tag": "status"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "",
+    "GOOGLE_API_KEY": ""
+  }
+}
