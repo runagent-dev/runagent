@@ -1,22 +1,23 @@
 from runagent import RunAgentClient
 
 client = RunAgentClient(
-    agent_id="528bfbf3-433f-4728-a203-3310dad42dee",
+    agent_id="6cf5351f-b228-4648-9a07-20608ef490be",
     entrypoint_tag="simulate_stream",
     local=False
 )
 
 # Run and print ALL output including logs
 for update in client.run(
-    num_agents=5,
-    total_days=2,
-    sessions_per_day=2,
+    num_agents="5",        
+    total_days="2",        
+    sessions_per_day="2",  
     model="gpt-4o-mini"
 ):
-    # Print everything
-    if update.get('type') == 'log':
-        # Raw log output
-        print(update['message'])
-    else:
-        # Structured events
-        print(f"[{update['type']}] {update.get('message', '')}")
+    print(update)
+    # # Print everything
+    # if update.get('type') == 'log':
+    #     # Raw log output
+    #     print(update['message'])
+    # else:
+    #     # Structured events
+    #     print(f"[{update['type']}] {update.get('message', '')}")
