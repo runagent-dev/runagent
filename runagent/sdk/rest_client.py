@@ -155,7 +155,8 @@ class HttpHandler:
             data = None
 
         try:
-            print("[REQUEST] to: ", url)
+            if os.getenv("DISABLE_TRY_CATCH"):
+                console.print("[REQUEST] to: ", url)
             response = self.session.request(
                 method=method.upper(),
                 url=url,

@@ -88,10 +88,10 @@ def setup(again):
                 'setup_method',
                 message="Select setup method",
                 choices=[
-                    ('🪄 Express Setup (Browser login - Coming Soon!)', 'express'),
-                    ('🔑 Manual Setup (Enter API key)', 'manual'),
+                    ('⚡ Express Setup (Browser login)', 'express'),
+                    ('📝 Manual Setup (Enter API key)', 'manual'),
                 ],
-                default=('🔑 Manual Setup (Enter API key)', 'manual'),
+                default=('⚡ Express Setup (Browser login)', 'express'),
                 carousel=True
             ),
         ]
@@ -104,79 +104,110 @@ def setup(again):
         choice = answers['setup_method']
         
         if choice == "express":
-            # Express setup - coming soon
-            console.print(Panel(
-                "[bold cyan]🚀 Express Setup - Coming Soon![/bold cyan]\n\n"
-                "This feature will allow you to authenticate via your browser.\n\n"
-                "[dim]For now, please use Manual Setup[/dim]\n\n"
-                "📚 [link=https://docs.runagent.dev/setup]Learn more[/link]",
-                title="[bold]Feature Preview[/bold]",
-                border_style="cyan"
-            ))
-            
-            if not Confirm.ask("\n[bold]Continue with Manual Setup?[/bold]", default=True):
-                console.print("[dim]Setup cancelled.[/dim]")
-                return
-        
-        # Manual setup - prompt for API key
-        console.print("\n[bold white]📝 Manual Setup[/bold white]\n")
-        api_key = Prompt.ask(
-            "[cyan]Enter your API key[/cyan]",
-            password=True
-        )
-        
-        if not api_key or not api_key.strip():
-            console.print(Panel(
-                "[red]❌ API key cannot be empty[/red]",
-                title="[bold red]Error[/bold red]",
-                border_style="red"
-            ))
-            raise click.ClickException("Invalid API key")
-        
-        console.print("\n🔑 [cyan]Configuring RunAgent...[/cyan]")
-
-        # Configure SDK with validation
-        try:
-            from rich.status import Status
+            # Express setup - Device code authentication flow
+            from runagent.cli.auth.device_flow import DeviceCodeAuthFlow
             from runagent.constants import DEFAULT_BASE_URL
             
-            # Use default base URL from constants
             base_url = Config.get_base_url() or DEFAULT_BASE_URL
             
-            with Status("[bold cyan]Validating credentials...", spinner="dots", console=console) as status:
-                sdk.configure(api_key=api_key, base_url=base_url, save=True)
+            try:
+                flow = DeviceCodeAuthFlow(base_url)
+                auth_result = flow.authenticate()
+                api_key = auth_result.get("api_key")
+                user_info = auth_result.get("user_info", {})
+                
+                # Save the API key
+                if Config.set_api_key(api_key):
+                    # Save user info from device auth
+                    if user_info:
+                        Config.set_user_config("user_email", user_info.get("email"))
+                        Config.set_user_config("user_id", user_info.get("user_id"))
+                        Config.set_user_config("user_tier", user_info.get("tier", "Free"))
+                        Config.set_user_config("active_project_id", user_info.get("active_project_id"))
+                        Config.set_user_config("active_project_name", user_info.get("active_project_name"))
+                    
+                    # Successfully saved, continue to show user info
+                    pass
+                else:
+                    console.print(Panel(
+                        "[red]❌ Failed to save credentials[/red]",
+                        title="[bold red]Error[/bold red]",
+                        border_style="red"
+                    ))
+                    raise click.ClickException("Failed to save API key")
             
-            console.print(Panel(
-                "[bold green]✅ Setup completed successfully![/bold green]\n\n"
-                "[dim]Your credentials have been saved securely.[/dim]",
-                title="[bold green]Success[/bold green]",
-                border_style="green"
-            ))
-        except AuthenticationError as auth_err:
-            if os.getenv('DISABLE_TRY_CATCH'):
+            except click.ClickException:
                 raise
-            console.print(f"❌ [red]Authentication failed:[/red] {auth_err}")
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(Panel(
+                    f"[red]❌ Setup failed:[/red] {str(e)}",
+                    title="[bold red]Error[/bold red]",
+                    border_style="red"
+                ))
+                raise click.ClickException("Express setup failed")
+        
+        else:
+            # Manual setup - prompt for API key
+            console.print("\n[bold white]📝 Manual Setup[/bold white]\n")
+            api_key = Prompt.ask(
+                "[cyan]Enter your API key[/cyan]",
+                password=True
+            )
             
-            # Provide specific troubleshooting based on error message
-            error_msg = str(auth_err).lower()
-            console.print("\n💡 [yellow]Troubleshooting:[/yellow]")
+            if not api_key or not api_key.strip():
+                console.print(Panel(
+                    "[red]❌ API key cannot be empty[/red]",
+                    title="[bold red]Error[/bold red]",
+                    border_style="red"
+                ))
+                raise click.ClickException("Invalid API key")
             
-            if "invalid api key" in error_msg or "not authenticated" in error_msg:
-                console.print("   • Check that your API key is correct")
-                console.print("   • Verify the API key is not expired")
-                console.print("   • Ensure you have access to the middleware")
-            elif "connection" in error_msg or "timeout" in error_msg:
-                console.print("   • Check your internet connection")
-                console.print("   • Verify the middleware server is accessible")
-                from runagent.constants import DEFAULT_BASE_URL
-                display_url = base_url if 'base_url' in locals() else DEFAULT_BASE_URL
-                console.print(f"   • Trying to connect to: {display_url}")
-            else:
-                console.print("   • Check your API key and network connection")
-                console.print("   • Contact support if the issue persists")
-            
-            raise click.ClickException("Authentication failed")
+            console.print("\n🔑 [cyan]Configuring RunAgent...[/cyan]")
 
+            # Configure SDK with validation
+            try:
+                from rich.status import Status
+                from runagent.constants import DEFAULT_BASE_URL
+                
+                # Use default base URL from constants
+                base_url = Config.get_base_url() or DEFAULT_BASE_URL
+                
+                with Status("[bold cyan]Validating credentials...", spinner="dots", console=console) as status:
+                    sdk.configure(api_key=api_key, base_url=base_url, save=True)
+                
+                console.print(Panel(
+                    "[bold green]✅ Setup completed successfully![/bold green]\n\n"
+                    "[dim]Your credentials have been saved securely.[/dim]",
+                    title="[bold green]Success[/bold green]",
+                    border_style="green"
+                ))
+            except AuthenticationError as auth_err:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"❌ [red]Authentication failed:[/red] {auth_err}")
+                
+                # Provide specific troubleshooting based on error message
+                error_msg = str(auth_err).lower()
+                console.print("\n💡 [yellow]Troubleshooting:[/yellow]")
+                
+                if "invalid api key" in error_msg or "not authenticated" in error_msg:
+                    console.print("   • Check that your API key is correct")
+                    console.print("   • Verify the API key is not expired")
+                    console.print("   • Ensure you have access to the middleware")
+                elif "connection" in error_msg or "timeout" in error_msg:
+                    console.print("   • Check your internet connection")
+                    console.print("   • Verify the middleware server is accessible")
+                    from runagent.constants import DEFAULT_BASE_URL
+                    display_url = base_url if 'base_url' in locals() else DEFAULT_BASE_URL
+                    console.print(f"   • Trying to connect to: {display_url}")
+                else:
+                    console.print("   • Check your API key and network connection")
+                    console.print("   • Contact support if the issue persists")
+                
+                raise click.ClickException("Authentication failed")
+        
         # Show user information (from cached data)
         config_status = sdk.get_config_status()
         user_info = config_status.get('user_info', {})

@@ -22,7 +22,7 @@ ENV_RUNAGENT_LOGGING_LEVEL = "RUNAGENT_LOGGING_LEVEL"
 
 # Local Configuration
 LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
-DEFAULT_BASE_URL = "https://runagent-middleware-v2.onrender.com/"
+DEFAULT_BASE_URL = "https://backend.run-agent.ai/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
 DATABASE_FILE_NAME = "runagent_local.db"
 
@@ -56,3 +56,9 @@ class Framework(str, Enum):
 class TemplateVariant(str, Enum):
     BASIC = "basic"
     ADVANCED = "advanced"
+
+# Device Code Authentication Configuration
+DEVICE_CODE_POLL_INTERVAL = 5  # seconds
+DEVICE_CODE_EXPIRATION = 600  # seconds (10 minutes)
+DEVICE_CODE_MAX_RETRIES = 3
+DEVICE_CODE_RETRY_BACKOFF_BASE = 2  # seconds
