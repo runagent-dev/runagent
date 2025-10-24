@@ -1,8 +1,9 @@
 from runagent import RunAgentClient
 
 client = RunAgentClient(
-    agent_id="93f061de-1b0c-4b97-b9bd-0cabd43b2619 ",
+    agent_id="528bfbf3-433f-4728-a203-3310dad42dee",
     entrypoint_tag="simulate_stream",
+    local=False
 )
 
 # Run and print ALL output including logs

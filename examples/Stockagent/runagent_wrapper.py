@@ -82,6 +82,26 @@ class StockAgentRunner:
     ) -> Iterator[Dict[str, Any]]:
         """Stream REAL simulation with LLM agents and ALL logs"""
         
+        # FIX: Convert string parameters to appropriate types
+        try:
+            num_agents = int(num_agents) if isinstance(num_agents, str) else num_agents
+            total_days = int(total_days) if isinstance(total_days, str) else total_days
+            sessions_per_day = int(sessions_per_day) if isinstance(sessions_per_day, str) else sessions_per_day
+            stock_a_price = float(stock_a_price) if isinstance(stock_a_price, str) else stock_a_price
+            stock_b_price = float(stock_b_price) if isinstance(stock_b_price, str) else stock_b_price
+            
+            # Convert string boolean to actual boolean
+            if isinstance(enable_events, str):
+                enable_events = enable_events.lower() in ('true', '1', 'yes', 'on')
+        except (ValueError, TypeError) as e:
+            yield asdict(SimulationUpdate(
+                type="error",
+                day=0,
+                message=f"❌ Parameter conversion error: {str(e)}",
+                data={"error": str(e)}
+            ))
+            return
+        
         # Setup log capturing
         log_capture = LogCapture()
         
@@ -104,7 +124,7 @@ class StockAgentRunner:
                 }
             ))
             
-            # Update util settings
+            # Update util settings with converted values
             util.AGENTS_NUM = num_agents
             util.TOTAL_DATE = total_days
             util.TOTAL_SESSION = sessions_per_day
@@ -345,7 +365,6 @@ class StockAgentRunner:
                     "surviving_agents": len(all_agents)
                 }
             )
-
 
     
     def _collect_results(self) -> Dict[str, Any]:
