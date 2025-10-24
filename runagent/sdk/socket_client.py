@@ -33,16 +33,20 @@ class SocketClient:
         """Stream agent execution results (async version)"""
 
         uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream?token={self.api_key}"
-        # if not self.is_local:
-                # uri = f"{uri}?token={self.api_key}"
         
-        async with websockets.connect(uri) as websocket:
+        async with websockets.connect(
+            uri,
+            ping_interval=20,
+            ping_timeout=60,
+            close_timeout=10,
+            max_size=10 * 1024 * 1024
+        ) as websocket:
             # Send start stream request in the exact format required
             request_data = {
                 "entrypoint_tag": entrypoint_tag,
                 "input_args": input_args,
                 "input_kwargs": input_kwargs,
-                "timeout_seconds": 60,
+                "timeout_seconds": 600,  
                 "async_execution": False
             }
             # Send the request as direct JSON
@@ -75,14 +79,21 @@ class SocketClient:
         
         uri = f"{self.base_socket_url}/agents/{agent_id}/run-stream?token={self.api_key}"
         
-        with connect(uri) as websocket:
+        # Add proper timeout and keepalive settings
+        with connect(
+            uri,
+            ping_interval=20,      # Send ping every 20 seconds
+            ping_timeout=60,       # Wait up to 60 seconds for pong
+            close_timeout=10,      # Timeout for closing handshake
+            max_size=10 * 1024 * 1024  # 10MB max message size
+        ) as websocket:
 
             # Send start stream request in the exact format required
             request_data = {
                 "entrypoint_tag": entrypoint_tag,
                 "input_args": input_args,
                 "input_kwargs": input_kwargs,
-                "timeout_seconds": 60,
+                "timeout_seconds": 600,  
                 "async_execution": False
             }
             
