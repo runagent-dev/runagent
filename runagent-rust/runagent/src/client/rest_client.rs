@@ -163,13 +163,14 @@ impl RestClient {
         input_kwargs: &HashMap<String, Value>,
     ) -> RunAgentResult<Value> {
         let data = serde_json::json!({
-            "input_data": {
-                "input_args": input_args,
-                "input_kwargs": input_kwargs
-            }
+            "entrypoint_tag": entrypoint_tag,
+            "input_args": input_args,
+            "input_kwargs": input_kwargs,
+            "timeout_seconds": 60,
+            "async_execution": false
         });
 
-        let path = format!("agents/{}/execute/{}", agent_id, entrypoint_tag);
+        let path = format!("agents/{}/run", agent_id);
         self.post(&path, &data).await
     }
 

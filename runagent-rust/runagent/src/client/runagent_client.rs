@@ -135,9 +135,20 @@ impl RunAgentClient {
             db_service,
         };
 
-        // Get agent architecture
-        client.agent_architecture = Some(client.get_agent_architecture_internal().await?);
-        client.validate_entrypoint()?;
+        // Get agent architecture (skip validation to match Python SDK behavior)
+        match client.get_agent_architecture_internal().await {
+            Ok(architecture) => {
+                client.agent_architecture = Some(architecture);
+                tracing::debug!("Agent architecture loaded, skipping client-side validation");
+            }
+            Err(e) => {
+                tracing::debug!("Failed to get agent architecture, skipping validation: {}", e);
+                // Set a minimal architecture to avoid validation errors
+                client.agent_architecture = Some(serde_json::json!({
+                    "entrypoints": [{"tag": "simulate_stream", "file": "main.py", "module": "simulate_stream"}]
+                }));
+            }
+        }
 
         Ok(client)
     }
@@ -146,7 +157,7 @@ impl RunAgentClient {
         match self.rest_client.get_agent_architecture(&self.agent_id).await {
             Ok(architecture) => Ok(architecture),
             Err(_) => {
-                // Fallback: provide default architecture
+                // Fallback: provide default architecture with common entrypoints
                 Ok(serde_json::json!({
                     "entrypoints": [
                         {
@@ -158,6 +169,16 @@ impl RunAgentClient {
                             "tag": "generic_stream",
                             "file": "main.py", 
                             "module": "run_stream"
+                        },
+                        {
+                            "tag": "simulate_stream",
+                            "file": "main.py",
+                            "module": "simulate_stream"
+                        },
+                        {
+                            "tag": "run",
+                            "file": "main.py",
+                            "module": "run"
                         }
                     ]
                 }))
@@ -219,17 +240,36 @@ impl RunAgentClient {
             .await?;
 
         if response.get("success").and_then(|s| s.as_bool()).unwrap_or(false) {
-            if let Some(output_data) = response.get("output_data") {
-                self.serializer.deserialize_object(output_data.clone())
-            } else {
-                Ok(Value::Null)
+            // Handle new response format with nested data (matching Python SDK)
+            if let Some(data) = response.get("data") {
+                if let Some(result_data) = data.get("result_data") {
+                    if let Some(output_data) = result_data.get("data") {
+                        return self.serializer.deserialize_object(output_data.clone());
+                    }
+                }
             }
+            // Fallback to old format for backward compatibility
+            if let Some(output_data) = response.get("output_data") {
+                return self.serializer.deserialize_object(output_data.clone());
+            }
+            Ok(Value::Null)
         } else {
-            let error_msg = response
-                .get("error")
-                .and_then(|e| e.as_str())
-                .unwrap_or("Unknown error");
-            Err(RunAgentError::server(error_msg))
+            // Handle new error format with ErrorDetail object (matching Python SDK)
+            if let Some(error_info) = response.get("error") {
+                if let Some(error_obj) = error_info.as_object() {
+                    if let (Some(message), Some(code)) = (
+                        error_obj.get("message").and_then(|m| m.as_str()),
+                        error_obj.get("code").and_then(|c| c.as_str())
+                    ) {
+                        return Err(RunAgentError::server(format!("[{}] {}", code, message)));
+                    }
+                }
+                // Fallback to old format
+                if let Some(error_msg) = error_info.as_str() {
+                    return Err(RunAgentError::server(error_msg));
+                }
+            }
+            Err(RunAgentError::server("Unknown error"))
         }
     }
 

@@ -94,6 +94,7 @@ pub enum WebSocketActionType {
 pub struct WebSocketAgentRequest {
     pub action: WebSocketActionType,
     pub agent_id: String,
+    pub entrypoint_tag: String,
     pub input_data: AgentInputArgs,
     #[serde(default)]
     pub stream_config: HashMap<String, serde_json::Value>,
@@ -147,6 +148,7 @@ pub enum MessageType {
     AgentThought,
     FinalResponse,
     Error,
+    ExecutionError,
     Status,
     RawData,
     Data,
