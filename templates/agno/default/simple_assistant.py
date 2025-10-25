@@ -19,7 +19,7 @@ def agent_print_response(prompt: str):
     
     # Return structured data that can be serialized
     return {
-        "content": response.content if hasattr(response, 'content') else str(response),
+        "content": response.content
     }
 
 def agent_print_response_stream(prompt: str):

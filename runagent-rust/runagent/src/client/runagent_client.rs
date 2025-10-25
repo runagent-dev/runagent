@@ -244,12 +244,28 @@ impl RunAgentClient {
             if let Some(data) = response.get("data") {
                 if let Some(result_data) = data.get("result_data") {
                     if let Some(output_data) = result_data.get("data") {
+                        // Check if the output contains a generator object string
+                        if let Some(content_str) = output_data.as_str() {
+                            if content_str.contains("generator object") {
+                                tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
+                                // Return the raw string for now
+                                return Ok(output_data.clone());
+                            }
+                        }
                         return self.serializer.deserialize_object(output_data.clone());
                     }
                 }
             }
             // Fallback to old format for backward compatibility
             if let Some(output_data) = response.get("output_data") {
+                // Check if the output contains a generator object string
+                if let Some(content_str) = output_data.as_str() {
+                    if content_str.contains("generator object") {
+                        tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
+                        // Return the raw string for now
+                        return Ok(output_data.clone());
+                    }
+                }
                 return self.serializer.deserialize_object(output_data.clone());
             }
             Ok(Value::Null)
