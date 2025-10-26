@@ -100,14 +100,15 @@ impl RestClient {
         data: Option<&Value>,
         params: Option<&HashMap<String, String>>,
     ) -> RunAgentResult<Value> {
-        let url = self.get_url(path)?;
+        let mut url = self.get_url(path)?;
+        
+        // Add API key as token query parameter if available (matching WebSocket behavior)
+        if let Some(ref api_key) = self.api_key {
+            url.query_pairs_mut()
+                .append_pair("token", api_key);
+        }
         
         let mut request_builder = self.client.request(method, url);
-
-        // Add authorization header if API key is available
-        if let Some(ref api_key) = self.api_key {
-            request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
-        }
 
         // Add query parameters
         if let Some(params) = params {
@@ -119,6 +120,11 @@ impl RestClient {
             request_builder = request_builder
                 .header("Content-Type", "application/json")
                 .json(data);
+        }
+
+        // Add Authorization header if API key is available
+        if let Some(ref api_key) = self.api_key {
+            request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
         }
 
         let response = request_builder.send().await?;
@@ -163,10 +169,11 @@ impl RestClient {
         input_kwargs: &HashMap<String, Value>,
     ) -> RunAgentResult<Value> {
         let data = serde_json::json!({
+            "id": "run_start",
             "entrypoint_tag": entrypoint_tag,
             "input_args": input_args,
             "input_kwargs": input_kwargs,
-            "timeout_seconds": 60,
+            "timeout_seconds": 600,
             "async_execution": false
         });
 
