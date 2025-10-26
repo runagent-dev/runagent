@@ -825,7 +825,8 @@ class RestClient:
             payload = config or {}
 
             try:
-                response = self.http.post(f"/agents/{agent_id}/start", data=payload, timeout=60)
+                # Increased timeout to 5 minutes to allow for background processing
+                response = self.http.post(f"/agents/{agent_id}/start", data=payload, timeout=300)
                 result = response.json()
                 return self._process_start_result(result, agent_id)
 

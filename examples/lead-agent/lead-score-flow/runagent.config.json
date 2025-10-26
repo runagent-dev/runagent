@@ -13,12 +13,12 @@
     "agent_architecture": {
       "entrypoints": [
         {
-          "file": "runagent_entrypoints.py",
+          "file": "main.py",
           "module": "run_flow",
           "tag": "lead_score_flow"
         },
         {
-          "file": "runagent_entrypoints.py",
+          "file": "main.py",
           "module": "score_single_candidate",
           "tag": "score_candidate"
         }

@@ -44,10 +44,13 @@ def load_candidates_from_csv() -> List[Candidate]:
 
 async def score_single_candidate_async(
     candidate: Candidate,
-    job_description: str,
+    job_description: str = None,
     additional_instructions: str = ""
 ) -> CandidateScore:
     """Score a single candidate asynchronously"""
+    # Use provided job_description or fall back to constant
+    job_desc = job_description if job_description else JOB_DESCRIPTION
+    
     result = await (
         LeadScoreCrew()
         .crew()
@@ -56,7 +59,7 @@ async def score_single_candidate_async(
                 "candidate_id": candidate.id,
                 "name": candidate.name,
                 "bio": candidate.bio,
-                "job_description": job_description,
+                "job_description": job_desc,
                 "additional_instructions": additional_instructions,
             }
         )
@@ -70,6 +73,7 @@ def score_single_candidate(
     email: str = None,
     bio: str = None,
     skills: str = None,
+    job_description: str = None,
     additional_instructions: str = ""
 ) -> Dict[str, Any]:
     """
@@ -81,6 +85,7 @@ def score_single_candidate(
         email: Candidate's email
         bio: Candidate's biography/description
         skills: Candidate's skills (comma-separated)
+        job_description: Job description to match against (optional)
         additional_instructions: Additional scoring criteria
     
     Returns:
@@ -111,11 +116,11 @@ def score_single_candidate(
             except ImportError:
                 pass
             score = loop.run_until_complete(
-                score_single_candidate_async(candidate, JOB_DESCRIPTION, additional_instructions)
+                score_single_candidate_async(candidate, job_description, additional_instructions)
             )
         else:
             score = asyncio.run(
-                score_single_candidate_async(candidate, JOB_DESCRIPTION, additional_instructions)
+                score_single_candidate_async(candidate, job_description, additional_instructions)
             )
         
         return {
@@ -124,7 +129,7 @@ def score_single_candidate(
             "candidate_name": name,
             "score": score.score,
             "reason": score.reason,
-            "job_description": JOB_DESCRIPTION
+            "job_description": job_description or JOB_DESCRIPTION
         }
         
     except Exception as e:
@@ -140,6 +145,7 @@ def score_single_candidate(
 
 async def score_all_candidates_async(
     candidates: List[Candidate],
+    job_description: str = None,
     additional_instructions: str = ""
 ) -> List[CandidateScore]:
     """Score all candidates asynchronously"""
@@ -147,7 +153,7 @@ async def score_all_candidates_async(
     
     for candidate in candidates:
         task = asyncio.create_task(
-            score_single_candidate_async(candidate, JOB_DESCRIPTION, additional_instructions)
+            score_single_candidate_async(candidate, job_description, additional_instructions)
         )
         tasks.append(task)
     
@@ -179,23 +185,34 @@ async def generate_email_async(
 
 def run_flow(
     top_n: int = 3,
+    job_description: str = None,
     additional_instructions: str = "",
-    generate_emails: bool = True
+    generate_emails: bool = True,
+    candidates: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     RunAgent entry point: Run the complete lead scoring flow
     
     Args:
         top_n: Number of top candidates to select (default: 3)
+        job_description: Job description to match against (optional)
         additional_instructions: Additional scoring criteria
         generate_emails: Whether to generate follow-up emails (default: True)
+        candidates: Optional list of candidates as dicts. If not provided, loads from CSV.
     
     Returns:
         Dictionary with scored candidates and email generation status
     """
     try:
-        # Load candidates
-        candidates = load_candidates_from_csv()
+        # Load candidates from parameter or CSV file
+        if candidates:
+            # Convert dicts to Candidate objects
+            candidate_objects = []
+            for c in candidates:
+                candidate_objects.append(Candidate(**c))
+            candidates = candidate_objects
+        else:
+            candidates = load_candidates_from_csv()
         
         # Score all candidates
         try:
@@ -211,11 +228,11 @@ def run_flow(
             except ImportError:
                 pass
             scores = loop.run_until_complete(
-                score_all_candidates_async(candidates, additional_instructions)
+                score_all_candidates_async(candidates, job_description, additional_instructions)
             )
         else:
             scores = asyncio.run(
-                score_all_candidates_async(candidates, additional_instructions)
+                score_all_candidates_async(candidates, job_description, additional_instructions)
             )
         
         # Combine candidates with scores
@@ -305,31 +322,3 @@ def run_flow(
             "traceback": traceback.format_exc()
         }
 
-
-if __name__ == "__main__":
-    # Test the RunAgent-compatible entry points
-    print("Testing RunAgent-compatible Lead Score Flow")
-    print("=" * 50)
-    
-    # Test 1: Score a single candidate
-    print("\n1. Testing single candidate scoring:")
-    single_result = score_single_candidate(
-        candidate_id="test-1",
-        name="Test User",
-        email="test@example.com",
-        bio="Experienced React developer with 3 years of Next.js experience and AI integration skills.",
-        skills="React, Next.js, JavaScript, Vercel AI SDK"
-    )
-    print(json.dumps(single_result, indent=2))
-    
-    # Test 2: Run full flow
-    print("\n2. Testing full flow:")
-    flow_result = run_flow(top_n=3, generate_emails=False)
-    print(f"Total candidates: {flow_result.get('total_candidates')}")
-    print(f"Success: {flow_result.get('success')}")
-    if flow_result.get('success'):
-        print(f"Top {len(flow_result.get('top_candidates', []))} candidates:")
-        for candidate in flow_result.get('top_candidates', []):
-            print(f"  - {candidate['name']}: {candidate['score']}")
-    else:
-        print(f"Error: {flow_result.get('error')}")
