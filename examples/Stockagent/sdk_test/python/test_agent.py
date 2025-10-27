@@ -14,10 +14,3 @@ for update in client.run(
     model="gpt-4o-mini"
 ):
     print(update)
-    # # Print everything
-    # if update.get('type') == 'log':
-    #     # Raw log output
-    #     print(update['message'])
-    # else:
-    #     # Structured events
-    #     print(f"[{update['type']}] {update.get('message', '')}")

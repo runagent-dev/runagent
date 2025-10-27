@@ -52,7 +52,7 @@ def score_leads():
         client = RunAgentClient(
             agent_id=agent_id,
             entrypoint_tag="lead_score_flow",
-            local=True  # Set to False when using RunAgent Cloud
+            local=False  # Set to False when using RunAgent Cloud
         )
         
         # Run the lead scoring flow

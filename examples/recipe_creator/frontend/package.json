@@ -1,0 +1,12 @@
+{
+  "name": "chefgenius-frontend",
+  "version": "1.0.0",
+  "description": "AI-Powered Recipe Creator Frontend",
+  "scripts": {
+    "dev": "http-server -p 3000 -o"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+
