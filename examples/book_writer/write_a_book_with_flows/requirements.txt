@@ -1,0 +1,6 @@
+crewai
+crewai[tools]
+langchain-tools
+crewai-tools
+pydantic
+nest-asyncio

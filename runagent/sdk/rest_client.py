@@ -20,6 +20,7 @@ from rich.progress import (
 )
 
 from runagent.utils.config import Config
+from runagent.constants import DEFAULT_TIMEOUT_SECONDS
 from runagent.utils.agent_id import (
     generate_agent_id,
     generate_agent_fingerprint,
@@ -1138,7 +1139,7 @@ class RestClient:
         entrypoint_tag: str,
         input_args: list = None,
         input_kwargs: dict = None,
-        timeout_seconds: int = 60,
+        timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
         async_execution: bool = False,
     ) -> Dict:
         """Execute an agent with given parameters"""
