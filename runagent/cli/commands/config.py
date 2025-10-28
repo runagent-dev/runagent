@@ -43,8 +43,10 @@ def format_error_message(error_info):
 @click.group(invoke_without_command=True)
 @click.option("--set-api-key", help="Set API key directly (e.g., runagent config --set-api-key YOUR_KEY)")
 @click.option("--set-base-url", help="Set base URL directly (e.g., runagent config --set-base-url https://api.example.com)")
+@click.option("--register-agent", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path), help="Register a modified agent in the database")
+@click.option("--delete-agent", help="Delete an agent by ID")
 @click.pass_context
-def config(ctx, set_api_key, set_base_url):
+def config(ctx, set_api_key, set_base_url, register_agent, delete_agent):
     """
     Manage RunAgent configuration
     
@@ -56,6 +58,8 @@ def config(ctx, set_api_key, set_base_url):
     Direct flags (for scripts/agents):
       $ runagent config --set-api-key YOUR_KEY
       $ runagent config --set-base-url https://api.example.com
+      $ runagent config --register-agent .
+      $ runagent config --delete-agent <agent_id>
     
     \b
     Subcommands:
@@ -71,6 +75,14 @@ def config(ctx, set_api_key, set_base_url):
     if set_base_url:
         _set_base_url_direct(set_base_url)
         return
+    
+    if register_agent:
+        from .register import register as register_func
+        return register_func(register_agent)
+    
+    if delete_agent:
+        from .delete import delete as delete_func
+        return delete_func(delete_agent, False)
     
     # If no subcommand and no flags, show interactive menu
     if ctx.invoked_subcommand is None:

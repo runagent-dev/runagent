@@ -4,6 +4,7 @@ import os
 import tempfile
 import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -566,19 +567,37 @@ class RestClient:
                 from runagent.sdk.db import DBService
                 db_service = DBService()
                 
-                # Add remote agent to database
-                db_result = db_service.add_remote_agent(
-                    agent_id=agent_id,
-                    agent_path="",  # Remote agent, no local path
-                    framework="unknown",  # Will be updated when agent is started
-                    fingerprint=upload_metadata.get("fingerprint", ""),
-                    status="uploaded"
-                )
+                # Check if agent already exists in database (from init command)
+                existing_agent = db_service.get_agent(agent_id)
                 
-                if db_result.get("success"):
-                    console.print(f"💾 [green]Agent saved to local database[/green]")
+                if existing_agent:
+                    # Agent exists - update it instead of adding new one
+                    db_result = db_service.update_agent(
+                        agent_id=agent_id,
+                        framework=upload_metadata.get("framework", "unknown"),
+                        remote_status="uploaded",  # Remote status for upload
+                        fingerprint=upload_metadata.get("fingerprint", ""),
+                        deployed_at=datetime.now()
+                    )
+                    
+                    if db_result.get("success"):
+                        console.print(f"🔄 [green]Agent updated in local database[/green]")
+                    else:
+                        console.print(f"⚠️ [yellow]Warning: Could not update local database: {db_result.get('error')}[/yellow]")
                 else:
-                    console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
+                    # Agent doesn't exist - add new remote agent
+                    db_result = db_service.add_remote_agent(
+                        agent_id=agent_id,
+                        agent_path="",  # Remote agent, no local path
+                        framework="unknown",  # Will be updated when agent is started
+                        fingerprint=upload_metadata.get("fingerprint", ""),
+                        status="uploaded"
+                    )
+                    
+                    if db_result.get("success"):
+                        console.print(f"💾 [green]Agent saved to local database[/green]")
+                    else:
+                        console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
                     
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
@@ -981,9 +1000,37 @@ class RestClient:
                         "existing_agent": existing_agent
                     }
             else:
-                # No existing agent found - create new one
-                agent_id = generate_agent_id()
-                console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                # No existing agent found - check if agent was initialized
+                if agent_config and agent_config.agent_id:
+                    # Agent was initialized - validate agent ID exists in database
+                    from runagent.sdk.db import DBService
+                    db_service = DBService()
+                    validation_result = db_service.validate_agent_id(agent_config.agent_id)
+                    
+                    if not validation_result["valid"]:
+                        console.print(f"⚠️ [yellow]Warning: {validation_result['error']}[/yellow]")
+                        console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+                        console.print(f"🔧 [blue]You can use 'runagent config --register-agent .' to register a modified agent[/blue]")
+                        
+                        # Ask user if they want to continue
+                        from rich.prompt import Confirm
+                        continue_anyway = Confirm.ask("Do you want to continue anyway?", default=False)
+                        
+                        if not continue_anyway:
+                            return {
+                                "success": False,
+                                "error": "Agent ID validation failed",
+                                "code": "AGENT_ID_VALIDATION_FAILED"
+                            }
+                    
+                    # Agent ID is valid - use existing agent_id
+                    agent_id = agent_config.agent_id
+                    console.print(f"🔄 [green]Found initialized agent: [bold magenta]{agent_id}[/bold magenta][/green]")
+                    console.print(f"📋 [cyan]Framework: [bold]{agent_config.framework}[/bold][/cyan]")
+                else:
+                    # No initialized agent - create new one (legacy behavior)
+                    agent_id = generate_agent_id()
+                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
 
             # Step 5: Full deployment with single progress bar
             console.print(f"🌐 Deploying to: [bold blue]{self.base_url}[/bold blue]")
@@ -1038,6 +1085,18 @@ class RestClient:
                 if start_result.get("success"):
                     progress.update(deploy_task, completed=100, description="Deployment completed successfully!")
                     time.sleep(0.5)  # Brief pause to show completion
+                    
+                    # Update remote_status to "deployed" for successful deployment
+                    try:
+                        from runagent.sdk.db import DBService
+                        db_service = DBService()
+                        db_service.update_agent(
+                            agent_id=agent_id,
+                            remote_status="deployed"
+                        )
+                        console.print(f"🔄 [green]Agent remote status updated to 'deployed'[/green]")
+                    except Exception as e:
+                        console.print(f"⚠️ [yellow]Warning: Could not update remote status: {e}[/yellow]")
                     
                     # Process upload result for database storage
                     self._process_upload_result(upload_result, {

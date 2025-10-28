@@ -17,7 +17,6 @@ from .commands.deploy import deploy as deploy_cmd
 from .commands.serve import serve as serve_cmd
 from .commands.run import run as run_cmd
 from .commands.run_stream import run_stream as run_stream_cmd
-from .commands.delete import delete as delete_cmd
 from .commands.db import db as db_cmd
 
 if not os.getenv('DISABLE_TRY_CATCH'):
@@ -72,7 +71,6 @@ runagent.add_command(deploy_cmd)
 runagent.add_command(serve_cmd)
 runagent.add_command(run_cmd)
 runagent.add_command(run_stream_cmd)
-runagent.add_command(delete_cmd)
 runagent.add_command(db_cmd) 
 
 if __name__ == "__main__":

@@ -469,114 +469,55 @@ class LocalServer:
         except Exception as e:
             framework = detect_framework(agent_path)
 
-        # Check if an agent from this path already exists
-        existing_agent = db_service.get_agent_by_path(str(agent_path))
+        # agent_id is required in config - load config
+        agent_config = get_agent_config(agent_path)
         
-        if existing_agent:
-            # Agent already exists - check if its port is available
-            existing_host = existing_agent['host']
-            existing_port = existing_agent['port']
-            
-            console.print(f"[yellow]Found existing agent for path: {agent_path}[/yellow]")
-            console.print(f"[cyan]Agent Details:[/cyan]")
-            console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
-            console.print(f"   • Host: [blue]{existing_host}[/blue]")
-            console.print(f"   • Port: [blue]{existing_port}[/blue]")
-            console.print(f"   • Framework: [green]{existing_agent['framework']}[/green]")
-            console.print(f"   • Status: [yellow]{existing_agent['status']}[/yellow]")
-            console.print(f"   • Deployed: [dim]{existing_agent['deployed_at']}[/dim]")
-            console.print(f"   • Total Runs: [cyan]{existing_agent['run_count']}[/cyan]")
-            console.print(f"   • Success Rate: [green]{existing_agent['success_count']}/{existing_agent['run_count']}[/green]")
-            
-            if existing_agent['last_run']:
-                console.print(f"   • Last Run: [dim]{existing_agent['last_run']}[/dim]")
-                        
-            # Check if the existing port is available
-            if PortManager.is_port_available(existing_host, existing_port):
-                console.print(f"\n🔄 [green]Port {existing_port} is available - reusing existing agent configuration[/green]")
-                
-                return LocalServer(
-                    agent_path=agent_path,
-                    agent_id=existing_agent['agent_id'],
-                    port=existing_port,
-                    host=existing_host,
-                    db_service=db_service,
-                )
-            else:
-                # Port is in use - need to allocate a new one and update the database
-                console.print(f"\n[yellow]Port {existing_port} is already in use - allocating new port[/yellow]")
-                
-                # Get currently used ports to avoid conflicts
-                used_ports = PortManager.get_used_ports_from_db(db_service)
-                
-                # Allocate new address
-                if port and PortManager.is_port_available(host, port):
-                    new_host = host
-                    new_port = port
-                    console.print(f"Using preferred address: [blue]{new_host}:{new_port}[/blue]")
-                else:
-                    new_host, new_port = PortManager.allocate_unique_address(used_ports)
-                
-                # Update the existing agent's host/port in the database
-                with db_service.db_manager.get_session() as session:
-                    from runagent.sdk.db import Agent
-                    agent_record = session.query(Agent).filter(Agent.agent_id == existing_agent['agent_id']).first()
-                    if agent_record:
-                        agent_record.host = new_host
-                        agent_record.port = new_port
-                        session.commit()
-                        console.print(f"🔄 [green]Updated agent address in database: {new_host}:{new_port}[/green]")
-                
-                return LocalServer(
-                    agent_path=agent_path,
-                    agent_id=existing_agent['agent_id'],
-                    port=new_port,
-                    host=new_host,
-                    db_service=db_service,
-                )
+        if not agent_config:
+            raise Exception(f"Invalid agent configuration. Please run 'runagent init' first to initialize your agent.")
         
-        else:
-            # No existing agent - create new one
-            console.print(f"🆕 [green]Creating new agent for path: {agent_path}[/green]")
-            console.print(f"📋 [cyan]Framework detected: [bold]{framework}[/bold][/cyan]")
-            
-            # Check database capacity
-            capacity_info = db_service.get_database_capacity_info()
-            if capacity_info["is_full"]:
-                raise Exception(
-                    "Database is full. Refer to our docs at "
-                    "https://docs.runagent.ai/local-server for more information."
-                )
-
-            # Generate unique agent ID (same for all frameworks including Letta)
-            agent_id = str(uuid.uuid4())
-            
-            # Add agent with automatic port allocation
-            result = db_service.add_agent_with_auto_port(
-                agent_id=agent_id,
-                agent_path=str(agent_path),
-                framework=framework.value if hasattr(framework, 'value') else str(framework),
-                status="ready",
-                preferred_host=host,
-                preferred_port=port,  # Will auto-allocate if None or unavailable
-            )
-            
-            if not result["success"]:
-                raise Exception(f"Failed to add agent to database: {result['error']}")
-            
-            allocated_host = result["allocated_host"]
-            allocated_port = result["allocated_port"]
-            
-            console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
-            console.print(f"🔌 [green]Allocated address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
-            
-            return LocalServer(
-                agent_path=agent_path,
-                agent_id=agent_id,
-                port=allocated_port,  # Use allocated port
-                host=allocated_host,  # Use allocated host
-                db_service=db_service,
-            )
+        if not agent_config.agent_id:
+            raise Exception(f"Agent ID not found in configuration. Please run 'runagent init' first to initialize your agent.")
+        
+        # Validate agent ID exists in database
+        validation_result = db_service.validate_agent_id(agent_config.agent_id)
+        
+        if not validation_result["valid"]:
+            console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
+            console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+            console.print(f"🔧 [blue]You can use 'runagent config --register-agent .' to register a modified agent[/blue]")
+            raise Exception(f"Agent ID validation failed. Cannot serve agent.")
+        
+        # Agent ID is valid - update and serve
+        agent_id = agent_config.agent_id
+        console.print(f"🔄 [green]Serving agent: [bold magenta]{agent_id}[/bold magenta][/green]")
+        console.print(f"📋 [cyan]Framework: [bold]{framework}[/bold][/cyan]")
+        
+        # Update agent with automatic port allocation
+        result = db_service.update_agent(
+            agent_id=agent_id,
+            framework=framework.value if hasattr(framework, 'value') else str(framework),
+            status="serving",  # Local status
+            auto_port=True,
+            preferred_host=host,
+            preferred_port=port,
+        )
+        
+        if not result["success"]:
+            raise Exception(f"Failed to update agent in database: {result['error']}")
+        
+        allocated_host = result["host"]
+        allocated_port = result["port"]
+        
+        console.print(f"✅ [green]Agent ready to serve[/green]")
+        console.print(f"🔌 [green]Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
+        
+        return LocalServer(
+            agent_path=agent_path,
+            agent_id=agent_id,
+            port=allocated_port,
+            host=allocated_host,
+            db_service=db_service,
+        )
 
     def _setup_routes(self):
         """Setup FastAPI routes - ENHANCED with invocation tracking"""

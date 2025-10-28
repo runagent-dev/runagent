@@ -1,53 +1,33 @@
-"""
-CLI commands that use the restructured SDK internally.
-"""
-import os
 import json
-import uuid
-
+import os
+import warnings
+from datetime import datetime
 from pathlib import Path
 
 import click
+import inquirer
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
+from rich.prompt import Prompt
 
-from runagent import RunAgent
-from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
-    AuthenticationError,
-    TemplateError,
-    ValidationError,
-)
-from runagent.client.client import RunAgentClient
-from runagent.sdk.server.local_server import LocalServer
-from runagent.utils.agent import detect_framework
-from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
-from runagent.utils.config import Config
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
+from runagent.cli.branding import print_header
 from runagent.cli.utils import add_framework_options, get_selected_framework
+from runagent.sdk import RunAgent
+from runagent.sdk.db import DBService
+from runagent.sdk.exceptions import TemplateError
+from runagent.utils.agent import get_agent_config, get_agent_config_with_defaults
+from runagent.utils.agent_id import generate_agent_id, generate_config_fingerprint
 from runagent.utils.enums.framework import Framework
+
 console = Console()
 
 
-def format_error_message(error_info):
-    """Format error information from API responses"""
-    if isinstance(error_info, dict) and "message" in error_info:
-        # New format with ErrorDetail object
-        error_message = error_info.get("message", "Unknown error")
-        error_code = error_info.get("code", "UNKNOWN_ERROR")
-        return f"[{error_code}] {error_message}"
-    else:
-        # Fallback to old format for backward compatibility
-        return str(error_info) if error_info else "Unknown error"
-
-
-# ============================================================================
-# Config Command Group
-# ============================================================================
-
-
 @click.command()
-@click.option("--template", help="Template variant (default, advanced, etc.) - for non-interactive")
+@click.option("--template", default="default", help="Template variant (default, advanced, etc.) - for non-interactive")
 @click.option("--blank", is_flag=True, help="Start from blank template - for non-interactive")
+@click.option("--from-template", help="Specific template to use (e.g., langchain/problem_solver)")
+@click.option("--from-github", help="GitHub repository URL to clone")
+@click.option("--use-auth", type=click.Choice(['none', 'api_key']), help="Authentication type to use")
 @click.option("--name", help="Agent name - for non-interactive")
 @click.option("--description", help="Agent description - for non-interactive")
 @click.option("--overwrite", is_flag=True, help="Overwrite existing folder")
@@ -64,7 +44,7 @@ def format_error_message(error_info):
     default=".",
     required=False,
 )
-def init(template, blank, name, description, overwrite, path, **kwargs):
+def init(path, template, blank, from_template, from_github, use_auth, name, description, overwrite, **kwargs):
     """
     Initialize a new RunAgent project
     
@@ -73,40 +53,41 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
       $ runagent init
     
     \b
-    Non-interactive with template:
-      $ runagent init --framework langgraph --template advanced --name "My Agent" --description "Does XYZ" ./my-agent
-    
-    \b
-    Non-interactive blank:
-      $ runagent init --blank --name "Custom Agent" --description "My custom implementation"
+    Non-interactive examples:
+      $ runagent init . --blank --name "My Agent" --description "Does XYZ"
+      $ runagent init . --from-template langchain/problem_solver
+      $ runagent init . --from-github https://github.com/user/repo
+      $ runagent init . --langgraph --template advanced --name "My Agent"
+      $ runagent init /path/to/project --use-auth api_key
     """
     
     try:
-        from runagent.cli.branding import print_header
-        from rich.prompt import Prompt
-        from rich.panel import Panel
-        import inquirer
-        
         print_header("Initialize Project")
         
         sdk = RunAgent()
         
+        # Determine project path
+        project_path = path.resolve()
+        if project_path.name == ".":
+            project_path = project_path.parent
+        
         # Determine if interactive mode
-        selected_framework = get_selected_framework(kwargs)
-        has_required_non_interactive = (
-            (selected_framework or blank) and name and description
+        has_non_interactive_options = (
+            blank or from_template or from_github or 
+            (name and description) or use_auth
         )
-        is_interactive = not has_required_non_interactive
+        is_interactive = not has_non_interactive_options
         
         # Variables to collect
         agent_name = name
         agent_description = description
-        use_blank = blank
-        framework = selected_framework
-        selected_template = template or "default"
+        auth_type = use_auth or "none"
+        template_source = None
+        selected_template = None
+        framework = None
         
         if is_interactive:
-            # Step 1: Choose blank or template
+            # Step 1: Choose project type
             console.print("[bold cyan]How would you like to start?[/bold cyan]\n")
             
             start_questions = [
@@ -114,8 +95,9 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                     'start_type',
                     message="Select starting point",
                     choices=[
+                        ('📄 Blank Project (Own codebase)', 'blank'),
                         ('📦 From Template (recommended)', 'template'),
-                        ('📄 Blank Project (advanced)', 'blank'),
+                        ('🐙 From GitHub Repository', 'github'),
                     ],
                     default=('📦 From Template (recommended)', 'template'),
                     carousel=True
@@ -127,12 +109,19 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                 console.print("[dim]Initialization cancelled.[/dim]")
                 return
             
-            use_blank = (start_answer['start_type'] == 'blank')
+            start_type = start_answer['start_type']
             
-            # Step 2: If template, select framework and template
-            if not use_blank:
-                # Select framework
+            if start_type == 'blank':
+                # Blank project - use default/default
+                template_source = "blank"
+                selected_template = "default/default"
+                framework = Framework.DEFAULT
+                
+            elif start_type == 'template':
+                # Template project - select framework and template from API
                 console.print("\n[bold]Select framework:[/bold]\n")
+                
+                # TODO: Get frameworks from REST API
                 selectable_frameworks = Framework.get_selectable_frameworks()
                 
                 framework_choices = []
@@ -157,98 +146,111 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
                 
                 framework = fw_answer['framework']
                 
-                # Select template for chosen framework
+                # TODO: Get templates from REST API for selected framework
                 console.print(f"\n[bold]Select template for {framework.value}:[/bold]")
                 
-                # Fetch templates with real progress feedback
-                from rich.status import Status
-                import time
+                # For now, use default template
+                selected_template = f"{framework.value}/default"
+                template_source = "template"
                 
-                fetch_start = time.time()
+            elif start_type == 'github':
+                # GitHub project - get repository URL
+                github_url = Prompt.ask(
+                    "[cyan]GitHub repository URL[/cyan]",
+                    default=""
+                )
                 
-                with Status(
-                    "[cyan]Fetching available templates...[/cyan]",
-                    console=console,
-                    spinner="dots"
-                ) as status:
-                    clone_start = time.time()
-                    status.update("[cyan]Cloning template repository...[/cyan]")
-                    
-                templates = sdk.list_templates(framework.value)
-                clone_time = time.time() - clone_start
+                if not github_url:
+                    console.print("[dim]Initialization cancelled.[/dim]")
+                    return
                 
-                status.update(f"[cyan]Templates fetched ({clone_time:.1f}s)[/cyan]")
-                template_list = templates.get(framework.value, ["default"])
-                
-                fetch_time = time.time() - fetch_start
-                
-                console.print(f"[dim]✓ Found {len(template_list)} template(s) in {fetch_time:.1f}s[/dim]")
-                
-                # Auto-select if only one template available
-                if len(template_list) == 1:
-                    selected_template = template_list[0]
-                    console.print(f"[dim]→ Using template: {selected_template}[/dim]\n")
-                else:
-                    # Show dropdown for multiple templates
-                    console.print()
-                    template_choices = [(f"🧱 {tmpl}", tmpl) for tmpl in template_list]
-                    
-                    tmpl_questions = [
-                        inquirer.List(
-                            'template',
-                            message="Choose template",
-                            choices=template_choices,
-                            carousel=True
-                        ),
-                    ]
-                    
-                    tmpl_answer = inquirer.prompt(tmpl_questions)
-                    if not tmpl_answer:
-                        console.print("[dim]Initialization cancelled.[/dim]")
-                        return
-                    
-                    selected_template = tmpl_answer['template']
-            else:
-                # Blank project uses default framework
+                template_source = "github"
+                selected_template = github_url
+                # Framework will be detected from the cloned repository
+                framework = Framework.DEFAULT  # Will be updated after cloning
+        else:
+            # Non-interactive mode
+            if blank:
+                template_source = "blank"
+                selected_template = "default/default"
                 framework = Framework.DEFAULT
-                selected_template = "default"
+            elif from_template:
+                template_source = "template"
+                selected_template = from_template
+                # Extract framework from template name (e.g., "langchain/problem_solver")
+                if "/" in from_template:
+                    framework_name = from_template.split("/")[0]
+                    try:
+                        framework = Framework.from_string(framework_name)
+                    except ValueError:
+                        framework = Framework.DEFAULT
+                else:
+                    framework = Framework.DEFAULT
+            elif from_github:
+                template_source = "github"
+                selected_template = from_github
+                framework = Framework.DEFAULT  # Will be detected after cloning
+            else:
+                # Default to template mode
+                template_source = "template"
+                selected_template = template
+                framework = get_selected_framework(kwargs) or Framework.DEFAULT
+        
+        # Step 2: Get project details
+
+        is_custom_path = project_path.resolve() != Path.cwd()
+        if is_interactive or not (name and description):
+            console.print("\n[bold]Project Details:[/bold]\n")
             
-            # Step 3: Get agent name and description (for both blank and template)
-            console.print("\n[bold]Agent Details:[/bold]\n")
+            # Suggest name based on path
+            # Check if project path is current working directory
+            # is_cwd = project_path.resolve() == Path.cwd()
+            suggested_name = project_path.name if is_custom_path else "runagent-starter"
             
             agent_name = Prompt.ask(
                 "[cyan]Agent name[/cyan]",
-                default="my-agent"
+                default=suggested_name
             )
             
             agent_description = Prompt.ask(
                 "[cyan]Agent description[/cyan]",
                 default="My AI agent"
             )
-            
-            # Step 4: Get path (default based on agent name)
-            console.print()
-            # Convert agent name to valid directory name (replace spaces with hyphens, lowercase)
-            default_path = agent_name.lower().replace(" ", "-").replace("_", "-")
+        
+        # Step 3: Get project path (if not already specified)
+        if is_interactive or not is_custom_path:
+            # console.print()
+            custom_path = project_path / agent_name.lower().replace(" ", "-")
+            suggested_path = project_path.resolve() if is_custom_path else custom_path
             path_input = Prompt.ask(
                 "[cyan]Project path[/cyan]",
-                default=default_path
+                default=suggested_path.as_posix()
             )
-            path = Path(path_input)
+            project_path = Path(path_input).resolve()
         
-        # Ensure framework is set
-        if not framework:
-            framework = Framework.DEFAULT
-        
-        # Validate framework if it came from string input
-        if isinstance(framework, str):
-            try:
-                framework = Framework.from_string(framework)
-            except ValueError as e:
-                raise click.UsageError(str(e))
-        
-        # Use the path as the project location
-        project_path = path.resolve()
+        # Step 4: Get authentication type
+        if is_interactive or not use_auth:
+            console.print("\n[bold]Authentication:[/bold]\n")
+            
+            auth_questions = [
+                inquirer.List(
+                    'auth_type',
+                    message="Select authentication type",
+                    choices=[
+                        ('🔓 None (no authentication)', 'none'),
+                        ('🔑 API Key', 'api_key'),
+                    ],
+                    default=('🔓 None (no authentication)', 'none'),
+                    carousel=True
+                ),
+            ]
+            
+            auth_answer = inquirer.prompt(auth_questions)
+            if not auth_answer:
+                console.print("[dim]Initialization cancelled.[/dim]")
+                return
+            
+            auth_type = auth_answer['auth_type']
         
         # Ensure the path exists
         project_path.parent.mkdir(parents=True, exist_ok=True)
@@ -258,54 +260,110 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
             f"[bold]Project Configuration:[/bold]\n\n"
             f"[dim]Name:[/dim] [cyan]{agent_name}[/cyan]\n"
             f"[dim]Description:[/dim] [white]{agent_description}[/white]\n"
-            f"[dim]Framework:[/dim] [magenta]{framework.value}[/magenta]\n"
+            f"[dim]Source:[/dim] [magenta]{template_source}[/magenta]\n"
             f"[dim]Template:[/dim] [yellow]{selected_template}[/yellow]\n"
+            f"[dim]Framework:[/dim] [blue]{framework.value}[/blue]\n"
+            f"[dim]Auth:[/dim] [green]{auth_type}[/green]\n"
             f"[dim]Path:[/dim] [blue]{project_path}[/blue]",
             title="[bold cyan]Creating Agent[/bold cyan]",
             border_style="cyan"
         ))
         
-        # Initialize project
-        success = sdk.init_project(
-            folder_path=project_path,
-            framework=framework.value,
-            template=selected_template,
-            overwrite=overwrite
-        )
+        # Initialize project based on source type
+        if template_source == "blank":
+            # Initialize blank project
+            success = sdk.init_project(
+                folder_path=project_path,
+                framework=framework.value,
+                template="default",
+                overwrite=overwrite
+            )
+        elif template_source == "template":
+            # Initialize from template
+            success = sdk.init_project(
+                folder_path=project_path,
+                framework=framework.value,
+                template=selected_template.split("/")[1] if "/" in selected_template else "default",
+                overwrite=overwrite
+            )
+        elif template_source == "github":
+            # TODO: Clone from GitHub
+            console.print(f"[yellow]⚠️  GitHub cloning not yet implemented for: {selected_template}[/yellow]")
+            success = False
         
         if not success:
             raise Exception("Project initialization failed")
         
-        # Update config file with name and description
+        # Generate agent ID and update config file
         try:
-            import warnings
-            from datetime import datetime
-            
             # Suppress Pydantic datetime warnings during config update
             warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
             
+            # Generate unique agent ID
+            agent_id = generate_agent_id()
+            
             config_path = project_path / "runagent.config.json"
             if config_path.exists():
-                with open(config_path, 'r') as f:
-                    config_data = json.load(f)
+                # Load config using the schema (handles missing fields gracefully)
+                config = get_agent_config(project_path)
                 
-                config_data['name'] = agent_name
-                config_data['description'] = agent_description
+                # Update config with user-provided values and agent_id
+                config.agent_id = agent_id
+                config.agent_name = agent_name
+                config.description = agent_description
                 
-                # Fix created_at format if it exists and is a string in wrong format
-                if 'created_at' in config_data and isinstance(config_data['created_at'], str):
-                    try:
-                        # Try to parse and convert to ISO format
-                        dt = datetime.strptime(config_data['created_at'], "%Y-%m-%d %H:%M:%S")
-                        config_data['created_at'] = dt.isoformat()
-                    except:
-                        # If parsing fails, use current time in ISO format
-                        config_data['created_at'] = datetime.now().isoformat()
+                # Add auth_settings
+                config_dict = config.to_dict()
+                config_dict['auth_settings'] = {
+                    'type': auth_type
+                }
                 
+                # Save updated config
                 with open(config_path, 'w') as f:
-                    json.dump(config_data, f, indent=2)
+                    json.dump(config_dict, f, indent=2)
                 
-                console.print("\n[dim]✓ Updated agent name and description in config[/dim]")
+                console.print(f"\n[dim]✓ Generated agent ID: [cyan]{agent_id}[/cyan][/dim]")
+                console.print("[dim]✓ Updated agent name and description in config[/dim]")
+                console.print(f"[dim]✓ Set authentication type: [green]{auth_type}[/green][/dim]")
+                
+                # Create database entry for the initialized agent
+                try:
+                    # Load config with defaults
+                    config_with_defaults = get_agent_config_with_defaults(project_path)
+                    
+                    # Generate config fingerprint
+                    config_fingerprint = generate_config_fingerprint(project_path)
+                    
+                    # Create database service and add agent
+                    db_service = DBService()
+                    
+                    # Get active project ID from user metadata
+                    active_project_id = db_service.get_active_project_id()
+                    
+                    result = db_service.add_agent(
+                        agent_id=agent_id,
+                        agent_path=str(project_path),
+                        host="",  # Will be updated when deployed
+                        port=0000,  # Will be updated when deployed
+                        framework=framework.value,
+                        status="initialized",  # New status for initialized agents
+                        agent_name=config_with_defaults.get('agent_name'),
+                        description=config_with_defaults.get('description'),
+                        template=config_with_defaults.get('template'),
+                        version=config_with_defaults.get('version'),
+                        initialized_at=config_with_defaults.get('created_at'),
+                        config_fingerprint=config_fingerprint,
+                        project_id=active_project_id,  # Get from user metadata, not config
+                    )
+                    
+                    if result.get('success'):
+                        console.print("[dim]✓ Agent registered in database[/dim]")
+                    else:
+                        console.print(f"[yellow]⚠️  Could not register agent in database: {result.get('error', 'Unknown error')}[/yellow]")
+                        
+                except Exception as db_error:
+                    console.print(f"[yellow]⚠️  Could not register agent in database: {db_error}[/yellow]")
+                    
         except Exception as e:
             console.print(f"[yellow]⚠️  Could not update config: {e}[/yellow]")
         
@@ -315,7 +373,9 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
         console.print(Panel(
             f"[bold green]✅ Agent '{agent_name}' created successfully![/bold green]\n\n"
             f"[dim]Location:[/dim] [cyan]{relative_path}[/cyan]\n"
-            f"[dim]Framework:[/dim] [magenta]{framework.value}[/magenta]",
+            f"[dim]Framework:[/dim] [magenta]{framework.value}[/magenta]\n"
+            f"[dim]Source:[/dim] [blue]{template_source}[/blue]\n"
+            f"[dim]Auth:[/dim] [green]{auth_type}[/green]",
             title="[bold green]Success[/bold green]",
             border_style="green"
         ))
@@ -347,15 +407,13 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
             raise
         
         # Extract just the path from the error message
-        path_match = str(e).split("'")
-        folder_path = path_match[1] if len(path_match) > 1 else "the specified path"
+        folder_path = str(e).split("'")[1] if "'" in str(e) else str(e)
         
         console.print(Panel(
             f"[bold yellow]Directory Already Exists[/bold yellow]\n\n"
             f"[dim]Path:[/dim] [cyan]{folder_path}[/cyan]\n\n"
             f"The directory already exists and is not empty.\n\n"
             f"[bold]Options:[/bold]\n"
-            f"  • Choose a different path\n"
             f"  • Use [cyan]--overwrite[/cyan] flag to replace existing files\n"
             f"  • Remove the directory manually",
             title="[bold yellow]⚠️  Path Conflict[/bold yellow]",
@@ -371,4 +429,3 @@ def init(template, blank, name, description, overwrite, path, **kwargs):
             raise
         console.print(f"❌ [red]Initialization error:[/red] {e}")
         raise click.ClickException("Project initialization failed")
-
