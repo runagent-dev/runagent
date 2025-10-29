@@ -46,6 +46,7 @@ def format_error_message(error_info):
 
 
 @click.command()
+@click.option("--overwrite", is_flag=True, help="Overwrite existing agent if it already exists")
 @click.argument(
     "path",
     type=click.Path(
@@ -58,7 +59,7 @@ def format_error_message(error_info):
     ),
     default=".",
 )
-def upload(path: Path):
+def upload(path: Path, overwrite: bool):
     """Upload agent to remote server"""
 
     try:
@@ -82,7 +83,7 @@ def upload(path: Path):
         console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
         # Upload agent (framework auto-detected)
-        result = sdk.upload_agent(folder=path)
+        result = sdk.upload_agent(folder=path, overwrite=overwrite)
 
         if result.get("success"):
             agent_id = result["agent_id"]

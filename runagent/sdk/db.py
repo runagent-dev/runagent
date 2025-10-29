@@ -1931,6 +1931,7 @@ class DBService:
                         "agent": {
                             "agent_id": existing_agent.agent_id,
                             "agent_name": existing_agent.agent_name,
+                            "agent_path": existing_agent.agent_path,
                             "status": existing_agent.status,
                             "remote_status": existing_agent.remote_status,
                             "framework": existing_agent.framework,
@@ -1942,6 +1943,64 @@ class DBService:
                         "error": f"Agent ID '{agent_id}' not found in database",
                         "code": "AGENT_NOT_FOUND",
                         "suggestion": "Use 'runagent config --register-agent .' to register a modified agent"
+                    }
+                    
+            except Exception as e:
+                return {
+                    "valid": False,
+                    "error": f"Database error: {str(e)}",
+                    "code": "DATABASE_ERROR",
+                }
+
+    def validate_agent_path(self, agent_id: str, current_path: str) -> Dict:
+        """
+        Validate that the agent path in database matches the current folder path
+        
+        Args:
+            agent_id: Agent ID to validate
+            current_path: Current folder path being uploaded
+            
+        Returns:
+            Dictionary with validation result
+        """
+        if not agent_id or not current_path:
+            return {
+                "valid": False,
+                "error": "Agent ID and current path are required",
+                "code": "MISSING_PARAMETERS",
+            }
+        
+        with self.db_manager.get_session() as session:
+            try:
+                existing_agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
+                
+                if not existing_agent:
+                    return {
+                        "valid": False,
+                        "error": f"Agent ID '{agent_id}' not found in database",
+                        "code": "AGENT_NOT_FOUND",
+                    }
+                
+                # Normalize paths for comparison
+                db_path = str(Path(existing_agent.agent_path).resolve()) if existing_agent.agent_path else ""
+                current_path_normalized = str(Path(current_path).resolve())
+                
+                if db_path == current_path_normalized:
+                    return {
+                        "valid": True,
+                        "message": "Agent path matches database record"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "error": f"Agent path mismatch detected",
+                        "code": "PATH_MISMATCH",
+                        "details": {
+                            "db_path": db_path,
+                            "current_path": current_path_normalized,
+                            "agent_id": agent_id
+                        },
+                        "suggestion": "Use 'runagent config --register-agent .' to update the agent location in database"
                     }
                     
             except Exception as e:

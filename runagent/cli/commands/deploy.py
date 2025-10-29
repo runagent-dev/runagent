@@ -46,6 +46,7 @@ def format_error_message(error_info):
 
 
 @click.command()
+@click.option("--overwrite", is_flag=True, help="Overwrite existing agent if it already exists")
 @click.argument(
     "path",
     type=click.Path(
@@ -58,7 +59,7 @@ def format_error_message(error_info):
     ),
     default=".",
 )
-def deploy(path: Path):
+def deploy(path: Path, overwrite: bool):
     """Deploy agent (upload + start) to remote server"""
 
     try:
@@ -82,7 +83,7 @@ def deploy(path: Path):
         console.print(f"📁 Source: [cyan]{path}[/cyan]")
 
         # Deploy agent (framework auto-detected)
-        result = sdk.deploy_remote(folder=str(path))
+        result = sdk.deploy_remote(folder=str(path), overwrite=overwrite)
 
         if result.get("success"):
             console.print(f"\n✅ [green]Deployment successful![/green]")

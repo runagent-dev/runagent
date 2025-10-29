@@ -103,10 +103,15 @@ class HttpHandler:
                 # Handle middleware-style errors
                 if "detail" in error_data:
                     error_message = error_data["detail"]
-                elif "message" in error_data:
-                    error_message = error_data["message"]
                 elif "error" in error_data:
-                    error_message = error_data["error"]
+                    # Handle both string errors and error objects
+                    error_obj = error_data["error"]
+                    if isinstance(error_obj, dict):
+                        error_message = error_obj.get("message", str(error_obj))
+                    else:
+                        error_message = str(error_obj)
+                elif "message" in error_data and error_data["message"] is not None:
+                    error_message = error_data["message"]
         except (json.JSONDecodeError, ValueError):
             if response.text:
                 error_message = response.text
@@ -274,6 +279,40 @@ class RestClient:
         """Close HTTP resources"""
         self.http.close()
 
+    def _validate_entrypoint_files(self, folder_path: Path, agent_config) -> None:
+        """Validate that all entrypoint files exist in the filtered file structure"""
+        from runagent.utils.gitignore import get_filtered_files
+        
+        # Get filtered file structure
+        file_structure = get_filtered_files(folder_path)
+        
+        # Check each entrypoint
+        for entrypoint in agent_config.agent_architecture.entrypoints:
+            file_path = entrypoint.file
+            
+            if file_path not in file_structure:
+                raise ValueError(
+                    f"Entrypoint file '{file_path}' not found in agent directory. "
+                    f"This file may be ignored by .gitignore or doesn't exist. "
+                    f"Available files: {', '.join(file_structure[:10])}{'...' if len(file_structure) > 10 else ''}"
+                )
+
+    def _get_project_id(self) -> str:
+        """Get the active project ID from configuration"""
+        try:
+            from runagent.sdk.config import SDKConfig
+            config = SDKConfig()
+            project_id = config._config.get("active_project_id")
+            if project_id:
+                return project_id
+            
+            # Fallback to a default project ID if none is configured
+            console.print("⚠️ [yellow]No active project ID found, using default[/yellow]")
+            return "default"
+        except Exception as e:
+            console.print(f"⚠️ [yellow]Could not get project ID: {e}, using default[/yellow]")
+            return "default"
+
     def _check_limits_cache(self) -> Optional[Dict]:
         """Check if limits cache is valid"""
         if self._limits_cache and self._cache_expiry and time.time() < self._cache_expiry:
@@ -396,24 +435,139 @@ class RestClient:
         console.print("🔄 [dim]Limits cache cleared[/dim]")
 
     def _create_zip_from_folder(self, agent_id: str, folder_path: Path) -> str:
-        """Create a zip file from the agent folder"""
-        temp_dir = tempfile.gettempdir()
-        zip_path = os.path.join(temp_dir, f"agent_{agent_id[:8]}.zip")
+        """Create zip file from agent folder respecting .gitignore"""
+        import tempfile
+        import zipfile
+        import shutil
+        from runagent.utils.gitignore import get_filtered_files
+        
+        # Create temporary directory for filtered files
+        temp_dir = tempfile.mkdtemp()
+        filtered_dir = os.path.join(temp_dir, "agent")
+        os.makedirs(filtered_dir, exist_ok=True)
+        
+        try:
+            # Get filtered file structure
+            filtered_files = get_filtered_files(folder_path)
+            
+            # Copy filtered files to temporary directory
+            for file_path in filtered_files:
+                src_path = folder_path / file_path
+                dst_path = Path(filtered_dir) / file_path
+                
+                # Create parent directories if needed
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Copy file
+                shutil.copy2(src_path, dst_path)
+            
+            # Create zip file from filtered directory
+            zip_path = os.path.join(temp_dir, f"agent_{agent_id[:8]}.zip")
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
+                for root, dirs, files in os.walk(filtered_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, filtered_dir)
+                        zipf.write(file_path, arcname)
+            
+            return zip_path
+            
+        except Exception as e:
+            # Clean up temporary directory on error
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise e
 
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
-            for file_path in folder_path.rglob("*"):
-                if file_path.is_file():
-                    #  and not file_path.name.startswith("."):
-                    # Skip unnecessary files
-                    if file_path.name in ["__pycache__", ".DS_Store", "Thumbs.db"]:
-                        continue
-                    if file_path.suffix in [".pyc", ".pyo", ".log"]:
-                        continue
-
-                    arcname = file_path.relative_to(folder_path)
-                    zipf.write(file_path, arcname)
-
-        return zip_path
+    def _check_agent_exists_error(self, result: Dict, folder_path: Path, overwrite: bool) -> Dict:
+        """Check if the error is due to agent already existing and handle user prompt"""
+        from rich.prompt import Confirm
+        from runagent.utils.agent import get_agent_config
+        
+        # Get agent ID for error messages
+        agent_config = get_agent_config(folder_path)
+        agent_id = agent_config.agent_id
+        
+        error_info = result.get("error", {})
+        
+        # Handle both string and dict error formats
+        if isinstance(error_info, str):
+            error_message = error_info
+            # Check for common error patterns
+            if "already exists" in error_message.lower() or "agent already exists" in error_message.lower():
+                console.print(f"⚠️ [yellow]Agent Already Exists[/yellow]")
+                console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
+                console.print(f"   {error_message}")
+                
+                # Ask user if they want to overwrite
+                if not overwrite:
+                    console.print(f"💡 [cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
+                    if Confirm.ask("Do you want to overwrite the existing agent?", default=True):
+                        # Return special code to indicate retry needed
+                        return {
+                            "success": False,
+                            "error": "RETRY_WITH_OVERWRITE",
+                            "code": "RETRY_WITH_OVERWRITE"
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Upload cancelled by user",
+                            "code": "USER_CANCELLED"
+                        }
+                else:
+                    # Already trying to overwrite but still failed
+                    return result
+            elif "permission" in error_message.lower() or "not found" in error_message.lower():
+                console.print(f"❌ [red]Project Access Error[/red]")
+                console.print(f"   {error_message}")
+                console.print(f"💡 [cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
+                return {
+                    "success": False,
+                    "error": f"Agent exists under different project: {error_message}",
+                    "code": "WRONG_PROJECT"
+                }
+        
+        elif isinstance(error_info, dict):
+            error_code = error_info.get("code")
+            error_message = error_info.get("message", "")
+            
+            if error_code == "INSUFFICIENT_PERMISSIONS":
+                console.print(f"❌ [red]Project Access Error[/red]")
+                console.print(f"   {error_message}")
+                console.print(f"💡 [cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
+                return {
+                    "success": False,
+                    "error": f"Agent exists under different project: {error_message}",
+                    "code": "WRONG_PROJECT"
+                }
+            
+            elif error_code == "RESOURCE_ALREADY_EXISTS":
+                console.print(f"⚠️ [yellow]Agent Already Exists[/yellow]")
+                console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
+                console.print(f"   {error_message}")
+                
+                # Ask user if they want to overwrite
+                if not overwrite:
+                    console.print(f"💡 [cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
+                    if Confirm.ask("Do you want to overwrite the existing agent?", default=True):
+                        # Return special code to indicate retry needed
+                        return {
+                            "success": False,
+                            "error": "RETRY_WITH_OVERWRITE",
+                            "code": "RETRY_WITH_OVERWRITE"
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Upload cancelled by user",
+                            "code": "USER_CANCELLED"
+                        }
+                else:
+                    # Already trying to overwrite but still failed
+                    return result
+        
+        # For other errors, return as-is
+        return result
 
     def _upload_agent_metadata_to_server(self, config_data: Dict, agent_id: str) -> Dict:
         """Upload agent metadata (config, entrypoints) to middleware server"""
@@ -458,9 +612,48 @@ class RestClient:
                 raise
             return {"success": False, "error": f"Metadata upload error: {str(e)}"}
 
-    def _upload_agent_metadata_core(self, config_data: Dict, agent_id: str) -> Dict:
-        """Core logic for uploading agent metadata without progress bar"""
-        return self._upload_agent_metadata_to_server(config_data, agent_id)
+    def _upload_agent_metadata_core(self, folder_path: Path, overwrite: bool = False) -> Dict:
+        """Core logic for uploading agent metadata - handles metadata formation internally"""
+        try:
+            # Load agent config from folder
+            from runagent.utils.agent import get_agent_config
+            from runagent.utils.gitignore import get_filtered_files
+            from runagent.utils.env_vars import merge_env_vars
+            
+            agent_config = get_agent_config(folder_path)
+            agent_id = agent_config.agent_id
+            
+            # Validate entrypoint files exist in the filtered file structure
+            self._validate_entrypoint_files(folder_path, agent_config)
+            
+            # Get filtered file structure respecting .gitignore
+            file_structure = get_filtered_files(folder_path)
+            
+            # Merge environment variables from config and .env file
+            merged_env_vars = merge_env_vars(agent_config.env_vars, folder_path)
+            
+            # Create enhanced agent metadata
+            agent_metadata = {
+                "file_structure": file_structure,
+                "auth_settings": agent_config.auth_settings,
+                "env_vars": merged_env_vars
+            }
+            
+            # Form the metadata payload
+            config_data = {
+                "agent_id": agent_id,
+                "agent_metadata": agent_metadata,
+                "config": agent_config.to_dict(),  # Keep original config for compatibility
+                "project_id": self._get_project_id(),
+                "overwrite": overwrite
+            }
+            
+            return self._upload_agent_metadata_to_server(config_data, agent_id)
+            
+        except Exception as e:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            return {"success": False, "error": f"Metadata formation failed: {str(e)}"}
 
     def _upload_agent_zip_file_to_server(self, zip_path: str, agent_id: str, progress: Progress, task_id) -> Dict:
         """Upload agent zip file (source code) to middleware server"""
@@ -573,31 +766,21 @@ class RestClient:
                 if existing_agent:
                     # Agent exists - update it instead of adding new one
                     db_result = db_service.update_agent(
-                        agent_id=agent_id,
+                    agent_id=agent_id,
                         framework=upload_metadata.get("framework", "unknown"),
                         remote_status="uploaded",  # Remote status for upload
-                        fingerprint=upload_metadata.get("fingerprint", ""),
                         deployed_at=datetime.now()
-                    )
-                    
-                    if db_result.get("success"):
+                )
+                
+                if db_result.get("success"):
                         console.print(f"🔄 [green]Agent updated in local database[/green]")
-                    else:
-                        console.print(f"⚠️ [yellow]Warning: Could not update local database: {db_result.get('error')}[/yellow]")
                 else:
-                    # Agent doesn't exist - add new remote agent
-                    db_result = db_service.add_remote_agent(
-                        agent_id=agent_id,
-                        agent_path="",  # Remote agent, no local path
-                        framework="unknown",  # Will be updated when agent is started
-                        fingerprint=upload_metadata.get("fingerprint", ""),
-                        status="uploaded"
-                    )
-                    
-                    if db_result.get("success"):
-                        console.print(f"💾 [green]Agent saved to local database[/green]")
-                    else:
-                        console.print(f"⚠️ [yellow]Warning: Could not save to local database: {db_result.get('error')}[/yellow]")
+                        console.print(f"⚠️ [yellow]Warning: Could not update local database: {db_result.get('error')}[/yellow]")
+                # else:
+                #     # Agent doesn't exist - this shouldn't happen with new flow, but handle gracefully
+                #     console.print(f"⚠️ [yellow]Warning: Agent not found in local database[/yellow]")
+                #     console.print(f"💡 [cyan]This agent was not created via 'runagent init'[/cyan]")
+                #     console.print(f"🔧 [blue]Consider using 'runagent config --register-agent .' to register it[/blue]")
                     
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
@@ -616,7 +799,7 @@ class RestClient:
                 f"✅ [bold green]Upload successful![/bold green]\n"
                 f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
                 f"🌐 Server: [blue]{self.base_url}[/blue]\n"
-                f"🔍 Fingerprint: [dim]{upload_metadata.get('fingerprint', 'N/A')[:16]}...[/dim]",
+                f"📊 Status: [cyan]uploaded[/cyan]",
                 title="📤 Upload Complete",
                 border_style="green",
             ))
@@ -629,7 +812,7 @@ class RestClient:
             }
         return result
 
-    def upload_agent_metadata_and_zip(self, folder_path: Path) -> Dict:
+    def upload_agent_metadata_and_zip(self, folder_path: Path, overwrite: bool = False) -> Dict:
         """Upload agent folder to middleware server with validation and progress bar"""
         try:
             if not folder_path.exists():
@@ -664,88 +847,59 @@ class RestClient:
                     raise
                 return {"success": False, "error": f"Failed to load agent config: {str(e)}"}
 
-            # Step 3: Generate agent fingerprint for duplicate detection
-            fingerprint = generate_agent_fingerprint(folder_path)
-            console.print(f"🔍 Agent fingerprint: [dim]{fingerprint[:16]}...[/dim]")
+            # Step 3: Use agent ID from config (required field)
+            if not agent_config.agent_id:
+                    return {
+                        "success": False,
+                    "error": "Agent ID not found in configuration. Please run 'runagent init' first to initialize your agent."
+                }
+            
+            agent_id = agent_config.agent_id
+            console.print(f"🆔 Using Agent ID: [magenta]{agent_id}[/magenta]")
 
-            # Step 4: Check for existing agents (both by fingerprint and by path)
+            # Step 4: Validate agent ID exists in database
             from runagent.sdk.db import DBService
             db_service = DBService()
             
-            # Check for exact fingerprint match (identical content)
-            existing_agent_by_fingerprint = db_service.get_agent_by_fingerprint(fingerprint)
+            validation_result = db_service.validate_agent_id(agent_id)
             
-            # Check for existing agent by path (same folder, potentially modified)
-            existing_agent_by_path = db_service.get_agent_by_path(str(folder_path))
-            
-            if existing_agent_by_fingerprint:
-                # Identical content detected
-                existing_agent = existing_agent_by_fingerprint
-                console.print(f"⚠️ [yellow]Agent with identical content already exists![/yellow]")
-                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
-                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+            if not validation_result["valid"]:
+                console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
+                console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+                console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
                 
-                # Ask user if they want to overwrite identical content
-                from rich.prompt import Confirm
-                overwrite = Confirm.ask("Do you want to overwrite the existing agent?", default=False)
-                
-                if not overwrite:
-                    return {
-                        "success": False,
-                        "error": "Upload cancelled by user",
-                        "code": "USER_CANCELLED",
-                        "existing_agent": existing_agent
-                    }
-                
-                # Use existing agent ID for overwrite
-                agent_id = existing_agent['agent_id']
-                console.print(f"🔄 [yellow]Overwriting existing agent: {agent_id}[/yellow]")
-                
-            elif existing_agent_by_path:
-                # Modified content detected (same folder, different fingerprint)
-                existing_agent = existing_agent_by_path
-                console.print(f"⚠️ [yellow]Agent content has changed![/yellow]")
-                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
-                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
-                console.print(f"🔍 Content fingerprint changed (modified files detected)")
-                
-                # Show enhanced options for modified content
-                from rich.prompt import Prompt
-                choice = Prompt.ask(
-                    "What would you like to do?",
-                    choices=["overwrite", "new", "cancel"],
-                    default="new"
-                )
-                
-                if choice == "overwrite":
-                    # Feature not available yet - show message and fallback
-                    console.print(f"\n🚧 [yellow]Overwrite functionality is not yet available.[/yellow]")
-                    console.print(f"💡 [cyan]This feature is coming soon! For now, we'll create a new agent.[/cyan]")
-                    console.print(f"📢 [blue]Contact us on Discord if you need this feature sooner.[/blue]")
-                    console.print(f"🔗 [link]https://discord.gg/Q9P9AdHVHz[/link]")
-                    
-                    # Fallback to new agent creation
-                    agent_id = generate_agent_id()
-                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
-                    
-                elif choice == "new":
-                    # Create new agent with new ID
-                    agent_id = generate_agent_id()
-                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
-                    
-                else:  # cancel
-                    return {
-                        "success": False,
-                        "error": "Upload cancelled by user",
-                        "code": "USER_CANCELLED",
-                        "existing_agent": existing_agent
-                    }
+                return {
+                    "success": False,
+                    "error": f"Agent validation failed: {validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
+                    "code": "AGENT_NOT_REGISTERED"
+                }
             else:
-                # No existing agent found - create new one
-                agent_id = generate_agent_id()
-                console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                existing_agent = validation_result["agent"]
+                console.print(f"✅ [green]Agent ID validated in database[/green]")
+                console.print(f"📊 Current Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"🌐 Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
+                
+                # Step 4.5: Validate agent path matches database
+                path_validation_result = db_service.validate_agent_path(agent_id, str(folder_path))
+                
+                if not path_validation_result["valid"]:
+                    if path_validation_result["code"] == "PATH_MISMATCH":
+                        console.print(f"⚠️ [yellow]Agent path mismatch detected![/yellow]")
+                        console.print(f"📁 Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
+                        console.print(f"📁 Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
+                        console.print(f"💡 [cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
+                        console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
+                    else:
+                        # Other path validation errors
+                        console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
+                    
+                    return {
+                        "success": False,
+                        "error": f"Path validation failed: {path_validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
+                        "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR")
+                    }
+                else:
+                    console.print(f"✅ [green]Agent path validated - matches database record[/green]")
 
             # Step 5: Upload with progress bar
             console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
@@ -763,15 +917,73 @@ class RestClient:
                 
                 # Step 1: Upload metadata first
                 progress.update(upload_task, completed=10, description="Uploading agent metadata...")
-                config_data = {
-                    "id": agent_id,
-                    "config": agent_config.to_dict()
-                }
-
-                metadata_result = self._upload_agent_metadata_core(config_data, agent_id)
+                metadata_result = self._upload_agent_metadata_core(folder_path, overwrite)
                 
                 if not metadata_result.get("success"):
-                    return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                    # Stop progress bar before showing user prompt
+                    progress.stop()
+                    
+                    # Check if this is an agent exists error that needs user input
+                    error_check = self._check_agent_exists_error(metadata_result, folder_path, overwrite)
+                    
+                    if error_check.get("code") == "RETRY_WITH_OVERWRITE":
+                        # User confirmed overwrite, restart the progress bar
+                        console.print(f"🔄 [cyan]Restarting upload with overwrite enabled...[/cyan]")
+                        progress.stop()
+                        
+                        # Restart with fresh progress bar
+                        with Progress(
+                            SpinnerColumn(),
+                            TextColumn("[bold green]{task.description}[/bold green]"),
+                            BarColumn(bar_width=40),
+                            TextColumn("[bold]{task.percentage:>3.0f}%"),
+                            TimeElapsedColumn(),
+                            TimeRemainingColumn(),
+                            console=console,
+                        ) as retry_progress:
+                            retry_task = retry_progress.add_task("Restarting upload...", total=100)
+                            
+                            # Retry with overwrite=True
+                            retry_progress.update(retry_task, completed=10, description="Uploading agent metadata (overwrite)...")
+                            metadata_result = self._upload_agent_metadata_core(folder_path, overwrite=True)
+                            
+                            if not metadata_result.get("success"):
+                                return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                            
+                            retry_progress.update(retry_task, completed=20, description="Metadata uploaded successfully")
+                            
+                            # Continue with zip upload
+                            retry_progress.update(retry_task, completed=30, description="Creating agent package...")
+                            zip_path = self._create_zip_from_folder(agent_id, folder_path)
+                            retry_progress.update(retry_task, completed=40, description="Package created successfully")
+                            
+                            # Upload zip file
+                            retry_progress.update(retry_task, completed=50, description="Uploading agent files...")
+                            zip_result = self._upload_agent_zip_file_to_server(zip_path, agent_id, retry_progress, retry_task)
+                            
+                            if not zip_result.get("success"):
+                                return {"success": False, "error": f"File upload failed: {zip_result.get('error')}"}
+                            
+                            retry_progress.update(retry_task, completed=100, description="Upload completed successfully!")
+                            
+                            # Clean up zip file
+                            try:
+                                os.remove(zip_path)
+                            except:
+                                pass
+                            
+                            return {
+                                "success": True,
+                                "agent_id": agent_id,
+                                "base_url": self.base_url,
+                                "message": f'Agent uploaded. Use "runagent start --id {agent_id}" to deploy, or "runagent deploy --id {agent_id}" for direct deployment.',
+                            }
+                    
+                    elif error_check.get("code") == "USER_CANCELLED":
+                        return {"success": False, "error": "Upload cancelled by user"}
+                    
+                    else:
+                        return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
                 
                 progress.update(upload_task, completed=20, description="Metadata uploaded successfully")
                 
@@ -794,8 +1006,8 @@ class RestClient:
 
             return self._process_upload_result(result, {
                 "agent_id": agent_id, 
-                "fingerprint": fingerprint,
-                "source_folder": str(folder_path)
+                "source_folder": str(folder_path),
+                "framework": agent_config.framework.value if hasattr(agent_config.framework, 'value') else str(agent_config.framework)
             })
 
         except Exception as e:
@@ -886,7 +1098,7 @@ class RestClient:
             }
         return result
 
-    def deploy_agent(self, folder_path: str, metadata: Dict = None) -> Dict:
+    def deploy_agent(self, folder_path: str, metadata: Dict = None, overwrite: bool = False) -> Dict:
         """Upload and start agent in one operation with single progress bar"""
         console.print("🎯 [bold cyan]Starting full deployment (upload + start)...[/bold cyan]")
 
@@ -921,116 +1133,59 @@ class RestClient:
                     raise
                 return {"success": False, "error": f"Failed to load agent config: {str(e)}"}
 
-            # Step 3: Generate agent fingerprint for duplicate detection
-            fingerprint = generate_agent_fingerprint(folder_path)
-            console.print(f"🔍 Agent fingerprint: [dim]{fingerprint[:16]}...[/dim]")
+            # Step 3: Use agent ID from config (required field)
+            if not agent_config.agent_id:
+                    return {
+                        "success": False,
+                    "error": "Agent ID not found in configuration. Please run 'runagent init' first to initialize your agent."
+                }
+            
+            agent_id = agent_config.agent_id
+            console.print(f"🆔 Using Agent ID: [magenta]{agent_id}[/magenta]")
 
-            # Step 4: Check for existing agents (both by fingerprint and by path)
+            # Step 4: Validate agent ID exists in database
             from runagent.sdk.db import DBService
             db_service = DBService()
             
-            # Check for exact fingerprint match (identical content)
-            existing_agent_by_fingerprint = db_service.get_agent_by_fingerprint(fingerprint)
+            validation_result = db_service.validate_agent_id(agent_id)
             
-            # Check for existing agent by path (same folder, potentially modified)
-            existing_agent_by_path = db_service.get_agent_by_path(str(folder_path))
-            
-            if existing_agent_by_fingerprint:
-                # Identical content detected
-                existing_agent = existing_agent_by_fingerprint
-                console.print(f"⚠️ [yellow]Agent with identical content already exists![/yellow]")
-                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
-                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
+            if not validation_result["valid"]:
+                console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
+                console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+                console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
                 
-                # Ask user if they want to overwrite identical content
-                from rich.prompt import Confirm
-                overwrite = Confirm.ask("Do you want to overwrite the existing agent?", default=False)
-                
-                if not overwrite:
-                    return {
-                        "success": False,
-                        "error": "Deployment cancelled by user",
-                        "code": "USER_CANCELLED",
-                        "existing_agent": existing_agent
-                    }
-                
-                # Use existing agent ID for overwrite
-                agent_id = existing_agent['agent_id']
-                console.print(f"🔄 [yellow]Overwriting existing agent: {agent_id}[/yellow]")
-                
-            elif existing_agent_by_path:
-                # Modified content detected (same folder, different fingerprint)
-                existing_agent = existing_agent_by_path
-                console.print(f"⚠️ [yellow]Agent content has changed![/yellow]")
-                console.print(f"🆔 Existing Agent ID: [magenta]{existing_agent['agent_id']}[/magenta]")
-                console.print(f"📊 Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"📍 Type: [cyan]{'Local' if existing_agent['is_local'] else 'Remote'}[/cyan]")
-                console.print(f"🔍 Content fingerprint changed (modified files detected)")
-                
-                # Show enhanced options for modified content
-                from rich.prompt import Prompt
-                choice = Prompt.ask(
-                    "What would you like to do?",
-                    choices=["overwrite", "new", "cancel"],
-                    default="new"
-                )
-                
-                if choice == "overwrite":
-                    # Feature not available yet - show message and fallback
-                    console.print(f"\n🚧 [yellow]Overwrite functionality is not yet available.[/yellow]")
-                    console.print(f"💡 [cyan]This feature is coming soon! For now, we'll create a new agent.[/cyan]")
-                    console.print(f"📢 [blue]Contact us on Discord if you need this feature sooner.[/blue]")
-                    console.print(f"🔗 [link]https://discord.gg/Q9P9AdHVHz[/link]")
-                    
-                    # Fallback to new agent creation
-                    agent_id = generate_agent_id()
-                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
-                    
-                elif choice == "new":
-                    # Create new agent with new ID
-                    agent_id = generate_agent_id()
-                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
-                    
-                else:  # cancel
-                    return {
-                        "success": False,
-                        "error": "Deployment cancelled by user",
-                        "code": "USER_CANCELLED",
-                        "existing_agent": existing_agent
-                    }
+                return {
+                    "success": False,
+                    "error": f"Agent validation failed: {validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
+                    "code": "AGENT_NOT_REGISTERED"
+                }
             else:
-                # No existing agent found - check if agent was initialized
-                if agent_config and agent_config.agent_id:
-                    # Agent was initialized - validate agent ID exists in database
-                    from runagent.sdk.db import DBService
-                    db_service = DBService()
-                    validation_result = db_service.validate_agent_id(agent_config.agent_id)
+                existing_agent = validation_result["agent"]
+                console.print(f"✅ [green]Agent ID validated in database[/green]")
+                console.print(f"📊 Current Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"🌐 Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
+                
+                # Step 4.5: Validate agent path matches database
+                path_validation_result = db_service.validate_agent_path(agent_id, str(folder_path))
+                
+                if not path_validation_result["valid"]:
+                    if path_validation_result["code"] == "PATH_MISMATCH":
+                        console.print(f"⚠️ [yellow]Agent path mismatch detected![/yellow]")
+                        console.print(f"📁 Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
+                        console.print(f"📁 Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
+                        console.print(f"💡 [cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
+                        console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
+                    else:
+                        # Other path validation errors
+                        console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
                     
-                    if not validation_result["valid"]:
-                        console.print(f"⚠️ [yellow]Warning: {validation_result['error']}[/yellow]")
-                        console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
-                        console.print(f"🔧 [blue]You can use 'runagent config --register-agent .' to register a modified agent[/blue]")
-                        
-                        # Ask user if they want to continue
-                        from rich.prompt import Confirm
-                        continue_anyway = Confirm.ask("Do you want to continue anyway?", default=False)
-                        
-                        if not continue_anyway:
-                            return {
-                                "success": False,
-                                "error": "Agent ID validation failed",
-                                "code": "AGENT_ID_VALIDATION_FAILED"
-                            }
-                    
-                    # Agent ID is valid - use existing agent_id
-                    agent_id = agent_config.agent_id
-                    console.print(f"🔄 [green]Found initialized agent: [bold magenta]{agent_id}[/bold magenta][/green]")
-                    console.print(f"📋 [cyan]Framework: [bold]{agent_config.framework}[/bold][/cyan]")
+                    return {
+                        "success": False,
+                        "error": f"Path validation failed: {path_validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
+                        "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR")
+                    }
                 else:
-                    # No initialized agent - create new one (legacy behavior)
-                    agent_id = generate_agent_id()
-                    console.print(f"🆔 New Agent ID: [magenta]{agent_id}[/magenta]")
+                    console.print(f"✅ [green]Agent path validated - matches database record[/green]")
 
             # Step 5: Full deployment with single progress bar
             console.print(f"🌐 Deploying to: [bold blue]{self.base_url}[/bold blue]")
@@ -1048,15 +1203,83 @@ class RestClient:
                 
                 # Phase 1: Upload metadata (0-20%)
                 progress.update(deploy_task, completed=5, description="Uploading agent metadata...")
-                config_data = {
-                    "id": agent_id,
-                    "config": agent_config.to_dict()
-                }
-
-                metadata_result = self._upload_agent_metadata_core(config_data, agent_id)
+                metadata_result = self._upload_agent_metadata_core(folder_path, overwrite)
                 
                 if not metadata_result.get("success"):
-                    return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                    # Stop progress bar before showing user prompt
+                    progress.stop()
+                    
+                    # Check if this is an agent exists error that needs user input
+                    error_check = self._check_agent_exists_error(metadata_result, folder_path, overwrite)
+                    
+                    if error_check.get("code") == "RETRY_WITH_OVERWRITE":
+                        # User confirmed overwrite, restart the progress bar
+                        console.print(f"🔄 [cyan]Restarting deployment with overwrite enabled...[/cyan]")
+                        progress.stop()
+                        
+                        # Restart with fresh progress bar
+                        with Progress(
+                            SpinnerColumn(),
+                            TextColumn("[bold green]{task.description}[/bold green]"),
+                            BarColumn(bar_width=40),
+                            TextColumn("[bold]{task.percentage:>3.0f}%"),
+                            TimeElapsedColumn(),
+                            TimeRemainingColumn(),
+                            console=console,
+                        ) as retry_progress:
+                            retry_task = retry_progress.add_task("Restarting deployment...", total=100)
+                            
+                            # Retry with overwrite=True
+                            retry_progress.update(retry_task, completed=5, description="Uploading agent metadata (overwrite)...")
+                            metadata_result = self._upload_agent_metadata_core(folder_path, overwrite=True)
+                            
+                            if not metadata_result.get("success"):
+                                return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
+                            
+                            retry_progress.update(retry_task, completed=20, description="Metadata uploaded successfully")
+                            
+                            # Continue with zip upload
+                            retry_progress.update(retry_task, completed=30, description="Creating agent package...")
+                            zip_path = self._create_zip_from_folder(agent_id, folder_path)
+                            retry_progress.update(retry_task, completed=40, description="Package created successfully")
+                            
+                            # Upload zip file
+                            retry_progress.update(retry_task, completed=50, description="Uploading agent files...")
+                            zip_result = self._upload_agent_zip_file_to_server(zip_path, agent_id, retry_progress, retry_task)
+                            
+                            if not zip_result.get("success"):
+                                return {"success": False, "error": f"File upload failed: {zip_result.get('error')}"}
+                            
+                            retry_progress.update(retry_task, completed=60, description="Files uploaded successfully")
+                            
+                            # Clean up zip file
+                            try:
+                                os.remove(zip_path)
+                            except:
+                                pass
+                            
+                            # Phase 2: Start agent (60-100%)
+                            retry_progress.update(retry_task, completed=70, description="Starting agent...")
+                            start_result = self.start_agent(agent_id, {})
+                            
+                            if not start_result.get("success"):
+                                return {"success": False, "error": f"Agent start failed: {start_result.get('error')}"}
+                            
+                            retry_progress.update(retry_task, completed=100, description="Deployment completed successfully!")
+                            
+                            endpoint = start_result.get("endpoint", "/api/v1/agents/run")
+                            return {
+                                "success": True,
+                                "agent_id": agent_id,
+                                "endpoint": f"{self.base_url}{endpoint}",
+                                "status": "deployed",
+                            }
+                    
+                    elif error_check.get("code") == "USER_CANCELLED":
+                        return {"success": False, "error": "Deployment cancelled by user"}
+                    
+                    else:
+                        return {"success": False, "error": f"Metadata upload failed: {metadata_result.get('error')}"}
                 
                 progress.update(deploy_task, completed=20, description="Metadata uploaded successfully")
                 
@@ -1101,8 +1324,8 @@ class RestClient:
                     # Process upload result for database storage
                     self._process_upload_result(upload_result, {
                         "agent_id": agent_id, 
-                        "fingerprint": fingerprint,
-                        "source_folder": str(folder_path)
+                        "source_folder": str(folder_path),
+                        "framework": agent_config.framework.value if hasattr(agent_config.framework, 'value') else str(agent_config.framework)
                     })
                     
                     return {
@@ -1277,378 +1500,3 @@ class RestClient:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
             return {"success": False, "error": f"Failed to get architecture: {str(e)}"}
-
-# runagent/sdk/rest_client.py - FIXED RestClient initialization
-
-# class RestClient:
-#     """Client for remote server deployment via REST API"""
-
-#     def __init__(
-#         self,
-#         base_url: Optional[str] = None,
-#         api_key: Optional[str] = None,
-#         api_prefix: Optional[str] = "/api/v1",
-#     ):
-#         """Initialize REST client for middleware server"""
-#         self.api_key = api_key or Config.get_api_key()
-        
-#         # Fix base URL construction
-#         if base_url:
-#             self.base_url = base_url.rstrip("/") + api_prefix
-#         else:
-#             raw_base_url = Config.get_base_url()
-#             self.base_url = raw_base_url.rstrip("/") + api_prefix
-
-#         # Initialize HTTP handler directly with API key
-#         # The middleware auth system will handle JWT conversion automatically
-#         self.http = HttpHandler(
-#             api_key=self.api_key,  # Use API key directly - middleware handles conversion
-#             base_url=self.base_url
-#         )
-
-#         # Cache for limits to avoid repeated API calls
-#         self._limits_cache = None
-#         self._cache_expiry = None
-
-
-#     def validate_api_connection(self) -> Dict[str, Any]:
-#         """Validate API connection and authentication - SIMPLIFIED"""
-#         try:
-#             # Test basic connectivity first
-#             try:
-#                 health_response = self.http.get("/health", timeout=10, handle_errors=False)
-                
-#                 if health_response.status_code != 200:
-#                     return {
-#                         "success": False,
-#                         "api_connected": False,
-#                         "error": f"Health check failed: {health_response.status_code}",
-#                     }
-
-#             except Exception as e:
-#                 return {
-#                     "success": False,
-#                     "api_connected": False,
-#                     "error": f"Cannot connect to middleware: {str(e)}",
-#                 }
-
-#             # Test authentication if API key provided
-#             if self.api_key:
-#                 try:
-#                     # Try to get user profile which requires authentication
-#                     auth_response = self.http.get("/users/profile", timeout=10)
-                    
-#                     if auth_response.status_code == 200:
-#                         profile_data = auth_response.json()
-#                         auth_data = profile_data.get("auth_data", {})
-                        
-#                         return {
-#                             "success": True,
-#                             "api_connected": True,
-#                             "api_authenticated": True,
-#                             "user_info": {
-#                                 "email": auth_data.get("email"),
-#                                 "id": auth_data.get("id")
-#                             },
-#                             "base_url": self.base_url,
-#                         }
-#                     else:
-#                         error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
-#                         return {
-#                             "success": False,
-#                             "api_connected": True,
-#                             "api_authenticated": False,
-#                             "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
-#                             "base_url": self.base_url,
-#                         }
-                        
-#                 except AuthenticationError as e:
-#                     return {
-#                         "success": False,
-#                         "api_connected": True,
-#                         "api_authenticated": False,
-#                         "error": f"Invalid API key: {e.message}",
-#                         "base_url": self.base_url,
-#                     }
-#                 except Exception as e:
-#                     return {
-#                         "success": False,
-#                         "api_connected": True,
-#                         "api_authenticated": False,
-#                         "error": f"Authentication test failed: {str(e)}",
-#                         "base_url": self.base_url,
-#                     }
-#             else:
-#                 return {
-#                     "success": True,
-#                     "api_connected": True,
-#                     "api_authenticated": False,
-#                     "base_url": self.base_url,
-#                     "message": "No API key provided",
-#                 }
-
-#         except Exception as e:
-#             return {
-#                 "success": False,
-#                 "api_connected": False,
-#                 "error": f"Connection validation failed: {str(e)}",
-#             }
-
-
-
-#     def _make_request(self, method: str, endpoint: str, **kwargs) -> dict:
-#         """
-#         Make authenticated HTTP request to middleware API (for middleware sync)
-        
-#         Args:
-#             method: HTTP method (GET, POST, PUT, DELETE)
-#             endpoint: API endpoint path
-#             **kwargs: Additional arguments for requests
-            
-#         Returns:
-#             Response data as dict
-#         """
-#         if not self.api_key:
-#             raise Exception("API key not configured")
-        
-#         try:
-#             # Convert 'json' kwarg to 'data' to match HttpHandler interface
-#             if 'json' in kwargs:
-#                 kwargs['data'] = kwargs.pop('json')
-            
-#             # Use the existing HTTP handler for consistency
-#             if method.upper() == "GET":
-#                 response = self.http.get(endpoint, **kwargs)
-#             elif method.upper() == "POST":
-#                 response = self.http.post(endpoint, **kwargs)
-#             elif method.upper() == "PUT":
-#                 response = self.http.put(endpoint, **kwargs)
-#             elif method.upper() == "DELETE":
-#                 response = self.http.delete(endpoint, **kwargs)
-#             elif method.upper() == "PATCH":
-#                 response = self.http.patch(endpoint, **kwargs)
-#             else:
-#                 raise ValueError(f"Unsupported HTTP method: {method}")
-            
-#             # Handle response - check if it's already a dict or a Response object
-#             if hasattr(response, 'json') and callable(response.json):
-#                 return response.json()
-#             elif isinstance(response, dict):
-#                 return response
-#             else:
-#                 # Fallback: try to get json content
-#                 try:
-#                     return response.json()
-#                 except:
-#                     return {"success": False, "error": "Invalid response format"}
-                
-#         except (ClientError, ServerError, ConnectionError, AuthenticationError, ValidationError) as e:
-#             raise Exception(f"API request failed: {e.message}")
-#         except Exception as e:
-#             raise Exception(f"Request error: {e}")
-
-
-#     def sync_local_agent(self, agent_data: Dict[str, Any]) -> Dict[str, Any]:
-#         """Sync local agent to middleware"""
-#         try:
-#             response = self.http.post("/local-agents", data=agent_data, timeout=30)
-#             return response.json()
-#         except Exception as e:
-#             return {"success": False, "error": str(e)}
-
-#     def create_local_invocation(self, invocation_data: Dict[str, Any]) -> Dict[str, Any]:
-#         """Create local invocation in middleware"""
-#         try:
-#             response = self.http.post("/local-invocations", data=invocation_data, timeout=30)
-#             return response.json()
-#         except Exception as e:
-#             return {"success": False, "error": str(e)}
-
-#     def update_local_invocation(self, invocation_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-#         """Update local invocation in middleware"""
-#         try:
-#             response = self.http.put(f"/local-invocations/{invocation_id}", data=update_data, timeout=30)
-#             return response.json()
-#         except Exception as e:
-#             return {"success": False, "error": str(e)}
-
-#     def _get_jwt_token_from_api_key(self) -> Optional[str]:
-#         """Convert API key to JWT token using middleware auth endpoint"""
-#         if not self.api_key:
-#             return None
-            
-#         try:
-#             # Check if API key is already a JWT token
-#             if self.api_key.startswith('eyJ'):  # JWT tokens start with 'eyJ'
-#                 return self.api_key
-            
-#             # Create a temporary HTTP handler without auth for this request
-#             temp_http = HttpHandler(base_url=self.base_url)
-            
-#             # The middleware auth.py shows that API keys are validated and converted to JWT
-#             # We'll use the validation endpoint which should return a JWT
-#             try:
-#                 response = temp_http.post("/tokens/validate", data={"token": self.api_key}, timeout=10)
-                
-#                 if response.status_code == 200:
-#                     validation_result = response.json()
-#                     if validation_result.get("valid"):
-
-#                         return self.api_key
-#                 else:
-#                     console.print(f"[red]API key validation failed: {response.status_code}[/red]")
-#                     return None
-                    
-#             except Exception as e:
-#                 console.print(f"[yellow]Could not validate API key: {e}[/yellow]")
-#                 # Return API key anyway - let middleware handle the conversion
-#                 return self.api_key
-                
-#         except Exception as e:
-#             console.print(f"[red]Error processing API key: {e}[/red]")
-#             return None
-
-#     def validate_api_connection(self) -> Dict[str, Any]:
-#         """Validate API connection and authentication - UPDATED"""
-#         try:
-#             # Test basic connectivity first
-#             try:
-#                 health_response = self.http.get("/health", timeout=10, handle_errors=False)
-                
-#                 if health_response.status_code != 200:
-#                     return {
-#                         "success": False,
-#                         "api_connected": False,
-#                         "error": f"Health check failed: {health_response.status_code}",
-#                     }
-
-#             except Exception as e:
-#                 return {
-#                     "success": False,
-#                     "api_connected": False,
-#                     "error": f"Cannot connect to middleware: {str(e)}",
-#                 }
-
-#             # Test authentication if API key provided
-#             if self.api_key:
-#                 try:
-#                     # Try to get user profile which requires authentication
-#                     auth_response = self.http.get("/users/profile", timeout=10)
-                    
-#                     if auth_response.status_code == 200:
-#                         profile_data = auth_response.json()
-#                         user_info = profile_data.get("auth_data", {})
-                        
-#                         return {
-#                             "success": True,
-#                             "api_connected": True,
-#                             "api_authenticated": True,
-#                             "user_info": {
-#                                 "email": user_info.get("email"),
-#                                 "id": user_info.get("id")
-#                             },
-#                             "base_url": self.base_url,
-#                         }
-#                     else:
-#                         error_data = auth_response.json() if hasattr(auth_response, 'json') else {}
-#                         return {
-#                             "success": False,
-#                             "api_connected": True,
-#                             "api_authenticated": False,
-#                             "error": error_data.get("detail", f"Authentication failed: {auth_response.status_code}"),
-#                             "base_url": self.base_url,
-#                         }
-                        
-#                 except AuthenticationError as e:
-#                     return {
-#                         "success": False,
-#                         "api_connected": True,
-#                         "api_authenticated": False,
-#                         "error": f"Invalid API key: {e.message}",
-#                         "base_url": self.base_url,
-#                     }
-#                 except Exception as e:
-#                     return {
-#                         "success": False,
-#                         "api_connected": True,
-#                         "api_authenticated": False,
-#                         "error": f"Authentication test failed: {str(e)}",
-#                         "base_url": self.base_url,
-#                     }
-#             else:
-#                 return {
-#                     "success": True,
-#                     "api_connected": True,
-#                     "api_authenticated": False,
-#                     "base_url": self.base_url,
-#                     "message": "No API key provided",
-#                 }
-
-#         except Exception as e:
-#             return {
-#                 "success": False,
-#                 "api_connected": False,
-#                 "error": f"Connection validation failed: {str(e)}",
-#             }
-#     def __del__(self):
-#         """Cleanup on deletion"""
-#         try:
-#             self.close()
-#         except:
-#             pass
-
-#     def debug_connection(self) -> Dict:
-#         """Debug middleware connection"""
-#         try:
-#             print(f"🔍 Debug: Testing connection to {self.base_url}")
-            
-#             # Test health endpoint
-#             try:
-#                 response = self.http.get("health", timeout=5)
-#                 print(f"✅ Health check successful: {response}")
-#                 health_data = response.json() if hasattr(response, 'json') else response
-                
-#                 # Test auth validation if API key exists
-#                 if self.api_key:
-#                     try:
-#                         auth_response = self.http.get("validate", timeout=5)
-#                         print(f"✅ Auth validation successful: {auth_response}")
-#                         auth_data = auth_response.json() if hasattr(auth_response, 'json') else auth_response
-                        
-#                         return {
-#                             "success": True,
-#                             "health": health_data,
-#                             "auth": auth_data,
-#                             "base_url": self.base_url
-#                         }
-#                     except Exception as auth_e:
-#                         print(f"❌ Auth validation failed: {auth_e}")
-#                         return {
-#                             "success": False,
-#                             "health": health_data,
-#                             "auth_error": str(auth_e),
-#                             "base_url": self.base_url
-#                         }
-#                 else:
-#                     return {
-#                         "success": True,
-#                         "health": health_data,
-#                         "auth": "No API key provided",
-#                         "base_url": self.base_url
-#                     }
-                    
-#             except Exception as health_e:
-#                 print(f"❌ Health check failed: {health_e}")
-#                 return {
-#                     "success": False,
-#                     "health_error": str(health_e),
-#                     "base_url": self.base_url
-#                 }
-                
-#         except Exception as e:
-#             print(f"❌ Connection debug failed: {e}")
-#             return {
-#                 "success": False,
-#                 "error": str(e),
-#                 "base_url": self.base_url
-#             }

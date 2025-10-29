@@ -27,6 +27,7 @@ class RemoteDeployment:
         folder_path: str,
         framework: t.Optional[str] = None,
         config: t.Optional[t.Dict[str, t.Any]] = None,
+        overwrite: bool = False,
     ) -> t.Dict[str, t.Any]:
         """
         Deploy an agent remotely (upload + start).
@@ -35,6 +36,7 @@ class RemoteDeployment:
             folder_path: Path to agent folder
             framework: Framework type (auto-detected if None)
             config: Optional deployment configuration
+            overwrite: Whether to overwrite existing agent
 
         Returns:
             Deployment result
@@ -49,16 +51,17 @@ class RemoteDeployment:
 
         metadata = {"framework": framework}
 
-        return self.client.deploy_agent(folder_path=str(folder_path), metadata=metadata)
+        return self.client.deploy_agent(folder_path=str(folder_path), metadata=metadata, overwrite=overwrite)
 
     def upload_agent_to_server(
-        self, folder_path: Path, framework: t.Optional[str] = None
+        self, folder_path: Path, framework: t.Optional[str] = None, overwrite: bool = False
     ) -> t.Dict[str, t.Any]:
         """
         Upload an agent without starting it.
 
         Args:
             folder_path: Path to agent folder
+            overwrite: Whether to overwrite existing agent
 
         Returns:
             Upload result
@@ -71,7 +74,7 @@ class RemoteDeployment:
         #     framework = self._detect_framework(folder_path)
 
         # metadata = {"framework": framework}
-        return self.client.upload_agent_metadata_and_zip(folder_path=folder_path)
+        return self.client.upload_agent_metadata_and_zip(folder_path=folder_path, overwrite=overwrite)
 
     def start_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None

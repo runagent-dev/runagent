@@ -198,8 +198,7 @@ class SDKConfig:
                         "user_id": user_info["user_id"],
                         "user_tier": user_info["tier"],
                         "active_project_id": user_info["active_project_id"],
-                        "active_project_name": user_info["active_project_name"],
-                        "auth_validated": True
+                        "active_project_name": user_info["active_project_name"]
                     })
                     
                     return {
@@ -253,12 +252,16 @@ class SDKConfig:
         return bool(self._config.get("api_key") and self._config.get("base_url"))
 
     def is_authenticated(self) -> bool:
-        """Check if current configuration is authenticated - USE CACHED RESULT"""
+        """Check if current configuration is authenticated"""
         if not self.is_configured():
             return False
         
-        # Use cached validation result to avoid repeated API calls
-        return self._config.get("auth_validated", False)
+        # If we have user info (email, ID), the API key was already validated
+        # This is the only reliable way to know if authentication worked
+        return bool(
+            self._config.get("user_email") and 
+            self._config.get("user_id")
+        )
 
     def get_status(self) -> t.Dict[str, t.Any]:
         """Get detailed configuration status - NO REDUNDANT VALIDATION"""

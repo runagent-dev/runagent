@@ -211,6 +211,7 @@ class RunAgentSDK:
         folder: str,
         framework: t.Optional[str] = None,
         config: t.Optional[t.Dict[str, t.Any]] = None,
+        overwrite: bool = False,
     ) -> t.Dict[str, t.Any]:
         """
         Deploy an agent to the remote server (upload + start).
@@ -219,6 +220,7 @@ class RunAgentSDK:
             folder: Folder containing agent files
             framework: Framework type (auto-detected if not specified)
             config: Optional deployment configuration
+            overwrite: Whether to overwrite existing agent
 
         Returns:
             Deployment result with agent_id and endpoint
@@ -228,18 +230,18 @@ class RunAgentSDK:
         """
         self._require_authentication()
         return self.remote.deploy_agent(
-            folder_path=folder, framework=framework, config=config
+            folder_path=folder, framework=framework, config=config, overwrite=overwrite
         )
 
     def upload_agent(
-        self, folder: Path
+        self, folder: Path, overwrite: bool = False
     ) -> t.Dict[str, t.Any]:
         """
         Upload an agent to the remote server (without starting).
 
         Args:
             folder: Folder containing agent files
-            framework: Framework type (auto-detected if not specified)
+            overwrite: Whether to overwrite existing agent
 
         Returns:
             Upload result with agent_id
@@ -248,7 +250,7 @@ class RunAgentSDK:
             AuthenticationError: If not properly authenticated
         """
         self._require_authentication()
-        return self.remote.upload_agent_to_server(folder_path=folder)
+        return self.remote.upload_agent_to_server(folder_path=folder, overwrite=overwrite)
 
     def start_remote_agent(
         self, agent_id: str, config: t.Optional[t.Dict[str, t.Any]] = None

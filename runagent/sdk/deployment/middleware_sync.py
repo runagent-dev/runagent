@@ -33,8 +33,8 @@ class MiddlewareSyncService:
                 api_key=self.api_key
             )
             
-            # If authentication was successful during setup, enable sync
-            if hasattr(config, '_config') and config._config.get("auth_validated"):
+            # If we have user info, authentication was successful, enable sync
+            if hasattr(config, '_config') and config._config.get("user_email") and config._config.get("user_id"):
                 console.print("[dim]Using cached authentication - middleware sync enabled[/dim]")
                 self.sync_enabled = True
                 self.enabled = True
@@ -186,7 +186,7 @@ class MiddlewareSyncService:
         return {
             "sync_enabled": getattr(self, 'sync_enabled', False),
             "api_configured": bool(getattr(self, 'api_key', None)),
-            "auth_validated": getattr(self.config, '_config', {}).get("auth_validated", False),
+            "authenticated": bool(getattr(self.config, '_config', {}).get("user_email") and getattr(self.config, '_config', {}).get("user_id")),
             "base_url": getattr(self.config, 'base_url', None),
             "middleware_available": self._test_middleware_connection() if getattr(self, 'rest_client', None) else False
         }
