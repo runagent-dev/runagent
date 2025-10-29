@@ -1,7 +1,7 @@
 from runagent import RunAgentClient
 
 client = RunAgentClient(
-    agent_id="0ce78865-74b7-4b97-91d9-03139e6c0c90",
+    agent_id="a4fa94f2-13e4-4cdf-8f61-647ac611a3a8",
     entrypoint_tag="generate_outline",
     local=False
 )

@@ -1,6 +1,4 @@
-crewai
-crewai[tools]
+crewai==1.2.1
 langchain-tools
-crewai-tools
 pydantic
 nest-asyncio
