@@ -1,0 +1,27 @@
+{
+    "agent_name": "Recipe Creator Agent",
+    "description": "AI-powered recipe creation assistant",
+    "framework": "agno",
+    "template": "custom",
+    "version": "1.0.0",
+    "created_at": "2025-10-27 00:00:00",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "templates/agno/custom",
+      "author": "custom"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "recipe_agent.py",
+          "module": "create_recipe",
+          "tag": "recipe_create"
+        },
+        {
+          "file": "recipe_agent.py",
+          "module": "create_recipe_stream",
+          "tag": "recipe_stream"
+        }
+      ]
+    }
+  }

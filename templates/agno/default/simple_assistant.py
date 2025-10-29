@@ -18,9 +18,7 @@ def agent_print_response(prompt: str):
     response = agent.run(prompt)
     
     # Return structured data that can be serialized
-    return {
-        "content": response.content if hasattr(response, 'content') else str(response),
-    }
+    return response
 
 def agent_print_response_stream(prompt: str):
     """Streaming response that yields serializable chunks"""

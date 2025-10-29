@@ -1,9 +1,9 @@
 # from runagent import RunAgentClient
 
 # ra = RunAgentClient(
-#     agent_id="27f68f00-e8cd-4965-9b91-fac501e132e3",
+#     agent_id="71b31b58-c2d6-49ab-b564-d72b1a449df7",
 #     entrypoint_tag="agno_print_response",
-#     local=True
+#     local=False
 #     )
 
 
@@ -17,9 +17,9 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="27f68f00-e8cd-4965-9b91-fac501e132e3",
+    agent_id="c12d3486-cbf6-4d3a-b58b-e5a9c0dfe311",
     entrypoint_tag="agno_print_response_stream",
-    local=True
+    local=False
     )
 
 for chunk in ra.run(

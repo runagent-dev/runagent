@@ -1,0 +1,40 @@
+
+{
+    "agent_name": "Book Writer Flow",
+    "description": "AI-powered book writing system using CrewAI - generates outlines and writes complete books with multiple chapters",
+    "framework": "crewai",
+    "template": "book_writer",
+    "version": "1.0.0",
+    "created_at": "2025-10-28",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "flows/write-a-book-with-flows",
+      "author": "runagent"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "main.py",
+          "module": "generate_outline",
+          "tag": "generate_outline",
+          "description": "Generate a book outline with chapters based on topic and goal"
+        },
+        {
+          "file": "main.py",
+          "module": "write_chapter",
+          "tag": "write_chapter",
+          "description": "Write a single book chapter based on title and description"
+        },
+        {
+          "file": "main.py",
+          "module": "write_full_book",
+          "tag": "write_full_book",
+          "description": "Write a complete book with outline and all chapters"
+        }
+      ]
+    },
+    "env_vars": {
+      "OPENAI_API_KEY": "",
+      "SERPER_API_KEY": ""
+    }
+  }

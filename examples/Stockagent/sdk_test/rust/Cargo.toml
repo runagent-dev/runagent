@@ -1,0 +1,11 @@
+[package]
+name = "temp_rust_test"
+version = "0.1.1"
+edition = "2021"
+
+[dependencies]
+runagent = { path = "../../../../runagent-rust/runagent" }
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+anyhow = "1.0"
+futures = "0.3"

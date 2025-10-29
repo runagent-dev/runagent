@@ -1,0 +1,4 @@
+crewai
+pydantic
+nest-asyncio
+PyYAML

@@ -1,8 +1,7 @@
 //! WebSocket client for streaming agent interactions
 
 use crate::types::{
-    RunAgentError, RunAgentResult, SafeMessage, WebSocketActionType, WebSocketAgentRequest,
-    AgentInputArgs, MessageType,
+    RunAgentError, RunAgentResult, SafeMessage, MessageType,
 };
 use crate::utils::config::Config;
 use crate::utils::serializer::CoreSerializer;
@@ -55,9 +54,14 @@ impl SocketClient {
         Self::new(&ws_url, config.api_key(), Some("/api/v1"))
     }
 
-    fn get_websocket_url(&self, agent_id: &str, entrypoint_tag: &str) -> RunAgentResult<Url> {
-        let path = format!("agents/{}/execute/{}", agent_id, entrypoint_tag);
-        let full_url = format!("{}{}/{}", self.base_socket_url, self.api_prefix, path);
+    fn get_websocket_url(&self, agent_id: &str, _entrypoint_tag: &str) -> RunAgentResult<Url> {
+        let path = format!("agents/{}/run-stream", agent_id);
+        let mut full_url = format!("{}{}/{}", self.base_socket_url, self.api_prefix, path);
+        
+        // Add API key as token parameter if available
+        if let Some(ref api_key) = self.api_key {
+            full_url = format!("{}?token={}", full_url, api_key);
+        }
         
         Url::parse(&full_url)
             .map_err(|e| RunAgentError::validation(format!("Invalid WebSocket URL: {}", e)))
@@ -81,39 +85,34 @@ impl SocketClient {
 
         let (mut write, mut read) = ws_stream.split();
 
-        // Prepare start stream request
-        let request = WebSocketAgentRequest {
-            action: WebSocketActionType::StartStream,
-            agent_id: agent_id.to_string(),
-            input_data: AgentInputArgs {
-                input_args: input_args.to_vec(),
-                input_kwargs: input_kwargs.clone(),
-            },
-            stream_config: HashMap::new(),
-        };
+        // Prepare start stream request with id field (as middleware expects)
+        let request_data = serde_json::json!({
+            "id": "stream_start",
+            "entrypoint_tag": entrypoint_tag,
+            "input_args": input_args,
+            "input_kwargs": input_kwargs,
+            "timeout_seconds": 600,
+            "async_execution": false
+        });
 
-        let start_msg = SafeMessage::new(
-            "stream_start".to_string(),
-            MessageType::Status,
-            serde_json::to_value(&request)?,
-        );
-
-        // Send start stream message
-        let serialized_msg = self.serializer.serialize_message(&start_msg)?;
+        // Send the request data directly (matching Python SDK format)
+        let serialized_msg = serde_json::to_string(&request_data)?;
         write.send(Message::Text(serialized_msg)).await
             .map_err(|e| RunAgentError::connection(format!("Failed to send start message: {}", e)))?;
 
-        // Create stream that processes incoming messages
-        let serializer = self.serializer.clone();
+        // Create stream that processes incoming messages (matching Python SDK behavior)
         let stream = async_stream::stream! {
             while let Some(message) = read.next().await {
                 match message {
                     Ok(Message::Text(text)) => {
-                        match serializer.deserialize_message(&text) {
-                            Ok(safe_msg) => {
-                                match safe_msg.message_type {
-                                    MessageType::Status => {
-                                        if let Some(status) = safe_msg.data.get("status") {
+                        // Parse as plain JSON (matching Python SDK)
+                        match serde_json::from_str::<serde_json::Value>(&text) {
+                            Ok(msg) => {
+                                let message_type = msg.get("type").and_then(|v| v.as_str());
+                                
+                                match message_type {
+                                    Some("status") => {
+                                        if let Some(status) = msg.get("status").and_then(|v| v.as_str()) {
                                             if status == "stream_completed" {
                                                 break;
                                             } else if status == "stream_started" {
@@ -121,20 +120,28 @@ impl SocketClient {
                                             }
                                         }
                                     }
-                                    MessageType::Error => {
-                                        yield Err(RunAgentError::server(
-                                            safe_msg.error.unwrap_or_else(|| "Agent error".to_string())
-                                        ));
+                                    Some("error") => {
+                                        let error_msg = msg.get("error")
+                                            .or_else(|| msg.get("detail"))
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("Unknown error");
+                                        yield Err(RunAgentError::server(format!("Stream error: {}", error_msg)));
                                         break;
                                     }
+                                    Some("data") => {
+                                        // Yield the content field (matching Python SDK)
+                                        if let Some(content) = msg.get("content") {
+                                            yield Ok(content.clone());
+                                        }
+                                    }
                                     _ => {
-                                        // Yield the actual chunk data
-                                        yield Ok(safe_msg.data);
+                                        // For other message types, yield the whole message
+                                        yield Ok(msg);
                                     }
                                 }
                             }
                             Err(e) => {
-                                yield Err(RunAgentError::server(format!("Stream error: {}", e)));
+                                yield Err(RunAgentError::server(format!("Stream error: JSON error: {}", e)));
                                 break;
                             }
                         }

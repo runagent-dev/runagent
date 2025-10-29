@@ -24,7 +24,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.sql import func
 
-from runagent.constants import LOCAL_CACHE_DIRECTORY
+from runagent.constants import LOCAL_CACHE_DIRECTORY, DATABASE_FILE_NAME
 from runagent.utils.port import PortManager
 
 
@@ -164,6 +164,22 @@ class AgentLog(Base):
         Index("idx_agent_logs_level", "log_level"),
     )
 
+
+class UserMetadata(Base):
+    """User metadata model for storing user configuration as key-value pairs"""
+
+    __tablename__ = "user_metadata"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)  # Store JSON-serialized values
+    created_at = Column(DateTime, default=func.current_timestamp())
+    updated_at = Column(
+        DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp()
+    )
+
+    # Indexes
+    __table_args__ = (Index("idx_user_metadata_key", "key"),)
+
 class DBManager:
     """Low-level database manager for SQLAlchemy operations"""
 
@@ -175,7 +191,7 @@ class DBManager:
             db_path: Path to the SQLite database file
         """
         if db_path is None:
-            db_path = Path(LOCAL_CACHE_DIRECTORY) / "runagent_local.db"
+            db_path = Path(LOCAL_CACHE_DIRECTORY) / DATABASE_FILE_NAME
 
         self.db_path = db_path
         self.engine = None
@@ -2037,3 +2053,149 @@ class DBService:
                 session.rollback()
                 console.print(f"Error cleaning up old logs: {e}")
                 return 0
+
+    # User Metadata Methods
+    def set_user_metadata(self, key: str, value: Any) -> bool:
+        """
+        Set user metadata key-value pair
+        
+        Args:
+            key: Metadata key (e.g., 'api_key', 'base_url', 'user_email')
+            value: Metadata value (will be JSON-serialized)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                # Serialize value to JSON
+                value_json = json.dumps(value)
+                
+                # Check if key exists
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if metadata:
+                    # Update existing
+                    metadata.value = value_json
+                    metadata.updated_at = func.current_timestamp()
+                else:
+                    # Create new
+                    metadata = UserMetadata(
+                        key=key,
+                        value=value_json
+                    )
+                    session.add(metadata)
+                
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error setting user metadata: {e}")
+                return False
+
+    def get_user_metadata(self, key: str, default: Any = None) -> Any:
+        """
+        Get user metadata value by key
+        
+        Args:
+            key: Metadata key
+            default: Default value if key doesn't exist
+            
+        Returns:
+            Deserialized metadata value or default
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if not metadata:
+                    return default
+                
+                # Deserialize JSON value
+                return json.loads(metadata.value)
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error getting user metadata: {e}")
+                return default
+
+    def get_all_user_metadata(self) -> Dict[str, Any]:
+        """
+        Get all user metadata as a dictionary
+        
+        Returns:
+            Dictionary with all metadata key-value pairs
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata_records = session.query(UserMetadata).all()
+                
+                result = {}
+                for record in metadata_records:
+                    try:
+                        result[record.key] = json.loads(record.value)
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, store as string
+                        result[record.key] = record.value
+                
+                return result
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error getting all user metadata: {e}")
+                return {}
+
+    def delete_user_metadata(self, key: str) -> bool:
+        """
+        Delete user metadata by key
+        
+        Args:
+            key: Metadata key to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if not metadata:
+                    return False
+                
+                session.delete(metadata)
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error deleting user metadata: {e}")
+                return False
+
+    def clear_all_user_metadata(self) -> bool:
+        """
+        Clear all user metadata
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                session.query(UserMetadata).delete()
+                session.commit()
+                console.print("🧹 [green]Cleared all user metadata[/green]")
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error clearing user metadata: {e}")
+                return False
