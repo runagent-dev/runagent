@@ -25,6 +25,7 @@ LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
 DEFAULT_BASE_URL = "https://backend.run-agent.ai/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
 DATABASE_FILE_NAME = "runagent_local.db"
+DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes default timeout
 
 # Rest of the file remains the same...
 _cache_dir = os.environ.get(ENV_LOCAL_CACHE_DIRECTORY)

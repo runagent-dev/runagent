@@ -1,0 +1,31 @@
+{
+    "agent_name": "Lead Score Flow",
+    "description": "AI-powered lead scoring and response system using CrewAI",
+    "framework": "crewai",
+    "template": "lead_score",
+    "version": "1.0.0",
+    "created_at": "2025-10-26",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "flows/lead-score-flow",
+      "author": "runagent"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "main.py",
+          "module": "run_flow",
+          "tag": "lead_score_flow"
+        },
+        {
+          "file": "main.py",
+          "module": "score_single_candidate",
+          "tag": "score_candidate"
+        }
+      ]
+    },
+    "env_vars": {
+      "OPENAI_API_KEY": "",
+      "SERPER_API_KEY": ""
+    }
+  }

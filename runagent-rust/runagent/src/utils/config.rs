@@ -15,6 +15,11 @@ use std::path::PathBuf;
 pub struct Config {
     pub api_key: Option<String>,
     pub base_url: String,
+    pub user_email: Option<String>,
+    pub user_id: Option<String>,
+    pub user_tier: Option<String>,
+    pub auth_validated: Option<bool>,
+    #[serde(default)]
     pub user_info: HashMap<String, serde_json::Value>,
 }
 
@@ -23,6 +28,10 @@ impl Default for Config {
         Self {
             api_key: None,
             base_url: DEFAULT_BASE_URL.to_string(),
+            user_email: None,
+            user_id: None,
+            user_tier: None,
+            auth_validated: None,
             user_info: HashMap::new(),
         }
     }
@@ -69,8 +78,10 @@ impl Config {
             let content = fs::read_to_string(&config_path)
                 .map_err(|e| RunAgentError::config(format!("Failed to read config file: {}", e)))?;
             
-            serde_json::from_str(&content)
-                .map_err(|e| RunAgentError::config(format!("Failed to parse config file: {}", e)))
+            match serde_json::from_str::<Self>(&content) {
+                Ok(parsed_config) => Ok(parsed_config),
+                Err(_) => Ok(Self::default())
+            }
         } else {
             Ok(Self::default())
         }

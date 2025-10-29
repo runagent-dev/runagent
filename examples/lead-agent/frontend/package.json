@@ -1,0 +1,32 @@
+{
+  "name": "lead-score-saas",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SaaS Frontend for Lead Scoring with RunAgent",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.6.0",
+    "react-dropzone": "^14.2.3",
+    "lucide-react": "^0.263.1",
+    "tailwindcss": "^3.3.0",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@types/papaparse": "^5.3.14",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  }
+}
