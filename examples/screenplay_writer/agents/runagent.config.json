@@ -1,0 +1,28 @@
+{
+  "agent_name": "Screenplay Writer Crew",
+  "description": "CrewAI-based pipeline turning discussion text into a formatted screenplay and score.",
+  "framework": "crewai",
+  "template": "custom",
+  "version": "1.0.0",
+  "created_at": "2025-10-30 00:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/crewai/custom",
+    "author": "custom"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "screenplay_agent.py",
+        "module": "generate_screenplay",
+        "tag": "screenplay_generate"
+      },
+      {
+        "file": "screenplay_agent.py",
+        "module": "generate_screenplay_stream",
+        "tag": "screenplay_stream"
+      }
+    ]
+  }
+}
+

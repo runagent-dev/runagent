@@ -1,0 +1,11 @@
+{
+    "name": "tripgenius-frontend",
+    "version": "1.0.0",
+    "description": "AI-Powered Trip Planner Frontend",
+    "scripts": {
+      "dev": "http-server -p 3001 -o"
+    },
+    "devDependencies": {
+      "http-server": "^14.1.1"
+    }
+  }

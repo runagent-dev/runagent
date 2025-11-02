@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, FileText, Download, Loader2, ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
+import { BookOpen, FileText, Download, Loader2, ArrowRight, ArrowLeft, Sparkles, Check, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 
 interface Chapter {
   number: number;
@@ -33,6 +33,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
+  const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<'overview' | 'full'>('overview');
 
   const generateBook = async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ function App() {
     try {
       setProgress('Generating book outline...');
       
-      const response = await fetch('http://localhost:8000/api/write-book', {
+      const response = await fetch('/api/write-book', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +83,7 @@ function App() {
     if (!result) return;
 
     try {
-      const response = await fetch('http://localhost:8000/api/download-book', {
+      const response = await fetch('/api/download-book', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,6 +114,100 @@ function App() {
     setResult(null);
     setError(null);
     setProgress('');
+    setExpandedChapters(new Set());
+    setViewMode('overview');
+  };
+
+  const toggleChapter = (chapterNumber: number) => {
+    const newExpanded = new Set(expandedChapters);
+    if (newExpanded.has(chapterNumber)) {
+      newExpanded.delete(chapterNumber);
+    } else {
+      newExpanded.add(chapterNumber);
+    }
+    setExpandedChapters(newExpanded);
+  };
+
+  const formatMarkdown = (text: string) => {
+    if (!text) return { __html: '' };
+    
+    let formatted = text;
+    
+    // Split by lines to process properly
+    const lines = formatted.split('\n');
+    const processed: string[] = [];
+    let inList = false;
+    let listItems: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Headers (process first)
+      if (line.match(/^#{1,6}\s/)) {
+        // Close any open list
+        if (inList) {
+          processed.push(`<ul class="list-disc ml-6 mb-4 space-y-2 text-gray-700">${listItems.join('')}</ul>`);
+          listItems = [];
+          inList = false;
+        }
+        
+        if (line.startsWith('### ')) {
+          processed.push(`<h3 class="text-xl font-bold mt-6 mb-3 text-gray-800">${line.substring(4)}</h3>`);
+        } else if (line.startsWith('## ')) {
+          processed.push(`<h2 class="text-2xl font-bold mt-8 mb-4 text-gray-800">${line.substring(3)}</h2>`);
+        } else if (line.startsWith('# ')) {
+          processed.push(`<h1 class="text-3xl font-bold mt-8 mb-4 text-gray-900">${line.substring(2)}</h1>`);
+        }
+        continue;
+      }
+      
+      // List items
+      if (line.match(/^[-+*]\s/) || line.match(/^\d+\.\s/)) {
+        if (!inList) {
+          inList = true;
+        }
+        const content = line.replace(/^[-+*]\s/, '').replace(/^\d+\.\s/, '');
+        // Process inline formatting
+        const processedContent = content
+          .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em class="italic text-gray-700">$1</em>');
+        listItems.push(`<li class="mb-1">${processedContent}</li>`);
+        continue;
+      }
+      
+      // Close list if we hit a non-list line
+      if (inList) {
+        processed.push(`<ul class="list-disc ml-6 mb-4 space-y-2 text-gray-700">${listItems.join('')}</ul>`);
+        listItems = [];
+        inList = false;
+      }
+      
+      // Empty line = paragraph break
+      if (line === '') {
+        processed.push('');
+        continue;
+      }
+      
+      // Regular paragraph line
+      let para = line;
+      
+      // Process inline formatting (bold, italic, links)
+      // Bold first (double asterisks)
+      para = para.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+      // Then italic (single asterisks not part of bold)
+      para = para.replace(/\*([^*]+?)\*/g, '<em class="italic text-gray-700">$1</em>');
+      // Links
+      para = para.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">$1</a>');
+      
+      processed.push(`<p class="mb-4 text-gray-700 leading-relaxed">${para}</p>`);
+    }
+    
+    // Close any remaining list
+    if (inList) {
+      processed.push(`<ul class="list-disc ml-6 mb-4 space-y-2 text-gray-700">${listItems.join('')}</ul>`);
+    }
+    
+    return { __html: processed.join('\n') };
   };
 
   return (
@@ -327,38 +423,101 @@ function App() {
 
             {/* Chapters Preview */}
             <div className="bg-white rounded-2xl shadow-2xl p-8">
-              <h3 className="text-2xl font-semibold mb-6 text-gray-800">
-                Chapters Overview
-              </h3>
-              <div className="space-y-4">
-                {result.chapters.map((chapter) => (
-                  <div
-                    key={chapter.number}
-                    className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow bg-gradient-to-r from-white to-gray-50"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center">
-                        <span className="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg mr-4 text-lg">
-                          {chapter.number}
-                        </span>
-                        <h4 className="font-semibold text-xl text-gray-800">
-                          {chapter.title}
-                        </h4>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-500">Words</div>
-                        <div className="text-lg font-bold text-purple-600">
-                          {chapter.word_count?.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                    {chapter.description && (
-                      <p className="text-sm text-gray-600 mt-3 pl-16">
-                        {chapter.description}
-                      </p>
-                    )}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-semibold text-gray-800">
+                  Chapters Overview
+                </h3>
+                <button
+                  onClick={() => setViewMode(viewMode === 'overview' ? 'full' : 'overview')}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                >
+                  {viewMode === 'overview' ? (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      View Full Content
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="h-4 w-4" />
+                      Overview Mode
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {viewMode === 'full' && result.book_content && (
+                <div className="mb-6 border-b border-gray-200 pb-6">
+                  <div className="prose prose-lg max-w-none">
+                    <div 
+                      className="markdown-content bg-gray-50 rounded-xl p-8 border border-gray-200"
+                      dangerouslySetInnerHTML={formatMarkdown(result.book_content)}
+                    />
                   </div>
-                ))}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {result.chapters.map((chapter) => {
+                  const isExpanded = expandedChapters.has(chapter.number);
+                  return (
+                    <div
+                      key={chapter.number}
+                      className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow bg-gradient-to-r from-white to-gray-50"
+                    >
+                      <div 
+                        className="p-6 cursor-pointer"
+                        onClick={() => viewMode === 'overview' && toggleChapter(chapter.number)}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center flex-1">
+                            <span className="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg mr-4 text-lg min-w-[3rem] text-center">
+                              {chapter.number}
+                            </span>
+                            <h4 className="font-semibold text-xl text-gray-800 flex-1">
+                              {chapter.title}
+                            </h4>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="text-sm text-gray-500">Words</div>
+                              <div className="text-lg font-bold text-purple-600">
+                                {chapter.word_count?.toLocaleString()}
+                              </div>
+                            </div>
+                            {viewMode === 'overview' && chapter.content && (
+                              <button className="ml-4 text-purple-600 hover:text-purple-800 transition-colors">
+                                {isExpanded ? (
+                                  <ChevronUp className="h-5 w-5" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {chapter.description && (
+                          <p className="text-sm text-gray-600 mt-3 ml-20">
+                            {chapter.description}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {/* Expandable Chapter Content */}
+                      {viewMode === 'overview' && isExpanded && chapter.content && (
+                        <div className="border-t border-gray-200 bg-gray-50">
+                          <div className="p-6">
+                            <div className="prose prose-lg max-w-none">
+                              <div 
+                                className="markdown-content"
+                                dangerouslySetInnerHTML={formatMarkdown(chapter.content)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

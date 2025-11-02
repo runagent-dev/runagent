@@ -41,7 +41,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    println!("✅ StockAgent test completed successfully!");
-    
+    println!("✅ StockAgent test completed successfully!");  
     Ok(())
 }

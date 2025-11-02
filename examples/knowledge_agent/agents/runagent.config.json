@@ -1,0 +1,38 @@
+{
+  "agent_name": "Agno Knowledge Agent ChromaDB",
+  "description": "Agent using Agno Knowledge with ChromaDB for RAG-style queries.",
+  "framework": "agno",
+  "template": "custom",
+  "version": "1.0.0",
+  "created_at": "2025-10-30 00:00:00",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/agno/custom",
+    "author": "custom"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "knowledge_agent.py",
+        "module": "kb_query",
+        "tag": "kb_query"
+      },
+      {
+        "file": "knowledge_agent.py",
+        "module": "kb_query_stream",
+        "tag": "kb_query_stream"
+      },
+      {
+        "file": "knowledge_agent.py",
+        "module": "kb_delete_by_name",
+        "tag": "kb_delete_by_name"
+      },
+      {
+        "file": "knowledge_agent.py",
+        "module": "kb_delete_by_metadata",
+        "tag": "kb_delete_by_metadata"
+      }
+    ]
+  }
+}
+

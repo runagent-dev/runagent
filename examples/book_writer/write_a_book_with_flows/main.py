@@ -14,6 +14,27 @@ src_dir = current_dir / "src"
 if src_dir.exists():
     sys.path.insert(0, str(src_dir))
 
+# Safe print function to avoid rich FileProxy issues in VM environments
+def safe_print(*args, **kwargs):
+    """Print function that safely handles rich FileProxy issues"""
+    try:
+        # Try to use the original stdout if available
+        if hasattr(sys, '__stdout__') and sys.__stdout__ is not None:
+            print(*args, **kwargs, file=sys.__stdout__)
+        else:
+            # Direct write to stdout file descriptor to bypass rich
+            import os
+            message = ' '.join(str(arg) for arg in args) + '\n'
+            os.write(1, message.encode('utf-8'))
+    except (AttributeError, OSError, TypeError):
+        # Final fallback: write to stderr
+        try:
+            import os
+            message = ' '.join(str(arg) for arg in args) + '\n'
+            os.write(2, message.encode('utf-8'))
+        except:
+            pass  # Silently fail if all else fails
+
 # Lazy imports - will be loaded when functions are called
 def get_outline_crew():
     from write_a_book_with_flows.crews.outline_book_crew.outline_crew import OutlineCrew
@@ -45,8 +66,8 @@ def generate_outline(
         Dictionary with book outline including chapters
     """
     try:
-        print(f"📚 Generating outline for: {title}")
-        print(f"Topic: {topic}")
+        safe_print(f"📚 Generating outline for: {title}")
+        safe_print(f"Topic: {topic}")
         
         # Import crew class
         OutlineCrew = get_outline_crew()
@@ -141,7 +162,7 @@ def write_chapter(
         Dictionary with chapter content
     """
     try:
-        print(f"✍️ Writing chapter: {chapter_title}")
+        safe_print(f"✍️ Writing chapter: {chapter_title}")
         
         # Run async chapter writing
         try:
@@ -203,12 +224,12 @@ def write_full_book(
         Dictionary with complete book including all chapters
     """
     try:
-        print(f"📖 Writing complete book: {title}")
-        print(f"Topic: {topic}")
-        print(f"Target chapters: {num_chapters}")
+        safe_print(f"📖 Writing complete book: {title}")
+        safe_print(f"Topic: {topic}")
+        safe_print(f"Target chapters: {num_chapters}")
         
         # Step 1: Generate outline
-        print("\n📋 Step 1: Generating outline...")
+        safe_print("\n📋 Step 1: Generating outline...")
         outline_result = generate_outline(title, topic, goal)
         
         if not outline_result.get("success"):
@@ -217,13 +238,13 @@ def write_full_book(
         chapters_outline = outline_result["chapters"][:num_chapters]
         
         # Step 2: Write all chapters
-        print(f"\n✍️ Step 2: Writing {len(chapters_outline)} chapters...")
+        safe_print(f"\n✍️ Step 2: Writing {len(chapters_outline)} chapters...")
         
         async def write_all_chapters():
             tasks = []
             
             for chapter_outline in chapters_outline:
-                print(f"  - Scheduling: {chapter_outline['title']}")
+                safe_print(f"  - Scheduling: {chapter_outline['title']}")
                 task = asyncio.create_task(
                     write_chapter_async(
                         title=title,
@@ -256,7 +277,7 @@ def write_full_book(
             chapters = asyncio.run(write_all_chapters())
         
         # Step 3: Combine into full book
-        print("\n📚 Step 3: Combining chapters into book...")
+        safe_print("\n📚 Step 3: Combining chapters into book...")
         
         book_content = f"# {title}\n\n"
         book_content += f"## About This Book\n\n"
@@ -302,7 +323,7 @@ def write_full_book(
 
 if __name__ == "__main__":
     # Test the functions
-    print("Testing Book Writer Flow...\n")
+    safe_print("Testing Book Writer Flow...\n")
     
     # Test outline generation
     result = generate_outline(
@@ -310,4 +331,4 @@ if __name__ == "__main__":
         topic="Python programming for beginners",
         goal="Teach fundamental Python concepts"
     )
-    print(result)
+    safe_print(result)

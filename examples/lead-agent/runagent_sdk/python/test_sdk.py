@@ -2,7 +2,7 @@
 from runagent import RunAgentClient
 
 client = RunAgentClient(
-    agent_id="506babd5-7d5c-4b2d-bd49-9de437dcf58a",
+    agent_id="706b9423-a817-4953-a899-d2d2404e0799",
     entrypoint_tag="lead_score_flow",
     local=False
 )

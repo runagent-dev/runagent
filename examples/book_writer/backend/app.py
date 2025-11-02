@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from runagent import RunAgentClient
 import os
@@ -7,14 +7,17 @@ from datetime import datetime
 import io
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ]
-    }
-})
+
+# CORS configuration - allow all origins in development, or specify in production
+cors_origins = os.getenv('CORS_ORIGINS', '*').split(',')
+if cors_origins == ['*']:
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+else:
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [origin.strip() for origin in cors_origins]
+        }
+    })
 
 @app.route('/api/generate-outline', methods=['POST'])
 def generate_outline():
@@ -103,7 +106,7 @@ def write_book():
         client = RunAgentClient(
             agent_id=agent_id,
             entrypoint_tag="write_full_book",
-            local=True
+            local=False
         )
         
         # Write the complete book
@@ -145,16 +148,22 @@ def download_book():
         # Create filename
         filename = f"{title.replace(' ', '_')}.md"
         
-        # Create file in memory
-        file_stream = io.BytesIO(content.encode('utf-8'))
+        # Create file in memory using BytesIO
+        file_stream = io.BytesIO()
+        file_stream.write(content.encode('utf-8'))
         file_stream.seek(0)
         
-        return send_file(
-            file_stream,
+        # Create a response with proper headers to avoid _FileProxy__buffer issues
+        response = Response(
+            file_stream.getvalue(),
             mimetype='text/markdown',
-            as_attachment=True,
-            download_name=filename
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/markdown; charset=utf-8'
+            }
         )
+        
+        return response
         
     except Exception as e:
         error_trace = traceback.format_exc()
