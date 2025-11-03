@@ -79,8 +79,8 @@ def upload(path: Path, overwrite: bool):
         if not Path(path).exists():
             raise click.ClickException(f"Folder not found: {path}")
 
-        console.print(f"📤 [bold]Uploading agent...[/bold]")
-        console.print(f"📁 Source: [cyan]{path}[/cyan]")
+        console.print(f"[bold]Uploading agent...[/bold]")
+        console.print(f"Source: [cyan]{path}[/cyan]")
 
         # Upload agent (framework auto-detected)
         result = sdk.upload_agent(folder=path, overwrite=overwrite)
@@ -88,8 +88,8 @@ def upload(path: Path, overwrite: bool):
         if result.get("success"):
             agent_id = result["agent_id"]
             console.print(f"\n✅ [green]Upload successful![/green]")
-            console.print(f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]")
-            console.print(f"\n💡 [bold]Next step:[/bold]")
+            console.print(f"Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+            console.print(f"\n[bold]Next step:[/bold]")
             console.print(f"[cyan]runagent start --id {agent_id}[/cyan]")
         else:
             console.print(f"❌ [red]Upload failed:[/red] {format_error_message(result.get('error'))}")

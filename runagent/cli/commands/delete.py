@@ -62,7 +62,7 @@ def delete(agent_id, yes):
             console.print(f"❌ [red]Agent {agent_id} not found in database[/red]")
             
             # Show available agents
-            console.print("\n💡 Available agents:")
+            console.print("\n[cyan]Available agents:[/cyan]")
             agents = sdk.db_service.list_agents()
             if agents:
                 table = Table(title="Available Agents")
@@ -85,7 +85,7 @@ def delete(agent_id, yes):
             raise click.ClickException("Agent not found")
         
         # Show agent details
-        console.print(f"\n🔍 [yellow]Agent to be deleted:[/yellow]")
+        console.print(f"\n[yellow]Agent to be deleted:[/yellow]")
         console.print(f"   Agent ID: [bold magenta]{agent['agent_id']}[/bold magenta]")
         console.print(f"   Framework: [green]{agent['framework']}[/green]")
         console.print(f"   Path: [blue]{agent['agent_path']}[/blue]")
@@ -95,7 +95,7 @@ def delete(agent_id, yes):
         
         # Confirmation
         if not yes:
-            if not click.confirm("\n⚠️ This will permanently delete the agent from the database. Continue?"):
+            if not click.confirm("\n[yellow]This will permanently delete the agent from the database. Continue?[/yellow]"):
                 console.print("Deletion cancelled.")
                 return
         
@@ -107,7 +107,7 @@ def delete(agent_id, yes):
             
             # Show updated capacity
             capacity_info = sdk.db_service.get_database_capacity_info()
-            console.print(f"📊 Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
+            console.print(f"Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
         else:
             console.print(f"❌ [red]Failed to delete agent:[/red] {format_error_message(result.get('error'))}")
             import sys

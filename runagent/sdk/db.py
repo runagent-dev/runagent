@@ -392,11 +392,11 @@ class DBService:
 
                 if enhanced:
                     console.print(
-                        f"🔑 [green]Enhanced limits active: {max_agents} agents[/green]"
+                        f"[green]Enhanced limits active: {max_agents} agents[/green]"
                     )
                 else:
                     console.print(
-                        f"🔑 [yellow]Using default limits: {max_agents} agents[/yellow]"
+                        f"[yellow]Using default limits: {max_agents} agents[/yellow]"
                     )
 
                 return result
@@ -798,11 +798,11 @@ class DBService:
 
                 if enhanced:
                     console.print(
-                        f"🔑 [green]Enhanced limits active: {max_agents} agents[/green]"
+                        f"[green]Enhanced limits active: {max_agents} agents[/green]"
                     )
                 else:
                     console.print(
-                        f"🔑 [yellow]Using default limits: {max_agents} agents[/yellow]"
+                        f"[yellow]Using default limits: {max_agents} agents[/yellow]"
                     )
 
                 return result
@@ -904,7 +904,7 @@ class DBService:
                 # Phase 1: Check if we're within default limits (no API call needed)
                 if current_count < default_limit:
                     console.print(
-                        f"🟢 Adding agent within default limits ({current_count + 1}/{default_limit})"
+                        f"[green]Adding agent within default limits ({current_count + 1}/{default_limit})[/green]"
                     )
 
                     # Proceed without API check
@@ -938,7 +938,7 @@ class DBService:
 
                 # Phase 2: At or above default limit - check API for enhanced limits
                 console.print(
-                    f"🟡 At default limit ({current_count}/{default_limit}) - checking for enhanced limits..."
+                    f"[yellow]At default limit ({current_count}/{default_limit}) - checking for enhanced limits...[/yellow]"
                 )
 
                 limit_info = self._check_enhanced_limits_with_fallback()

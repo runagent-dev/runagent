@@ -147,13 +147,13 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         )
     
     if not input_file and not extra_params:
-        console.print("⚠️  No input file or extra parameters provided. Running with defaults.")
+        console.print("[yellow]No input file or extra parameters provided. Running with defaults.[/yellow]")
     
     # ============================================
     # DISPLAY CONFIGURATION
     # ============================================
     
-    console.print("🚀 RunAgent Configuration:")
+    console.print("[bold]RunAgent Configuration:[/bold]")
     
     # Connection info
     if agent_id:

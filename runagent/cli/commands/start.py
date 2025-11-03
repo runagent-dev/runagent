@@ -73,15 +73,15 @@ def start(agent_id, config):
                     raise
                 raise click.ClickException("Invalid JSON in config parameter")
 
-        console.print(f"🚀 [bold]Starting agent...[/bold]")
-        console.print(f"🆔 Agent ID: [magenta]{agent_id}[/magenta]")
+        console.print(f"[bold]Starting agent...[/bold]")
+        console.print(f"Agent ID: [magenta]{agent_id}[/magenta]")
 
         # Start agent
         result = sdk.start_remote_agent(agent_id, config_dict)
 
         if result.get("success"):
             console.print(f"\n✅ [green]Agent started successfully![/green]")
-            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
+            console.print(f"Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
             console.print(f"❌ [red]Start failed:[/red] {format_error_message(result.get('error'))}")
             import sys

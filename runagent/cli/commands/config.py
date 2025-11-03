@@ -192,12 +192,12 @@ def show_interactive_config_menu():
                 'config_option',
                 message="What would you like to configure?",
                 choices=[
-                    ('🔑 API Key', 'api_key'),
-                    ('🌐 Base URL', 'base_url'),
-                    ('📁 Active Project', 'project'),
-                    ('🔄 Sync Settings', 'sync'),
-                    ('📊 View Status', 'status'),
-                    ('🔃 Reset Configuration', 'reset'),
+                    ('API Key', 'api_key'),
+                    ('Base URL', 'base_url'),
+                    ('Active Project', 'project'),
+                    ('Sync Settings', 'sync'),
+                    ('View Status', 'status'),
+                    ('Reset Configuration', 'reset'),
                 ],
                 carousel=True
             ),
@@ -344,7 +344,7 @@ def _interactive_sync_settings():
         else:
             status_text = "[red]Currently: DISABLED[/red]"
         
-        console.print(f"\n📡 Middleware Sync {status_text}\n")
+        console.print(f"\n[bold]Middleware Sync[/bold] {status_text}\n")
         
         # Ask what to do
         questions = [
@@ -352,10 +352,10 @@ def _interactive_sync_settings():
                 'sync_action',
                 message="Select sync preference",
                 choices=[
-                    ('✅ Enable Sync (sync local runs to middleware)', 'enable'),
-                    ('❌ Disable Sync (local only)', 'disable'),
+                    ('Enable Sync (sync local runs to middleware)', 'enable'),
+                    ('Disable Sync (local only)', 'disable'),
                 ],
-                default=('✅ Enable Sync (sync local runs to middleware)', 'enable') if current_status else ('❌ Disable Sync (local only)', 'disable'),
+                default=('Enable Sync (sync local runs to middleware)', 'enable') if current_status else ('Disable Sync (local only)', 'disable'),
                 carousel=True
             ),
         ]
@@ -381,7 +381,7 @@ def _interactive_sync_settings():
             ))
         else:
             console.print(Panel(
-                "[bold yellow]⚠️  Middleware sync disabled[/bold yellow]\n\n"
+                "[bold yellow]Middleware sync disabled[/bold yellow]\n\n"
                 "[dim]Local agents will only store data locally.[/dim]\n"
                 "[dim]Your runs won't appear in the middleware dashboard.[/dim]",
                 title="[bold]Sync Disabled[/bold]",
@@ -413,7 +413,7 @@ def _interactive_set_project():
             return
         
         # Fetch projects from API
-        console.print("\n[cyan]📁 Fetching your projects...[/cyan]\n")
+        console.print("\n[cyan]Fetching your projects...[/cyan]\n")
         
         from runagent.sdk.rest_client import RestClient
         
@@ -475,7 +475,7 @@ def _interactive_set_project():
             is_default = project.get('is_default', False)
             
             # Mark current and default projects
-            label = f"📁 {project_name}"
+            label = project_name
             if project_id == current_project_id:
                 label = f"✓ {label} [current]"
                 default_choice = (label, project_id)
@@ -549,30 +549,30 @@ def _show_config_status():
     # API Key status
     if api_key:
         masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-        table.add_row("🔑 API Key", f"[green]✓[/green] {masked_key}")
+        table.add_row("API Key", f"[green]✓[/green] {masked_key}")
     else:
-        table.add_row("🔑 API Key", "[red]✗ Not set[/red]")
+        table.add_row("API Key", "[red]✗ Not set[/red]")
     
     # Base URL
-    table.add_row("🌐 Base URL", base_url or "[yellow]Using default[/yellow]")
+    table.add_row("Base URL", base_url or "[yellow]Using default[/yellow]")
     
     # User info
     if user_config.get('user_email'):
-        table.add_row("✉️  Email", user_config.get('user_email'))
+        table.add_row("Email", user_config.get('user_email'))
     
     if user_config.get('user_tier'):
-        table.add_row("🎯 Tier", user_config.get('user_tier'))
+        table.add_row("Tier", user_config.get('user_tier'))
     
     # Active project
     if user_config.get('active_project_name'):
-        table.add_row("📁 Active Project", user_config.get('active_project_name'))
+        table.add_row("Active Project", user_config.get('active_project_name'))
     
     # Sync status
     sync_enabled = user_config.get('local_sync_enabled', True)
     if sync_enabled:
-        table.add_row("🔄 Middleware Sync", "[green]✓ Enabled[/green]")
+        table.add_row("Middleware Sync", "[green]✓ Enabled[/green]")
     else:
-        table.add_row("🔄 Middleware Sync", "[yellow]⚠ Disabled[/yellow]")
+        table.add_row("Middleware Sync", "[yellow]Disabled[/yellow]")
     
     console.print(Panel(
         table,
@@ -581,8 +581,8 @@ def _show_config_status():
     ))
     
     # Show helpful info
-    console.print("\n[dim]💡 Use arrow keys in interactive mode: 'runagent config'[/dim]")
-    console.print("[dim]💡 Direct flags for automation: 'runagent config --set-api-key <key>'[/dim]\n")
+    console.print("\n[dim]Use arrow keys in interactive mode: 'runagent config'[/dim]")
+    console.print("[dim]Direct flags for automation: 'runagent config --set-api-key <key>'[/dim]\n")
 
 
 def _interactive_reset_config():
@@ -590,7 +590,7 @@ def _interactive_reset_config():
     from rich.prompt import Confirm
     from rich.panel import Panel
     
-    console.print("[yellow]⚠️  This will remove all your configuration including API key[/yellow]")
+    console.print("[yellow]This will remove all your configuration including API key[/yellow]")
     if not Confirm.ask("\n[bold]Are you sure you want to reset?[/bold]", default=False):
         console.print("[dim]Reset cancelled.[/dim]")
         return

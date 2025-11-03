@@ -76,7 +76,7 @@ def setup(again):
             if not api_key:
                 print_setup_banner()
             else:
-                console.print("\n[bold cyan]🔄 Reconfiguring RunAgent[/bold cyan]\n")
+                console.print("\n[bold cyan]Reconfiguring RunAgent[/bold cyan]\n")
         
         # Show setup method options with arrow-key selection
         console.print("[bold cyan]Choose your setup method:[/bold cyan]\n")
@@ -88,10 +88,10 @@ def setup(again):
                 'setup_method',
                 message="Select setup method",
                 choices=[
-                    ('⚡ Express Setup (Browser login)', 'express'),
-                    ('📝 Manual Setup (Enter API key)', 'manual'),
+                    ('Express Setup (Browser login)', 'express'),
+                    ('Manual Setup (Enter API key)', 'manual'),
                 ],
-                default=('⚡ Express Setup (Browser login)', 'express'),
+                default=('Express Setup (Browser login)', 'express'),
                 carousel=True
             ),
         ]
@@ -150,7 +150,7 @@ def setup(again):
         
         else:
             # Manual setup - prompt for API key
-            console.print("\n[bold white]📝 Manual Setup[/bold white]\n")
+            console.print("\n[bold white]Manual Setup[/bold white]\n")
             api_key = Prompt.ask(
                 "[cyan]Enter your API key[/cyan]",
                 password=True
@@ -164,7 +164,7 @@ def setup(again):
                 ))
                 raise click.ClickException("Invalid API key")
             
-            console.print("\n🔑 [cyan]Configuring RunAgent...[/cyan]")
+            console.print("\n[cyan]Configuring RunAgent...[/cyan]")
 
             # Configure SDK with validation
             try:
@@ -190,7 +190,7 @@ def setup(again):
                 
                 # Provide specific troubleshooting based on error message
                 error_msg = str(auth_err).lower()
-                console.print("\n💡 [yellow]Troubleshooting:[/yellow]")
+                console.print("\n[yellow]Troubleshooting:[/yellow]")
                 
                 if "invalid api key" in error_msg or "not authenticated" in error_msg:
                     console.print("   • Check that your API key is correct")
@@ -221,42 +221,42 @@ def setup(again):
             info_table.add_column("", style="dim", no_wrap=True)
             info_table.add_column("", style="cyan")
             
-            info_table.add_row("✉️  Email", user_info.get('email'))
-            info_table.add_row("🎯 Tier", user_info.get('tier', 'Free'))
+            info_table.add_row("Email", user_info.get('email'))
+            info_table.add_row("Tier", user_info.get('tier', 'Free'))
             
             # Show active project
             user_config = Config.get_user_config()
             active_project = user_config.get('active_project_name')
             if active_project:
-                info_table.add_row("📁 Active Project", active_project)
+                info_table.add_row("Active Project", active_project)
             
             console.print(Panel(
                 info_table,
-                title="[bold]👤 User Information[/bold]",
+                title="[bold]User Information[/bold]",
                 border_style="cyan"
             ))
 
         # Show sync status (simplified)
-        console.print("\n🔄 [bold]Middleware Sync Status:[/bold]")
+        console.print("\n[bold]Middleware Sync Status:[/bold]")
         try:
             from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
             sync_service = MiddlewareSyncService(sdk.config)
             
             if sync_service.is_sync_enabled():
                 console.print("   Status: [green]✅ ENABLED[/green]")
-                console.print("   📊 Local agent runs will sync to middleware")
+                console.print("   Local agent runs will sync to middleware")
             else:
-                console.print("   Status: [yellow]⚠️ DISABLED[/yellow]")
-                console.print("   📊 Only local storage will be used")
+                console.print("   Status: [yellow]DISABLED[/yellow]")
+                console.print("   Only local storage will be used")
                 
         except Exception as e:
             console.print(f"   Status: [yellow]Unknown - {e}[/yellow]")
 
         # Show next steps - Simple workflow
-        console.print("\n💡 [bold]Next Steps:[/bold]")
-        console.print("   1️⃣  Initialize a new agent: [cyan]runagent init[/cyan]")
-        console.print("   2️⃣  Serve it locally: [cyan]runagent serve <path>[/cyan]")
-        console.print("   3️⃣  Invoke your agent: [cyan]runagent run --id <agent-id> --tag <tag>[/cyan]")
+        console.print("\n[bold]Next Steps:[/bold]")
+        console.print("   1. Initialize a new agent: [cyan]runagent init[/cyan]")
+        console.print("   2. Serve it locally: [cyan]runagent serve <path>[/cyan]")
+        console.print("   3. Invoke your agent: [cyan]runagent run --id <agent-id> --tag <tag>[/cyan]")
 
     except AuthenticationError:
         # Already handled above

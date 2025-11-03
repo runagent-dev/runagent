@@ -302,7 +302,7 @@ def show_subtle_robotic_runner(duration=2.5, style="field"):
     if animation.thread:
         animation.thread.join()
     
-    console.clear()
+    # Don't clear terminal - maintain continuity
 
 
 # Even simpler version for quick startup
@@ -360,4 +360,4 @@ def show_quick_runner(duration=2.0):
     if runner.thread:
         runner.thread.join()
     
-    console.clear()
+    # Don't clear terminal - maintain continuity

@@ -50,7 +50,7 @@ def register(path: Path):
         config_path = agent_path / "runagent.config.json"
         if not config_path.exists():
             console.print(f"❌ [red]No runagent.config.json found in {agent_path}[/red]")
-            console.print("💡 [cyan]Make sure you're in an agent directory or run 'runagent init' first[/cyan]")
+            console.print("[cyan]Make sure you're in an agent directory or run 'runagent init' first[/cyan]")
             raise click.ClickException("Agent configuration not found")
         
         # Load agent config
@@ -63,7 +63,7 @@ def register(path: Path):
             agent_id = agent_config.agent_id
             if not agent_id:
                 console.print(f"❌ [red]No agent_id found in configuration[/red]")
-                console.print("💡 [cyan]Run 'runagent init' to create a proper agent configuration[/cyan]")
+                console.print("[cyan]Run 'runagent init' to create a proper agent configuration[/cyan]")
                 raise click.ClickException("Missing agent_id in configuration")
                 
         except Exception as e:
@@ -75,9 +75,9 @@ def register(path: Path):
         existing_agent = db_service.get_agent(agent_id)
         
         if existing_agent:
-            console.print(f"⚠️ [yellow]Agent {agent_id} already exists in database[/yellow]")
-            console.print(f"📊 [cyan]Current status: {existing_agent.get('status', 'unknown')}[/cyan]")
-            console.print(f"🌐 [cyan]Remote status: {existing_agent.get('remote_status', 'unknown')}[/cyan]")
+            console.print(f"[yellow]Agent {agent_id} already exists in database[/yellow]")
+            console.print(f"[cyan]Current status: {existing_agent.get('status', 'unknown')}[/cyan]")
+            console.print(f"[cyan]Remote status: {existing_agent.get('remote_status', 'unknown')}[/cyan]")
             
             from rich.prompt import Confirm
             overwrite = Confirm.ask("Do you want to update the existing agent?", default=False)
@@ -154,9 +154,9 @@ def register(path: Path):
             border_style="green"
         ))
         
-        console.print("\n💡 [bold]Next Steps:[/bold]")
-        console.print(f"   1️⃣  Serve locally: [cyan]runagent serve .[/cyan]")
-        console.print(f"   2️⃣  Deploy remotely: [cyan]runagent deploy .[/cyan]")
+        console.print("\n[bold]Next Steps:[/bold]")
+        console.print(f"   1. Serve locally: [cyan]runagent serve .[/cyan]")
+        console.print(f"   2. Deploy remotely: [cyan]runagent deploy .[/cyan]")
         
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):

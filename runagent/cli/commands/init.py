@@ -95,11 +95,11 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                     'start_type',
                     message="Select starting point",
                     choices=[
-                        ('📄 Blank Project (Own codebase)', 'blank'),
-                        ('📦 From Template (recommended)', 'template'),
-                        ('🐙 From GitHub Repository', 'github'),
+                        ('Blank Project (Own codebase)', 'blank'),
+                        ('From Template (recommended)', 'template'),
+                        ('From GitHub Repository', 'github'),
                     ],
-                    default=('📦 From Template (recommended)', 'template'),
+                    default=('From Template (recommended)', 'template'),
                     carousel=True
                 ),
             ]
@@ -126,8 +126,7 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 
                 framework_choices = []
                 for fw in selectable_frameworks:
-                    category_emoji = "🐍" if fw.is_pythonic() else "🌐" if fw.is_webhook() else "❓"
-                    label = f"{category_emoji} {fw.value} ({fw.category})"
+                    label = f"{fw.value} ({fw.category})"
                     framework_choices.append((label, fw))
                 
                 fw_questions = [
@@ -237,10 +236,10 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                     'auth_type',
                     message="Select authentication type",
                     choices=[
-                        ('🔓 None (no authentication)', 'none'),
-                        ('🔑 API Key', 'api_key'),
+                        ('None (no authentication)', 'none'),
+                        ('API Key', 'api_key'),
                     ],
-                    default=('🔓 None (no authentication)', 'none'),
+                    default=('None (no authentication)', 'none'),
                     carousel=True
                 ),
             ]
@@ -288,7 +287,7 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
             )
         elif template_source == "github":
             # TODO: Clone from GitHub
-            console.print(f"[yellow]⚠️  GitHub cloning not yet implemented for: {selected_template}[/yellow]")
+            console.print(f"[yellow]GitHub cloning not yet implemented for: {selected_template}[/yellow]")
             success = False
         
         if not success:
@@ -322,9 +321,9 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 with open(config_path, 'w') as f:
                     json.dump(config_dict, f, indent=2)
                 
-                console.print(f"\n[dim]✓ Generated agent ID: [cyan]{agent_id}[/cyan][/dim]")
-                console.print("[dim]✓ Updated agent name and description in config[/dim]")
-                console.print(f"[dim]✓ Set authentication type: [green]{auth_type}[/green][/dim]")
+                console.print(f"\n[dim]✅ Generated agent ID: [cyan]{agent_id}[/cyan][/dim]")
+                console.print("[dim]✅ Updated agent name and description in config[/dim]")
+                console.print(f"[dim]✅ Set authentication type: [green]{auth_type}[/green][/dim]")
                 
                 # Create database entry for the initialized agent
                 try:
@@ -357,15 +356,15 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                     )
                     
                     if result.get('success'):
-                        console.print("[dim]✓ Agent registered in database[/dim]")
+                        console.print("[dim]✅ Agent registered in database[/dim]")
                     else:
-                        console.print(f"[yellow]⚠️  Could not register agent in database: {result.get('error', 'Unknown error')}[/yellow]")
+                        console.print(f"[yellow]Could not register agent in database: {result.get('error', 'Unknown error')}[/yellow]")
                         
                 except Exception as db_error:
-                    console.print(f"[yellow]⚠️  Could not register agent in database: {db_error}[/yellow]")
+                    console.print(f"[yellow]Could not register agent in database: {db_error}[/yellow]")
                     
         except Exception as e:
-            console.print(f"[yellow]⚠️  Could not update config: {e}[/yellow]")
+            console.print(f"[yellow]Could not update config: {e}[/yellow]")
         
         # Success message
         relative_path = project_path.relative_to(Path.cwd()) if project_path != Path.cwd() else Path(".")
@@ -381,14 +380,14 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
         ))
         
         # Simple next steps
-        console.print("\n💡 [bold]Next Steps:[/bold]")
+        console.print("\n[bold]Next Steps:[/bold]")
         if relative_path != Path("."):
-            console.print(f"   1️⃣  [cyan]cd {relative_path}[/cyan]")
-            console.print(f"   2️⃣  Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
-            console.print(f"   3️⃣  Serve locally: [cyan]runagent serve .[/cyan]")
+            console.print(f"   1. [cyan]cd {relative_path}[/cyan]")
+            console.print(f"   2. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
+            console.print(f"   3. Serve locally: [cyan]runagent serve .[/cyan]")
         else:
-            console.print(f"   1️⃣  Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
-            console.print(f"   2️⃣  Serve locally: [cyan]runagent serve .[/cyan]")
+            console.print(f"   1. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
+            console.print(f"   2. Serve locally: [cyan]runagent serve .[/cyan]")
     
     except TemplateError as e:
         if os.getenv('DISABLE_TRY_CATCH'):
@@ -416,7 +415,7 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
             f"[bold]Options:[/bold]\n"
             f"  • Use [cyan]--overwrite[/cyan] flag to replace existing files\n"
             f"  • Remove the directory manually",
-            title="[bold yellow]⚠️  Path Conflict[/bold yellow]",
+            title="[bold yellow]Path Conflict[/bold yellow]",
             border_style="yellow"
         ))
         import sys

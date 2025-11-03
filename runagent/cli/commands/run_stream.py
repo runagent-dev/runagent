@@ -119,7 +119,7 @@ def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
     # DISPLAY CONFIGURATION
     # ============================================
     
-    console.print("🚀 RunAgent Streaming Configuration:")
+    console.print("[bold]RunAgent Streaming Configuration:[/bold]")
     
     # Connection info
     if agent_id:
@@ -185,9 +185,9 @@ def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
             entrypoint_tag=tag
         )
 
-        console.print(f"\n🔄 [bold]Starting streaming execution...[/bold]")
-        console.print(f"📡 [dim]Connected to agent via WebSocket[/dim]")
-        console.print(f"📤 [dim]Streaming results:[/dim]\n")
+        console.print(f"\n[bold]Starting streaming execution...[/bold]")
+        console.print(f"[dim]Connected to agent via WebSocket[/dim]")
+        console.print(f"[dim]Streaming results:[/dim]\n")
         
         # Stream the results
         for chunk in ra_client.run_stream(**input_params):

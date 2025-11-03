@@ -495,13 +495,13 @@ class RestClient:
             error_message = error_info
             # Check for common error patterns
             if "already exists" in error_message.lower() or "agent already exists" in error_message.lower():
-                console.print(f"⚠️ [yellow]Agent Already Exists[/yellow]")
+                console.print(f"[yellow]Agent Already Exists[/yellow]")
                 console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
                 console.print(f"   {error_message}")
                 
                 # Ask user if they want to overwrite
                 if not overwrite:
-                    console.print(f"💡 [cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
+                    console.print(f"[cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
                     if Confirm.ask("Do you want to overwrite the existing agent?", default=True):
                         # Return special code to indicate retry needed
                         return {
@@ -521,7 +521,7 @@ class RestClient:
             elif "permission" in error_message.lower() or "not found" in error_message.lower():
                 console.print(f"❌ [red]Project Access Error[/red]")
                 console.print(f"   {error_message}")
-                console.print(f"💡 [cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
+                console.print(f"[cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
                 return {
                     "success": False,
                     "error": f"Agent exists under different project: {error_message}",
@@ -535,7 +535,7 @@ class RestClient:
             if error_code == "INSUFFICIENT_PERMISSIONS":
                 console.print(f"❌ [red]Project Access Error[/red]")
                 console.print(f"   {error_message}")
-                console.print(f"💡 [cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
+                console.print(f"[cyan]This agent exists under a different project. Switch to the correct project to modify it.[/cyan]")
                 return {
                     "success": False,
                     "error": f"Agent exists under different project: {error_message}",
@@ -543,13 +543,13 @@ class RestClient:
                 }
             
             elif error_code == "RESOURCE_ALREADY_EXISTS":
-                console.print(f"⚠️ [yellow]Agent Already Exists[/yellow]")
+                console.print(f"[yellow]Agent Already Exists[/yellow]")
                 console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
                 console.print(f"   {error_message}")
                 
                 # Ask user if they want to overwrite
                 if not overwrite:
-                    console.print(f"💡 [cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
+                    console.print(f"[cyan]Use --overwrite flag or confirm below to replace the existing agent[/cyan]")
                     if Confirm.ask("Do you want to overwrite the existing agent?", default=True):
                         # Return special code to indicate retry needed
                         return {
@@ -798,10 +798,10 @@ class RestClient:
 
             console.print(Panel(
                 f"✅ [bold green]Upload successful![/bold green]\n"
-                f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                f"🌐 Server: [blue]{self.base_url}[/blue]\n"
-                f"📊 Status: [cyan]uploaded[/cyan]",
-                title="📤 Upload Complete",
+                f"Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
+                f"Server: [blue]{self.base_url}[/blue]\n"
+                f"Status: [cyan]uploaded[/cyan]",
+                title="Upload Complete",
                 border_style="green",
             ))
 
@@ -819,10 +819,10 @@ class RestClient:
             if not folder_path.exists():
                 return {"success": False, "error": f"Folder not found: {folder_path}"}
 
-            console.print(f"📤 Uploading agent from: [blue]{folder_path}[/blue]")
+            console.print(f"Uploading agent from: [blue]{folder_path}[/blue]")
 
             # Step 1: Validate agent
-            console.print(f"🔍 Validating agent...")
+            console.print(f"Validating agent...")
 
             is_valid, validation_details = validate_agent(folder_path)
             
@@ -842,7 +842,7 @@ class RestClient:
             # Step 2: Load agent config
             try:
                 agent_config = get_agent_config(folder_path)
-                console.print(f"📋 [green]Agent config loaded successfully[/green]")
+                console.print(f"✅ [green]Agent config loaded successfully[/green]")
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
                     raise
@@ -856,7 +856,7 @@ class RestClient:
                 }
             
             agent_id = agent_config.agent_id
-            console.print(f"🆔 Using Agent ID: [magenta]{agent_id}[/magenta]")
+            console.print(f"Using Agent ID: [magenta]{agent_id}[/magenta]")
 
             # Step 4: Validate agent ID exists in database
             from runagent.sdk.db import DBService
@@ -866,8 +866,8 @@ class RestClient:
             
             if not validation_result["valid"]:
                 console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
-                console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
-                console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
+                console.print(f"[cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+                console.print(f"[blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
                 
                 return {
                     "success": False,
@@ -877,19 +877,19 @@ class RestClient:
             else:
                 existing_agent = validation_result["agent"]
                 console.print(f"✅ [green]Agent ID validated in database[/green]")
-                console.print(f"📊 Current Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"🌐 Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
+                console.print(f"Current Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
                 
                 # Step 4.5: Validate agent path matches database
                 path_validation_result = db_service.validate_agent_path(agent_id, str(folder_path))
                 
                 if not path_validation_result["valid"]:
                     if path_validation_result["code"] == "PATH_MISMATCH":
-                        console.print(f"⚠️ [yellow]Agent path mismatch detected![/yellow]")
-                        console.print(f"📁 Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
-                        console.print(f"📁 Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
-                        console.print(f"💡 [cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
-                        console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
+                        console.print(f"[yellow]Agent path mismatch detected![/yellow]")
+                        console.print(f"Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
+                        console.print(f"Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
+                        console.print(f"[cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
+                        console.print(f"[blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
                     else:
                         # Other path validation errors
                         console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
@@ -903,7 +903,7 @@ class RestClient:
                     console.print(f"✅ [green]Agent path validated - matches database record[/green]")
 
             # Step 5: Upload with progress bar
-            console.print(f"🌐 Uploading to: [bold blue]{self.base_url}[/bold blue]")
+            console.print(f"Uploading to: [bold blue]{self.base_url}[/bold blue]")
 
             with Progress(
                 SpinnerColumn(),
@@ -929,7 +929,7 @@ class RestClient:
                     
                     if error_check.get("code") == "RETRY_WITH_OVERWRITE":
                         # User confirmed overwrite, restart the progress bar
-                        console.print(f"🔄 [cyan]Restarting upload with overwrite enabled...[/cyan]")
+                        console.print(f"[cyan]Restarting upload with overwrite enabled...[/cyan]")
                         progress.stop()
                         
                         # Restart with fresh progress bar
@@ -992,7 +992,7 @@ class RestClient:
                 progress.update(upload_task, completed=25, description="Creating upload package...")
                 zip_path = self._create_zip_from_folder(agent_id, folder_path)
                 
-                console.print(f"📦 Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
+                console.print(f"Created upload package: [cyan]{Path(zip_path).name}[/cyan]")
                 
                 # Step 3: Upload zip file with progress updates
                 progress.update(upload_task, completed=30, description="Uploading agent files...")
@@ -1129,7 +1129,7 @@ class RestClient:
             # Step 2: Load agent config
             try:
                 agent_config = get_agent_config(folder_path)
-                console.print(f"📋 [green]Agent config loaded successfully[/green]")
+                console.print(f"✅ [green]Agent config loaded successfully[/green]")
             except Exception as e:
                 if os.getenv('DISABLE_TRY_CATCH'):
                     raise
@@ -1143,7 +1143,7 @@ class RestClient:
                 }
             
             agent_id = agent_config.agent_id
-            console.print(f"🆔 Using Agent ID: [magenta]{agent_id}[/magenta]")
+            console.print(f"Using Agent ID: [magenta]{agent_id}[/magenta]")
 
             # Step 4: Validate agent ID exists in database
             from runagent.sdk.db import DBService
@@ -1153,8 +1153,8 @@ class RestClient:
             
             if not validation_result["valid"]:
                 console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
-                console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
-                console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
+                console.print(f"[cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+                console.print(f"[blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
                 
                 return {
                     "success": False,
@@ -1164,19 +1164,19 @@ class RestClient:
             else:
                 existing_agent = validation_result["agent"]
                 console.print(f"✅ [green]Agent ID validated in database[/green]")
-                console.print(f"📊 Current Status: [cyan]{existing_agent['status']}[/cyan]")
-                console.print(f"🌐 Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
+                console.print(f"Current Status: [cyan]{existing_agent['status']}[/cyan]")
+                console.print(f"Remote Status: [cyan]{existing_agent['remote_status']}[/cyan]")
                 
                 # Step 4.5: Validate agent path matches database
                 path_validation_result = db_service.validate_agent_path(agent_id, str(folder_path))
                 
                 if not path_validation_result["valid"]:
                     if path_validation_result["code"] == "PATH_MISMATCH":
-                        console.print(f"⚠️ [yellow]Agent path mismatch detected![/yellow]")
-                        console.print(f"📁 Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
-                        console.print(f"📁 Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
-                        console.print(f"💡 [cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
-                        console.print(f"🔧 [blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
+                        console.print(f"[yellow]Agent path mismatch detected![/yellow]")
+                        console.print(f"Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
+                        console.print(f"Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
+                        console.print(f"[cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
+                        console.print(f"[blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
                     else:
                         # Other path validation errors
                         console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
@@ -1216,7 +1216,7 @@ class RestClient:
                     
                     if error_check.get("code") == "RETRY_WITH_OVERWRITE":
                         # User confirmed overwrite, restart the progress bar
-                        console.print(f"🔄 [cyan]Restarting deployment with overwrite enabled...[/cyan]")
+                        console.print(f"[cyan]Restarting deployment with overwrite enabled...[/cyan]")
                         progress.stop()
                         
                         # Restart with fresh progress bar

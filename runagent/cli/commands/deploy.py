@@ -79,16 +79,16 @@ def deploy(path: Path, overwrite: bool):
         if not Path(path).exists():
             raise click.ClickException(f"Folder not found: {path}")
 
-        console.print(f"🎯 [bold]Deploying agent (upload + start)...[/bold]")
-        console.print(f"📁 Source: [cyan]{path}[/cyan]")
+        console.print(f"[bold]Deploying agent (upload + start)...[/bold]")
+        console.print(f"Source: [cyan]{path}[/cyan]")
 
         # Deploy agent (framework auto-detected)
         result = sdk.deploy_remote(folder=str(path), overwrite=overwrite)
 
         if result.get("success"):
             console.print(f"\n✅ [green]Deployment successful![/green]")
-            console.print(f"🆔 Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
-            console.print(f"🌐 Endpoint: [link]{result.get('endpoint')}[/link]")
+            console.print(f"Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
+            console.print(f"Endpoint: [link]{result.get('endpoint')}[/link]")
         else:
             console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(result.get('error'))}")
             import sys

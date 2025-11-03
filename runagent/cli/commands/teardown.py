@@ -66,7 +66,7 @@ def teardown(yes):
             
             # Show what will be deleted
             console.print(Panel(
-                "[bold red]⚠️  COMPLETE TEARDOWN[/bold red]\n\n"
+                "[bold red]COMPLETE TEARDOWN[/bold red]\n\n"
                 "This will permanently delete:\n"
                 "  • All configuration (API key, user info, settings)\n"
                 "  • Complete database (all agents, runs, logs, history)\n"
@@ -76,7 +76,7 @@ def teardown(yes):
                 border_style="red"
             ))
             
-            console.print("\n📊 [bold]Current data:[/bold]")
+            console.print("\n[bold]Current data:[/bold]")
             if config_status.get("configured"):
                 console.print(f"   User: [cyan]{config_status.get('user_info', {}).get('email', 'N/A')}[/cyan]")
             console.print(f"   Total agents: [yellow]{db_stats.get('total_agents', 0)}[/yellow]")
@@ -100,13 +100,13 @@ def teardown(yes):
         db_path = Path(LOCAL_CACHE_DIRECTORY) / DATABASE_FILE_NAME
         if db_path.exists():
             db_path.unlink()
-            console.print(f"🗑️  [dim]Deleted database: {db_path}[/dim]")
+            console.print(f"[dim]Deleted database: {db_path}[/dim]")
         
         # Delete legacy JSON file if exists
         json_file = Path(LOCAL_CACHE_DIRECTORY) / "user_data.json"
         if json_file.exists():
             json_file.unlink()
-            console.print(f"🗑️  [dim]Deleted legacy config: {json_file}[/dim]")
+            console.print(f"[dim]Deleted legacy config: {json_file}[/dim]")
 
         console.print(Panel(
             "[bold green]✅ RunAgent teardown completed successfully![/bold green]\n\n"

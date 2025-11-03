@@ -166,3 +166,4 @@ mod tests {
         assert_eq!(db_path, expected);
     }
 }
+

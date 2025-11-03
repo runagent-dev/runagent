@@ -62,7 +62,7 @@ def status(cleanup_days, agent_id, capacity):
             # Show detailed capacity info
             capacity_info = sdk.db_service.get_database_capacity_info()
 
-            console.print(f"\n📊 [bold]Database Capacity Information[/bold]")
+            console.print(f"\n[bold]Database Capacity Information[/bold]")
             console.print(
                 f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents"
             )
@@ -70,27 +70,27 @@ def status(cleanup_days, agent_id, capacity):
                 f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]"
             )
 
-            status = "🔴 FULL" if capacity_info.get("is_full") else "🟢 Available"
+            status = "[red]FULL[/red]" if capacity_info.get("is_full") else "[green]Available[/green]"
             console.print(f"Status: {status}")
 
             agents = capacity_info.get("agents", [])
             if agents:
-                console.print(f"\n📋 [bold]Deployed Agents (by age):[/bold]")
+                console.print(f"\n[bold]Deployed Agents (by age):[/bold]")
                 
                 # Create table for agents
                 table = Table(title="Agents by Deployment Age")
                 table.add_column("#", style="dim", width=3)
-                table.add_column("Status", width=6)
+                table.add_column("Status", width=8)
                 table.add_column("Agent ID", style="magenta", width=36)
                 table.add_column("Framework", style="green", width=12)
                 table.add_column("Deployed At", style="cyan", width=20)
                 table.add_column("Age Note", style="yellow", width=10)
                 
                 for i, agent in enumerate(agents):
-                    status_icon = (
-                        "🟢"
+                    status_text = (
+                        "[green]deployed[/green]"
                         if agent["status"] == "deployed"
-                        else "🔴" if agent["status"] == "error" else "🟡"
+                        else "[red]error[/red]" if agent["status"] == "error" else "[yellow]other[/yellow]"
                     )
                     age_label = (
                         "oldest"
@@ -100,7 +100,7 @@ def status(cleanup_days, agent_id, capacity):
                     
                     table.add_row(
                         str(i+1),
-                        status_icon,
+                        status_text,
                         agent['agent_id'],
                         agent['framework'],
                         agent['deployed_at'] or "Unknown",
@@ -112,7 +112,7 @@ def status(cleanup_days, agent_id, capacity):
             if capacity_info.get("is_full"):
                 oldest = capacity_info.get("oldest_agent", {})
                 console.print(
-                    f"\n💡 [yellow]To deploy new agent, replace oldest:[/yellow]"
+                    f"\n[yellow]To deploy new agent, replace oldest:[/yellow]"
                 )
                 console.print(
                     f"   [cyan]runagent serve --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]"
@@ -128,14 +128,14 @@ def status(cleanup_days, agent_id, capacity):
             result = sdk.get_agent_info(agent_id, local=True)
             if result.get("success"):
                 agent_data = result["agent_info"]
-                console.print(f"\n🔍 [bold]Agent Details: {agent_id}[/bold]")
+                console.print(f"\n[bold]Agent Details: {agent_id}[/bold]")
                 console.print(f"Framework: [green]{agent_data.get('framework')}[/green]")
                 console.print(f"Status: [yellow]{agent_data.get('status')}[/yellow]")
                 console.print(f"Path: [blue]{agent_data.get('deployment_path')}[/blue]")
                 
                 # Show agent-specific invocation stats
                 agent_inv_stats = sdk.db_service.get_invocation_stats(agent_id=agent_id)
-                console.print(f"\n📊 [bold]Invocation Statistics for {agent_id}[/bold]")
+                console.print(f"\n[bold]Invocation Statistics for {agent_id}[/bold]")
                 console.print(f"Total: [cyan]{agent_inv_stats.get('total_invocations', 0)}[/cyan]")
                 console.print(f"Success Rate: [blue]{agent_inv_stats.get('success_rate', 0)}%[/blue]")
                 
@@ -145,7 +145,7 @@ def status(cleanup_days, agent_id, capacity):
         stats = sdk.db_service.get_database_stats()
         capacity_info = sdk.db_service.get_database_capacity_info()
 
-        console.print("\n📊 [bold]Local Database Status[/bold]")
+        console.print("\n[bold]Local Database Status[/bold]")
 
         current_count = capacity_info.get("current_count", 0)
         is_full = capacity_info.get("is_full", False)
@@ -164,7 +164,7 @@ def status(cleanup_days, agent_id, capacity):
         # NEW: Show invocation statistics
         overall_stats = sdk.db_service.get_invocation_stats()
         
-        console.print(f"\n📊 [bold]Invocation Statistics[/bold]")
+        console.print(f"\n[bold]Invocation Statistics[/bold]")
         console.print(f"Total Invocations: [cyan]{overall_stats.get('total_invocations', 0)}[/cyan]")
         console.print(f"Completed: [green]{overall_stats.get('completed_invocations', 0)}[/green]")
         console.print(f"Failed: [red]{overall_stats.get('failed_invocations', 0)}[/red]")
@@ -182,7 +182,7 @@ def status(cleanup_days, agent_id, capacity):
         # Show agent status breakdown
         status_counts = stats.get("agent_status_counts", {})
         if status_counts:
-            console.print("\n📈 [bold]Agent Status Breakdown:[/bold]")
+            console.print("\n[bold]Agent Status Breakdown:[/bold]")
             for status, count in status_counts.items():
                 console.print(f"  [cyan]{status}[/cyan]: {count}")
 
@@ -190,11 +190,11 @@ def status(cleanup_days, agent_id, capacity):
         agents = sdk.db_service.list_agents()
 
         if agents:
-            console.print(f"\n📋 [bold]Deployed Agents:[/bold]")
+            console.print(f"\n[bold]Deployed Agents:[/bold]")
             
             # Create table for better formatting
             table = Table(title=f"Local Agents ({len(agents)} total)")
-            table.add_column("Status", width=8)
+            table.add_column("Status", width=10)
             table.add_column("Files", width=6)
             table.add_column("Agent ID", style="magenta", width=36)
             table.add_column("Framework", style="green", width=12)
@@ -203,16 +203,16 @@ def status(cleanup_days, agent_id, capacity):
             table.add_column("Status", style="yellow", width=10)
             
             for agent in agents:
-                status_icon = (
-                    "🟢"
+                status_text = (
+                    "[green]deployed[/green]"
                     if agent["status"] == "deployed"
-                    else "🔴" if agent["status"] == "error" else "🟡"
+                    else "[red]error[/red]" if agent["status"] == "error" else "[yellow]other[/yellow]"
                 )
-                exists_icon = "📁" if agent.get("exists") else "❌"
+                exists_text = "[green]exists[/green]" if agent.get("exists") else "[red]missing[/red]"
                 
                 table.add_row(
-                    status_icon,
-                    exists_icon,
+                    status_text,
+                    exists_text,
                     agent['agent_id'],
                     agent['framework'],
                     f"{agent.get('host', 'N/A')}:{agent.get('port', 'N/A')}",
@@ -225,12 +225,12 @@ def status(cleanup_days, agent_id, capacity):
         # Show recent invocations
         recent_invocations = sdk.db_service.list_invocations(limit=5)
         if recent_invocations:
-            console.print(f"\n📋 [bold]Recent Invocations:[/bold]")
+            console.print(f"\n[bold]Recent Invocations:[/bold]")
             for inv in recent_invocations:
                 status_color = "green" if inv['status'] == "completed" else "red" if inv['status'] == "failed" else "yellow"
                 console.print(f"   • {inv['invocation_id'][:12]}... [{status_color}]{inv['status']}[/{status_color}] ({inv.get('entrypoint_tag', 'N/A')})")
 
-        console.print(f"\n💡 [bold]Database Commands:[/bold]")
+        console.print(f"\n[bold]Database Commands:[/bold]")
         console.print(f"   • [cyan]runagent db invocations[/cyan] - Show all invocations")
         console.print(f"   • [cyan]runagent db invocation <id>[/cyan] - Show specific invocation")
         console.print(f"   • [cyan]runagent db cleanup[/cyan] - Clean up old records")
@@ -239,7 +239,7 @@ def status(cleanup_days, agent_id, capacity):
 
         # Cleanup if requested (keep existing logic)
         if cleanup_days:
-            console.print(f"\n🧹 Cleaning up records older than {cleanup_days} days...")
+            console.print(f"\n[cyan]Cleaning up records older than {cleanup_days} days...[/cyan]")
             cleanup_result = sdk.cleanup_local_database(cleanup_days)
             if cleanup_result.get("success"):
                 console.print(f"✅ [green]{cleanup_result.get('message')}[/green]")
@@ -275,7 +275,7 @@ def invocations(agent_id, status, limit, output_format):
             return
         
         if not invocations_list:
-            console.print("📭 [yellow]No invocations found[/yellow]")
+            console.print("[yellow]No invocations found[/yellow]")
             if agent_id:
                 console.print(f"   • Agent ID: {agent_id}")
             if status:
@@ -288,7 +288,7 @@ def invocations(agent_id, status, limit, output_format):
         else:
             stats = sdk.db_service.get_invocation_stats()
         
-        console.print(f"\n📊 [bold]Invocation Statistics[/bold]")
+        console.print(f"\n[bold]Invocation Statistics[/bold]")
         if agent_id:
             console.print(f"   Agent ID: [magenta]{agent_id}[/magenta]")
         console.print(f"   Total: [cyan]{stats.get('total_invocations', 0)}[/cyan]")
@@ -300,7 +300,7 @@ def invocations(agent_id, status, limit, output_format):
             console.print(f"   Avg Execution Time: [cyan]{stats.get('avg_execution_time_ms', 0):.1f}ms[/cyan]")
         
         # Show invocations table
-        console.print(f"\n📋 [bold]Recent Invocations (showing {len(invocations_list)} of {limit} max)[/bold]")
+        console.print(f"\n[bold]Recent Invocations (showing {len(invocations_list)} of {limit} max)[/bold]")
         
         table = Table(title="Agent Invocations")
         table.add_column("Invocation", style="dim", width=12)

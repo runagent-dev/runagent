@@ -69,32 +69,23 @@ def format_error_message(error_info):
     default=".",
 )
 def serve(port, host, debug, replace, no_animation, animation_style, path):
-    """Start local FastAPI server with subtle robotic runner animation"""
+    """Start local FastAPI server"""
 
     try:
         from runagent.cli.branding import print_header
         print_header("Serve Agent Locally")
         
-        # Show subtle startup animation
-        if not no_animation:
-            console.print("\n")
-            
-            if animation_style == "quick":
-                show_quick_runner(duration=1.5)
-            else:
-                show_subtle_robotic_runner(duration=2.0, style=animation_style)
-        
         sdk = RunAgent()
         
         # Handle replace operation
         if replace:
-            console.print(f"🔄 [yellow]Replacing agent: {replace}[/yellow]")
+            console.print(f"[yellow]Replacing agent: {replace}[/yellow]")
             
             # Check if the agent to replace exists
             existing_agent = sdk.db_service.get_agent(replace)
             if not existing_agent:
-                console.print(f"⚠️ [yellow]Agent {replace} not found in database[/yellow]")
-                console.print("💡 Available agents:")
+                console.print(f"[yellow]Agent {replace} not found in database[/yellow]")
+                console.print("Available agents:")
                 agents = sdk.db_service.list_agents()
                 for agent in agents[:5]:  # Show first 5
                     console.print(f"   • {agent['agent_id']} ({agent['framework']})")
@@ -116,10 +107,10 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
             if port and PortManager.is_port_available(host, port):
                 allocated_host = host
                 allocated_port = port
-                console.print(f"🎯 Using specified address: [blue]{allocated_host}:{allocated_port}[/blue]")
+                console.print(f"Using specified address: [blue]{allocated_host}:{allocated_port}[/blue]")
             else:
                 allocated_host, allocated_port = PortManager.allocate_unique_address(used_ports)
-                console.print(f"🔌 Auto-allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
+                console.print(f"Auto-allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
             
             # Use the existing replace_agent method with proper port allocation
             result = sdk.db_service.replace_agent(
@@ -135,8 +126,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 raise click.ClickException(f"Failed to replace agent: {result['error']}")
             
             console.print(f"✅ [green]Agent replaced successfully![/green]")
-            console.print(f"🆔 New Agent ID: [bold magenta]{new_agent_id}[/bold magenta]")
-            console.print(f"🔌 Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
+            console.print(f"New Agent ID: [bold magenta]{new_agent_id}[/bold magenta]")
+            console.print(f"Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
             
             # Create server with the new agent ID and allocated host/port
             from runagent.sdk.db import DBService
@@ -156,12 +147,12 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 console.print("❌ [red]Database is full![/red]")
                 oldest_agent = capacity_info.get("oldest_agent", {})
                 if oldest_agent:
-                    console.print(f"💡 [yellow]Suggested commands:[/yellow]")
+                    console.print(f"[yellow]Suggested commands:[/yellow]")
                     console.print(f"   Replace: [cyan]runagent serve {path} --replace {oldest_agent.get('agent_id', '')}[/cyan]")
                     console.print(f"   Delete:  [cyan]runagent delete --id {oldest_agent.get('agent_id', '')}[/cyan]")
                 raise click.ClickException("Database at capacity. Use --replace or use 'runagent delete' to free space.")
             
-            console.print("⚡ [bold]Starting local server with auto port allocation...[/bold]")
+            console.print("[bold]Starting local server with auto port allocation...[/bold]")
             
             # Use the existing LocalServer.from_path method
             server = LocalServer.from_path(path, port=port, host=host)
@@ -170,8 +161,8 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
         allocated_host = server.host
         allocated_port = server.port
         
-        console.print(f"🌐 URL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
-        console.print(f"📖 Docs: [link]http://{allocated_host}:{allocated_port}/docs[/link]")
+        console.print(f"URL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
+        console.print(f"Docs: [link]http://{allocated_host}:{allocated_port}/docs[/link]")
 
         try:
                         
@@ -179,10 +170,10 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
             sync_enabled = sync_service.is_sync_enabled()
             api_key_set = bool(Config.get_api_key())
             
-            console.print(f"\n🔄 [bold]Middleware Sync Status:[/bold]")
+            console.print(f"\n[bold]Middleware Sync Status:[/bold]")
             if sync_enabled:
                 console.print(f"   Status: [green]✅ ENABLED[/green]")
-                console.print(f"   📊 Local invocations will sync to middleware")
+                console.print(f"   Local invocations will sync to middleware")
                 
                 # Test connection
                 try:
@@ -196,16 +187,16 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                         raise
                     console.print(f"   Connection: [red]❌ Connection test failed: {e}[/red]")
             else:
-                console.print(f"   Status: [yellow]⚠️ DISABLED[/yellow]")
+                console.print(f"   Status: [yellow]DISABLED[/yellow]")
                 if not api_key_set:
                     console.print(f"   Reason: [yellow]API key not configured[/yellow]")
-                    console.print(f"   💡 Setup: [cyan]runagent setup --api-key <key>[/cyan]")
+                    console.print(f"   Setup: [cyan]runagent setup --api-key <key>[/cyan]")
                 else:
                     user_disabled = not Config.get_user_config().get("local_sync_enabled", True)
                     if user_disabled:
                         console.print(f"   Reason: [yellow]Disabled by user[/yellow]")
-                        console.print(f"   💡 Enable: [cyan]runagent local-sync --enable[/cyan]")
-                console.print(f"   📊 Local invocations will only be stored locally")
+                        console.print(f"   Enable: [cyan]runagent local-sync --enable[/cyan]")
+                console.print(f"   Local invocations will only be stored locally")
                 
         except Exception as e:
             console.print(f"[dim]Note: Could not check middleware sync status: {e}[/dim]")
@@ -214,7 +205,7 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
         server.start(debug=debug)
 
     except KeyboardInterrupt:
-        console.print("\n🛑 [yellow]Server stopped by user[/yellow]")
+        console.print("\n[yellow]Server stopped by user[/yellow]")
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
