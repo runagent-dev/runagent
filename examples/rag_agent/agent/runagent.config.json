@@ -1,0 +1,32 @@
+{
+    "agent_name": "RAG Router Agent",
+    "description": "Advanced RAG agent with intelligent database routing and web search fallback",
+    "framework": "agno",
+    "template": "rag_router",
+    "version": "1.0.0",
+    "created_at": "2025-11-04",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "templates/rag_router",
+      "author": "runagent"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "agent.py",
+          "module": "query_rag",
+          "tag": "query"
+        },
+        {
+          "file": "agent.py",
+          "module": "query_rag_stream",
+          "tag": "query_stream"
+        }
+      ]
+    },
+    "env_vars": {
+      "OPENAI_API_KEY": "your-openai-api-key",
+      "QDRANT_URL": "https://e531166d-7d3a-41a5-a330-7b78a2e000cd.us-west-2-0.aws.cloud.qdrant.io:6333",
+      "QDRANT_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.fPMISmabZeHPRXromh2KD7MjIu34ZfpaLZ__862P2hY"
+    }
+  }

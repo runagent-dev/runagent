@@ -1,0 +1,76 @@
+{
+    "agent_name": "LightRAG Multi-Document Agent",
+    "description": "Advanced RAG agent with multimodal document processing using LightRAG and RAG-Anything, backed by Neon PostgreSQL",
+    "framework": "default",
+    "template": "neon_postgres",
+    "version": "1.0.0",
+    "created_at": "2025-01-08",
+    "template_source": {
+      "repo_url": "https://github.com/HKUDS/LightRAG.git",
+      "path": "templates/lightrag_neon",
+      "author": "runagent-team"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "initialize_agent",
+          "tag": "init_agent"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "insert_documents",
+          "tag": "insert_docs"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "insert_documents_batch",
+          "tag": "insert_docs_batch"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "process_multimodal_document",
+          "tag": "process_multimodal"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "process_folder",
+          "tag": "process_folder"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "query_rag",
+          "tag": "query"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "query_rag_stream",
+          "tag": "query_stream"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "query_multimodal",
+          "tag": "query_multimodal"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "query_with_vlm",
+          "tag": "query_vlm"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "delete_documents",
+          "tag": "delete_docs"
+        },
+        {
+          "file": "agent/lightrag_agent.py",
+          "module": "get_agent_stats",
+          "tag": "stats"
+        }
+      ]
+    },
+    "env_vars": {
+      "OPENAI_API_KEY": "required",
+      "NEON_DATABASE_URL": "required"
+    }
+  }
