@@ -50,10 +50,6 @@ pub enum RunAgentError {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
-    /// Database errors
-    #[error("SQL error: {0}")]
-    Sql(#[from] sqlx::Error),
-
     /// Generic error with context
     #[error("RunAgent error: {message}")]
     Generic { message: String },
@@ -137,7 +133,6 @@ impl RunAgentError {
             Self::Io(_) => "io",
             Self::Json(_) => "json",
             Self::Http(_) => "http",
-            Self::Sql(_) => "sql",
             Self::Generic { .. } => "generic",
         }
     }

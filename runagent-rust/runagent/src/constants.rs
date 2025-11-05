@@ -31,7 +31,7 @@ pub const ENV_LOCAL_CACHE_DIRECTORY: &str = "RUNAGENT_CACHE_DIR";
 pub const ENV_RUNAGENT_LOGGING_LEVEL: &str = "RUNAGENT_LOGGING_LEVEL";
 
 /// Default base URL
-pub const DEFAULT_BASE_URL: &str = "http://20.84.81.110:8333/";
+pub const DEFAULT_BASE_URL: &str = "http://20.84.81.110:8335/";
 
 /// Agent config file name
 pub const AGENT_CONFIG_FILE_NAME: &str = "runagent.config.json";

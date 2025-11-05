@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from runagent import RunAgentClient
 import os
+import json
 from typing import List, Dict, Any
 import traceback
 
@@ -47,6 +48,27 @@ def score_leads():
         job_description = data.get('job_description', '')
         generate_emails = data.get('generate_emails', True)
         additional_instructions = data.get('additional_instructions', '')
+        
+        # Normalize candidates: ensure they're all dictionaries, not JSON strings
+        normalized_candidates = []
+        for candidate in candidates:
+            if isinstance(candidate, str):
+                # If it's a JSON string, parse it
+                try:
+                    candidate = json.loads(candidate)
+                except json.JSONDecodeError:
+                    return jsonify({'error': f'Invalid candidate format: expected dict or JSON string, got: {candidate}'}), 400
+            if not isinstance(candidate, dict):
+                return jsonify({'error': f'Invalid candidate format: expected dict or JSON string, got: {type(candidate)}'}), 400
+            normalized_candidates.append(candidate)
+        
+        candidates = normalized_candidates
+        
+        # Debug: Log candidate types before sending to SDK
+        print(f"[DEBUG] Number of candidates: {len(candidates)}")
+        if candidates:
+            print(f"[DEBUG] First candidate type: {type(candidates[0])}")
+            print(f"[DEBUG] First candidate sample: {str(candidates[0])[:200]}")
         
         # Initialize RunAgent client
         client = RunAgentClient(

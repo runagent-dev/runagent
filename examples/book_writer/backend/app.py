@@ -51,7 +51,7 @@ def generate_outline():
         client = RunAgentClient(
             agent_id=agent_id,
             entrypoint_tag="generate_outline",
-            local=True  # Set to False when using RunAgent Cloud
+            local=False  # Set to False when using RunAgent Cloud
         )
         
         # Generate the outline

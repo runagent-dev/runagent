@@ -1,5 +1,5 @@
 {
-  "agent_name": "Demo Agent",
+  "agent_name": "A Rust backend agent for Agno",
   "description": "A simple placeholder agent",
   "framework": "agno",
   "template": "default",

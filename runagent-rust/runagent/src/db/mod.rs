@@ -1,13 +1,10 @@
-//! Database components for the RunAgent SDK
+//! Minimal database module for agent lookups
 //!
-//! This module provides database functionality for managing local agent deployments,
-//! tracking agent runs, and maintaining capacity information.
+//! This module provides a simple database interface for looking up local agent
+//! metadata (host, port) by agent ID. This allows connecting to agents without
+//! explicitly specifying the address.
 
-pub mod manager;
-pub mod models;
 pub mod service;
 
-// Re-export commonly used types
-pub use manager::DatabaseManager;
-pub use models::*;
 pub use service::DatabaseService;
+

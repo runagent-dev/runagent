@@ -27,7 +27,10 @@ pub struct RunAgentClient {
 }
 
 impl RunAgentClient {
-    /// Create a new RunAgent client with database lookup
+    /// Create a new RunAgent client
+    /// 
+    /// For local agents, tries to lookup host/port from database if available.
+    /// For remote agents, configuration is loaded from environment variables.
     pub async fn new(
         agent_id: &str,
         entrypoint_tag: &str,
