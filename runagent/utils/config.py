@@ -10,7 +10,6 @@ from runagent.constants import (
     ENV_RUNAGENT_API_KEY,
     ENV_RUNAGENT_BASE_URL,
     LOCAL_CACHE_DIRECTORY,
-    USER_DATA_FILE_NAME,
 )
 
 
@@ -69,27 +68,54 @@ class Config:
     @staticmethod
     def get_user_config() -> t.Dict[str, t.Any]:
         """
-        Get user configuration from {ENV_LOCAL_CACHE_DIRECTORY}/config.json
+        Get user configuration from database (user_metadata table)
 
         Returns:
             User configuration content
         """
-        config_dir = Path.home() / LOCAL_CACHE_DIRECTORY
-        config_file = config_dir / USER_DATA_FILE_NAME
-
-        if not config_file.exists():
-            return {}
-
         try:
-            with config_file.open("r") as f:
-                return json.load(f)
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            
+            # Get from database
+            metadata = db_service.get_all_user_metadata()
+            
+            # One-time migration: Check for old JSON file only if database is empty
+            if not metadata:
+                config_dir = Path.home() / LOCAL_CACHE_DIRECTORY
+                config_file = config_dir / "user_data.json"  # Legacy file
+                
+                if config_file.exists():
+                    try:
+                        with config_file.open("r") as f:
+                            json_config = json.load(f)
+                        
+                        # Migrate to database
+                        if json_config:
+                            for key, value in json_config.items():
+                                db_service.set_user_metadata(key, value)
+                            
+                            # Backup and remove old JSON file
+                            backup_file = config_file.with_suffix('.json.backup')
+                            config_file.rename(backup_file)
+                            
+                            return json_config
+                    except Exception:
+                        if os.getenv('DISABLE_TRY_CATCH'):
+                            raise
+                        pass
+            
+            return metadata or {}
         except Exception:
+            if os.getenv('DISABLE_TRY_CATCH'):
+                raise
+            # If database fails, return empty (no fallback)
             return {}
 
     @staticmethod
     def set_user_config(key: str, value: t.Any) -> bool:
         """
-        Set a value in the user configuration
+        Set a value in the user configuration (database-backed)
 
         Args:
             key: Configuration key
@@ -98,31 +124,10 @@ class Config:
         Returns:
             True if successful, False otherwise
         """
-        config_dir = Path.home() / LOCAL_CACHE_DIRECTORY
-        config_dir.mkdir(exist_ok=True)
-
-        config_file = config_dir / USER_DATA_FILE_NAME
-
-        # Get existing config or create new
-        if config_file.exists():
-            try:
-                with config_file.open("r") as f:
-                    config = json.load(f)
-            except Exception:
-                if os.getenv('DISABLE_TRY_CATCH'):
-                    raise
-                config = {}
-        else:
-            config = {}
-
-        # Update config
-        config[key] = value
-
-        # Write config
         try:
-            with config_file.open("w") as f:
-                json.dump(config, f, indent=2)
-            return True
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            return db_service.set_user_metadata(key, value)
         except Exception:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
@@ -235,23 +240,18 @@ class Config:
         with info_file.open("r") as f:
             return json.load(f)
 
-    # Add these methods to your Config class
-
     @staticmethod
     def clear_user_config() -> bool:
         """
-        Clear all user configuration
+        Clear all user configuration from database
 
         Returns:
             True if successful, False otherwise
         """
-        config_dir = Path.home() / LOCAL_CACHE_DIRECTORY
-        config_file = config_dir / USER_DATA_FILE_NAME
-
         try:
-            if config_file.exists():
-                config_file.unlink()
-            return True
+            from runagent.sdk.db import DBService
+            db_service = DBService()
+            return db_service.clear_all_user_metadata()
         except Exception:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
@@ -283,9 +283,6 @@ class Config:
             "base_url": Config.get_base_url(),
             "user_email": config.get("email"),
             "user_name": config.get("name"),
-            "config_file_exists": (
-                Path.home() / LOCAL_CACHE_DIRECTORY / USER_DATA_FILE_NAME
-            ).exists(),
         }
 
     @staticmethod

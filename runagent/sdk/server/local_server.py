@@ -120,8 +120,11 @@ class LocalServer:
                 "sync_timestamp": datetime.utcnow().isoformat()
             }
 
-            console.print(f"[cyan]Syncing agent {self.agent_id} to middleware...[/cyan]")
-            console.print(f"[dim]Agent data: {agent_data['name']} ({agent_data['framework']})[/dim]")
+            from runagent.utils.logging_utils import is_verbose_logging_enabled
+            verbose = is_verbose_logging_enabled()
+            if verbose:
+                console.print(f"[cyan]Syncing agent {self.agent_id} to middleware...[/cyan]")
+                console.print(f"[dim]Agent data: {agent_data['name']} ({agent_data['framework']})[/dim]")
             
             sync_result = await self.middleware_sync.sync_agent_startup(self.agent_id, agent_data)
             
@@ -469,114 +472,55 @@ class LocalServer:
         except Exception as e:
             framework = detect_framework(agent_path)
 
-        # Check if an agent from this path already exists
-        existing_agent = db_service.get_agent_by_path(str(agent_path))
+        # agent_id is required in config - load config
+        agent_config = get_agent_config(agent_path)
         
-        if existing_agent:
-            # Agent already exists - check if its port is available
-            existing_host = existing_agent['host']
-            existing_port = existing_agent['port']
-            
-            console.print(f"[yellow]Found existing agent for path: {agent_path}[/yellow]")
-            console.print(f"[cyan]Agent Details:[/cyan]")
-            console.print(f"   • Agent ID: [bold magenta]{existing_agent['agent_id']}[/bold magenta]")
-            console.print(f"   • Host: [blue]{existing_host}[/blue]")
-            console.print(f"   • Port: [blue]{existing_port}[/blue]")
-            console.print(f"   • Framework: [green]{existing_agent['framework']}[/green]")
-            console.print(f"   • Status: [yellow]{existing_agent['status']}[/yellow]")
-            console.print(f"   • Deployed: [dim]{existing_agent['deployed_at']}[/dim]")
-            console.print(f"   • Total Runs: [cyan]{existing_agent['run_count']}[/cyan]")
-            console.print(f"   • Success Rate: [green]{existing_agent['success_count']}/{existing_agent['run_count']}[/green]")
-            
-            if existing_agent['last_run']:
-                console.print(f"   • Last Run: [dim]{existing_agent['last_run']}[/dim]")
-                        
-            # Check if the existing port is available
-            if PortManager.is_port_available(existing_host, existing_port):
-                console.print(f"\n🔄 [green]Port {existing_port} is available - reusing existing agent configuration[/green]")
-                
-                return LocalServer(
-                    agent_path=agent_path,
-                    agent_id=existing_agent['agent_id'],
-                    port=existing_port,
-                    host=existing_host,
-                    db_service=db_service,
-                )
-            else:
-                # Port is in use - need to allocate a new one and update the database
-                console.print(f"\n[yellow]Port {existing_port} is already in use - allocating new port[/yellow]")
-                
-                # Get currently used ports to avoid conflicts
-                used_ports = PortManager.get_used_ports_from_db(db_service)
-                
-                # Allocate new address
-                if port and PortManager.is_port_available(host, port):
-                    new_host = host
-                    new_port = port
-                    console.print(f"Using preferred address: [blue]{new_host}:{new_port}[/blue]")
-                else:
-                    new_host, new_port = PortManager.allocate_unique_address(used_ports)
-                
-                # Update the existing agent's host/port in the database
-                with db_service.db_manager.get_session() as session:
-                    from runagent.sdk.db import Agent
-                    agent_record = session.query(Agent).filter(Agent.agent_id == existing_agent['agent_id']).first()
-                    if agent_record:
-                        agent_record.host = new_host
-                        agent_record.port = new_port
-                        session.commit()
-                        console.print(f"🔄 [green]Updated agent address in database: {new_host}:{new_port}[/green]")
-                
-                return LocalServer(
-                    agent_path=agent_path,
-                    agent_id=existing_agent['agent_id'],
-                    port=new_port,
-                    host=new_host,
-                    db_service=db_service,
-                )
+        if not agent_config:
+            raise Exception(f"Invalid agent configuration. Please run 'runagent init' first to initialize your agent.")
         
-        else:
-            # No existing agent - create new one
-            console.print(f"🆕 [green]Creating new agent for path: {agent_path}[/green]")
-            console.print(f"📋 [cyan]Framework detected: [bold]{framework}[/bold][/cyan]")
-            
-            # Check database capacity
-            capacity_info = db_service.get_database_capacity_info()
-            if capacity_info["is_full"]:
-                raise Exception(
-                    "Database is full. Refer to our docs at "
-                    "https://docs.runagent.ai/local-server for more information."
-                )
-
-            # Generate unique agent ID (same for all frameworks including Letta)
-            agent_id = str(uuid.uuid4())
-            
-            # Add agent with automatic port allocation
-            result = db_service.add_agent_with_auto_port(
-                agent_id=agent_id,
-                agent_path=str(agent_path),
-                framework=framework.value if hasattr(framework, 'value') else str(framework),
-                status="ready",
-                preferred_host=host,
-                preferred_port=port,  # Will auto-allocate if None or unavailable
-            )
-            
-            if not result["success"]:
-                raise Exception(f"Failed to add agent to database: {result['error']}")
-            
-            allocated_host = result["allocated_host"]
-            allocated_port = result["allocated_port"]
-            
-            console.print(f"✅ [green]New agent created with ID: [bold magenta]{agent_id}[/bold magenta][/green]")
-            console.print(f"🔌 [green]Allocated address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
-            
-            return LocalServer(
-                agent_path=agent_path,
-                agent_id=agent_id,
-                port=allocated_port,  # Use allocated port
-                host=allocated_host,  # Use allocated host
-                db_service=db_service,
-            )
+        if not agent_config.agent_id:
+            raise Exception(f"Agent ID not found in configuration. Please run 'runagent init' first to initialize your agent.")
+        
+        # Validate agent ID exists in database
+        validation_result = db_service.validate_agent_id(agent_config.agent_id)
+        
+        if not validation_result["valid"]:
+            console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
+            console.print(f"💡 [cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
+            console.print(f"🔧 [blue]You can use 'runagent config --register-agent .' to register a modified agent[/blue]")
+            raise Exception(f"Agent ID validation failed. Cannot serve agent.")
+        
+        # Agent ID is valid - update and serve
+        agent_id = agent_config.agent_id
+        console.print(f"🔄 [green]Serving agent: [bold magenta]{agent_id}[/bold magenta][/green]")
+        console.print(f"📋 [cyan]Framework: [bold]{framework}[/bold][/cyan]")
+        
+        # Update agent with automatic port allocation
+        result = db_service.update_agent(
+            agent_id=agent_id,
+            framework=framework.value if hasattr(framework, 'value') else str(framework),
+            status="serving",  # Local status
+            auto_port=True,
+            preferred_host=host,
+            preferred_port=port,
+        )
+        
+        if not result["success"]:
+            raise Exception(f"Failed to update agent in database: {result['error']}")
+        
+        allocated_host = result["host"]
+        allocated_port = result["port"]
+        
+        console.print(f"✅ [green]Agent ready to serve[/green]")
+        console.print(f"🔌 [green]Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue][/green]")
+        
+        return LocalServer(
+            agent_path=agent_path,
+            agent_id=agent_id,
+            port=allocated_port,
+            host=allocated_host,
+            db_service=db_service,
+        )
 
     def _setup_routes(self):
         """Setup FastAPI routes - ENHANCED with invocation tracking"""
@@ -785,50 +729,12 @@ class LocalServer:
 
             self.log_execution_start(invocation_id, request.entrypoint_tag)
 
-            # FIXED: Sync invocation start to middleware IMMEDIATELY after local creation
-            middleware_invocation_id = None
-            if (hasattr(self, 'middleware_sync') and 
-                self.middleware_sync and 
-                self.middleware_sync.is_sync_enabled() and
-                getattr(self, 'agent_synced_to_middleware', False)):  # Only if agent is synced
-                
-                try:
-                    console.print(f"📡 [cyan]Syncing invocation start to middleware...[/cyan]")
-                    
-                    # FIXED: Use correct structure matching middleware expectations
-                    sync_payload = {
-                        "agent_id": self.agent_id,  # Main agent ID
-                        "local_execution_id": invocation_id,  # This becomes main execution ID
-                        "input_data": {
-                            "input_args": request.input_args,
-                            "input_kwargs": request.input_kwargs
-                        },
-                        "entrypoint_tag": request.entrypoint_tag,
-                        "sdk_type": "local_server",
-                        "client_info": {
-                            "server_host": self.host,
-                            "server_port": self.port,
-                            "agent_name": self.agent_name,
-                            "agent_framework": self.agent_framework.value
-                        }
-                    }
-                    
-                    middleware_invocation_id = await self.middleware_sync.sync_invocation_start(sync_payload)
-                    
-                    if middleware_invocation_id:
-                        console.print(f"✅ [green]Middleware invocation created: {middleware_invocation_id}[/green]")
-                    else:
-                        console.print(f"⚠️ [yellow]Middleware invocation sync returned None[/yellow]")
-                        
-                except Exception as e:
-                    console.print(f"❌ [red]Middleware sync start failed: {e}[/red]")
-                    import traceback
-                    traceback.print_exc()
-
             start_time = time.time()
             execution_success = False
             error_detail = None
             result_data = None
+            serializable_output = None
+            middleware_synced = False
 
             try:
                 console.print(f"Running agent: {self.agent_id} (invocation: {invocation_id}...)")
@@ -870,30 +776,73 @@ class LocalServer:
                     except Exception as e2:
                         console.print(f"Critical: Could not complete local invocation tracking: {str(e2)}")
 
-                # FIXED: Sync invocation completion to middleware with proper error handling
-                if middleware_invocation_id:
+                # Sync complete execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled() and
+                    getattr(self, 'agent_synced_to_middleware', False)):
+                    
                     try:
-                        console.print(f"📡 [cyan]Syncing completion to middleware...[/cyan]")
-                        completion_result = await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            {
-                                "output_data": serializable_output,
-                                "execution_time_ms": execution_time * 1000,
-                                "status": "completed"
-                            }
-                        )
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        if is_verbose_logging_enabled():
+                            console.print(f"📡 [cyan]Syncing execution to middleware...[/cyan]")
                         
-                        if completion_result:
-                            console.print(f"✅ [green]Middleware completion synced successfully[/green]")
+                        # Wrap result_data to match remote execution format (consistent with middleware)
+                        # Format: { "data": <actual_result>, "type": "result", "timestamp": "..." }
+                        if isinstance(serializable_output, dict):
+                            # Already a dict, use it as the data
+                            actual_data = serializable_output
+                        elif isinstance(serializable_output, str):
+                            # String result
+                            actual_data = serializable_output
+                        elif serializable_output is None:
+                            actual_data = None
                         else:
-                            console.print(f"⚠️ [yellow]Middleware completion sync returned False[/yellow]")
+                            # Other types (list, number, etc.)
+                            actual_data = serializable_output
+                        
+                        # Wrap in standard format matching remote executions
+                        result_data_dict = {
+                            "data": actual_data,
+                            "type": "result",
+                            "timestamp": datetime.now().isoformat() + "Z"
+                        }
+                        
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": request.entrypoint_tag,
+                            "status": "completed",
+                            "started_at": datetime.fromtimestamp(start_time).isoformat() + "Z",
+                            "completed_at": datetime.fromtimestamp(time.time()).isoformat() + "Z",
+                            "input_data": {
+                                "input_args": request.input_args,
+                                "input_kwargs": request.input_kwargs
+                            },
+                            "result_data": result_data_dict,
+                            "execution_metadata": {
+                                "sdk_type": "local_server",
+                                "client_info": {
+                                    "server_host": self.host,
+                                    "server_port": self.port,
+                                    "agent_name": self.agent_name,
+                                    "agent_framework": self.agent_framework.value
+                                },
+                                "runtime_seconds": execution_time
+                            }
+                        }
+                        
+                        sync_result = await self.middleware_sync.sync_execution(self.agent_id, execution_data)
+                        
+                        if sync_result:
+                            console.print(f"✅ [green]Execution synced to middleware successfully[/green]")
+                            middleware_synced = True
+                        else:
+                            console.print(f"⚠️ [yellow]Middleware sync returned False[/yellow]")
                             
                     except Exception as e:
-                        console.print(f"❌ [red]Failed to sync completion to middleware: {e}[/red]")
+                        console.print(f"❌ [red]Failed to sync execution to middleware: {e}[/red]")
                         import traceback
                         traceback.print_exc()
-                elif self.middleware_sync and self.middleware_sync.is_sync_enabled():
-                    console.print(f"⚠️ [yellow]No middleware invocation ID to update (sync may have failed at start)[/yellow]")
 
                 # Record in original agent_runs table for backward compatibility
                 try:
@@ -946,7 +895,7 @@ class LocalServer:
                         "timeout_seconds": 60,
                         "async_execution": False,
                         "execution_config": {},
-                        "middleware_synced": middleware_invocation_id is not None
+                        "middleware_synced": middleware_synced
                     },
                     error_message=None,
                     is_local=True,
@@ -987,23 +936,59 @@ class LocalServer:
                     execution_time_ms=execution_time * 1000
                 )
 
-                # FIXED: Sync invocation error to middleware with proper error handling
-                if middleware_invocation_id:
+                # Sync failed execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled() and
+                    getattr(self, 'agent_synced_to_middleware', False)):
+                    
                     try:
-                        console.print(f"📡 [cyan]Syncing error to middleware...[/cyan]")
-                        error_result = await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            {
-                                "error_detail": error_detail,
-                                "execution_time_ms": execution_time * 1000,
-                                "status": "failed"
-                            }
-                        )
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        if is_verbose_logging_enabled():
+                            console.print(f"📡 [cyan]Syncing failed execution to middleware...[/cyan]")
                         
-                        if error_result:
-                            console.print(f"✅ [green]Middleware error synced[/green]")
+                        # Extract error code from exception if available
+                        error_code = "EXECUTION_ERROR"
+                        if isinstance(e, Exception):
+                            error_type = type(e).__name__
+                            if "ValidationError" in error_type:
+                                error_code = "VALIDATION_ERROR"
+                            elif "ConnectionError" in error_type:
+                                error_code = "CONNECTION_ERROR"
+                            elif "TimeoutError" in error_type:
+                                error_code = "TIMEOUT_ERROR"
+                        
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": request.entrypoint_tag,
+                            "status": "failed",
+                            "started_at": datetime.fromtimestamp(start_time).isoformat() + "Z",
+                            "completed_at": datetime.fromtimestamp(time.time()).isoformat() + "Z",
+                            "input_data": {
+                                "input_args": request.input_args,
+                                "input_kwargs": request.input_kwargs
+                            },
+                            "error_message": error_detail,
+                            "execution_metadata": {
+                                "sdk_type": "local_server",
+                                "client_info": {
+                                    "server_host": self.host,
+                                    "server_port": self.port,
+                                    "agent_name": self.agent_name,
+                                    "agent_framework": self.agent_framework.value
+                                },
+                                "runtime_seconds": execution_time,
+                                "error_code": error_code
+                            }
+                        }
+                        
+                        sync_result = await self.middleware_sync.sync_execution(self.agent_id, execution_data)
+                        
+                        if sync_result:
+                            console.print(f"✅ [green]Failed execution synced to middleware[/green]")
+                            middleware_synced = True
                         else:
-                            console.print(f"⚠️ [yellow]Middleware error sync returned False[/yellow]")
+                            console.print(f"⚠️ [yellow]Middleware sync returned False[/yellow]")
                             
                     except Exception as sync_error:
                         console.print(f"❌ [red]Failed to sync error to middleware: {sync_error}[/red]")
@@ -1053,7 +1038,7 @@ class LocalServer:
                         "timeout_seconds": 60,
                         "async_execution": False,
                         "execution_config": {},
-                        "middleware_synced": middleware_invocation_id is not None
+                        "middleware_synced": middleware_synced
                     },
                     error_message=error_detail,
                     is_local=True,
@@ -1177,7 +1162,7 @@ class LocalServer:
 
         return endpoints
 
-    def start(self, debug: bool = False):
+    def start(self, debug: bool = False, reload: bool = False):
         """Start the FastAPI server with FIXED middleware sync timing"""
         try:
             # STEP 1: Log server startup to LOCAL database first
@@ -1187,24 +1172,27 @@ class LocalServer:
                 self.agent_logger.info(f"Server URL: http://{self.host}:{self.port}")
                 self.agent_logger.info(f"Docs URL: http://{self.host}:{self.port}/docs")
             
-            # STEP 2: Sync agent to middleware BEFORE starting server (BLOCKING)
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            try:
-                sync_success = loop.run_until_complete(self._sync_agent_to_middleware_and_wait())
-            finally:
-                loop.close()
-            
-            # STEP 3: Print sync status
+            # STEP 2: Start sync agent to middleware in background (NON-BLOCKING)
+            # Server will start immediately without waiting for sync to complete
             if self.middleware_sync and self.middleware_sync.sync_enabled:
+                import threading
+                
+                def background_sync():
+                    """Run sync in background thread without blocking server startup"""
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(self._sync_agent_to_middleware_and_wait())
+                    finally:
+                        loop.close()
+                
+                # Start sync in background thread (non-blocking)
+                sync_thread = threading.Thread(target=background_sync, daemon=True)
+                sync_thread.start()
+                
                 console.print("🔄 [cyan]Middleware Sync Status:[/cyan]")
-                if sync_success:
-                    console.print("   Status: ✅ ENABLED & SYNCED")
-                else:
-                    console.print("   Status: ⚠️ ENABLED BUT SYNC FAILED")
-                    console.print("Local logs will be stored locally only")
+                console.print("   Status: ✅ ENABLED (syncing in background)")
             else:
                 console.print("[yellow]Middleware Sync Status:[/yellow]")
                 console.print("   Status: ❌ DISABLED")
@@ -1238,7 +1226,7 @@ class LocalServer:
                 f"🔧 Debug mode: [{debug_color}]{debug_status}[/{debug_color}]"
             )
 
-            # Print docs URL
+                        # Print docs URL
             console.print(
                 f"📖 API Docs: [link]http://{self.host}:{self.port}/docs[/link]\n"
             )
@@ -1248,15 +1236,15 @@ class LocalServer:
             # Print invocation tracking info
             console.print(f"📊 Invocation tracking: [green]ENABLED[/green]")
             console.print(f"   • View stats: [cyan]GET /api/v1/agents/{self.agent_id}/invocations/stats[/cyan]")
-            console.print(f"   • View history: [cyan]GET /api/v1/agents/{self.agent_id}/invocations[/cyan]")
+            console.print(f"   • View history: [cyan]GET /api/v1/agents/{self.agent_id}/invocations[/cyan]")                                                    
 
             # Log that server is about to start
             if hasattr(self, 'agent_logger'):
                 self.agent_logger.info("Starting uvicorn server...")
-                if sync_success:
-                    self.agent_logger.info("Agent synced to middleware - full sync mode enabled")
+                if self.middleware_sync and self.middleware_sync.sync_enabled:
+                    self.agent_logger.info("Agent sync initiated in background - full sync mode enabled")
                 else:
-                    self.agent_logger.info("Agent sync failed - running in local-only mode")
+                    self.agent_logger.info("Middleware sync disabled - running in local-only mode")
 
             # Start uvicorn server
             uvicorn.run(
@@ -1265,7 +1253,7 @@ class LocalServer:
                 port=self.port,
                 log_level="debug" if debug else "info",
                 access_log=debug,
-                reload=False,  # Disable auto-reload for stability
+                reload=reload,  # Enable auto-reload if requested (useful for development)
             )
 
         except OSError as e:

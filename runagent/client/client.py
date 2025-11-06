@@ -1,3 +1,4 @@
+import os
 from runagent.sdk import RunAgentSDK
 from runagent.sdk.rest_client import RestClient
 from runagent.sdk.socket_client import SocketClient
@@ -56,6 +57,9 @@ class RunAgentClient:
         response = self.rest_client.run_agent(
             self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
         )
+        # Only print debug response in DISABLE_TRY_CATCH mode
+        if os.getenv('DISABLE_TRY_CATCH'):
+            print(f"response: {response}")
         if response.get("success"):
             # Handle new response format with nested data
             if "data" in response and "result_data" in response["data"]:

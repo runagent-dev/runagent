@@ -1,0 +1,27 @@
+{
+    "agent_name": "AI Lead Generation Agent",
+    "description": "Automated lead generation from Quora using Firecrawl Extract endpoint and Google Sheets integration",
+    "framework": "agno",
+    "template": "lead_generation",
+    "version": "1.0.0",
+    "created_at": "2025-11-02",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "examples/ai_lead_generation",
+      "author": "runagent"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "main.py",
+          "module": "generate_leads",
+          "tag": "generate_leads",
+          "description": "Generate leads from Quora based on search query and save to Google Sheets"
+        }
+      ]
+    },
+    "env_vars": {
+      "FIRECRAWL_API_KEY": "",
+      "OPENAI_API_KEY": ""
+    }
+  }

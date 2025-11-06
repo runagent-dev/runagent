@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+import typing as t
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -24,7 +25,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.sql import func
 
-from runagent.constants import LOCAL_CACHE_DIRECTORY
+from runagent.constants import LOCAL_CACHE_DIRECTORY, DATABASE_FILE_NAME
 from runagent.utils.port import PortManager
 
 
@@ -35,7 +36,7 @@ Base = declarative_base()
 
 
 class Agent(Base):
-    """Agent model - UNCHANGED to maintain SDK compatibility"""
+    """Agent model - Enhanced with config-based fields"""
 
     __tablename__ = "agents"
 
@@ -44,10 +45,11 @@ class Agent(Base):
     host = Column(String, nullable=False, default="localhost")
     port = Column(Integer, nullable=False, default=8000)
     framework = Column(String)
-    status = Column(String, default="deployed")
+    status = Column(String, default="initialized")  # Local deployment status
+    remote_status = Column(String, default="initialized")  # Remote deployment status
     is_local = Column(Boolean, default=True)  # True for local agents, False for remote uploads
     fingerprint = Column(String, nullable=True)  # Agent folder fingerprint for duplicate detection
-    deployed_at = Column(DateTime, default=func.current_timestamp())
+    deployed_at = Column(DateTime, nullable=True)  # Made nullable since agents start as 'initialized'
     last_run = Column(DateTime)
     run_count = Column(Integer, default=0)
     success_count = Column(Integer, default=0)
@@ -56,6 +58,15 @@ class Agent(Base):
     updated_at = Column(
         DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
+    
+    # NEW FIELDS - Config-based agent information
+    agent_name = Column(String, nullable=True)  # From runagent.config.json
+    description = Column(Text, nullable=True)   # From runagent.config.json
+    template = Column(String, nullable=True)    # From runagent.config.json
+    version = Column(String, nullable=True)     # From runagent.config.json
+    initialized_at = Column(DateTime, nullable=True)  # When agent was first initialized
+    config_fingerprint = Column(String, nullable=True)  # Hash of config file for change detection
+    project_id = Column(String, nullable=True)  # Project/organization identifier
 
     # Relationships
     runs = relationship(
@@ -164,6 +175,22 @@ class AgentLog(Base):
         Index("idx_agent_logs_level", "log_level"),
     )
 
+
+class UserMetadata(Base):
+    """User metadata model for storing user configuration as key-value pairs"""
+
+    __tablename__ = "user_metadata"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)  # Store JSON-serialized values
+    created_at = Column(DateTime, default=func.current_timestamp())
+    updated_at = Column(
+        DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp()
+    )
+
+    # Indexes
+    __table_args__ = (Index("idx_user_metadata_key", "key"),)
+
 class DBManager:
     """Low-level database manager for SQLAlchemy operations"""
 
@@ -175,7 +202,7 @@ class DBManager:
             db_path: Path to the SQLite database file
         """
         if db_path is None:
-            db_path = Path(LOCAL_CACHE_DIRECTORY) / "runagent_local.db"
+            db_path = Path(LOCAL_CACHE_DIRECTORY) / DATABASE_FILE_NAME
 
         self.db_path = db_path
         self.engine = None
@@ -365,11 +392,11 @@ class DBService:
 
                 if enhanced:
                     console.print(
-                        f"🔑 [green]Enhanced limits active: {max_agents} agents[/green]"
+                        f"[green]Enhanced limits active: {max_agents} agents[/green]"
                     )
                 else:
                     console.print(
-                        f"🔑 [yellow]Using default limits: {max_agents} agents[/yellow]"
+                        f"[yellow]Using default limits: {max_agents} agents[/yellow]"
                     )
 
                 return result
@@ -771,11 +798,11 @@ class DBService:
 
                 if enhanced:
                     console.print(
-                        f"🔑 [green]Enhanced limits active: {max_agents} agents[/green]"
+                        f"[green]Enhanced limits active: {max_agents} agents[/green]"
                     )
                 else:
                     console.print(
-                        f"🔑 [yellow]Using default limits: {max_agents} agents[/yellow]"
+                        f"[yellow]Using default limits: {max_agents} agents[/yellow]"
                     )
 
                 return result
@@ -823,6 +850,13 @@ class DBService:
         port: int = 8450,
         framework: str = None,
         status: str = "deployed",
+        agent_name: str = None,
+        description: str = None,
+        template: str = None,
+        version: str = None,
+        initialized_at: str = None,
+        config_fingerprint: str = None,
+        project_id: str = None,
     ) -> Dict:
         if hasattr(framework, 'value'):
             framework = framework.value
@@ -870,7 +904,7 @@ class DBService:
                 # Phase 1: Check if we're within default limits (no API call needed)
                 if current_count < default_limit:
                     console.print(
-                        f"🟢 Adding agent within default limits ({current_count + 1}/{default_limit})"
+                        f"[green]Adding agent within default limits ({current_count + 1}/{default_limit})[/green]"
                     )
 
                     # Proceed without API check
@@ -881,6 +915,14 @@ class DBService:
                         port=port,
                         framework=framework,
                         status=status,
+                        remote_status="initialized",  # Default remote status
+                        agent_name=agent_name,
+                        description=description,
+                        template=template,
+                        version=version,
+                        initialized_at=initialized_at,
+                        config_fingerprint=config_fingerprint,
+                        project_id=project_id,
                     )
 
                     session.add(new_agent)
@@ -896,7 +938,7 @@ class DBService:
 
                 # Phase 2: At or above default limit - check API for enhanced limits
                 console.print(
-                    f"🟡 At default limit ({current_count}/{default_limit}) - checking for enhanced limits..."
+                    f"[yellow]At default limit ({current_count}/{default_limit}) - checking for enhanced limits...[/yellow]"
                 )
 
                 limit_info = self._check_enhanced_limits_with_fallback()
@@ -953,6 +995,14 @@ class DBService:
                     port=port,
                     framework=framework,
                     status=status,
+                    remote_status="initialized",  # Default remote status
+                    agent_name=agent_name,
+                    description=description,
+                    template=template,
+                    version=version,
+                    initialized_at=initialized_at,
+                    config_fingerprint=config_fingerprint,
+                    project_id=project_id,
                 )
 
                 session.add(new_agent)
@@ -995,85 +1045,29 @@ class DBService:
         framework: str = None,
     ) -> Dict:
         """
-        Replace an existing agent with a new one
+        DEPRECATED: Agent IDs are immutable and cannot be replaced.
+        This method is disabled to maintain data integrity.
+        
+        Agent IDs are UUIDs generated at creation time and should never be modified.
+        To use a different agent, create a new agent with 'runagent init' or 'runagent serve'.
 
         Args:
-            old_agent_id: Agent ID to replace
-            new_agent_id: New agent ID
-            agent_path: Path to agent directory
-            host: Host address
-            port: Port number
-            framework: Framework type
+            old_agent_id: Agent ID to replace (deprecated)
+            new_agent_id: New agent ID (deprecated)
+            agent_path: Path to agent directory (deprecated)
+            host: Host address (deprecated)
+            port: Port number (deprecated)
+            framework: Framework type (deprecated)
 
         Returns:
-            Dictionary with success status and details
+            Dictionary with error indicating this operation is not allowed
         """
-        if not old_agent_id or not new_agent_id or not agent_path:
-            return {
-                "success": False,
-                "error": "Missing required fields",
-                "code": "INVALID_INPUT",
-            }
-
-        with self.db_manager.get_session() as session:
-            try:
-                # Check if old agent exists
-                old_agent = (
-                    session.query(Agent).filter(Agent.agent_id == old_agent_id).first()
-                )
-                if not old_agent:
-                    return {
-                        "success": False,
-                        "error": f"Agent {old_agent_id} not found for replacement",
-                        "code": "AGENT_NOT_FOUND",
-                    }
-
-                # Check if new agent ID already exists
-                existing_new_agent = (
-                    session.query(Agent).filter(Agent.agent_id == new_agent_id).first()
-                )
-                if existing_new_agent:
-                    return {
-                        "success": False,
-                        "error": f"New agent ID {new_agent_id} already exists",
-                        "code": "NEW_AGENT_EXISTS",
-                    }
-
-                # Update the existing record
-                old_agent.agent_id = new_agent_id
-                old_agent.agent_path = str(agent_path)
-                old_agent.host = host
-                old_agent.port = port
-                old_agent.framework = framework
-                old_agent.deployed_at = func.current_timestamp()
-                old_agent.updated_at = func.current_timestamp()
-                old_agent.status = "deployed"
-                old_agent.run_count = 0
-                old_agent.success_count = 0
-                old_agent.error_count = 0
-
-                # Update run records to point to new agent ID
-                session.query(AgentRun).filter(
-                    AgentRun.agent_id == old_agent_id
-                ).update({"agent_id": new_agent_id})
-
-                session.commit()
-
-                return {
-                    "success": True,
-                    "message": f"Agent {old_agent_id} replaced with {new_agent_id}",
-                    "old_agent_id": old_agent_id,
-                    "new_agent_id": new_agent_id,
-                    "operation": "replace",
-                }
-
-            except Exception as e:
-                session.rollback()
-                return {
-                    "success": False,
-                    "error": f"Replacement failed: {str(e)}",
-                    "code": "REPLACE_ERROR",
-                }
+        return {
+            "success": False,
+            "error": "Agent ID replacement is not allowed. Agent IDs are immutable UUIDs generated at creation time.",
+            "code": "IMMUTABLE_AGENT_ID",
+            "message": "To use a different agent, create a new agent with 'runagent init' or 'runagent serve'."
+        }
 
     def delete_agent(self, agent_id: str) -> bool:
         """
@@ -1088,7 +1082,7 @@ class DBService:
         console.print(
             f"⚠️ Agent deletion is disabled. Agent {agent_id} cannot be deleted from database."
         )
-        console.print(f"💡 Use 'replace_agent()' to replace this agent with a new one.")
+        console.print(f"💡 Each agent has a unique immutable ID. Create a new agent with 'runagent init' or 'runagent serve'.")
         return False
 
     def get_database_capacity_info(self) -> Dict:
@@ -1326,7 +1320,14 @@ class DBService:
         agent_path: str,
         framework: str = None,
         fingerprint: str = None,
-        status: str = "uploaded"
+        status: str = "uploaded",
+        agent_name: str = None,
+        description: str = None,
+        template: str = None,
+        version: str = None,
+        initialized_at: str = None,
+        config_fingerprint: str = None,
+        project_id: str = None,
     ) -> Dict:
         """
         Add a remote uploaded agent to the database
@@ -1391,9 +1392,17 @@ class DBService:
                     host="remote",  # Remote agents don't have local host/port
                     port=0,  # Remote agents don't have local port
                     framework=framework,
-                    status=status,
+                    status="initialized",  # Local status
+                    remote_status=status,  # Remote status
                     is_local=False,  # Mark as remote
                     fingerprint=fingerprint,
+                    agent_name=agent_name,
+                    description=description,
+                    template=template,
+                    version=version,
+                    initialized_at=initialized_at,
+                    config_fingerprint=config_fingerprint,
+                    project_id=project_id,
                 )
 
                 session.add(new_agent)
@@ -1683,196 +1692,154 @@ class DBService:
                 console.print(f"Error getting database stats: {e}")
                 return {"rest_client_configured": self.rest_client is not None}
 
-    def add_agent_with_auto_port(
+    def _allocate_port(self, session, preferred_host: str, preferred_port: int = None) -> int:
+        """
+        Allocate a port for an agent
+        
+        Args:
+            session: Database session
+            preferred_host: Preferred host address
+            preferred_port: Preferred port number
+            
+        Returns:
+            Allocated port number or None if no ports available
+        """
+        # Get currently used ports
+        used_ports = []
+        existing_agents = session.query(Agent).all()
+        for agent in existing_agents:
+            if agent.port:
+                used_ports.append(agent.port)
+        
+        # Try preferred port first
+        if preferred_port and PortManager.is_port_available(preferred_host, preferred_port):
+            return preferred_port
+        
+        # Auto-allocate available address
+        try:
+            _, allocated_port = PortManager.allocate_unique_address(used_ports)
+            return allocated_port
+        except Exception:
+            return None
+
+    def update_agent(
         self,
         agent_id: str,
-        agent_path: str,
+        host: str = None,
+        port: int = None,
         framework: str = None,
-        status: str = "deployed",
+        status: str = None,
+        remote_status: str = None,
+        fingerprint: str = None,
+        deployed_at: datetime = None,
+        auto_port: bool = False,
         preferred_host: str = "127.0.0.1",
         preferred_port: int = None,
     ) -> Dict:
-        if hasattr(framework, 'value'):
-            framework = framework.value
-        elif framework is not None:
-            framework = str(framework)
         """
-        Add a new agent with automatic port allocation
-
+        Update an existing agent's deployment information
+        
         Args:
             agent_id: Unique agent identifier
-            agent_path: Path to agent directory
-            framework: Framework type (langchain, langgraph, etc.)
-            status: Initial status
-            preferred_host: Preferred host (default: 127.0.0.1)
-            preferred_port: Preferred port (auto-allocated if None)
-
+            host: Host address (optional)
+            port: Port number (optional)
+            framework: Framework type (optional)
+            status: Local deployment status (optional)
+            remote_status: Remote deployment status (optional)
+            fingerprint: Agent fingerprint (optional)
+            deployed_at: Deployment timestamp (optional)
+            auto_port: Whether to auto-allocate port if not provided
+            preferred_host: Preferred host for auto-allocation
+            preferred_port: Preferred port for auto-allocation
+            
         Returns:
-            Dictionary with success status and allocated address details
+            Dictionary with success status and updated information
         """
-        if not agent_id or not agent_path:
+        if not agent_id:
             return {
                 "success": False,
-                "error": "Missing required fields",
+                "error": "Agent ID is required",
                 "code": "INVALID_INPUT",
             }
 
         with self.db_manager.get_session() as session:
             try:
-                # Check current agent count for capacity management
-                current_count = session.query(Agent).count()
-
-                # Check if agent already exists
-                existing_agent = (
-                    session.query(Agent).filter(Agent.agent_id == agent_id).first()
-                )
-                if existing_agent:
-                    return {
-                        "success": False,
-                        "error": f"Agent {agent_id} already exists",
-                        "code": "AGENT_EXISTS",
-                    }
-
-
-                # Get currently used ports to avoid conflicts
-                used_ports = []
-                existing_agents = session.query(Agent).all()
-                for agent in existing_agents:
-                    if agent.port:
-                        used_ports.append(agent.port)
-
-                # Allocate host and port
-                if preferred_port and PortManager.is_port_available(preferred_host, preferred_port):
-                    # Use preferred port if available
-                    allocated_host = preferred_host
-                    allocated_port = preferred_port
-                    console.print(f"🎯 Using preferred address: [blue]{allocated_host}:{allocated_port}[/blue]")
-                else:
-                    # Auto-allocate available address
-                    allocated_host, allocated_port = PortManager.allocate_unique_address(used_ports)
-
-                # Smart limit checking (existing logic)
-                default_limit = self._get_default_limit()
-
-                # Phase 1: Check if we're within default limits (no API call needed)
-                if current_count < default_limit:
-                    console.print(
-                        f"🟢 Adding agent within default limits ({current_count + 1}/{default_limit})"
-                    )
-                    console.print(f"🔌 Allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
-
-                    # Proceed without API check
-                    new_agent = Agent(
-                        agent_id=agent_id,
-                        agent_path=str(agent_path),
-                        host=allocated_host,
-                        port=allocated_port,
-                        framework=framework,
-                        status=status,
-                    )
-
-                    session.add(new_agent)
-                    session.commit()
-
-                    return {
-                        "success": True,
-                        "message": f"Agent {agent_id} added successfully with auto-allocated address",
-                        "current_count": current_count + 1,
-                        "limit_source": "default",
-                        "api_check_performed": False,
-                        "allocated_host": allocated_host,
-                        "allocated_port": allocated_port,
-                        "address": f"{allocated_host}:{allocated_port}",
-                    }
-
-                # Phase 2: At or above default limit - check API for enhanced limits
-                console.print(
-                    f"🟡 At default limit ({current_count}/{default_limit}) - checking for enhanced limits..."
-                )
-
-                limit_info = self._check_enhanced_limits_with_fallback()
-                max_capacity = limit_info["limit"]
-
-                # Check if we can still add within enhanced limits
-                if current_count >= max_capacity:
-                    oldest_agent = (
-                        session.query(Agent).order_by(Agent.deployed_at).first()
-                    )
-
-                    # Provide helpful error message based on API availability
-                    if not self.rest_client:
-                        error_message = f"Maximum {max_capacity} agents allowed. Configure RestClient with API key for enhanced limits."
-                        suggestion = "Configure RestClient with valid API key to potentially increase limits"
-                    elif not limit_info.get("api_validated", False):
-                        error_message = f"Maximum {max_capacity} agents allowed. API key invalid or not configured."
-                        suggestion = "Verify API key configuration in RestClient"
-                    else:
-                        error_message = f"Maximum {max_capacity} agents allowed. Database is at capacity ({current_count}/{max_capacity} agents)."
-                        suggestion = (
-                            f"Consider replacing the oldest agent: {oldest_agent.agent_id}"
-                            if oldest_agent
-                            else "Database cleanup needed"
-                        )
-
-                    return {
-                        "success": False,
-                        "error": error_message,
-                        "code": "DATABASE_FULL",
-                        "current_count": current_count,
-                        "max_allowed": max_capacity,
-                        "limit_info": limit_info,
-                        "oldest_agent": (
-                            {
-                                "agent_id": oldest_agent.agent_id,
-                                "deployed_at": (
-                                    oldest_agent.deployed_at.isoformat()
-                                    if oldest_agent.deployed_at
-                                    else None
-                                ),
-                            }
-                            if oldest_agent
-                            else None
-                        ),
-                        "suggestion": suggestion,
-                    }
-
-                # Enhanced limits allow the addition
-                console.print(f"🔌 Allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
+                # Find existing agent
+                existing_agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
                 
-                new_agent = Agent(
-                    agent_id=agent_id,
-                    agent_path=str(agent_path),
-                    host=allocated_host,
-                    port=allocated_port,
-                    framework=framework,
-                    status=status,
-                )
-
-                session.add(new_agent)
+                if not existing_agent:
+                    return {
+                        "success": False,
+                        "error": f"Agent {agent_id} not found",
+                        "code": "AGENT_NOT_FOUND",
+                    }
+                
+                # Handle auto port allocation if requested
+                allocated_host = host
+                allocated_port = port
+                
+                if auto_port and port is None:
+                    # Auto-allocate port
+                    allocated_host = preferred_host
+                    allocated_port = self._allocate_port(session, preferred_host, preferred_port)
+                    
+                    if allocated_port is None:
+                        return {
+                            "success": False,
+                            "error": "No available ports for auto-allocation",
+                            "code": "NO_PORTS_AVAILABLE",
+                        }
+                
+                # Update fields that are provided
+                if host is not None:
+                    existing_agent.host = host
+                elif allocated_host is not None:
+                    existing_agent.host = allocated_host
+                    
+                if port is not None:
+                    existing_agent.port = port
+                elif allocated_port is not None:
+                    existing_agent.port = allocated_port
+                    
+                if framework is not None:
+                    if hasattr(framework, 'value'):
+                        existing_agent.framework = framework.value
+                    else:
+                        existing_agent.framework = str(framework)
+                        
+                if status is not None:
+                    existing_agent.status = status
+                    
+                if remote_status is not None:
+                    existing_agent.remote_status = remote_status
+                    
+                if fingerprint is not None:
+                    existing_agent.fingerprint = fingerprint
+                    
+                if deployed_at is not None:
+                    existing_agent.deployed_at = deployed_at
+                elif status in ["serving", "deployed"] or remote_status in ["uploaded", "deploying", "deployed"]:
+                    # Auto-set deployed_at if status indicates deployment
+                    existing_agent.deployed_at = datetime.now()
+                
+                # Update timestamp
+                existing_agent.updated_at = datetime.now()
+                
                 session.commit()
-
-                limit_source = "enhanced" if limit_info.get("enhanced") else "default"
-                console.print(
-                    f"🟢 Agent added with {limit_source} limits ({current_count + 1}/{max_capacity})"
-                )
-
+                
                 return {
                     "success": True,
-                    "message": f"Agent {agent_id} added successfully with auto-allocated address ({limit_source} limits)",
-                    "current_count": current_count + 1,
-                    "max_allowed": max_capacity,
-                    "remaining_slots": (
-                        max_capacity - (current_count + 1)
-                        if max_capacity != 999
-                        else "unlimited"
-                    ),
-                    "limit_info": limit_info,
-                    "api_check_performed": True,
-                    "allocated_host": allocated_host,
-                    "allocated_port": allocated_port,
-                    "address": f"{allocated_host}:{allocated_port}",
+                    "message": f"Agent {agent_id} updated successfully",
+                    "agent_id": agent_id,
+                    "host": existing_agent.host,
+                    "port": existing_agent.port,
+                    "status": existing_agent.status,
+                    "remote_status": existing_agent.remote_status,
+                    "framework": existing_agent.framework,
+                    "allocated_host": allocated_host if auto_port else None,
+                    "allocated_port": allocated_port if auto_port else None,
                 }
-
+                
             except Exception as e:
                 session.rollback()
                 return {
@@ -1881,6 +1848,111 @@ class DBService:
                     "code": "DATABASE_ERROR",
                 }
 
+    def validate_agent_id(self, agent_id: str) -> Dict:
+        """
+        Validate that an agent ID exists in the database
+        
+        Args:
+            agent_id: Agent ID to validate
+            
+        Returns:
+            Dictionary with validation result
+        """
+        if not agent_id:
+            return {
+                "valid": False,
+                "error": "Agent ID is required",
+                "code": "MISSING_AGENT_ID",
+            }
+        
+        with self.db_manager.get_session() as session:
+            try:
+                existing_agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
+                
+                if existing_agent:
+                    return {
+                        "valid": True,
+                        "agent": {
+                            "agent_id": existing_agent.agent_id,
+                            "agent_name": existing_agent.agent_name,
+                            "agent_path": existing_agent.agent_path,
+                            "status": existing_agent.status,
+                            "remote_status": existing_agent.remote_status,
+                            "framework": existing_agent.framework,
+                        }
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "error": f"Agent ID '{agent_id}' not found in database",
+                        "code": "AGENT_NOT_FOUND",
+                        "suggestion": "Use 'runagent config --register-agent .' to register a modified agent"
+                    }
+                    
+            except Exception as e:
+                return {
+                    "valid": False,
+                    "error": f"Database error: {str(e)}",
+                    "code": "DATABASE_ERROR",
+                }
+
+    def validate_agent_path(self, agent_id: str, current_path: str) -> Dict:
+        """
+        Validate that the agent path in database matches the current folder path
+        
+        Args:
+            agent_id: Agent ID to validate
+            current_path: Current folder path being uploaded
+            
+        Returns:
+            Dictionary with validation result
+        """
+        if not agent_id or not current_path:
+            return {
+                "valid": False,
+                "error": "Agent ID and current path are required",
+                "code": "MISSING_PARAMETERS",
+            }
+        
+        with self.db_manager.get_session() as session:
+            try:
+                existing_agent = session.query(Agent).filter(Agent.agent_id == agent_id).first()
+                
+                if not existing_agent:
+                    return {
+                        "valid": False,
+                        "error": f"Agent ID '{agent_id}' not found in database",
+                        "code": "AGENT_NOT_FOUND",
+                    }
+                
+                # Normalize paths for comparison
+                db_path = str(Path(existing_agent.agent_path).resolve()) if existing_agent.agent_path else ""
+                current_path_normalized = str(Path(current_path).resolve())
+                
+                if db_path == current_path_normalized:
+                    return {
+                        "valid": True,
+                        "message": "Agent path matches database record"
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "error": f"Agent path mismatch detected",
+                        "code": "PATH_MISMATCH",
+                        "details": {
+                            "db_path": db_path,
+                            "current_path": current_path_normalized,
+                            "agent_id": agent_id
+                        },
+                        "suggestion": "Use 'runagent config --register-agent .' to update the agent location in database"
+                    }
+                    
+            except Exception as e:
+                return {
+                    "valid": False,
+                    "error": f"Database error: {str(e)}",
+                    "code": "DATABASE_ERROR",
+                }
 
     def get_agent_address(self, agent_id: str) -> Optional[Tuple[str, int]]:
         """
@@ -2037,3 +2109,171 @@ class DBService:
                 session.rollback()
                 console.print(f"Error cleaning up old logs: {e}")
                 return 0
+
+    # User Metadata Methods
+    def set_user_metadata(self, key: str, value: Any) -> bool:
+        """
+        Set user metadata key-value pair
+        
+        Args:
+            key: Metadata key (e.g., 'api_key', 'base_url', 'user_email')
+            value: Metadata value (will be JSON-serialized)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                # Serialize value to JSON
+                value_json = json.dumps(value)
+                
+                # Check if key exists
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if metadata:
+                    # Update existing
+                    metadata.value = value_json
+                    metadata.updated_at = func.current_timestamp()
+                else:
+                    # Create new
+                    metadata = UserMetadata(
+                        key=key,
+                        value=value_json
+                    )
+                    session.add(metadata)
+                
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error setting user metadata: {e}")
+                return False
+
+    def get_user_metadata(self, key: str, default: Any = None) -> Any:
+        """
+        Get user metadata value by key
+        
+        Args:
+            key: Metadata key
+            default: Default value if key doesn't exist
+            
+        Returns:
+            Deserialized metadata value or default
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if not metadata:
+                    return default
+                
+                # Deserialize JSON value
+                return json.loads(metadata.value)
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error getting user metadata: {e}")
+                return default
+
+    def get_all_user_metadata(self) -> Dict[str, Any]:
+        """
+        Get all user metadata as a dictionary
+        
+        Returns:
+            Dictionary with all metadata key-value pairs
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata_records = session.query(UserMetadata).all()
+                
+                result = {}
+                for record in metadata_records:
+                    try:
+                        result[record.key] = json.loads(record.value)
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, store as string
+                        result[record.key] = record.value
+                
+                return result
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error getting all user metadata: {e}")
+                return {}
+
+    def get_active_project_id(self) -> t.Optional[str]:
+        """
+        Get the active project ID from user metadata
+        
+        Returns:
+            Active project ID if found, None otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == "active_project_id"
+                ).first()
+                
+                if metadata:
+                    return metadata.value
+                return None
+            except Exception as e:
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error getting active project ID: {e}")
+                return None
+
+    def delete_user_metadata(self, key: str) -> bool:
+        """
+        Delete user metadata by key
+        
+        Args:
+            key: Metadata key to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                metadata = session.query(UserMetadata).filter(
+                    UserMetadata.key == key
+                ).first()
+                
+                if not metadata:
+                    return False
+                
+                session.delete(metadata)
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error deleting user metadata: {e}")
+                return False
+
+    def clear_all_user_metadata(self) -> bool:
+        """
+        Clear all user metadata
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.db_manager.get_session() as session:
+            try:
+                session.query(UserMetadata).delete()
+                session.commit()
+                console.print("🧹 [green]Cleared all user metadata[/green]")
+                return True
+            except Exception as e:
+                session.rollback()
+                if os.getenv('DISABLE_TRY_CATCH'):
+                    raise
+                console.print(f"Error clearing user metadata: {e}")
+                return False

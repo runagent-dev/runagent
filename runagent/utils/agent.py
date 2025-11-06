@@ -1,6 +1,7 @@
 import json
 import typing as t
 from pathlib import Path
+from datetime import datetime
 from runagent.constants import AGENT_CONFIG_FILE_NAME
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import RunAgentConfig
@@ -90,6 +91,26 @@ def get_agent_config(folder_path: Path) -> t.Optional[dict]:
             config_data["env_vars"].update(env_vars)
         except Exception as e:
             raise ValueError(f"Error loading .env file: {str(e)}")
+    
+    # Handle missing fields gracefully for backward compatibility
+    default_values = {
+        'agent_id': None,
+    }
+    
+    # Add missing fields with defaults
+    for field, default_value in default_values.items():
+        if field not in config_data:
+            config_data[field] = default_value
+    
+    # Convert string timestamps back to datetime objects for database compatibility
+    if 'created_at' in config_data and isinstance(config_data['created_at'], str):
+        try:
+            from datetime import datetime
+            config_data['created_at'] = datetime.fromisoformat(config_data['created_at'].replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            # If parsing fails, use current time
+            config_data['created_at'] = datetime.now()
+    
     return RunAgentConfig(**config_data)
 
 
@@ -252,3 +273,60 @@ def validate_pythonic_agent(config, dynamic_loading, folder_path):
         )
 
     return validation_details["valid"], validation_details
+
+
+def get_agent_config_with_defaults(agent_path: Path) -> t.Dict[str, t.Any]:
+    """
+    Load agent config with sensible defaults for new fields.
+    This ensures all new database fields have values even for legacy agents.
+    
+    Args:
+        agent_path: Path to the agent directory
+        
+    Returns:
+        Dictionary with config values and defaults for missing fields
+    """
+    config = get_agent_config(agent_path)
+    if not config:
+        # No config file - return defaults
+        return {
+            'agent_name': agent_path.name,
+            'description': 'No description provided',
+            'template': '',  # Empty string for blank templates
+            'version': '1.0.0',
+            'created_at': datetime.now(),  # Return datetime object, not string
+            'agent_id': None,
+        }
+    
+    # Convert Pydantic object to dict
+    if hasattr(config, 'to_dict'):
+        config_dict = config.to_dict()
+    elif hasattr(config, 'dict'):
+        config_dict = config.dict()
+    elif hasattr(config, 'model_dump'):
+        config_dict = config.model_dump()
+    else:
+        config_dict = config
+    
+    # Convert string timestamps back to datetime objects for database compatibility
+    if 'created_at' in config_dict and isinstance(config_dict['created_at'], str):
+        try:
+            config_dict['created_at'] = datetime.fromisoformat(config_dict['created_at'].replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            # If parsing fails, use current time
+            config_dict['created_at'] = datetime.now()
+    
+    # Add defaults for missing fields (only for fields not handled by schema)
+    defaults = {
+        'agent_name': agent_path.name,
+        'description': 'No description provided',
+        'template': '',  # Empty string for blank templates (will be overridden by actual template if present)
+        'version': '1.0.0',
+        'created_at': datetime.now(),  # Return datetime object, not string
+    }
+    
+    for key, default_value in defaults.items():
+        if key not in config_dict:
+            config_dict[key] = default_value
+    
+    return config_dict

@@ -1,0 +1,16 @@
+flask
+flask-cors
+werkzeug
+runagent
+python-dotenv
+langchain
+langchain-community
+langchain-core
+langchain-openai
+qdrant-client
+pypdf
+agno
+langgraph
+duckduckgo-search
+openai
+

@@ -58,13 +58,11 @@ class TemplateManager:
             Dictionary mapping framework names to template lists
         """
         try:
-            templates = self.downloader.list_available_templates(TEMPLATE_PREPATH)
-
-            if framework_filter:
-                if framework_filter in templates:
-                    return {framework_filter: templates[framework_filter]}
-                else:
-                    return {}
+            # Pass framework_filter to downloader for faster scanning
+            templates = self.downloader.list_available_templates(
+                TEMPLATE_PREPATH, 
+                framework_filter=framework_filter
+            )
 
             return templates
         except Exception as e:
@@ -111,8 +109,8 @@ class TemplateManager:
             ValidationError: If template is invalid
             FileExistsError: If folder exists and overwrite is False
         """
-        # Validate template exists
-        available_templates = self.list_available()
+        # Validate template exists - only fetch for this specific framework
+        available_templates = self.list_available(framework_filter=framework)
 
         if framework not in available_templates:
             raise ValidationError(

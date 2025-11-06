@@ -1,6 +1,9 @@
 import click
 import typing as t
 from runagent.utils.enums.framework import Framework
+from rich.console import Console
+
+console = Console()
 
 # Auto-generate Click options from enum
 def add_framework_options(func):
@@ -33,3 +36,32 @@ def get_selected_framework(kwargs: dict) -> t.Optional[Framework]:
         )
     
     return selected_frameworks[0] if selected_frameworks else None
+
+
+def safe_prompt(questions, cancellation_message="[dim]Operation cancelled.[/dim]"):
+    """
+    Wrapper around inquirer.prompt() that handles ESC key and KeyboardInterrupt gracefully.
+    
+    Args:
+        questions: List of inquirer questions
+        cancellation_message: Message to display when cancelled (default: "[dim]Operation cancelled.[/dim]")
+    
+    Returns:
+        Dictionary of answers if successful, None if cancelled
+    """
+    import inquirer
+    
+    try:
+        answers = inquirer.prompt(questions)
+        if not answers:
+            console.print(cancellation_message)
+            return None
+        return answers
+    except KeyboardInterrupt:
+        # Handle Ctrl+C
+        console.print(f"\n{cancellation_message}")
+        return None
+    except EOFError:
+        # Handle EOF (sometimes raised by ESC in some terminals)
+        console.print(f"\n{cancellation_message}")
+        return None

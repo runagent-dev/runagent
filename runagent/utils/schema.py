@@ -84,6 +84,15 @@ class RunAgentConfig(BaseModel):
     env_vars: t.Optional[t.Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
     )
+    
+    # NEW FIELDS - Agent ID management
+    agent_id: str = Field(..., description="Unique agent identifier")
+    
+    # Authentication settings
+    auth_settings: t.Optional[t.Dict[str, t.Any]] = Field(
+        default_factory=lambda: {"type": "none"}, 
+        description="Authentication configuration"
+    )
 
     def to_dict(self) -> dict:
         """Convert to dictionary with custom serialization"""

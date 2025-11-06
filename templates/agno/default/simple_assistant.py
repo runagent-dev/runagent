@@ -4,7 +4,7 @@ from agno.models.openai import OpenAIChat
 
 agent = Agent(
     model=OpenAIChat(
-        id="gpt-4o"
+        id="gpt-4o-mini"
     ),
     markdown=True
 )
@@ -18,9 +18,7 @@ def agent_print_response(prompt: str):
     response = agent.run(prompt)
     
     # Return structured data that can be serialized
-    return {
-        "content": response.content if hasattr(response, 'content') else str(response),
-    }
+    return response
 
 def agent_print_response_stream(prompt: str):
     """Streaming response that yields serializable chunks"""

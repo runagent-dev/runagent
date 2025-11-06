@@ -50,6 +50,29 @@ def get_agent_name_from_folder(folder_path: Path) -> str:
     return folder_path.name
 
 
+def generate_config_fingerprint(agent_path: Path) -> Optional[str]:
+    """
+    Generate fingerprint for runagent.config.json file.
+    This helps detect when the config file has been modified.
+    
+    Args:
+        agent_path: Path to the agent directory
+        
+    Returns:
+        SHA256 hash of the config file content, or None if file doesn't exist
+    """
+    config_path = agent_path / "runagent.config.json"
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+    except Exception:
+        return None
+
+
 def get_framework_from_folder(folder_path: Path) -> Optional[str]:
     """
     Try to detect framework from folder contents.

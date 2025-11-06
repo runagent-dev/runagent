@@ -16,16 +16,16 @@ DEFAULT_TEMPLATE = "basic"
 
 # Environment Variables
 ENV_RUNAGENT_API_KEY = "RUNAGENT_API_KEY"
-# UPDATED: Change default port to match your middleware (8333)
-ENV_RUNAGENT_BASE_URL = "http://20.84.81.110:8333/"
+ENV_RUNAGENT_BASE_URL = "RUNAGENT_BASE_URL"
 ENV_LOCAL_CACHE_DIRECTORY = "RUNAGENT_CACHE_DIR"
 ENV_RUNAGENT_LOGGING_LEVEL = "RUNAGENT_LOGGING_LEVEL"
 
 # Local Configuration
 LOCAL_CACHE_DIRECTORY_PATH = "~/.runagent"
-USER_DATA_FILE_NAME = "user_data.json"
-DEFAULT_BASE_URL = "http://20.84.81.110:8333/"
+DEFAULT_BASE_URL = "https://backend.run-agent.ai/"
 AGENT_CONFIG_FILE_NAME = "runagent.config.json"
+DATABASE_FILE_NAME = "runagent_local.db"
+DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes default timeout
 
 # Rest of the file remains the same...
 _cache_dir = os.environ.get(ENV_LOCAL_CACHE_DIRECTORY)
@@ -57,3 +57,9 @@ class Framework(str, Enum):
 class TemplateVariant(str, Enum):
     BASIC = "basic"
     ADVANCED = "advanced"
+
+# Device Code Authentication Configuration
+DEVICE_CODE_POLL_INTERVAL = 5  # seconds
+DEVICE_CODE_EXPIRATION = 600  # seconds (10 minutes)
+DEVICE_CODE_MAX_RETRIES = 3
+DEVICE_CODE_RETRY_BACKOFF_BASE = 2  # seconds

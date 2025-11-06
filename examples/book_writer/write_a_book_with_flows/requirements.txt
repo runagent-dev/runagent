@@ -1,0 +1,5 @@
+crewai==1.3.0
+langchain-tools
+pydantic
+nest-asyncio
+crewai-tools

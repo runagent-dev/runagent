@@ -7,6 +7,7 @@ from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import PythonicEntryPoint, RunAgentConfig
 from runagent.utils.serializer import CoreSerializer
 from runagent.utils.response import extract_jsonpath, to_dict
+from runagent.utils.logging_utils import is_verbose_logging_enabled
 
 console = Console()
 
@@ -30,14 +31,17 @@ class GenericExecutor:
         )
         
         async def normalized_runner(*input_args, **input_kwargs):
-            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
-            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
+            if is_verbose_logging_enabled():
+                console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+                console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
             
             if inspect.iscoroutinefunction(resolved_entrypoint):
-                print("resolved async", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                if is_verbose_logging_enabled():
+                    print("resolved async", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
                 result = await resolved_entrypoint(*input_args, **input_kwargs)
             else:
-                print("resolved sync (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                if is_verbose_logging_enabled():
+                    print("resolved sync (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
                 # Run sync function in executor to avoid blocking
                 result = await asyncio.get_event_loop().run_in_executor(
                     None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
@@ -61,12 +65,14 @@ class GenericExecutor:
         )
 
         async def normalized_stream_runner(*input_args, **input_kwargs):
-            console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
-            console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
+            if is_verbose_logging_enabled():
+                console.print(f"🔍 [cyan]Entrypoint:[/cyan] {entrypoint.tag}")
+                console.print(f"🔍 [cyan]Input data:[/cyan] *{input_args}, **{input_kwargs}")
             
             if inspect.isasyncgenfunction(resolved_entrypoint):
                 # Native async generator
-                print("resolved async generator", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                if is_verbose_logging_enabled():
+                    print("resolved async generator", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
                 async for chunk in resolved_entrypoint(*input_args, **input_kwargs):
                     if entrypoint.extractor:
                         chunk = extract_jsonpath(chunk, entrypoint.extractor)
@@ -75,7 +81,8 @@ class GenericExecutor:
             
             elif inspect.iscoroutinefunction(resolved_entrypoint):
                 # Async function that returns iterable
-                print("resolved async function (returns iterable)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                if is_verbose_logging_enabled():
+                    print("resolved async function (returns iterable)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
                 result = await resolved_entrypoint(*input_args, **input_kwargs)
                 for chunk in result:
                     if entrypoint.extractor:
@@ -85,7 +92,8 @@ class GenericExecutor:
             
             elif inspect.isgeneratorfunction(resolved_entrypoint):
                 # Sync generator - consume in executor
-                print("resolved sync generator (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
+                if is_verbose_logging_enabled():
+                    print("resolved sync generator (wrapped in async)", (entrypoint.tag, entrypoint.module, resolved_entrypoint))
                 generator = await asyncio.get_event_loop().run_in_executor(
                     None, lambda: resolved_entrypoint(*input_args, **input_kwargs)
                 )
@@ -110,26 +118,33 @@ class GenericExecutor:
         return normalized_stream_runner
 
     def _entrypoint_resolver(self, entrypoint_filepath: Path, entrypoint_module: str):
-        print(f"DEBUG: Resolving entrypoint - filepath: {entrypoint_filepath}, module: {entrypoint_module}")
+        verbose = is_verbose_logging_enabled()
+        if verbose:
+            print(f"DEBUG: Resolving entrypoint - filepath: {entrypoint_filepath}, module: {entrypoint_module}")
         primary_module, secondary_attr = (
             entrypoint_module.split(".", 1) + [""]
         )[:2]
-        print(f"DEBUG: Split module - primary: {primary_module}, secondary: {secondary_attr}")
+        if verbose:
+            print(f"DEBUG: Split module - primary: {primary_module}, secondary: {secondary_attr}")
         
         resolved_module = self.importer.resolve_import(
                 entrypoint_filepath, primary_module
             )
-        print(f"DEBUG: Resolved primary module: {resolved_module}")
+        if verbose:
+            print(f"DEBUG: Resolved primary module: {resolved_module}")
         
         if secondary_attr:
             attrs = secondary_attr.split('.')
-            print(f"DEBUG: Secondary attributes to resolve: {attrs}")
+            if verbose:
+                print(f"DEBUG: Secondary attributes to resolve: {attrs}")
             for attr in attrs:
                 resolved_module = getattr(resolved_module, attr)
-                print(f"DEBUG: Resolved attribute {attr}: {resolved_module}")
+                if verbose:
+                    print(f"DEBUG: Resolved attribute {attr}: {resolved_module}")
 
-        print(f"DEBUG: Final resolved module: {resolved_module}")
-        print("Resolving", (entrypoint_module, resolved_module))
+        if verbose:
+            print(f"DEBUG: Final resolved module: {resolved_module}")
+            print("Resolving", (entrypoint_module, resolved_module))
         return resolved_module
 
     def _get_function_type(self, func):

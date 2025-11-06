@@ -1,0 +1,6 @@
+firecrawl-py
+agno
+pydantic
+requests
+python-dotenv
+openai

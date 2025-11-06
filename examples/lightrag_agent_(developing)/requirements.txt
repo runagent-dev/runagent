@@ -1,0 +1,32 @@
+# Core LightRAG dependencies
+lightrag-hku
+raganything
+
+# PostgreSQL and database
+asyncpg
+sqlalchemy[asyncio]
+psycopg2-binary
+
+# OpenAI and embeddings
+openai
+
+# Document processing
+python-magic
+pypdf
+python-docx
+openpyxl
+Pillow
+
+# Utilities
+python-dotenv
+pydantic
+pydantic-settings
+httpx
+aiofiles
+
+# Optional: For advanced document parsing
+# magic-pdf>=0.1.0  # MinerU
+# docling>=0.1.0     # Alternative parser
+
+# Monitoring and logging
+loguru

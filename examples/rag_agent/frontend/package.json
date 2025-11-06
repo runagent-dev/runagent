@@ -1,0 +1,12 @@
+{
+  "name": "rag-agent-frontend",
+  "version": "1.0.0",
+  "description": "RAG Agent Frontend - Intelligent Document Assistant",
+  "scripts": {
+    "dev": "http-server -p 3000 -o"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TripGenius - AI Trip Planner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>✈️ TripGenius</h1>
+            <p class="tagline">Your AI-Powered Trip Planning Assistant</p>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Example Trips Section -->
+            <div class="examples-section">
+                <h2>✨ Popular Trip Ideas</h2>
+                <div id="examplesContainer" class="examples-grid">
+                    <!-- Examples will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Trip Planning Form -->
+            <div class="form-section">
+                <h2>Plan Your Trip</h2>
+                <form id="tripForm">
+                    <div class="form-group">
+                        <label for="destination">🌍 Destination *</label>
+                        <input 
+                            type="text" 
+                            id="destination" 
+                            placeholder="e.g., Rome, Paris, Tokyo"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numDays">📅 Number of Days *</label>
+                        <input 
+                            type="number" 
+                            id="numDays" 
+                            placeholder="e.g., 3"
+                            min="1"
+                            max="14"
+                            value="2"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="preferences">💡 Your Preferences</label>
+                        <textarea 
+                            id="preferences" 
+                            placeholder="e.g., historical sites, Italian cuisine, museums, must-see landmarks"
+                            rows="3"
+                        ></textarea>
+                        <small>Tell us what you're interested in (food, culture, history, adventure, etc.)</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" id="submitBtn" class="btn btn-primary">
+                            Create Itinerary
+                        </button>
+                        <button type="button" id="streamBtn" class="btn btn-secondary">
+                            Stream Itinerary
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2>🗺️ Your Trip Itinerary</h2>
+                    <button id="clearBtn" class="btn btn-clear">Clear</button>
+                </div>
+                <div id="itineraryContent" class="itinerary-content"></div>
+                <div id="loadingIndicator" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Planning your perfect trip...</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p>Powered by RunAgent & AG2 AI</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
