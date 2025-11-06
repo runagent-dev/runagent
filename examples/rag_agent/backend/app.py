@@ -27,7 +27,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Initialize RunAgent clients
 # Agent ID can be set via environment variable RAG_AGENT_ID or defaults to local mode
 # For local mode, agent_id can be omitted or set to None
-agent_id = os.getenv("RAG_AGENT_ID", "08e1a1e2-5931-4931-b3d3-322e91f80eb5")  # Update with your agent ID or set via env var
+agent_id = os.getenv("RAG_AGENT_ID", "64f60008-5ed2-450c-a36a-53bdb662dfc2")  # Update with your agent ID or set via env var
 
 rag_client = RunAgentClient(
     agent_id=agent_id,

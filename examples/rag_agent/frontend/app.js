@@ -19,8 +19,8 @@ const queryForm = document.getElementById('queryForm');
 const submitBtn = document.getElementById('submitBtn');
 const streamBtn = document.getElementById('streamBtn');
 const clearBtn = document.getElementById('clearBtn');
-const resultsSection = document.getElementById('resultsSection');
-const answerContent = document.getElementById('answerContent');
+const chatContainer = document.getElementById('chatContainer');
+const messagesEl = document.getElementById('messages');
 const metadataSection = document.getElementById('metadataSection');
 const metadataContent = document.getElementById('metadataContent');
 const loadingIndicator = document.getElementById('loadingIndicator');
@@ -189,39 +189,55 @@ async function loadDatabaseTypes() {
     }
 }
 
-// Show loading
-function showLoading() {
-    resultsSection.style.display = 'block';
-    loadingIndicator.style.display = 'block';
-    answerContent.style.display = 'none';
-    metadataSection.style.display = 'none';
-    submitBtn.disabled = true;
-    streamBtn.disabled = true;
-    
-    // Scroll to results
-    resultsSection.scrollIntoView({ behavior: 'smooth' });
+// Chat helpers
+function scrollChatToBottom() {
+    if (messagesEl) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
 }
 
-// Hide loading
-function hideLoading() {
-    loadingIndicator.style.display = 'none';
-    answerContent.style.display = 'block';
-    submitBtn.disabled = false;
-    streamBtn.disabled = false;
+function createMessageElement(role, htmlContent) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = `avatar ${role}`;
+    avatar.textContent = role === 'user' ? '🙂' : '🤖';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    const content = document.createElement('div');
+    content.className = 'content';
+    content.innerHTML = htmlContent || '';
+    bubble.appendChild(content);
+
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(bubble);
+
+    return { wrapper, content };
+}
+
+function appendMessage(role, textOrHtml, isMarkdown = true) {
+    const html = isMarkdown ? markdownToHtml(textOrHtml) : textOrHtml;
+    const { wrapper, content } = createMessageElement(role, html);
+    messagesEl.appendChild(wrapper);
+    scrollChatToBottom();
+    return content; // return content element for streaming updates
+}
+
+function setLoading(isLoading) {
+    loadingIndicator.style.display = isLoading ? 'block' : 'none';
+    submitBtn.disabled = isLoading;
+    streamBtn.disabled = isLoading;
 }
 
 // Show error
 function showError(message) {
-    answerContent.innerHTML = `
-        <div style="color: #dc3545; padding: 20px; text-align: center;">
-            <h3>❌ Error</h3>
-            <p>${message}</p>
-        </div>
-    `;
-    hideLoading();
+    appendMessage('assistant', `**Error:** ${message}`);
+    setLoading(false);
 }
 
-// Handle regular query submission
+// Handle regular query submission (Send)
 queryForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -232,7 +248,11 @@ queryForm.addEventListener('submit', async (e) => {
         return;
     }
     
-    showLoading();
+    // Add user message
+    appendMessage('user', question, false);
+    questionInput.value = '';
+    autoResizeTextArea();
+    setLoading(true);
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/query`, {
@@ -265,15 +285,14 @@ queryForm.addEventListener('submit', async (e) => {
                     ` : ''}
                 `;
             }
-            
-            answerContent.innerHTML = markdownToHtml(result.answer);
+            appendMessage('assistant', result.answer || '');
         } else {
             showError(result.error || 'Failed to process query');
         }
     } catch (error) {
         showError(`Network error: ${error.message}`);
     } finally {
-        hideLoading();
+        setLoading(false);
     }
 });
 
@@ -288,9 +307,10 @@ streamBtn.addEventListener('click', async (e) => {
         return;
     }
     
-    showLoading();
-    answerContent.innerHTML = '';
-    answerContent.style.display = 'block';
+    // Add user message
+    appendMessage('user', question, false);
+    questionInput.value = '';
+    autoResizeTextArea();
     metadataSection.style.display = 'none';
     loadingIndicator.style.display = 'none';
     submitBtn.disabled = true;
@@ -309,6 +329,7 @@ streamBtn.addEventListener('click', async (e) => {
         const decoder = new TextDecoder();
         let fullText = '';
         let metadata = null;
+        let assistantContentEl = appendMessage('assistant', '');
         
         while (true) {
             const { value, done } = await reader.read();
@@ -337,10 +358,8 @@ streamBtn.addEventListener('click', async (e) => {
                             `;
                         } else if (data.type === 'content') {
                             fullText += data.content || '';
-                            answerContent.innerHTML = markdownToHtml(fullText);
-                            
-                            // Auto-scroll to bottom
-                            answerContent.scrollTop = answerContent.scrollHeight;
+                            assistantContentEl.innerHTML = markdownToHtml(fullText);
+                            scrollChatToBottom();
                         } else if (data.type === 'complete') {
                             // Streaming complete
                             console.log('Streaming complete');
@@ -482,12 +501,24 @@ async function loadStats() {
 // Refresh stats button
 refreshStatsBtn.addEventListener('click', loadStats);
 
-// Clear results
+// Clear chat
 clearBtn.addEventListener('click', () => {
-    resultsSection.style.display = 'none';
-    answerContent.innerHTML = '';
+    messagesEl.innerHTML = '';
     metadataSection.style.display = 'none';
     metadataContent.innerHTML = '';
+});
+
+// Auto-resize textarea like ChatGPT
+function autoResizeTextArea() {
+    questionInput.style.height = 'auto';
+    questionInput.style.height = Math.min(questionInput.scrollHeight, 160) + 'px';
+}
+questionInput.addEventListener('input', autoResizeTextArea);
+questionInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitBtn.click();
+    }
 });
 
 // Check backend health on load

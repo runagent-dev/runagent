@@ -40,45 +40,37 @@
                     </div>
                 </div>
 
-                <!-- Query Form -->
-                <div class="form-section">
-                    <h2>Ask Your Question</h2>
-                    <form id="queryForm">
-                        <div class="form-group">
-                            <label for="question">❓ Question *</label>
-                            <textarea 
-                                id="question" 
-                                placeholder="e.g., What is the revenue breakdown by product category?"
-                                required
-                                rows="4"
-                            ></textarea>
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" id="submitBtn" class="btn btn-primary">
-                                Query
-                            </button>
-                            <button type="button" id="streamBtn" class="btn btn-secondary">
-                                Stream Query
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Results Section -->
-                <div id="resultsSection" class="results-section" style="display: none;">
-                    <div class="results-header">
-                        <h2>📖 Answer</h2>
+                <!-- Chat Section -->
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h2>💬 Chat</h2>
                         <button id="clearBtn" class="btn btn-clear">Clear</button>
+                    </div>
+                    <div id="chatContainer" class="chat-container">
+                        <div id="messages" class="messages"></div>
                     </div>
                     <div id="metadataSection" class="metadata-section" style="display: none;">
                         <div id="metadataContent"></div>
                     </div>
-                    <div id="answerContent" class="answer-content"></div>
                     <div id="loadingIndicator" class="loading" style="display: none;">
                         <div class="spinner"></div>
                         <p>Processing your question...</p>
                     </div>
+                    <form id="queryForm" class="chat-input-bar">
+                        <div class="chat-input-wrapper">
+                            <textarea 
+                                id="question"
+                                class="chat-input"
+                                placeholder="Message RAG Agent"
+                                required
+                                rows="1"
+                            ></textarea>
+                            <div class="chat-actions">
+                                <button type="button" id="streamBtn" class="btn btn-secondary">Stream</button>
+                                <button type="submit" id="submitBtn" class="btn btn-primary">Send</button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
 
