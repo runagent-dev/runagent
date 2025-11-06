@@ -17,7 +17,7 @@
 from runagent import RunAgentClient
 
 ra = RunAgentClient(
-    agent_id="c12d3486-cbf6-4d3a-b58b-e5a9c0dfe311",
+    agent_id="33129bdc-9fd6-4aae-80e3-68862e78e66b",
     entrypoint_tag="agno_print_response_stream",
     local=False
     )
