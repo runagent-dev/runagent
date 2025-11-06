@@ -1,5 +1,0 @@
-agno
-openai
-chromadb==1.2.0
-pypdf
-
