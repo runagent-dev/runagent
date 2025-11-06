@@ -5,11 +5,8 @@
 //!
 //! ## Features
 //!
-//! - **Multi-Framework Support**: Built-in support for LangChain, LangGraph, LlamaIndex, Letta, CrewAI, and AutoGen
-//! - **Local & Remote Deployment**: Deploy agents locally for testing or to remote servers  
+//! - **Client SDK**: REST and WebSocket clients for interacting with deployed agents
 //! - **Real-time Streaming**: WebSocket-based streaming for real-time agent interactions
-//! - **Database Management**: SQLite-based storage for agent metadata and execution history
-//! - **Template System**: Pre-built templates for quick agent setup
 //! - **Type Safety**: Full Rust type safety with comprehensive error handling
 //! - **Async/Await**: Built on Tokio for high-performance async operations
 //!
@@ -68,26 +65,28 @@
 //! }
 //! ```
 //!
-//! ### Local Server Setup
+//! ### Connecting to Local Agents
 //!
 //! ```rust,no_run
-//! use runagent::server::LocalServer;
-//! use std::path::PathBuf;
+//! use runagent::prelude::*;
+//! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Create a local server for testing
-//!     let server = LocalServer::from_path(
-//!         PathBuf::from("./my-agent"),
+//!     // Connect to a local agent running on localhost:8450
+//!     let client = RunAgentClient::with_address(
+//!         "my-agent-id",
+//!         "generic",
+//!         true,
 //!         Some("127.0.0.1"),
 //!         Some(8450)
 //!     ).await?;
 //!     
-//!     println!("Server info: {:?}", server.get_info());
+//!     let response = client.run(&[
+//!         ("message", json!("Hello, world!"))
+//!     ]).await?;
 //!     
-//!     // Start the server (this will block)
-//!     server.start().await?;
-//!     
+//!     println!("Response: {}", response);
 //!     Ok(())
 //! }
 //! ```
@@ -176,37 +175,6 @@
 //!     .build();
 //! ```
 //!
-//! ## Database Management
-//!
-//! ```rust,no_run
-//! use runagent::db::{DatabaseService, models::Agent};
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Initialize database service
-//!     let db_service = DatabaseService::new(None).await?;
-//!     
-//!     // Create a new agent record
-//!     let agent = Agent::new(
-//!         "my-agent".to_string(),
-//!         "/path/to/agent".to_string(),
-//!         "localhost".to_string(),
-//!         8450
-//!     ).with_framework("langchain".to_string());
-//!     
-//!     // Add agent to database
-//!     let result = db_service.add_agent(agent).await?;
-//!     println!("Agent added: {:?}", result);
-//!     
-//!     // List all agents
-//!     let agents = db_service.list_agents().await?;
-//!     for agent in agents {
-//!         println!("Agent: {} ({}:{})", agent.agent_id, agent.host, agent.port);
-//!     }
-//!     
-//!     Ok(())
-//! }
-//! ```
 //!
 //! ## Error Handling
 //!
@@ -249,39 +217,19 @@
 //! }
 //! ```
 //!
-//! ## Features
-//!
-//! The SDK supports optional features that can be enabled/disabled:
-//!
-//! ```toml
-//! [dependencies]
-//! runagent = { version = "0.1.0", features = ["db", "server"] }
-//! ```
-//!
-//! Available features:
-//! - `db` (default): Database functionality for agent metadata storage
-//! - `server` (default): Local server capabilities for testing
-//!
 //! ## Architecture Overview
 //!
-//! The RunAgent SDK is built around several core components:
+//! The RunAgent SDK focuses on client-side functionality for interacting with agents:
 //!
-//! - **Client Components**: High-level clients for interacting with deployed agents
-//! - **Local Server**: FastAPI-like local server for testing agents
-//! - **Database Management**: SQLite-based storage for agent metadata
-//! - **Multi-Framework Support**: Support for LangChain, LangGraph, LlamaIndex, and more
+//! - **Client Components**: High-level REST and WebSocket clients for interacting with deployed agents
+//! - **Configuration Management**: Environment-based and programmatic configuration
 //! - **Streaming Support**: WebSocket-based streaming for real-time agent interactions
-//!
-//! Each component is designed to work independently or together, allowing you to use
-//! only the parts you need for your specific use case.
+//! - **Type Safety**: Comprehensive error handling and type definitions
 
 pub mod client;
 pub mod constants;
 pub mod types;
 pub mod utils;
-
-#[cfg(feature = "server")]
-pub mod server;
 
 #[cfg(feature = "db")]
 pub mod db;
@@ -290,11 +238,8 @@ pub mod db;
 pub use client::{RunAgentClient, RestClient, SocketClient};
 pub use types::{RunAgentError, RunAgentResult};
 
-#[cfg(feature = "server")]
-pub use server::LocalServer;
-
 #[cfg(feature = "db")]
-pub use db::{DatabaseService, DatabaseManager};
+pub use db::DatabaseService;
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -322,7 +267,7 @@ pub fn init_logging() {
 /// Configuration builder for the RunAgent SDK
 ///
 /// Provides a fluent interface for configuring the SDK with various options
-/// including API keys, base URLs, database paths, and logging.
+/// including API keys, base URLs, and logging.
 ///
 /// # Example
 ///
@@ -341,8 +286,6 @@ pub struct RunAgentConfig {
     pub api_key: Option<String>,
     /// Base URL for API endpoints
     pub base_url: Option<String>,
-    /// Path to local database file
-    pub local_db_path: Option<std::path::PathBuf>,
     /// Whether to enable logging
     pub enable_logging: bool,
 }
@@ -391,26 +334,6 @@ impl RunAgentConfig {
     /// ```
     pub fn with_base_url<S: Into<String>>(mut self, base_url: S) -> Self {
         self.base_url = Some(base_url.into());
-        self
-    }
-
-    /// Set the local database path
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path to the database file
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use runagent::RunAgentConfig;
-    /// use std::path::PathBuf;
-    /// 
-    /// let config = RunAgentConfig::new()
-    ///     .with_local_db_path(PathBuf::from("./my_agents.db"));
-    /// ```
-    pub fn with_local_db_path<P: Into<std::path::PathBuf>>(mut self, path: P) -> Self {
-        self.local_db_path = Some(path.into());
         self
     }
 
@@ -468,11 +391,8 @@ pub mod prelude {
     pub use crate::types::{RunAgentError, RunAgentResult};
     pub use crate::RunAgentConfig;
     
-    #[cfg(feature = "server")]
-    pub use crate::server::LocalServer;
-    
     #[cfg(feature = "db")]
-    pub use crate::db::{DatabaseService, DatabaseManager};
+    pub use crate::db::DatabaseService;
 }
 
 #[cfg(test)]

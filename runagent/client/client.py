@@ -59,7 +59,7 @@ class RunAgentClient:
         )
         # Only print debug response in DISABLE_TRY_CATCH mode
         if os.getenv('DISABLE_TRY_CATCH'):
-            print(f"response#######################################: {response}")
+            print(f"response: {response}")
         if response.get("success"):
             # Handle new response format with nested data
             if "data" in response and "result_data" in response["data"]:

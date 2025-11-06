@@ -179,10 +179,36 @@ function App() {
       }
 
       const result: FlowResult = await response.json();
+      
+      // Debug: Log the response
+      console.log('Response received:', result);
+      
+      // Validate response structure
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response format');
+      }
+      
+      // Check if response has error
+      if ('error' in result && result.error) {
+        throw new Error(result.error);
+      }
+      
+      // Ensure required fields exist
+      if (result.success === false || (!result.total_candidates && !result.top_candidates)) {
+        throw new Error('Response missing required fields or operation failed');
+      }
+      
       setResults(result);
       setStep('results');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error in runLeadScoring:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      console.error('Error details:', {
+        message: errorMessage,
+        error: err,
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError(errorMessage);
       setStep('mapping'); // Go back to mapping on error
     } finally {
       setLoading(false);

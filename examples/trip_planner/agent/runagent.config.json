@@ -1,0 +1,27 @@
+{
+    "agent_name": "Trip Planner Agent",
+    "description": "AI-powered trip planning assistant with GraphRAG",
+    "framework": "ag2",
+    "template": "custom",
+    "version": "1.0.0",
+    "created_at": "2025-10-29 00:00:00",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "path": "templates/ag2/custom",
+      "author": "custom"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "trip_agent.py",
+          "module": "create_trip_planner",
+          "tag": "trip_create"
+        },
+        {
+          "file": "trip_agent.py",
+          "module": "create_trip_planner_stream",
+          "tag": "trip_stream"
+        }
+      ]
+    }
+  }

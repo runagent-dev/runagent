@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>RAG Agent - Intelligent Document Assistant</title>
+    <link rel="stylesheet" href="style.css?v=2.0">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>📚 RAG Agent</h1>
+            <p class="tagline">Your Intelligent Document Assistant</p>
+            <div id="backendStatus" class="backend-status" style="margin-top: 10px; padding: 8px 16px; border-radius: 8px; display: inline-block; font-size: 0.9em;">
+                <span id="statusIcon">⏳</span>
+                <span id="statusText">Checking backend status...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Tabs Navigation -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="query">💬 Query Documents</button>
+                <button class="tab-btn" data-tab="upload">📤 Upload Documents</button>
+                <button class="tab-btn" data-tab="stats">📊 Statistics</button>
+            </div>
+
+            <!-- Query Tab -->
+            <div id="queryTab" class="tab-content active">
+                <!-- Example Queries Section -->
+                <div class="examples-section">
+                    <h2>✨ Try These Examples</h2>
+                    <div id="examplesContainer" class="examples-grid">
+                        <!-- Examples will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Chat Section -->
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h2>💬 Chat</h2>
+                        <button id="clearBtn" class="btn btn-clear">Clear</button>
+                    </div>
+                    <div id="chatContainer" class="chat-container">
+                        <div id="messages" class="messages"></div>
+                    </div>
+                    <div id="metadataSection" class="metadata-section" style="display: none;">
+                        <div id="metadataContent"></div>
+                    </div>
+                    <div id="loadingIndicator" class="loading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Processing your question...</p>
+                    </div>
+                    <form id="queryForm" class="chat-input-bar">
+                        <div class="chat-input-wrapper">
+                            <textarea 
+                                id="question"
+                                class="chat-input"
+                                placeholder="Message RAG Agent"
+                                required
+                                rows="1"
+                            ></textarea>
+                            <div class="chat-actions">
+                                <button type="button" id="streamBtn" class="btn btn-secondary">Stream</button>
+                                <button type="submit" id="submitBtn" class="btn btn-primary">Send</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="uploadTab" class="tab-content" style="display: none;">
+                <div class="form-section">
+                    <h2>Upload PDF Document</h2>
+                    <form id="uploadForm">
+                        <div class="form-group">
+                            <label for="pdfFile">📄 PDF File *</label>
+                            <input 
+                                type="file" 
+                                id="pdfFile" 
+                                accept=".pdf"
+                                required
+                            >
+                            <small class="form-hint">Only PDF files are supported (max 50MB)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbType">🗄️ Database Type *</label>
+                            <select id="dbType" required style="cursor: pointer;">
+                                <option value="">Select database type...</option>
+                                <!-- Options will be loaded dynamically -->
+                            </select>
+                            <small class="form-hint">Choose the database category for this document</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="uploadBtn" class="btn btn-primary">
+                                Upload & Process
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Upload Results -->
+                    <div id="uploadResultsSection" class="upload-results" style="display: none;">
+                        <div id="uploadResultsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Tab -->
+            <div id="statsTab" class="tab-content" style="display: none;">
+                <div class="stats-section">
+                    <h2>📊 Database Statistics</h2>
+                    <button id="refreshStatsBtn" class="btn btn-secondary">Refresh</button>
+                    <div id="statsContainer" class="stats-grid">
+                        <!-- Stats will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p>Powered by RunAgent & Agno AI</p>
+        </footer>
+    </div>
+
+    <script src="app.js?v=2.0"></script>
+</body>
+</html>
+

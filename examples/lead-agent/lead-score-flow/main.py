@@ -206,9 +206,42 @@ def run_flow(
     try:
         # Load candidates from parameter or CSV file
         if candidates:
+            # Debug: Log what we received
+            print(f"[DEBUG] Candidates type: {type(candidates)}")
+            print(f"[DEBUG] Candidates value (first 200 chars): {str(candidates)[:200]}")
+            
+            # Handle case where candidates itself might be a JSON string
+            if isinstance(candidates, str):
+                print(f"[DEBUG] Candidates is a JSON string, parsing...")
+                try:
+                    candidates = json.loads(candidates)
+                    print(f"[DEBUG] Parsed candidates to type: {type(candidates)}")
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid candidates format: expected list or JSON string, got: {candidates[:200] if len(candidates) > 200 else candidates}")
+            
+            # Ensure candidates is a list
+            if not isinstance(candidates, list):
+                raise ValueError(f"Expected list of candidates, got {type(candidates)}: {candidates}")
+            
+            print(f"[DEBUG] Received {len(candidates)} candidates")
+            if candidates:
+                print(f"[DEBUG] First candidate type: {type(candidates[0])}")
+                print(f"[DEBUG] First candidate value: {candidates[0]}")
+            
             # Convert dicts to Candidate objects
             candidate_objects = []
-            for c in candidates:
+            for idx, c in enumerate(candidates):
+                # Handle case where c might be a JSON string (due to double serialization)
+                if isinstance(c, str):
+                    print(f"[DEBUG] Candidate {idx} is a string, parsing JSON...")
+                    try:
+                        c = json.loads(c)
+                        print(f"[DEBUG] Parsed to: {type(c)}")
+                    except json.JSONDecodeError as e:
+                        raise ValueError(f"Invalid candidate format: expected dict or JSON string, got: {c[:100] if len(str(c)) > 100 else c}")
+                # Ensure c is a dict before unpacking
+                if not isinstance(c, dict):
+                    raise ValueError(f"Expected dict or JSON string, got {type(c)}: {c}")
                 candidate_objects.append(Candidate(**c))
             candidates = candidate_objects
         else:

@@ -23,8 +23,9 @@ impl RestClient {
         api_key: Option<String>,
         api_prefix: Option<&str>,
     ) -> RunAgentResult<Self> {
+        // Increase timeout to 10 minutes (600 seconds) to match agent execution timeout
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(600))
             .user_agent("RunAgent-Rust-SDK/0.1.0")
             .build()?;
 
@@ -68,7 +69,20 @@ impl RestClient {
             } else {
                 // Try to parse as JSON to get error details
                 if let Ok(json) = serde_json::from_str::<Value>(&error_text) {
-                    if let Some(detail) = json.get("detail").and_then(|d| d.as_str()) {
+                    // Try to extract nested error message
+                    if let Some(error_obj) = json.get("error") {
+                        if let Some(message) = error_obj.get("message").and_then(|m| m.as_str()) {
+                            message.to_string()
+                        } else if let Some(detail) = json.get("detail").and_then(|d| d.as_str()) {
+                            detail.to_string()
+                        } else if let Some(message) = json.get("message").and_then(|m| m.as_str()) {
+                            message.to_string()
+                        } else if let Some(error) = json.get("error").and_then(|e| e.as_str()) {
+                            error.to_string()
+                        } else {
+                            error_text
+                        }
+                    } else if let Some(detail) = json.get("detail").and_then(|d| d.as_str()) {
                         detail.to_string()
                     } else if let Some(message) = json.get("message").and_then(|m| m.as_str()) {
                         message.to_string()
@@ -82,9 +96,18 @@ impl RestClient {
                 }
             };
 
+            // Check if error message contains permission/403 info even if status is 500
+            if error_msg.contains("permission") || error_msg.contains("403") || error_msg.contains("do not have permission") {
+                return Err(RunAgentError::authentication(format!(
+                    "Access denied: {}. This usually means:\n  - The agent doesn't belong to your account\n  - Your API key doesn't have permission to access this agent\n  - The agent ID is incorrect", error_msg
+                )));
+            }
+            
             match status.as_u16() {
                 401 => Err(RunAgentError::authentication(error_msg)),
-                403 => Err(RunAgentError::authentication(format!("Access denied: {}", error_msg))),
+                403 => Err(RunAgentError::authentication(format!(
+                    "Access denied: {}. This usually means:\n  - The agent doesn't belong to your account\n  - Your API key doesn't have permission to access this agent\n  - The agent ID is incorrect", error_msg
+                ))),
                 400 | 422 => Err(RunAgentError::validation(error_msg)),
                 404 => Err(RunAgentError::validation(format!("Not found: {}", error_msg))),
                 500..=599 => Err(RunAgentError::server(format!("Server error: {}", error_msg))),
@@ -178,13 +201,36 @@ impl RestClient {
         });
 
         let path = format!("agents/{}/run", agent_id);
+        let url = self.get_url(&path)?;
+        tracing::debug!("Running agent {} with entrypoint {} at {}", agent_id, entrypoint_tag, url);
+        
         self.post(&path, &data).await
+            .map_err(|e| {
+                if e.category() == "validation" && e.to_string().contains("Not found") {
+                    RunAgentError::validation(format!(
+                        "Agent {} not found on server at {}. Check that:\n  - The agent exists and is deployed\n  - The agent ID is correct\n  - The base URL ({}) is correct\n  - Your API key is valid (if required)",
+                        agent_id, url, self.base_url
+                    ))
+                } else {
+                    e
+                }
+            })
     }
 
     /// Get agent architecture information
     pub async fn get_agent_architecture(&self, agent_id: &str) -> RunAgentResult<Value> {
         let path = format!("agents/{}/architecture", agent_id);
         self.get(&path).await
+            .map_err(|e| {
+                if e.category() == "validation" && e.to_string().contains("Not found") {
+                    RunAgentError::validation(format!(
+                        "Agent {} not found on server. Check that the agent exists and is deployed. Error: {}",
+                        agent_id, e
+                    ))
+                } else {
+                    e
+                }
+            })
     }
 
     /// Health check

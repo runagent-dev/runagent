@@ -5,7 +5,7 @@ use serde_json::json;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing agno Agent with Rust SDK");
     
-    let agent_id = "af662135-5c00-4a89-b947-300e34787f03";
+    let agent_id = "f9415c35-6c01-4f76-a9d5-ef2e11c08cbb";
     
     // Test: Non-streaming execution
     println!("\n🚀 Testing Non-Streaming Execution");
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("🔗 Connected to agent at 127.0.0.1:8452");
     
     let response = client.run_with_args(
-            &[json!("Write small paragraph on breaking bad tv series")], // positional args
+            &[json!("Write small paragraph on how i met your mother tv series")], // positional args
             &[] // no keyword args
         ).await?;
     
@@ -45,13 +45,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let agent_id = "af662135-5c00-4a89-b947-300e34787f03";
+//     let agent_id = "f9415c35-6c01-4f76-a9d5-ef2e11c08cbb";
     
 //     println!("🌊 ag2 Streaming Test");
 //     let client = RunAgentClient::new(agent_id, "agno_print_response_stream", false).await?;
     
 //     let mut stream = client.run_stream(&[
-//         ("prompt", json!("Tell me about solar system"))
+//         ("prompt", json!("How many planets are there in the solar system?"))
 //     ]).await?;
     
 //     while let Some(chunk_result) = stream.next().await {

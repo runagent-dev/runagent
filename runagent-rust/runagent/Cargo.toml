@@ -2,7 +2,7 @@
 name = "runagent"
 version = "0.1.24"
 edition = "2021"
-description = "RunAgent SDK for Rust - Deploy and manage AI agents easily"
+description = "RunAgent SDK for Rust - Client SDK for interacting with deployed AI agents"
 license = "MIT"
 repository = "https://github.com/runagent-dev/runagent"
 homepage = "https://runagent.ai"
@@ -18,14 +18,9 @@ authors = ["RunAgent <runagent.live@gmail.com?>"]
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 reqwest = { workspace = true }
-axum = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true, features = ["trace"] }
-hyper = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-sqlx = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
@@ -37,22 +32,20 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 config = { workspace = true }
 dotenv = { workspace = true }
-which = { workspace = true }
-tempfile = { workspace = true }
 async-stream = { workspace = true }
+sqlx = { workspace = true }
 
 # Additional dependencies
 url = "2.5"
 bytes = "1.5"
 mime = "0.3"
 percent-encoding = "2.3"
-dirs = "5.0"  # Add this line
+dirs = "5.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
+tempfile = "3.8"
 
-# Add the features section
 [features]
-default = ["db", "server"]
-server = []
+default = ["db"]
 db = []
