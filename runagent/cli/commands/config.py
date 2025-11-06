@@ -23,7 +23,7 @@ from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
 from runagent.utils.config import Config
 from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-from runagent.cli.utils import add_framework_options, get_selected_framework
+from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
 from runagent.utils.enums.framework import Framework
 console = Console()
 
@@ -63,7 +63,6 @@ def config(ctx, set_api_key, set_base_url, register_agent, delete_agent):
     
     \b
     Subcommands:
-      $ runagent config status
       $ runagent config reset
     """
     
@@ -77,8 +76,8 @@ def config(ctx, set_api_key, set_base_url, register_agent, delete_agent):
         return
     
     if register_agent:
-        from .register import register as register_func
-        return register_func(register_agent)
+        from .register import _register_agent_core
+        return _register_agent_core(register_agent)
     
     if delete_agent:
         from .delete import delete as delete_func
@@ -196,16 +195,14 @@ def show_interactive_config_menu():
                     ('Base URL', 'base_url'),
                     ('Active Project', 'project'),
                     ('Sync Settings', 'sync'),
-                    ('View Status', 'status'),
                     ('Reset Configuration', 'reset'),
                 ],
                 carousel=True
             ),
         ]
         
-        answers = inquirer.prompt(questions)
+        answers = safe_prompt(questions, "[dim]Configuration cancelled.[/dim]")
         if not answers:
-            console.print("[dim]Configuration cancelled.[/dim]")
             return
         
         option = answers['config_option']
@@ -219,8 +216,6 @@ def show_interactive_config_menu():
             _interactive_set_project()
         elif option == 'sync':
             _interactive_sync_settings()
-        elif option == 'status':
-            _show_config_status()
         elif option == 'reset':
             _interactive_reset_config()
             
@@ -360,9 +355,8 @@ def _interactive_sync_settings():
             ),
         ]
         
-        answers = inquirer.prompt(questions)
+        answers = safe_prompt(questions, "[dim]Sync configuration cancelled.[/dim]")
         if not answers:
-            console.print("[dim]Sync configuration cancelled.[/dim]")
             return
         
         action = answers['sync_action']
@@ -498,9 +492,8 @@ def _interactive_set_project():
             ),
         ]
         
-        answers = inquirer.prompt(questions)
+        answers = safe_prompt(questions, "[dim]Project selection cancelled.[/dim]")
         if not answers:
-            console.print("[dim]Project selection cancelled.[/dim]")
             return
         
         selected_project_id = answers['project']
@@ -606,12 +599,6 @@ def _interactive_reset_config():
     ))
 
 
-
-
-@config.command("status")
-def config_status_cmd():
-    """Show current configuration status"""
-    _show_config_status()
 
 
 @config.command("reset")
