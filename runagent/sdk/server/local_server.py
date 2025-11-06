@@ -1162,7 +1162,7 @@ class LocalServer:
 
         return endpoints
 
-    def start(self, debug: bool = False):
+    def start(self, debug: bool = False, reload: bool = False):
         """Start the FastAPI server with FIXED middleware sync timing"""
         try:
             # STEP 1: Log server startup to LOCAL database first
@@ -1253,7 +1253,7 @@ class LocalServer:
                 port=self.port,
                 log_level="debug" if debug else "info",
                 access_log=debug,
-                reload=False,  # Disable auto-reload for stability
+                reload=reload,  # Enable auto-reload if requested (useful for development)
             )
 
         except OSError as e:

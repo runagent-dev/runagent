@@ -50,6 +50,7 @@ def format_error_message(error_info):
 @click.option("--port", type=int, help="Preferred port (auto-allocated if unavailable)")
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
+@click.option("--reload", is_flag=True, help="Enable auto-reload on code changes (development mode)")
 @click.option("--replace", help="Replace existing agent with this agent ID")
 @click.option("--no-animation", is_flag=True, help="Skip startup animation")
 @click.option("--animation-style",
@@ -68,7 +69,7 @@ def format_error_message(error_info):
     ),
     default=".",
 )
-def serve(port, host, debug, replace, no_animation, animation_style, path):
+def serve(port, host, debug, reload, replace, no_animation, animation_style, path):
     """Start local FastAPI server"""
 
     try:
@@ -211,7 +212,7 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
             console.print(f"[dim]Note: Could not check middleware sync status: {e}[/dim]")
 
         # Start server (this will block)
-        server.start(debug=debug)
+        server.start(debug=debug, reload=reload)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Server stopped by user[/yellow]")
