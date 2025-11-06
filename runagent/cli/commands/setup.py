@@ -23,7 +23,7 @@ from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
 from runagent.utils.config import Config
 from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-from runagent.cli.utils import add_framework_options, get_selected_framework
+from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
 from runagent.utils.enums.framework import Framework
 console = Console()
 
@@ -65,7 +65,7 @@ def setup(again):
                 f"[dim]User:[/dim] [green]{user_email}[/green]\n"
                 f"[dim]Base URL:[/dim] [cyan]{config_status.get('base_url')}[/cyan]\n\n"
                 "[dim]To reconfigure, run:[/dim] [white]runagent setup --again[/white]\n"
-                "[dim]To view config:[/dim] [white]runagent config status[/white]",
+                "[dim]To view config:[/dim] [white]runagent whoami[/white]",
                 title="[bold]Already Setup[/bold]",
                 border_style="cyan"
             ))
@@ -96,9 +96,8 @@ def setup(again):
             ),
         ]
         
-        answers = inquirer.prompt(questions)
+        answers = safe_prompt(questions, "[dim]Setup cancelled.[/dim]")
         if not answers:
-            console.print("[dim]Setup cancelled.[/dim]")
             return
         
         choice = answers['setup_method']

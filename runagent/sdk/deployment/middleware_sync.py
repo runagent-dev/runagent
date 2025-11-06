@@ -5,6 +5,7 @@ from datetime import datetime
 from rich.console import Console
 from runagent.sdk.rest_client import RestClient
 from runagent.sdk.config import SDKConfig
+from runagent.utils.logging_utils import is_verbose_logging_enabled
 
 console = Console()
 
@@ -60,31 +61,68 @@ class MiddlewareSyncService:
             return False
             
         try:
-            console.print(f"[cyan]Syncing agent {agent_id[:8]}... to middleware...[/cyan]")
+            verbose = is_verbose_logging_enabled()
+            if verbose:
+                console.print(f"[cyan]Syncing agent {agent_id[:8]}... to middleware...[/cyan]")
             
-            sync_data = {
-                "local_agent_id": agent_id,
-                "name": agent_data.get("name", "Local Agent"),
-                "framework": agent_data.get("framework", "unknown"),
-                "version": agent_data.get("version", "1.0.0"),
-                "path": agent_data.get("path", ""),
-                "host": agent_data.get("host", "127.0.0.1"),
-                "port": agent_data.get("port", 8450),
-                "entrypoints": agent_data.get("entrypoints", []),
-                "status": "running",
-                "sync_source": "local_server"
+            # Load full agent config from agent path
+            from pathlib import Path
+            from runagent.utils.agent import get_agent_config
+            from runagent.utils.gitignore import get_filtered_files
+            
+            agent_path = Path(agent_data.get("path", ""))
+            if not agent_path.exists():
+                console.print(f"[red]❌ Agent path not found: {agent_path}[/red]")
+                return False
+            
+            # Get agent config
+            agent_config = get_agent_config(agent_path)
+            
+            # Get filtered file structure respecting .gitignore
+            file_structure = get_filtered_files(agent_path)
+            
+            # Create agent metadata for local sync
+            # Note: env_vars are NOT included for local sync since the agent runs locally
+            # with its own environment variables already configured
+            agent_metadata = {
+                "file_structure": file_structure,
+                "auth_settings": agent_config.auth_settings if hasattr(agent_config, 'auth_settings') else {"type": "none"}
             }
             
-            console.print(f"[dim]Sending POST to /local-agents[/dim]")
-            console.print(f"[dim]Full URL: {self.rest_client.base_url}/local-agents[/dim]")
+            # Get active project ID from user config (same as RestClient._get_project_id)
+            # This ensures we use the user's currently active/selected project
+            project_id = "default"
+            try:
+                from runagent.utils.config import Config
+                user_config = Config.get_user_config()
+                project_id = user_config.get("active_project_id", "default")
+                if not project_id:
+                    project_id = "default"
+            except Exception as e:
+                console.print(f"[yellow]⚠️ Could not get active project ID: {e}, using default[/yellow]")
+                project_id = "default"
+            
+            # Build new payload structure matching updated API
+            sync_data = {
+                "agent_id": agent_id,  # Changed from local_agent_id
+                "config": agent_config.to_dict(),  # Full config with agent_name, framework, version
+                "agent_metadata": agent_metadata,
+                "project_id": project_id
+            }
+            
+            verbose = is_verbose_logging_enabled()
+            if verbose:
+                console.print(f"[dim]Sending POST to /local-agents/create[/dim]")
+                console.print(f"[dim]Full URL: {self.rest_client.base_url}/local-agents/create[/dim]")
             
             # Make direct HTTP call instead of using _make_async_request
             try:
-                response = self.rest_client.http.post("/local-agents", data=sync_data, timeout=30)
+                response = self.rest_client.http.post("/local-agents/create", data=sync_data, timeout=30)
                 result = response.json() if hasattr(response, 'json') else response
                 
-                console.print(f"[cyan]Response status: {response.status_code if hasattr(response, 'status_code') else 'N/A'}[/cyan]")
-                console.print(f"[cyan]Response: {result}[/cyan]")
+                if verbose:
+                    console.print(f"[cyan]Response status: {response.status_code if hasattr(response, 'status_code') else 'N/A'}[/cyan]")
+                    console.print(f"[cyan]Response: {result}[/cyan]")
                 
                 if result.get("success"):
                     console.print("[green]✅ Agent synced successfully[/green]")
@@ -105,81 +143,169 @@ class MiddlewareSyncService:
             return False
 
 
-    async def sync_invocation_start(self, invocation_data: Dict[str, Any]) -> Optional[str]:
-        """Sync invocation start to middleware"""
+    # async def sync_invocation_start(self, invocation_data: Dict[str, Any]) -> Optional[str]:
+    #     """Sync invocation start to middleware"""
+    #     if not self.is_sync_enabled():
+    #         return None
+            
+    #     try:
+    #         verbose = is_verbose_logging_enabled()
+    #         if not verbose:
+    #             # Minimal log in non-verbose mode
+    #             pass
+    #         else:
+    #             console.print(f"[cyan]📡 Syncing invocation start...[/cyan]")
+            
+    #         sync_payload = {
+    #             "agent_id": invocation_data.get("agent_id"),
+    #             "local_execution_id": invocation_data.get("local_execution_id"),
+    #             "input_data": invocation_data.get("input_data", {}),
+    #             "entrypoint_tag": invocation_data.get("entrypoint_tag", ""),
+    #             "sdk_type": invocation_data.get("sdk_type", "local_server"),
+    #             "client_info": invocation_data.get("client_info", {})
+    #         }
+            
+    #         verbose = is_verbose_logging_enabled()
+    #         if verbose:
+    #             console.print(f"[dim]POST to /local-agents/invocations[/dim]")
+            
+    #         response = self.rest_client.http.post("/local-agents/invocations", data=sync_payload, timeout=30)
+    #         result = response.json() if hasattr(response, 'json') else response
+            
+    #         if verbose:
+    #             console.print(f"[cyan]Response: {result}[/cyan]")
+            
+    #         if result.get("success"):
+    #             execution_id = result.get("data", {}).get("id")
+    #             if execution_id:
+    #                 console.print(f"[green]✅ Invocation synced: {execution_id[:8]}...[/green]")
+    #                 return execution_id
+            
+    #         return None
+            
+    #     except Exception as e:
+    #         console.print(f"[red]❌ Invocation sync error: {str(e)}[/red]")
+    #         return None
+
+
+    async def sync_execution(self, agent_id: str, execution_data: Dict[str, Any]) -> bool:
+        """
+        Sync complete execution to middleware using new unified endpoint.
+        
+        Args:
+            agent_id: The agent ID
+            execution_data: Complete execution data including:
+                - local_execution_id: Local invocation ID
+                - entrypoint_tag: Entrypoint tag
+                - status: "completed" or "failed"
+                - started_at: ISO timestamp
+                - completed_at: ISO timestamp
+                - input_data: Input data dict
+                - result_data: Result data (if success)
+                - error_message: Error message (if failed)
+                - execution_metadata: Metadata dict with sdk_type, client_info, runtime_seconds, error_code
+        """
         if not self.is_sync_enabled():
-            return None
-            
-        try:
-            console.print(f"[cyan]📡 Syncing invocation start...[/cyan]")
-            
-            sync_payload = {
-                "agent_id": invocation_data.get("agent_id"),
-                "local_execution_id": invocation_data.get("local_execution_id"),
-                "input_data": invocation_data.get("input_data", {}),
-                "entrypoint_tag": invocation_data.get("entrypoint_tag", ""),
-                "sdk_type": invocation_data.get("sdk_type", "local_server"),
-                "client_info": invocation_data.get("client_info", {})
-            }
-            
-            console.print(f"[dim]POST to /local-agents/invocations[/dim]")
-            
-            response = self.rest_client.http.post("/local-agents/invocations", data=sync_payload, timeout=30)
-            result = response.json() if hasattr(response, 'json') else response
-            
-            console.print(f"[cyan]Response: {result}[/cyan]")
-            
-            if result.get("success"):
-                execution_id = result.get("data", {}).get("id")
-                if execution_id:
-                    console.print(f"[green]✅ Invocation synced: {execution_id[:8]}...[/green]")
-                    return execution_id
-            
-            return None
-            
-        except Exception as e:
-            console.print(f"[red]❌ Invocation sync error: {str(e)}[/red]")
-            return None
-
-
-    async def sync_invocation_complete(self, execution_id: str, completion_data: Dict[str, Any]) -> bool:
-        """Sync invocation completion to middleware"""
-        if not self.is_sync_enabled() or not execution_id:
             return False
             
         try:
-            console.print(f"[cyan]📡 Syncing completion: {execution_id[:8]}...[/cyan]")
+            verbose = is_verbose_logging_enabled()
+            if verbose:
+                console.print(f"[cyan]📡 Syncing execution to middleware...[/cyan]")
             
-            update_payload = {}
+            # Prepare payload according to new API spec
+            payload = {
+                "local_execution_id": execution_data.get("local_execution_id"),
+                "entrypoint_tag": execution_data.get("entrypoint_tag"),
+                "status": execution_data.get("status"),  # "completed" or "failed"
+                "started_at": execution_data.get("started_at"),
+                "completed_at": execution_data.get("completed_at"),
+                "input_data": execution_data.get("input_data", {}),
+                "execution_metadata": execution_data.get("execution_metadata", {})
+            }
             
-            if completion_data.get("output_data"):
-                update_payload["output_data"] = completion_data["output_data"]
+            # Add result_data for successful executions
+            if execution_data.get("status") == "completed" and execution_data.get("result_data"):
+                payload["result_data"] = execution_data.get("result_data")
             
-            if completion_data.get("error_detail"):
-                update_payload["error_detail"] = completion_data["error_detail"]
+            # Add error_message for failed executions
+            if execution_data.get("status") == "failed" and execution_data.get("error_message"):
+                payload["error_message"] = execution_data.get("error_message")
             
-            if completion_data.get("execution_time_ms"):
-                update_payload["execution_time_ms"] = completion_data["execution_time_ms"]
+            if verbose:
+                console.print(f"[dim]POST to /local-agents/{agent_id}/execution[/dim]")
             
-            if completion_data.get("status"):
-                update_payload["status"] = completion_data["status"]
-            
-            console.print(f"[dim]PUT to /local-agents/invocations/{execution_id[:8]}...[/dim]")
-            
-            response = self.rest_client.http.put(f"/local-agents/invocations/{execution_id}", data=update_payload, timeout=30)
+            # Note: RestClient already adds /api/v1 prefix to base_url, so we don't include it here
+            response = self.rest_client.http.post(
+                f"/local-agents/{agent_id}/execution",
+                data=payload,
+                timeout=30
+            )
             result = response.json() if hasattr(response, 'json') else response
             
-            console.print(f"[cyan]Response: {result}[/cyan]")
+            if verbose:
+                console.print(f"[cyan]Response: {result}[/cyan]")
             
             if result.get("success"):
-                console.print(f"[green]✅ Completion synced[/green]")
+                console.print(f"[green]✅ Execution synced to middleware[/green]")
                 return True
             
             return False
             
         except Exception as e:
-            console.print(f"[red]❌ Completion sync error: {str(e)}[/red]")
+            console.print(f"[red]❌ Execution sync error: {str(e)}[/red]")
+            if verbose:
+                import traceback
+                console.print(f"[dim]{traceback.format_exc()}[/dim]")
             return False
+
+
+    # async def sync_invocation_complete(self, execution_id: str, completion_data: Dict[str, Any]) -> bool:
+    #     """DEPRECATED: Use sync_execution instead. Sync invocation completion to middleware"""
+    #     if not self.is_sync_enabled() or not execution_id:
+    #         return False
+            
+    #     try:
+    #         verbose = is_verbose_logging_enabled()
+    #         if not verbose:
+    #             # Minimal log in non-verbose mode  
+    #             pass
+    #         else:
+    #             console.print(f"[cyan]📡 Syncing completion: {execution_id[:8]}...[/cyan]")
+            
+    #         update_payload = {}
+            
+    #         if completion_data.get("output_data"):
+    #             update_payload["output_data"] = completion_data["output_data"]
+            
+    #         if completion_data.get("error_detail"):
+    #             update_payload["error_detail"] = completion_data["error_detail"]
+            
+    #         if completion_data.get("execution_time_ms"):
+    #             update_payload["execution_time_ms"] = completion_data["execution_time_ms"]
+            
+    #         if completion_data.get("status"):
+    #             update_payload["status"] = completion_data["status"]
+            
+    #         verbose = is_verbose_logging_enabled()
+    #         if verbose:
+    #             console.print(f"[dim]PUT to /local-agents/invocations/{execution_id[:8]}...[/dim]")
+            
+    #         response = self.rest_client.http.put(f"/local-agents/invocations/{execution_id}", data=update_payload, timeout=30)
+    #         result = response.json() if hasattr(response, 'json') else response
+            
+    #         if verbose:
+    #             console.print(f"[cyan]Response: {result}[/cyan]")
+            
+    #         if result.get("success"):
+    #             console.print(f"[green]✅ Completion synced[/green]")
+    #             return True
+            
+    #         return False
+            
+    #     except Exception as e:
+    #         console.print(f"[red]❌ Completion sync error: {str(e)}[/red]")
+    #         return False
 
     def get_sync_status(self) -> Dict[str, Any]:
         """Get current sync status with detailed info"""

@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from runagent.cli.branding import print_header
-from runagent.cli.utils import add_framework_options, get_selected_framework
+from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
 from runagent.sdk import RunAgent
 from runagent.sdk.db import DBService
 from runagent.sdk.exceptions import TemplateError
@@ -104,9 +104,8 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 ),
             ]
             
-            start_answer = inquirer.prompt(start_questions)
+            start_answer = safe_prompt(start_questions, "[dim]Initialization cancelled.[/dim]")
             if not start_answer:
-                console.print("[dim]Initialization cancelled.[/dim]")
                 return
             
             start_type = start_answer['start_type']
@@ -138,9 +137,8 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                     ),
                 ]
                 
-                fw_answer = inquirer.prompt(fw_questions)
+                fw_answer = safe_prompt(fw_questions, "[dim]Initialization cancelled.[/dim]")
                 if not fw_answer:
-                    console.print("[dim]Initialization cancelled.[/dim]")
                     return
                 
                 framework = fw_answer['framework']
@@ -244,9 +242,8 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 ),
             ]
             
-            auth_answer = inquirer.prompt(auth_questions)
+            auth_answer = safe_prompt(auth_questions, "[dim]Initialization cancelled.[/dim]")
             if not auth_answer:
-                console.print("[dim]Initialization cancelled.[/dim]")
                 return
             
             auth_type = auth_answer['auth_type']

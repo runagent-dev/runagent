@@ -17,34 +17,20 @@ from runagent.utils.agent_id import generate_config_fingerprint
 console = Console()
 
 
-@click.command()
-@click.argument(
-    "path",
-    type=click.Path(
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        readable=True,
-        resolve_path=True,
-        path_type=Path,
-    ),
-    default=".",
-)
-def register(path: Path):
+def _register_agent_core(agent_path: Path):
     """
-    Register a modified agent in the database.
+    Core logic for registering an agent (can be called directly or via Click command).
     
-    This command is useful when:
+    This function is useful when:
     - You manually modified the agent_id in runagent.config.json
     - The agent_id in config doesn't exist in the database
     - You want to register an agent that was created outside of runagent init
     """
-    
     try:
         print_header("Register Agent")
         
         # Resolve path
-        agent_path = path.resolve()
+        agent_path = agent_path.resolve()
         
         # Check if runagent.config.json exists
         config_path = agent_path / "runagent.config.json"
@@ -163,3 +149,21 @@ def register(path: Path):
             raise
         console.print(f"❌ [red]Registration error:[/red] {e}")
         raise click.ClickException("Agent registration failed")
+
+
+@click.command()
+@click.argument(
+    "path",
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+    default=".",
+)
+def register(path: Path):
+    """Register a modified agent in the database."""
+    _register_agent_core(path)

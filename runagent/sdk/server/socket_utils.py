@@ -84,10 +84,11 @@ class AgentWebSocketHandler:
         db_service
     ):
         """Handle streaming execution with proper chunk serialization"""
+        # Import datetime at function start to avoid scoping issues
+        from datetime import datetime as dt
         await websocket.accept()
         
         invocation_id = None
-        middleware_invocation_id = None
         
         try:
             # Wait for start message
@@ -154,55 +155,22 @@ class AgentWebSocketHandler:
             
             console.print(f"Started invocation: Invocation ID = {invocation_id}")
             
-            # Sync invocation start to middleware
-            if (hasattr(self, 'middleware_sync') and 
-                self.middleware_sync and 
-                self.middleware_sync.is_sync_enabled()):
-                
-                try:
-                    console.print(f"Syncing invocation start to middleware...")
-                    
-                    sync_payload = {
-                        "agent_id": agent_id,
-                        "local_execution_id": invocation_id,
-                        "input_data": {
-                            "input_args": input_args,
-                            "input_kwargs": input_kwargs
-                        },
-                        "entrypoint_tag": entrypoint_tag,
-                        "sdk_type": "websocket_stream",
-                        "client_info": {
-                            "connection_type": "websocket",
-                            "stream_mode": True,
-                            "server_host": "127.0.0.1",
-                            "server_port": 8450
-                        }
-                    }
-                    
-                    middleware_invocation_id = await self.middleware_sync.sync_invocation_start(sync_payload)
-                    
-                    if middleware_invocation_id:
-                        console.print(f"Middleware invocation started: {middleware_invocation_id}")
-                        
-                except Exception as e:
-                    console.print(f"Middleware sync start failed: {e}")
-            
             # Send stream started status
             await websocket.send_json({
                 "type": "status",
                 "status": "stream_started",
-                "invocation_id": invocation_id,
-                "middleware_invocation_id": middleware_invocation_id
+                "invocation_id": invocation_id
             })
             
             start_time = time.time()
             chunk_count = 0
-            stream_output_data = []
+            stream_output_data = []  # Store chunks with timestamps: [(chunk_data, timestamp), ...]
             
             # Run the streaming function
             try:
                 async for chunk in stream_runner(*input_args, **input_kwargs):
                     chunk_count += 1
+                    chunk_timestamp = dt.now().isoformat() + "Z"
                     
                     # Convert chunk to serializable format
                     try:
@@ -216,10 +184,10 @@ class AgentWebSocketHandler:
                             "chunk_str": str(chunk)[:200]
                         }
                     
-                    # Store chunk for final output tracking (limit to prevent memory issues)
+                    # Store chunk with timestamp for final output tracking (limit to prevent memory issues)
                     if chunk_count <= 5000:
                         try:
-                            stream_output_data.append(serializable_chunk)
+                            stream_output_data.append((serializable_chunk, chunk_timestamp))
                         except Exception as e:
                             console.print(f"Warning: Could not store chunk {chunk_count}: {e}")
                     
@@ -245,11 +213,14 @@ class AgentWebSocketHandler:
                 
                 # Complete LOCAL invocation tracking
                 try:
+                    # Extract just the chunk data (without timestamps) for local DB storage
+                    sample_chunks_data = [chunk_data for chunk_data, _ in stream_output_data[:10]] if stream_output_data else []
+                    
                     final_output_data = {
                         "stream_completed": True,
                         "total_chunks": chunk_count,
                         "execution_type": "streaming",
-                        "sample_chunks": stream_output_data[:10] if stream_output_data else [],
+                        "sample_chunks": sample_chunks_data,
                         "execution_time_seconds": execution_time,
                         "chunk_summary": {
                             "total_chunks": chunk_count,
@@ -268,29 +239,81 @@ class AgentWebSocketHandler:
                 except Exception as e:
                     console.print(f"Failed to complete local invocation: {e}")
                 
-                # Sync completion to middleware
-                if middleware_invocation_id and self.middleware_sync:
+                # Sync complete execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled()):
+                    
                     try:
-                        console.print(f"Syncing completion to middleware...")
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        # datetime is already imported at top of file
+                        if is_verbose_logging_enabled():
+                            console.print(f"Syncing streaming execution to middleware...")
                         
-                        completion_data = {
-                            "output_data": final_output_data,
-                            "execution_time_ms": execution_time * 1000,
-                            "status": "completed"
+                        # Wrap result_data to match remote streaming execution format
+                        # Format: { "stream_chunks": [...], "total_chunks": N, "execution_type": "stream", ... }
+                        # stream_output_data contains tuples: (chunk_data, timestamp)
+                        stream_chunks = []
+                        
+                        # Convert chunks to stream_chunks format matching remote execution format
+                        # Each item in stream_output_data is a tuple: (chunk_data, timestamp)
+                        for idx, chunk_item in enumerate(stream_output_data, 1):
+                            if isinstance(chunk_item, tuple) and len(chunk_item) == 2:
+                                chunk_data, chunk_timestamp = chunk_item
+                            else:
+                                # Fallback for old format (if any chunks don't have timestamps)
+                                chunk_data = chunk_item
+                                chunk_timestamp = dt.now().isoformat() + "Z"
+                            
+                            stream_chunks.append({
+                                "chunk_id": f"chunk_{idx}",
+                                "data": chunk_data,
+                                "timestamp": chunk_timestamp
+                            })
+                        
+                        # Wrap in standard streaming format matching remote executions
+                        result_data_dict = {
+                            "stream_chunks": stream_chunks,
+                            "total_chunks": chunk_count,
+                            "execution_type": "stream",
+                            "completed_at": dt.now().isoformat() + "Z",
+                            "runtime_seconds": execution_time
                         }
                         
-                        sync_success = await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            completion_data
-                        )
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": entrypoint_tag,
+                            "status": "completed",
+                            "started_at": dt.fromtimestamp(start_time).isoformat() + "Z",
+                            "completed_at": dt.fromtimestamp(time.time()).isoformat() + "Z",
+                            "input_data": {
+                                "input_args": input_args,
+                                "input_kwargs": input_kwargs
+                            },
+                            "result_data": result_data_dict,
+                            "execution_metadata": {
+                                "sdk_type": "websocket_stream",
+                                "client_info": {
+                                    "connection_type": "websocket",
+                                    "stream_mode": True,
+                                    "server_host": "127.0.0.1",
+                                    "server_port": 8450
+                                },
+                                "runtime_seconds": execution_time
+                            }
+                        }
+                        
+                        sync_success = await self.middleware_sync.sync_execution(agent_id, execution_data)
                         
                         if sync_success:
-                            console.print(f"Middleware completion synced successfully")
+                            console.print(f"✅ Streaming execution synced to middleware successfully")
                         else:
-                            console.print(f"Middleware completion sync failed")
+                            console.print(f"⚠️ Middleware sync returned False")
                             
                     except Exception as e:
-                        console.print(f"Middleware sync completion error: {e}")
+                        console.print(f"❌ Middleware sync error: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # Send completion status
                 await websocket.send_json({
@@ -298,8 +321,7 @@ class AgentWebSocketHandler:
                     "status": "stream_completed",
                     "total_chunks": chunk_count,
                     "execution_time": execution_time,
-                    "invocation_id": invocation_id,
-                    "middleware_synced": middleware_invocation_id is not None
+                    "invocation_id": invocation_id
                 })
                 
             except Exception as stream_error:
@@ -307,7 +329,13 @@ class AgentWebSocketHandler:
                 execution_time = time.time() - start_time
                 error_detail = f"Streaming error: {str(stream_error)}"
                 
+                # Always print error details, and include traceback if verbose logging is enabled
                 console.print(f"Stream execution failed: {error_detail}")
+                from runagent.utils.logging_utils import is_verbose_logging_enabled
+                if is_verbose_logging_enabled():
+                    import traceback
+                    console.print(f"[red]Full traceback:[/red]")
+                    console.print(f"[dim]{traceback.format_exc()}[/dim]")
                 
                 # Complete LOCAL invocation with error
                 self.db_service.complete_invocation(
@@ -316,25 +344,63 @@ class AgentWebSocketHandler:
                     execution_time_ms=execution_time * 1000
                 )
                 
-                # Sync error to middleware
-                if middleware_invocation_id and self.middleware_sync:
+                # Sync failed execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled()):
+                    
                     try:
-                        console.print(f"Syncing error to middleware...")
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        # datetime is already imported at top of file
+                        if is_verbose_logging_enabled():
+                            console.print(f"Syncing failed streaming execution to middleware...")
                         
-                        error_data = {
-                            "error_detail": error_detail,
-                            "execution_time_ms": execution_time * 1000,
-                            "status": "failed"
+                        # Extract error code from exception if available
+                        error_code = "EXECUTION_ERROR"
+                        if isinstance(stream_error, Exception):
+                            error_type = type(stream_error).__name__
+                            if "ValidationError" in error_type:
+                                error_code = "VALIDATION_ERROR"
+                            elif "ConnectionError" in error_type:
+                                error_code = "CONNECTION_ERROR"
+                            elif "TimeoutError" in error_type:
+                                error_code = "TIMEOUT_ERROR"
+                        
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": entrypoint_tag,
+                            "status": "failed",
+                            "started_at": dt.fromtimestamp(start_time).isoformat() + "Z",
+                            "completed_at": dt.fromtimestamp(time.time()).isoformat() + "Z",
+                            "input_data": {
+                                "input_args": input_args,
+                                "input_kwargs": input_kwargs
+                            },
+                            "error_message": error_detail,
+                            "execution_metadata": {
+                                "sdk_type": "websocket_stream",
+                                "client_info": {
+                                    "connection_type": "websocket",
+                                    "stream_mode": True,
+                                    "server_host": "127.0.0.1",
+                                    "server_port": 8450
+                                },
+                                "runtime_seconds": execution_time,
+                                "error_code": error_code
+                            }
                         }
                         
-                        await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            error_data
-                        )
-                        console.print(f"Middleware error synced")
+                        sync_success = await self.middleware_sync.sync_execution(agent_id, execution_data)
+                        
+                        if sync_success:
+                            console.print(f"✅ Failed streaming execution synced to middleware")
+                        else:
+                            console.print(f"⚠️ Middleware sync returned False")
                         
                     except Exception as sync_error:
-                        console.print(f"Middleware sync error failed: {sync_error}")
+                        console.print(f"❌ Middleware sync error failed: {sync_error}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # Send error to client
                 await websocket.send_text(json.dumps({
@@ -351,18 +417,43 @@ class AgentWebSocketHandler:
                     execution_time_ms=0
                 )
                 
-                if middleware_invocation_id and self.middleware_sync:
+                # Sync cancelled execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled() and
+                    invocation_id):
+                    
                     try:
-                        await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            {
-                                "error_detail": "WebSocket disconnected",
-                                "execution_time_ms": 0,
-                                "status": "cancelled"
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        from datetime import datetime
+                        
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": entrypoint_tag if 'entrypoint_tag' in locals() else "unknown",
+                            "status": "failed",
+                            "started_at": dt.fromtimestamp(start_time).isoformat() + "Z" if 'start_time' in locals() else dt.now().isoformat() + "Z",
+                            "completed_at": dt.now().isoformat() + "Z",
+                            "input_data": {
+                                "input_args": input_args if 'input_args' in locals() else [],
+                                "input_kwargs": input_kwargs if 'input_kwargs' in locals() else {}
+                            },
+                            "error_message": "WebSocket disconnected",
+                            "execution_metadata": {
+                                "sdk_type": "websocket_stream",
+                                "client_info": {
+                                    "connection_type": "websocket",
+                                    "stream_mode": True,
+                                    "server_host": "127.0.0.1",
+                                    "server_port": 8450
+                                },
+                                "runtime_seconds": 0,
+                                "error_code": "WEBSOCKET_DISCONNECTED"
                             }
-                        )
+                        }
+                        
+                        await self.middleware_sync.sync_execution(agent_id, execution_data)
                     except Exception as e:
-                        console.print(f"Failed to sync disconnection: {e}")
+                        console.print(f"❌ Failed to sync disconnection: {e}")
         
         except Exception as e:
             console.print(f"WebSocket handler error: {e}")
@@ -373,16 +464,41 @@ class AgentWebSocketHandler:
                     execution_time_ms=0
                 )
                 
-                if middleware_invocation_id and self.middleware_sync:
+                # Sync failed execution to middleware using new unified endpoint
+                if (hasattr(self, 'middleware_sync') and 
+                    self.middleware_sync and 
+                    self.middleware_sync.is_sync_enabled() and
+                    invocation_id):
+                    
                     try:
-                        await self.middleware_sync.sync_invocation_complete(
-                            middleware_invocation_id,
-                            {
-                                "error_detail": str(e),
-                                "execution_time_ms": 0,
-                                "status": "failed"
+                        from runagent.utils.logging_utils import is_verbose_logging_enabled
+                        from datetime import datetime
+                        
+                        execution_data = {
+                            "local_execution_id": invocation_id,
+                            "entrypoint_tag": entrypoint_tag if 'entrypoint_tag' in locals() else "unknown",
+                            "status": "failed",
+                            "started_at": dt.fromtimestamp(start_time).isoformat() + "Z" if 'start_time' in locals() else dt.now().isoformat() + "Z",
+                            "completed_at": dt.now().isoformat() + "Z",
+                            "input_data": {
+                                "input_args": input_args if 'input_args' in locals() else [],
+                                "input_kwargs": input_kwargs if 'input_kwargs' in locals() else {}
+                            },
+                            "error_message": str(e),
+                            "execution_metadata": {
+                                "sdk_type": "websocket_stream",
+                                "client_info": {
+                                    "connection_type": "websocket",
+                                    "stream_mode": True,
+                                    "server_host": "127.0.0.1",
+                                    "server_port": 8450
+                                },
+                                "runtime_seconds": 0,
+                                "error_code": "HANDLER_ERROR"
                             }
-                        )
+                        }
+                        
+                        await self.middleware_sync.sync_execution(agent_id, execution_data)
                     except Exception as sync_error:
                         console.print(f"Failed to sync handler error: {sync_error}")
 

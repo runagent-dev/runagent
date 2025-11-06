@@ -18,6 +18,7 @@ from .commands.serve import serve as serve_cmd
 from .commands.run import run as run_cmd
 from .commands.run_stream import run_stream as run_stream_cmd
 from .commands.db import db as db_cmd
+from .commands.whoami import whoami as whoami_cmd
 
 if not os.getenv('DISABLE_TRY_CATCH'):
     warnings.filterwarnings(
@@ -71,7 +72,8 @@ runagent.add_command(deploy_cmd)
 runagent.add_command(serve_cmd)
 runagent.add_command(run_cmd)
 runagent.add_command(run_stream_cmd)
-runagent.add_command(db_cmd) 
+runagent.add_command(db_cmd)
+runagent.add_command(whoami_cmd) 
 
 if __name__ == "__main__":
     runagent()

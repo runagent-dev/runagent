@@ -72,8 +72,12 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
     """Start local FastAPI server"""
 
     try:
-        from runagent.cli.branding import print_header
+        from runagent.cli.branding import print_header, show_simple_serve_progress
         print_header("Serve Agent Locally")
+        
+        # Show subtle progress animation (unless disabled)
+        if not no_animation:
+            show_simple_serve_progress("Initializing server")
         
         sdk = RunAgent()
         
@@ -153,15 +157,20 @@ def serve(port, host, debug, replace, no_animation, animation_style, path):
                 raise click.ClickException("Database at capacity. Use --replace or use 'runagent delete' to free space.")
             
             console.print("[bold]Starting local server with auto port allocation...[/bold]")
-            
-            # Use the existing LocalServer.from_path method
-            server = LocalServer.from_path(path, port=port, host=host)
+        
+        # Show progress while creating server
+        if not no_animation:
+            show_simple_serve_progress("Creating server instance")
+        
+        # Use the existing LocalServer.from_path method
+        server = LocalServer.from_path(path, port=port, host=host)
         
         # Common server startup code
         allocated_host = server.host
         allocated_port = server.port
         
-        console.print(f"URL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
+        # Show server info
+        console.print(f"\nURL: [bold blue]http://{allocated_host}:{allocated_port}[/bold blue]")
         console.print(f"Docs: [link]http://{allocated_host}:{allocated_port}/docs[/link]")
 
         try:

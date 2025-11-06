@@ -111,3 +111,90 @@ def print_setup_banner():
     print_logo(show_tagline=False, brand_color="cyan")
     console.print("[bold cyan]                    🎉 Welcome to RunAgent! 🎉[/bold cyan]")
     console.print("[dim]                Let's get you set up in a few steps...[/dim]\n")
+
+
+def show_serve_progress(steps: list = None):
+    """
+    Show a subtle progress animation for server startup
+    
+    Args:
+        steps: List of (message, completed) tuples showing progress steps
+    """
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+    from rich.live import Live
+    from rich.text import Text
+    import time
+    
+    default_steps = [
+        "Initializing server",
+        "Loading agent configuration",
+        "Setting up endpoints",
+        "Starting FastAPI server",
+    ]
+    
+    steps_to_show = steps if steps else default_steps
+    total_steps = len(steps_to_show)
+    
+    # Create progress bar with RunAgent branding colors
+    progress = Progress(
+        SpinnerColumn(spinner_style="cyan"),
+        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
+        BarColumn(bar_width=30, style="cyan", complete_style="bold cyan"),
+        TextColumn("[dim]{task.percentage:>3.0f}%[/dim]"),
+        console=console,
+        transient=True,  # This will auto-clear when done
+    )
+    
+    with progress:
+        task = progress.add_task("Starting server...", total=100)
+        
+        for i, step in enumerate(steps_to_show):
+            # Update progress
+            progress.update(task, description=f"[cyan]{step}...[/cyan]", completed=int((i + 1) / total_steps * 100))
+            time.sleep(0.3)  # Brief pause for each step
+        
+        # Complete
+        progress.update(task, completed=100, description="[bold green]Server ready![/bold green]")
+
+
+def show_simple_serve_progress(message: str = "Starting server..."):
+    """
+    Show a simple, controlled progress indicator that doesn't clear terminal.
+    Uses a spinner with RunAgent branding colors, then updates to static message.
+    
+    Args:
+        message: Message to display
+    """
+    from rich.status import Status
+    from rich.live import Live
+    from rich.text import Text
+    import time
+    
+    # Create status with RunAgent branding - use spinner name as string
+    status = Status(
+        f"[bold cyan]{message}[/bold cyan]",
+        spinner="dots",
+        console=console,
+    )
+    
+    with Live(
+        status,
+        console=console,
+        refresh_per_second=12,
+        transient=False,  # Don't clear - convert to static message
+    ) as live:
+        # Show spinner for brief moment
+        time.sleep(0.7)
+        
+        # Update to static completion message that stays visible
+        # Clean up the message for completion display
+        completion_text = message.replace("...", "").strip()
+        if "ing " in completion_text:
+            # Convert "Initializing" -> "Initialized", "Creating" -> "Created", etc.
+            completion_text = completion_text.replace("ing ", "ed ")
+        elif not completion_text.endswith("ed"):
+            # Add "completed" if it doesn't end with past tense
+            completion_text = f"{completion_text} completed"
+        
+        live.update(Text.from_markup(f"[bold green]✅ {completion_text}[/bold green]"))
+        time.sleep(0.15)
