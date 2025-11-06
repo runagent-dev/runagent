@@ -1045,85 +1045,29 @@ class DBService:
         framework: str = None,
     ) -> Dict:
         """
-        Replace an existing agent with a new one
+        DEPRECATED: Agent IDs are immutable and cannot be replaced.
+        This method is disabled to maintain data integrity.
+        
+        Agent IDs are UUIDs generated at creation time and should never be modified.
+        To use a different agent, create a new agent with 'runagent init' or 'runagent serve'.
 
         Args:
-            old_agent_id: Agent ID to replace
-            new_agent_id: New agent ID
-            agent_path: Path to agent directory
-            host: Host address
-            port: Port number
-            framework: Framework type
+            old_agent_id: Agent ID to replace (deprecated)
+            new_agent_id: New agent ID (deprecated)
+            agent_path: Path to agent directory (deprecated)
+            host: Host address (deprecated)
+            port: Port number (deprecated)
+            framework: Framework type (deprecated)
 
         Returns:
-            Dictionary with success status and details
+            Dictionary with error indicating this operation is not allowed
         """
-        if not old_agent_id or not new_agent_id or not agent_path:
-            return {
-                "success": False,
-                "error": "Missing required fields",
-                "code": "INVALID_INPUT",
-            }
-
-        with self.db_manager.get_session() as session:
-            try:
-                # Check if old agent exists
-                old_agent = (
-                    session.query(Agent).filter(Agent.agent_id == old_agent_id).first()
-                )
-                if not old_agent:
-                    return {
-                        "success": False,
-                        "error": f"Agent {old_agent_id} not found for replacement",
-                        "code": "AGENT_NOT_FOUND",
-                    }
-
-                # Check if new agent ID already exists
-                existing_new_agent = (
-                    session.query(Agent).filter(Agent.agent_id == new_agent_id).first()
-                )
-                if existing_new_agent:
-                    return {
-                        "success": False,
-                        "error": f"New agent ID {new_agent_id} already exists",
-                        "code": "NEW_AGENT_EXISTS",
-                    }
-
-                # Update the existing record
-                old_agent.agent_id = new_agent_id
-                old_agent.agent_path = str(agent_path)
-                old_agent.host = host
-                old_agent.port = port
-                old_agent.framework = framework
-                old_agent.deployed_at = func.current_timestamp()
-                old_agent.updated_at = func.current_timestamp()
-                old_agent.status = "deployed"
-                old_agent.run_count = 0
-                old_agent.success_count = 0
-                old_agent.error_count = 0
-
-                # Update run records to point to new agent ID
-                session.query(AgentRun).filter(
-                    AgentRun.agent_id == old_agent_id
-                ).update({"agent_id": new_agent_id})
-
-                session.commit()
-
-                return {
-                    "success": True,
-                    "message": f"Agent {old_agent_id} replaced with {new_agent_id}",
-                    "old_agent_id": old_agent_id,
-                    "new_agent_id": new_agent_id,
-                    "operation": "replace",
-                }
-
-            except Exception as e:
-                session.rollback()
-                return {
-                    "success": False,
-                    "error": f"Replacement failed: {str(e)}",
-                    "code": "REPLACE_ERROR",
-                }
+        return {
+            "success": False,
+            "error": "Agent ID replacement is not allowed. Agent IDs are immutable UUIDs generated at creation time.",
+            "code": "IMMUTABLE_AGENT_ID",
+            "message": "To use a different agent, create a new agent with 'runagent init' or 'runagent serve'."
+        }
 
     def delete_agent(self, agent_id: str) -> bool:
         """
@@ -1138,7 +1082,7 @@ class DBService:
         console.print(
             f"⚠️ Agent deletion is disabled. Agent {agent_id} cannot be deleted from database."
         )
-        console.print(f"💡 Use 'replace_agent()' to replace this agent with a new one.")
+        console.print(f"💡 Each agent has a unique immutable ID. Create a new agent with 'runagent init' or 'runagent serve'.")
         return False
 
     def get_database_capacity_info(self) -> Dict:
