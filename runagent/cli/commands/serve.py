@@ -51,7 +51,6 @@ def format_error_message(error_info):
 @click.option("--host", default="127.0.0.1", help="Host to bind server to")
 @click.option("--debug", is_flag=True, help="Run server in debug mode")
 @click.option("--reload", is_flag=True, help="Enable auto-reload on code changes (development mode)")
-@click.option("--replace", help="Replace existing agent with this agent ID")
 @click.option("--no-animation", is_flag=True, help="Skip startup animation")
 @click.option("--animation-style",
               type=click.Choice(["field", "ascii", "minimal", "quick"]),
@@ -69,7 +68,7 @@ def format_error_message(error_info):
     ),
     default=".",
 )
-def serve(port, host, debug, reload, replace, no_animation, animation_style, path):
+def serve(port, host, debug, reload, no_animation, animation_style, path):
     """Start local FastAPI server"""
 
     try:
@@ -82,82 +81,17 @@ def serve(port, host, debug, reload, replace, no_animation, animation_style, pat
         
         sdk = RunAgent()
         
-        # Handle replace operation
-        if replace:
-            console.print(f"[yellow]Replacing agent: {replace}[/yellow]")
-            
-            # Check if the agent to replace exists
-            existing_agent = sdk.db_service.get_agent(replace)
-            if not existing_agent:
-                console.print(f"[yellow]Agent {replace} not found in database[/yellow]")
-                console.print("Available agents:")
-                agents = sdk.db_service.list_agents()
-                for agent in agents[:5]:  # Show first 5
-                    console.print(f"   • {agent['agent_id']} ({agent['framework']})")
-                raise click.ClickException("Agent to replace not found")
-            
-            # Generate new agent ID
-            import uuid
-            new_agent_id = str(uuid.uuid4())
-            
-            # Get currently used ports to avoid conflicts
-            used_ports = []
-            all_agents = sdk.db_service.list_agents()
-            for agent in all_agents:
-                if agent.get('port') and agent['agent_id'] != replace:  # Exclude the agent being replaced
-                    used_ports.append(agent['port'])
-            
-            # Allocate host and port
-            from runagent.utils.port import PortManager
-            if port and PortManager.is_port_available(host, port):
-                allocated_host = host
-                allocated_port = port
-                console.print(f"Using specified address: [blue]{allocated_host}:{allocated_port}[/blue]")
-            else:
-                allocated_host, allocated_port = PortManager.allocate_unique_address(used_ports)
-                console.print(f"Auto-allocated address: [blue]{allocated_host}:{allocated_port}[/blue]")
-            
-            # Use the existing replace_agent method with proper port allocation
-            result = sdk.db_service.replace_agent(
-                old_agent_id=replace,
-                new_agent_id=new_agent_id,
-                agent_path=str(path),
-                host=allocated_host,
-                port=allocated_port,  # Ensure port is not None
-                framework=detect_framework(path).value,
-            )
-            
-            if not result["success"]:
-                raise click.ClickException(f"Failed to replace agent: {result['error']}")
-            
-            console.print(f"✅ [green]Agent replaced successfully![/green]")
-            console.print(f"New Agent ID: [bold magenta]{new_agent_id}[/bold magenta]")
-            console.print(f"Address: [bold blue]{allocated_host}:{allocated_port}[/bold blue]")
-            
-            # Create server with the new agent ID and allocated host/port
-            from runagent.sdk.db import DBService
-            db_service = DBService()
-            
-            server = LocalServer(
-                db_service=db_service,
-                agent_id=new_agent_id,
-                agent_path=path,
-                port=allocated_port,
-                host=allocated_host,
-            )
-        else:
-            # Normal operation - check capacity if not replacing
-            capacity_info = sdk.db_service.get_database_capacity_info()
-            if capacity_info["is_full"] and not replace:
-                console.print("❌ [red]Database is full![/red]")
-                oldest_agent = capacity_info.get("oldest_agent", {})
-                if oldest_agent:
-                    console.print(f"[yellow]Suggested commands:[/yellow]")
-                    console.print(f"   Replace: [cyan]runagent serve {path} --replace {oldest_agent.get('agent_id', '')}[/cyan]")
-                    console.print(f"   Delete:  [cyan]runagent delete --id {oldest_agent.get('agent_id', '')}[/cyan]")
-                raise click.ClickException("Database at capacity. Use --replace or use 'runagent delete' to free space.")
-            
-            console.print("[bold]Starting local server with auto port allocation...[/bold]")
+        # Check capacity
+        capacity_info = sdk.db_service.get_database_capacity_info()
+        if capacity_info["is_full"]:
+            console.print("❌ [red]Database is full![/red]")
+            oldest_agent = capacity_info.get("oldest_agent", {})
+            if oldest_agent:
+                console.print(f"[yellow]Suggested command:[/yellow]")
+                console.print(f"   Delete:  [cyan]runagent delete --id {oldest_agent.get('agent_id', '')}[/cyan]")
+            raise click.ClickException("Database at capacity. Use 'runagent delete' to free space.")
+        
+        console.print("[bold]Starting local server with auto port allocation...[/bold]")
         
         # Show progress while creating server
         if not no_animation:
