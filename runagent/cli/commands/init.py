@@ -379,9 +379,13 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
         # Simple next steps
         console.print("\n[bold]Next Steps:[/bold]")
         if relative_path != Path("."):
-            console.print(f"   1. [cyan]cd {relative_path}[/cyan]")
+            path_str = str(relative_path)
+            console.print(f"   1. [cyan]cd {path_str}[/cyan]")
             console.print(f"   2. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
             console.print(f"   3. Serve locally: [cyan]runagent serve .[/cyan]")
+            console.print(
+                f"      (or run [cyan]runagent serve {path_str}[/cyan] from the current directory)"
+            )
         else:
             console.print(f"   1. Install dependencies: [cyan]pip install -r requirements.txt[/cyan]")
             console.print(f"   2. Serve locally: [cyan]runagent serve .[/cyan]")

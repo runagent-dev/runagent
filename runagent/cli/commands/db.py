@@ -52,76 +52,10 @@ def db():
 @db.command()
 @click.option("--cleanup-days", type=int, help="Clean up records older than N days")
 @click.option("--agent-id", help="Show detailed info for specific agent")
-@click.option("--capacity", is_flag=True, help="Show detailed capacity information")
-def status(cleanup_days, agent_id, capacity):
+def status(cleanup_days, agent_id):
     """Show local database status and statistics (ENHANCED with invocation stats)"""
     try:
         sdk = RunAgent()
-
-        if capacity:
-            # Show detailed capacity info
-            capacity_info = sdk.db_service.get_database_capacity_info()
-
-            console.print(f"\n[bold]Database Capacity Information[/bold]")
-            console.print(
-                f"Current: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents"
-            )
-            console.print(
-                f"Remaining slots: [green]{capacity_info.get('remaining_slots', 0)}[/green]"
-            )
-
-            status = "[red]FULL[/red]" if capacity_info.get("is_full") else "[green]Available[/green]"
-            console.print(f"Status: {status}")
-
-            agents = capacity_info.get("agents", [])
-            if agents:
-                console.print(f"\n[bold]Deployed Agents (by age):[/bold]")
-                
-                # Create table for agents
-                table = Table(title="Agents by Deployment Age")
-                table.add_column("#", style="dim", width=3)
-                table.add_column("Status", width=8)
-                table.add_column("Agent ID", style="magenta", width=36)
-                table.add_column("Framework", style="green", width=12)
-                table.add_column("Deployed At", style="cyan", width=20)
-                table.add_column("Age Note", style="yellow", width=10)
-                
-                for i, agent in enumerate(agents):
-                    status_text = (
-                        "[green]deployed[/green]"
-                        if agent["status"] == "deployed"
-                        else "[red]error[/red]" if agent["status"] == "error" else "[yellow]other[/yellow]"
-                    )
-                    age_label = (
-                        "oldest"
-                        if i == 0
-                        else "newest" if i == len(agents) - 1 else ""
-                    )
-                    
-                    table.add_row(
-                        str(i+1),
-                        status_text,
-                        agent['agent_id'],
-                        agent['framework'],
-                        agent['deployed_at'] or "Unknown",
-                        age_label
-                    )
-                
-                console.print(table)
-
-            if capacity_info.get("is_full"):
-                oldest = capacity_info.get("oldest_agent", {})
-                console.print(
-                    f"\n[yellow]To deploy new agent, replace oldest:[/yellow]"
-                )
-                console.print(
-                    f"   [cyan]runagent serve --folder <path> --replace {oldest.get('agent_id', '')}[/cyan]"
-                )
-                console.print(
-                    f"   [cyan]runagent delete --id {oldest.get('agent_id', '')}[/cyan]"
-                )
-
-            return
 
         if agent_id:
             # Show agent-specific details including invocations
@@ -143,19 +77,11 @@ def status(cleanup_days, agent_id, capacity):
 
         # Show general database stats
         stats = sdk.db_service.get_database_stats()
-        capacity_info = sdk.db_service.get_database_capacity_info()
 
         console.print("\n[bold]Local Database Status[/bold]")
 
-        current_count = capacity_info.get("current_count", 0)
-        is_full = capacity_info.get("is_full", False)
-        status = "FULL" if is_full else "OK"
-        console.print(
-            f"Agent Capacity: [cyan]{current_count}/5[/cyan] agents ([red]{status}[/red])"
-            if is_full
-            else f"Agent Capacity: [cyan]{current_count}/5[/cyan] agents ([green]{status}[/green])"
-        )
-
+        total_agents = stats.get("total_agents", 0)
+        console.print(f"Total Agents: [cyan]{total_agents}[/cyan]")
         console.print(f"Total Agent Runs: [cyan]{stats.get('total_runs', 0)}[/cyan]")
         console.print(
             f"Database Size: [yellow]{stats.get('database_size_mb', 0)} MB[/yellow]"
@@ -235,7 +161,7 @@ def status(cleanup_days, agent_id, capacity):
         console.print(f"   • [cyan]runagent db invocation <id>[/cyan] - Show specific invocation")
         console.print(f"   • [cyan]runagent db cleanup[/cyan] - Clean up old records")
         console.print(f"   • [cyan]runagent db status --agent-id <id>[/cyan] - Agent-specific info")
-        console.print(f"   • [cyan]runagent db status --capacity[/cyan] - Capacity management info")
+        console.print(f"   • [cyan]runagent db status --agent-id <id>[/cyan] - Agent-specific info")
 
         # Cleanup if requested (keep existing logic)
         if cleanup_days:

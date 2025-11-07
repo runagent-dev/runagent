@@ -104,10 +104,6 @@ def delete(agent_id, yes):
         
         if result["success"]:
             console.print(f"\n✅ [green]Agent {agent_id} deleted successfully![/green]")
-            
-            # Show updated capacity
-            capacity_info = sdk.db_service.get_database_capacity_info()
-            console.print(f"Updated capacity: [cyan]{capacity_info.get('current_count', 0)}/5[/cyan] agents")
         else:
             console.print(f"❌ [red]Failed to delete agent:[/red] {format_error_message(result.get('error'))}")
             import sys

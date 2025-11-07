@@ -11,7 +11,6 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from runagent import RunAgent
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
     TemplateError,
@@ -78,18 +77,6 @@ def serve(port, host, debug, reload, no_animation, animation_style, path):
         # Show subtle progress animation (unless disabled)
         if not no_animation:
             show_simple_serve_progress("Initializing server")
-        
-        sdk = RunAgent()
-        
-        # Check capacity
-        capacity_info = sdk.db_service.get_database_capacity_info()
-        if capacity_info["is_full"]:
-            console.print("❌ [red]Database is full![/red]")
-            oldest_agent = capacity_info.get("oldest_agent", {})
-            if oldest_agent:
-                console.print(f"[yellow]Suggested command:[/yellow]")
-                console.print(f"   Delete:  [cyan]runagent delete --id {oldest_agent.get('agent_id', '')}[/cyan]")
-            raise click.ClickException("Database at capacity. Use 'runagent delete' to free space.")
         
         console.print("[bold]Starting local server with auto port allocation...[/bold]")
         
