@@ -198,16 +198,6 @@ class AgentRunResponseV2(BaseModel):
     request_id: str
 
 
-class CapacityInfo(BaseModel):
-    """Database capacity information"""
-
-    current_count: int
-    max_capacity: int
-    remaining_slots: int
-    is_full: bool
-    agents: t.List[t.Dict[str, t.Any]]
-
-
 class AgentInfo(BaseModel):
     """Agent information and endpoints"""
 
