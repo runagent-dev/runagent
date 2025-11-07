@@ -1,10 +1,23 @@
 import os
+import re
+
 from runagent.sdk import RunAgentSDK
 from runagent.sdk.rest_client import RestClient
 from runagent.sdk.socket_client import SocketClient
 from runagent.utils.serializer import CoreSerializer
 from rich.console import Console
 console = Console()
+
+
+class RunAgentExecutionError(Exception):
+    """Exception raised when a remote agent execution fails."""
+
+    def __init__(self, code: str, message: str, suggestion: str | None = None, details: dict | None = None):
+        self.code = code or "UNKNOWN_ERROR"
+        self.message = message or "Unknown error"
+        self.suggestion = suggestion
+        self.details = details
+        super().__init__(f"[{self.code}] {self.message}")
 
 
 class RunAgentClient:
@@ -76,10 +89,16 @@ class RunAgentClient:
                 # New format with ErrorDetail object
                 error_message = error_info.get("message", "Unknown error")
                 error_code = error_info.get("code", "UNKNOWN_ERROR")
-                raise Exception(f"[{error_code}] {error_message}")
+                suggestion = error_info.get("suggestion") or self._build_suggestion(error_code, error_message)
+                raise RunAgentExecutionError(
+                    code=error_code,
+                    message=error_message,
+                    suggestion=suggestion,
+                    details=error_info.get("details"),
+                )
             else:
                 # Fallback to old format for backward compatibility
-                raise Exception(response.get("error", "Unknown error"))
+                raise self._build_error_from_string(response.get("error"))
 
     def run_stream(self, *input_args, **input_kwargs):
         """Stream agent execution results in real-time via WebSocket"""
@@ -95,3 +114,55 @@ class RunAgentClient:
     def _run_stream(self, *input_args, **input_kwargs):
         """Legacy method - use run_stream instead"""
         return self.run_stream(*input_args, **input_kwargs)
+
+    def _build_suggestion(self, code: str, message: str) -> str | None:
+        message_lower = (message or "").lower()
+
+        if "not found" in message_lower:
+            tag_match = re.search(r"['\"](?P<tag>[A-Za-z0-9_\-]+)['\"]", message or "") if "entrypoint" in message_lower else None
+            dashboard_hint = f"https://app.run-agent.ai/dashboard/agents/{self.agent_id}"
+
+            if tag_match:
+                entrypoint = tag_match.group("tag")
+                return (
+                    f"Check that the entrypoint tag `{entrypoint}` exists for this agent. "
+                    f"Update or redeploy the agent if needed, then verify in the dashboard: {dashboard_hint}."
+                )
+
+            return (
+                "Verify the agent ID and ensure it is deployed. "
+                f"If the agent was modified locally, redeploy it with `runagent deploy` or upload/start it again. "
+                f"You can review its status in the dashboard: {dashboard_hint}."
+            )
+
+        if "must be deployed" in message_lower or "current status" in message_lower:
+            return (
+                "Deploy the agent before running it. "
+                f"Use `runagent deploy` (or `runagent start --id {self.agent_id}` if already uploaded) and confirm its status in the RunAgent dashboard."
+            )
+
+        if code == "CONNECTION_ERROR":
+            dashboard_hint = f"https://app.run-agent.ai/dashboard/agents/{self.agent_id}"
+            return (
+                "Check your network connection and confirm the RunAgent service URL is reachable. "
+                f"If the problem persists, review the agent in the dashboard: {dashboard_hint}."
+            )
+
+        return None
+
+    def _build_error_from_string(self, error_value) -> RunAgentExecutionError:
+        if isinstance(error_value, RunAgentExecutionError):
+            return error_value
+
+        error_text = str(error_value) if error_value else "Unknown error"
+
+        match = re.match(r"^\[(?P<code>[A-Z0-9_]+)]\s*(?P<message>.*)$", error_text)
+        if match:
+            code = match.group("code")
+            message = match.group("message") or "Unknown error"
+        else:
+            code = "UNKNOWN_ERROR"
+            message = error_text
+
+        suggestion = self._build_suggestion(code, message)
+        return RunAgentExecutionError(code=code, message=message, suggestion=suggestion)

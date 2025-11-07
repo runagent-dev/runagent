@@ -1,11 +1,13 @@
-import websockets
 import asyncio
-from typing import AsyncIterator, Iterator, Optional
-from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest, MessageType, SafeMessage
 import json
+import os
 import uuid
-from typing import Any
+from typing import Any, AsyncIterator, Iterator, Optional
+
+import websockets
+
 from runagent.utils.config import Config
+from runagent.utils.schema import MessageType, SafeMessage, WebSocketActionType, WebSocketAgentRequest
 from runagent.utils.serializer import CoreSerializer
 
 
@@ -50,10 +52,10 @@ class SocketClient:
                 
                 self.base_socket_url = ws_base.rstrip("/") + api_prefix
         
-        print(f"[DEBUG] SocketClient initialized:")
-        print(f"  - is_local: {self.is_local}")
-        print(f"  - base_socket_url: {self.base_socket_url}")
-        print(f"  - api_key: {'SET' if self.api_key else 'NOT SET'}")
+        self._debug("SocketClient initialized:")
+        self._debug(f"  - is_local: {self.is_local}")
+        self._debug(f"  - base_socket_url: {self.base_socket_url}")
+        self._debug(f"  - api_key: {'SET' if self.api_key else 'NOT SET'}")
         
     async def run_stream_async(self, agent_id: str, entrypoint_tag: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
         """Stream agent execution results (async version)"""
@@ -89,7 +91,7 @@ class SocketClient:
                 "async_execution": False
             }
             
-            print(f"[DEBUG] Sending request: {request_data}")
+            self._debug(f"Sending request: {request_data}")
             
             # Send the request as direct JSON
             await websocket.send(json.dumps(request_data))
@@ -99,7 +101,7 @@ class SocketClient:
                 try:
                     message = json.loads(raw_message)
                 except json.JSONDecodeError:
-                    print(f"[WARN] Invalid JSON message: {raw_message}")
+                    self._debug(f"[WARN] Invalid JSON message: {raw_message}")
                     continue
                 
                 message_type = message.get("type")
@@ -110,10 +112,10 @@ class SocketClient:
                 elif message_type == "status":
                     status = message.get("status")
                     if status == "stream_completed":
-                        print("[DEBUG] Stream completed")
+                        self._debug("Stream completed")
                         break
                     elif status == "stream_started":
-                        print("[DEBUG] Stream started")
+                        self._debug("Stream started")
                         continue
                 elif message_type == "data":
                     # Yield the actual chunk data
@@ -157,7 +159,7 @@ class SocketClient:
                 "async_execution": False
             }
             
-            print(f"[DEBUG] Sending request: {request_data}")
+            self._debug(f"Sending request: {request_data}")
             
             # Send the request as direct JSON
             websocket.send(json.dumps(request_data))
@@ -167,7 +169,7 @@ class SocketClient:
                 try:
                     message = json.loads(raw_message)
                 except json.JSONDecodeError:
-                    print(f"[WARN] Invalid JSON message: {raw_message}")
+                    self._debug(f"[WARN] Invalid JSON message: {raw_message}")
                     continue
                 
                 message_type = message.get("type")
@@ -178,11 +180,18 @@ class SocketClient:
                 elif message_type == "status":
                     status = message.get("status")
                     if status == "stream_completed":
-                        print("[DEBUG] Stream completed")
+                        self._debug("Stream completed")
                         break
                     elif status == "stream_started":
-                        print("[DEBUG] Stream started")
+                        self._debug("Stream started")
                         continue
                 elif message_type == "data":
                     # Yield the actual chunk data
                     yield message.get("content")
+
+    def _debug(self, message: str) -> None:
+        if os.getenv("RUNAGENT_DEBUG") or os.getenv("DISABLE_TRY_CATCH"):
+            if isinstance(message, str) and message.startswith("["):
+                print(message)
+            else:
+                print(f"[DEBUG] {message}")

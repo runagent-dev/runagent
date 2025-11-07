@@ -866,13 +866,18 @@ class RestClient:
             
             if not validation_result["valid"]:
                 console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
-                console.print(f"[cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
-                console.print(f"[blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
-                
+                suggestion_text = validation_result.get(
+                    "suggestion",
+                    "Use 'runagent config --register-agent .' to register the agent",
+                )
+
                 return {
                     "success": False,
-                    "error": f"Agent validation failed: {validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
-                    "code": "AGENT_NOT_REGISTERED"
+                    "error": {
+                        "code": "AGENT_NOT_REGISTERED",
+                        "message": validation_result["error"],
+                        "suggestion": suggestion_text,
+                    },
                 }
             else:
                 existing_agent = validation_result["agent"]
@@ -888,16 +893,23 @@ class RestClient:
                         console.print(f"[yellow]Agent path mismatch detected![/yellow]")
                         console.print(f"Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
                         console.print(f"Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
-                        console.print(f"[cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
-                        console.print(f"[blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
                     else:
                         # Other path validation errors
                         console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
-                    
+
+                    suggestion_text = path_validation_result.get(
+                        "suggestion",
+                        "Use 'runagent config --register-agent .' to update the agent location",
+                    )
+
                     return {
                         "success": False,
-                        "error": f"Path validation failed: {path_validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
-                        "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR")
+                        "error": {
+                            "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR"),
+                            "message": path_validation_result["error"],
+                            "suggestion": suggestion_text,
+                            "details": path_validation_result.get("details"),
+                        },
                     }
                 else:
                     console.print(f"✅ [green]Agent path validated - matches database record[/green]")
@@ -1153,13 +1165,18 @@ class RestClient:
             
             if not validation_result["valid"]:
                 console.print(f"❌ [red]Error: {validation_result['error']}[/red]")
-                console.print(f"[cyan]Suggestion: {validation_result.get('suggestion', '')}[/cyan]")
-                console.print(f"[blue]You must use 'runagent config --register-agent .' to register a modified agent[/blue]")
-                
+                suggestion_text = validation_result.get(
+                    "suggestion",
+                    "Use 'runagent config --register-agent .' to register the agent",
+                )
+
                 return {
                     "success": False,
-                    "error": f"Agent validation failed: {validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
-                    "code": "AGENT_NOT_REGISTERED"
+                    "error": {
+                        "code": "AGENT_NOT_REGISTERED",
+                        "message": validation_result["error"],
+                        "suggestion": suggestion_text,
+                    },
                 }
             else:
                 existing_agent = validation_result["agent"]
@@ -1175,16 +1192,23 @@ class RestClient:
                         console.print(f"[yellow]Agent path mismatch detected![/yellow]")
                         console.print(f"Database path: [dim]{path_validation_result['details']['db_path']}[/dim]")
                         console.print(f"Current path: [dim]{path_validation_result['details']['current_path']}[/dim]")
-                        console.print(f"[cyan]Suggestion: {path_validation_result.get('suggestion', '')}[/cyan]")
-                        console.print(f"[blue]You must use 'runagent config --register-agent .' to update the agent location[/blue]")
                     else:
                         # Other path validation errors
                         console.print(f"❌ [red]Path validation error: {path_validation_result['error']}[/red]")
-                    
+
+                    suggestion_text = path_validation_result.get(
+                        "suggestion",
+                        "Use 'runagent config --register-agent .' to update the agent location",
+                    )
+
                     return {
                         "success": False,
-                        "error": f"Path validation failed: {path_validation_result['error']}. Use 'runagent config --register-agent .' to fix this.",
-                        "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR")
+                        "error": {
+                            "code": path_validation_result.get("code", "PATH_VALIDATION_ERROR"),
+                            "message": path_validation_result["error"],
+                            "suggestion": suggestion_text,
+                            "details": path_validation_result.get("details"),
+                        },
                     }
                 else:
                     console.print(f"✅ [green]Agent path validated - matches database record[/green]")

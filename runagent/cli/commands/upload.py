@@ -31,13 +31,12 @@ console = Console()
 def format_error_message(error_info):
     """Format error information from API responses"""
     if isinstance(error_info, dict) and "message" in error_info:
-        # New format with ErrorDetail object
         error_message = error_info.get("message", "Unknown error")
-        error_code = error_info.get("code", "UNKNOWN_ERROR")
-        return f"[{error_code}] {error_message}"
-    else:
-        # Fallback to old format for backward compatibility
-        return str(error_info) if error_info else "Unknown error"
+        error_code = error_info.get("code")
+        if error_code:
+            return f"[{error_code}] {error_message}"
+        return error_message
+    return str(error_info) if error_info else "Unknown error"
 
 
 # ============================================================================
@@ -92,7 +91,12 @@ def upload(path: Path, overwrite: bool):
             console.print(f"\n[bold]Next step:[/bold]")
             console.print(f"[cyan]runagent start --id {agent_id}[/cyan]")
         else:
-            console.print(f"❌ [red]Upload failed:[/red] {format_error_message(result.get('error'))}")
+            error_info = result.get("error")
+            console.print(f"❌ [red]Upload failed:[/red] {format_error_message(error_info)}")
+            if isinstance(error_info, dict):
+                suggestion = error_info.get("suggestion")
+                if suggestion:
+                    console.print(f"[cyan]Suggestion: {suggestion}[/cyan]")
             import sys
             sys.exit(1)
 

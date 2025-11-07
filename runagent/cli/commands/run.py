@@ -17,7 +17,7 @@ from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     TemplateError,
     ValidationError,
 )
-from runagent.client.client import RunAgentClient
+from runagent.client.client import RunAgentClient, RunAgentExecutionError
 from runagent.sdk.server.local_server import LocalServer
 from runagent.utils.agent import detect_framework
 from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
@@ -225,6 +225,15 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
             result = ra_client.run(**input_params)
             console.print(result)
             
+    except RunAgentExecutionError as e:
+        if os.getenv('DISABLE_TRY_CATCH'):
+            raise
+        console.print(f"[bold red]❌ {e.message}[/bold red]")
+        if e.suggestion:
+            console.print(f"[cyan]Suggestion: {e.suggestion}[/cyan]")
+        import sys
+        sys.exit(1)
+
     except Exception as e:
         if os.getenv('DISABLE_TRY_CATCH'):
             raise
