@@ -78,8 +78,8 @@ class RunAgentConfig(BaseModel):
     template_source: t.Optional[TemplateSource] = Field(
         ..., description="Template source details"
     )
-    agent_architecture: AgentArchitecture = Field(
-        ..., description="Agent architecture details"
+    agent_architecture: t.Optional[AgentArchitecture] = Field(
+        default=None, description="Agent architecture details"
     )
     env_vars: t.Optional[t.Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
@@ -96,7 +96,9 @@ class RunAgentConfig(BaseModel):
 
     def to_dict(self) -> dict:
         """Convert to dictionary with custom serialization"""
-        data = self.model_dump()
+        # Use model_dump with exclude_none=False to include all fields
+        # Use exclude_unset=True to only include explicitly set fields
+        data = self.model_dump(exclude_none=False, exclude_unset=False)
         
         # Convert enum to string value
         if isinstance(data.get('framework'), Framework):
@@ -105,8 +107,20 @@ class RunAgentConfig(BaseModel):
         # Convert datetime to ISO string if needed
         if isinstance(data.get('created_at'), datetime):
             data['created_at'] = data['created_at'].isoformat()
-            
-        return data
+        
+        # Remove None values for optional fields that weren't set
+        # But keep empty dicts/lists if they were explicitly set
+        cleaned_data = {}
+        for key, value in data.items():
+            if value is not None:
+                cleaned_data[key] = value
+        
+        return cleaned_data
+    
+    def model_dump_json(self, **kwargs) -> str:
+        """Convert to JSON string with proper serialization"""
+        import json
+        return json.dumps(self.to_dict(), indent=2, **kwargs)
 
 
 class WebSocketActionType(str, Enum):

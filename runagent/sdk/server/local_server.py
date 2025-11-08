@@ -71,6 +71,23 @@ class LocalServer:
         self.agent_framework = self.agent_config.framework
         self.agent_architecture = self.agent_config.agent_architecture  
 
+        # Check if agent_architecture exists (required for serving)
+        if self.agent_architecture is None or not self.agent_architecture.entrypoints:
+            raise ValueError(
+                f"No entrypoints configured in {self.agent_path / 'runagent.config.json'}\n"
+                "Please add entrypoints to the agent_architecture section to enable agent execution.\n"
+                "Example:\n"
+                '  "agent_architecture": {\n'
+                '    "entrypoints": [\n'
+                '      {\n'
+                '        "file": "agent.py",\n'
+                '        "module": "app.invoke",\n'
+                '        "tag": "default"\n'
+                '      }\n'
+                '    ]\n'
+                '  }'
+            )
+
         # Install dependencies if requirements.txt exists
         self._install_dependencies()
 

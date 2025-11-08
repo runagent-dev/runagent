@@ -288,6 +288,8 @@ class RestClient:
         file_structure = get_filtered_files(folder_path)
         
         # Check each entrypoint
+        if agent_config.agent_architecture is None or not agent_config.agent_architecture.entrypoints:
+            return []  # No entrypoints configured
         for entrypoint in agent_config.agent_architecture.entrypoints:
             file_path = entrypoint.file
             
