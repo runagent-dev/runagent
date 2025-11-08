@@ -254,6 +254,10 @@ impl RunAgentClient {
                                 // Return the raw string for now
                                 return Ok(output_data.clone());
                             }
+                            // If it's a JSON string, try to parse it first
+                            if let Ok(parsed) = serde_json::from_str::<Value>(content_str) {
+                                return self.serializer.deserialize_object(parsed);
+                            }
                         }
                         return self.serializer.deserialize_object(output_data.clone());
                     }
@@ -267,6 +271,10 @@ impl RunAgentClient {
                         tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
                         // Return the raw string for now
                         return Ok(output_data.clone());
+                    }
+                    // If it's a JSON string, try to parse it first
+                    if let Ok(parsed) = serde_json::from_str::<Value>(content_str) {
+                        return self.serializer.deserialize_object(parsed);
                     }
                 }
                 return self.serializer.deserialize_object(output_data.clone());

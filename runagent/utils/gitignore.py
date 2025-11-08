@@ -38,7 +38,6 @@ class GitignoreFilter:
                 '*.egg-info/',
                 '.installed.cfg',
                 '*.egg',
-                '.env',
                 '.venv/',
                 'venv/',
                 'env/',

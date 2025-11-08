@@ -162,8 +162,12 @@ async fn score_leads(
                         println!("[DEBUG] Parsed JSON string result");
                         parsed
                     }
-                    Err(_) => {
-                        println!("[DEBUG] Result is not JSON string, using as-is");
+                    Err(e) => {
+                        println!("[DEBUG] Failed to parse JSON string: {}", e);
+                        println!("[DEBUG] Result string length: {}", result_str.len());
+                        println!("[DEBUG] Result string preview (first 500 chars): {}", 
+                                 result_str.chars().take(500).collect::<String>());
+                        // If parsing fails, return the raw string as a JSON value
                         result
                     }
                 }
