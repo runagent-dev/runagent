@@ -42,7 +42,6 @@ interface CSVMapping {
 
 function App() {
   const [step, setStep] = useState<'config' | 'upload' | 'mapping' | 'processing' | 'results'>('config');
-  const [agentId, setAgentId] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [topN, setTopN] = useState(3);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -160,13 +159,12 @@ function App() {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/score-leads', {
+      const response = await fetch('/api/score-leads', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          agent_id: agentId,
           candidates: candidateList,
           job_description: jobDescription,
           top_n: topN,
@@ -283,22 +281,6 @@ function App() {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  RunAgent Agent ID *
-                </label>
-                <input
-                  type="text"
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
-                  placeholder="Enter your deployed agent ID"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="mt-1 text-sm text-gray-500">
-                  Get this from running: <code className="bg-gray-100 px-2 py-1 rounded">runagent serve .</code>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Job Description *
                 </label>
                 <textarea
@@ -326,7 +308,7 @@ function App() {
 
               <button
                 onClick={() => setStep('upload')}
-                disabled={!agentId || !jobDescription}
+                disabled={!jobDescription}
                 className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
               >
                 Continue to Upload Candidates
