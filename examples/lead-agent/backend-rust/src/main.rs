@@ -9,10 +9,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_http::cors::{CorsLayer, AllowOrigin};
 
+// RunAgent configuration
+const RUNAGENT_ID: &str = "93eaf000-0000-0000-0000-000000000000";
+
 // Request/Response types
 #[derive(Deserialize)]
 struct ScoreLeadsRequest {
-    agent_id: String,
+    #[serde(default)]
+    agent_id: Option<String>, // Deprecated: kept for backward compatibility but ignored
     candidates: Vec<Value>,
     #[serde(default)]
     top_n: Option<u32>,
@@ -26,7 +30,8 @@ struct ScoreLeadsRequest {
 
 #[derive(Deserialize)]
 struct ScoreSingleRequest {
-    agent_id: String,
+    #[serde(default)]
+    agent_id: Option<String>, // Deprecated: kept for backward compatibility but ignored
     #[serde(default)]
     candidate_id: Option<String>,
     name: String,
@@ -60,16 +65,6 @@ async fn score_leads(
     Json(request): Json<ScoreLeadsRequest>,
 ) -> Result<JsonResponse<Value>, (StatusCode, JsonResponse<ErrorResponse>)> {
     // Validate required fields
-    if request.agent_id.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            JsonResponse(ErrorResponse {
-                error: "agent_id is required".to_string(),
-                traceback: None,
-            }),
-        ));
-    }
-
     if request.candidates.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -111,9 +106,9 @@ async fn score_leads(
         println!("[DEBUG] First candidate sample: {}", serde_json::to_string(first).unwrap_or_default());
     }
 
-    // Initialize RunAgent client
+    // Initialize RunAgent client using configured agent ID
     let client = match runagent::client::RunAgentClient::new(
-        &request.agent_id,
+        RUNAGENT_ID,
         "lead_score_flow",
         false, // Set to false when using RunAgent Cloud
     )
@@ -162,8 +157,12 @@ async fn score_leads(
                         println!("[DEBUG] Parsed JSON string result");
                         parsed
                     }
-                    Err(_) => {
-                        println!("[DEBUG] Result is not JSON string, using as-is");
+                    Err(e) => {
+                        println!("[DEBUG] Failed to parse JSON string: {}", e);
+                        println!("[DEBUG] Result string length: {}", result_str.len());
+                        println!("[DEBUG] Result string preview (first 500 chars): {}", 
+                                 result_str.chars().take(500).collect::<String>());
+                        // If parsing fails, return the raw string as a JSON value
                         result
                     }
                 }
@@ -191,16 +190,6 @@ async fn score_single(
     Json(request): Json<ScoreSingleRequest>,
 ) -> Result<JsonResponse<Value>, (StatusCode, JsonResponse<ErrorResponse>)> {
     // Validate required fields
-    if request.agent_id.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            JsonResponse(ErrorResponse {
-                error: "agent_id is required".to_string(),
-                traceback: None,
-            }),
-        ));
-    }
-
     if request.name.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -221,9 +210,9 @@ async fn score_single(
         ));
     }
 
-    // Initialize RunAgent client
+    // Initialize RunAgent client using configured agent ID
     let client = match runagent::client::RunAgentClient::new(
-        &request.agent_id,
+        RUNAGENT_ID,
         "score_candidate",
         true, // local = true for single candidate scoring
     )
@@ -290,9 +279,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setup CORS - matching Flask backend origins
     let allowed_origins = vec![
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         "http://10.1.0.5:5173",
+        "http://10.1.0.5:5174",
         "http://20.84.81.110:5173",
+        "http://20.84.81.110:5174",
     ]
     .into_iter()
     .map(|s| HeaderValue::from_static(s))

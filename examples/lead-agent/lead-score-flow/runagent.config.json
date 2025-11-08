@@ -24,8 +24,5 @@
         }
       ]
     },
-    "env_vars": {
-      "OPENAI_API_KEY": "",
-      "SERPER_API_KEY": ""
-    }
+    "agent_id": "89aef000-0000-0000-0000-000000000000"
   }

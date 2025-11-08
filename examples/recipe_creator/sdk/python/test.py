@@ -21,7 +21,7 @@ def test_non_streaming():
     print("-" * 50)
     
     client = RunAgentClient(
-        agent_id="ea9267bf-ce87-4717-a896-923539b77dab",
+        agent_id="76aef000-0000-0000-0000-000000000000",
         entrypoint_tag="recipe_create",
         local=False
     )
@@ -47,7 +47,7 @@ def test_streaming():
     print("-" * 50)
     
     client = RunAgentClient(
-        agent_id="ea9267bf-ce87-4717-a896-923539b77dab",
+        agent_id="76aef000-0000-0000-0000-000000000000",
         entrypoint_tag="recipe_stream",
         local=False
     )
