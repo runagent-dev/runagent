@@ -1090,11 +1090,14 @@ class RestClient:
         if result.get("success"):
             result_data = result["data"]
             endpoint = result_data.get("endpoint")
+            
+            # Generate dashboard URL instead of API endpoint
+            dashboard_url = f"https://app.run-agent.ai/dashboard/agents/{agent_id}"
 
             console.print(Panel(
                 f"✅ [bold green]Agent started successfully![/bold green]\n"
                 f"🆔 Agent ID: [bold magenta]{agent_id}[/bold magenta]\n"
-                f"🌐 Endpoint: [link]{self.base_url}{endpoint}[/link]",
+                f"🌐 Agent URL: [link]{dashboard_url}[/link]",
                 title="🚀 Deployment Complete",
                 border_style="green",
             ))
@@ -1110,6 +1113,7 @@ class RestClient:
                 "success": True,
                 "agent_id": agent_id,
                 "endpoint": f"{self.base_url}{endpoint}",
+                "dashboard_url": dashboard_url,
                 "status": "deployed",
             }
         return result

@@ -12,14 +12,14 @@ from rich.prompt import Prompt
 
 from runagent.cli.branding import print_header
 from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
-from runagent.constants import AGENT_CONFIG_FILE_NAME
+from runagent.constants import AGENT_CONFIG_FILE_NAME, TEMPLATE_REPO_URL
 from runagent.sdk import RunAgent
 from runagent.sdk.db import DBService
 from runagent.sdk.exceptions import TemplateError
 from runagent.utils.agent import get_agent_config, get_agent_config_with_defaults
 from runagent.utils.agent_id import generate_agent_id, generate_config_fingerprint
 from runagent.utils.enums.framework import Framework
-from runagent.utils.schema import RunAgentConfig
+from runagent.utils.schema import RunAgentConfig, TemplateSource
 
 console = Console()
 
@@ -339,7 +339,16 @@ def init(path, template, minimal, existing, from_template, use_auth, name, descr
             
             if template_source == "existing":
                 # For existing codebase, create new config from scratch
-                # No entrypoints, but assign agent_id
+                # Empty entrypoints list, but assign agent_id
+                from runagent.utils.schema import AgentArchitecture
+                
+                # Create valid template_source for existing codebase
+                template_source_obj = TemplateSource(
+                    repo_url=TEMPLATE_REPO_URL,
+                    author="runagent-cli",
+                    path=str(project_path)
+                )
+                
                 config = RunAgentConfig(
                     agent_name=agent_name,
                     description=agent_description,
@@ -347,8 +356,8 @@ def init(path, template, minimal, existing, from_template, use_auth, name, descr
                     template="",  # Empty for existing codebase
                     version="1.0.0",
                     created_at=datetime.now(),
-                    template_source=None,
-                    agent_architecture=None,  # No entrypoints initially
+                    template_source=template_source_obj,
+                    agent_architecture=AgentArchitecture(entrypoints=[]),  # Empty entrypoints list
                     env_vars={},
                     agent_id=agent_id,
                     auth_settings={"type": auth_type}

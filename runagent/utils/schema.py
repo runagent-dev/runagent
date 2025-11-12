@@ -75,7 +75,7 @@ class RunAgentConfig(BaseModel):
     template: str = Field(..., description="Template name")
     version: str = Field(..., description="Agent version")
     created_at: datetime = Field(..., description="Creation timestamp")
-    template_source: t.Optional[TemplateSource] = Field(
+    template_source: TemplateSource = Field(
         ..., description="Template source details"
     )
     agent_architecture: t.Optional[AgentArchitecture] = Field(
@@ -97,7 +97,7 @@ class RunAgentConfig(BaseModel):
     def to_dict(self) -> dict:
         """Convert to dictionary with custom serialization"""
         # Use model_dump with exclude_none=False to include all fields
-        # Use exclude_unset=True to only include explicitly set fields
+        # Use exclude_unset=False to include all fields (even defaults)
         data = self.model_dump(exclude_none=False, exclude_unset=False)
         
         # Convert enum to string value
@@ -108,8 +108,19 @@ class RunAgentConfig(BaseModel):
         if isinstance(data.get('created_at'), datetime):
             data['created_at'] = data['created_at'].isoformat()
         
-        # Remove None values for optional fields that weren't set
-        # But keep empty dicts/lists if they were explicitly set
+        # Convert AgentArchitecture to dict if present
+        if isinstance(data.get('agent_architecture'), AgentArchitecture):
+            arch = data['agent_architecture']
+            data['agent_architecture'] = {
+                'entrypoints': [ep.model_dump() if hasattr(ep, 'model_dump') else ep.dict() if hasattr(ep, 'dict') else ep for ep in arch.entrypoints]
+            }
+        
+        # Convert TemplateSource to dict if present
+        if isinstance(data.get('template_source'), TemplateSource):
+            ts = data['template_source']
+            data['template_source'] = ts.model_dump() if hasattr(ts, 'model_dump') else ts.dict()
+        
+        # Remove None values for optional fields (but keep empty lists/dicts)
         cleaned_data = {}
         for key, value in data.items():
             if value is not None:

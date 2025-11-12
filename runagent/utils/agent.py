@@ -152,8 +152,8 @@ def validate_agent(
     config = get_agent_config(folder_path)
     # framework = config.framework
     
-    # If no agent_architecture, validation passes (for existing codebase without entrypoints)
-    if config.agent_architecture is None:
+    # If no agent_architecture or empty entrypoints, validation passes (for existing codebase without entrypoints)
+    if config.agent_architecture is None or not config.agent_architecture.entrypoints:
         return True, {
             "valid": True,
             "folder_exists": True,
