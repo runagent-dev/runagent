@@ -760,7 +760,7 @@ class LocalServer:
                     *request.input_args, **request.input_kwargs
                 )
 
-                result_str = self.serializer.serialize_object(result_data)
+                structured_output_json = self.serializer.serialize_object_to_structured(result_data)
                 execution_time = time.time() - start_time
                 execution_success = True
                 self.log_execution_complete(invocation_id, True, execution_time)
@@ -821,6 +821,7 @@ class LocalServer:
                         # Wrap in standard format matching remote executions
                         result_data_dict = {
                             "data": actual_data,
+                            "structured_output": structured_output_json,
                             "type": "result",
                             "timestamp": datetime.now().isoformat() + "Z"
                         }
@@ -871,7 +872,7 @@ class LocalServer:
                     self.db_service.record_agent_run(
                         agent_id=self.agent_id,
                         input_data=serializable_input,
-                        output_data=result_str,
+                        output_data=structured_output_json,
                         success=True,
                         execution_time=execution_time,
                     )
@@ -900,7 +901,7 @@ class LocalServer:
                     },
                     result_data={
                         "message": "",
-                        "data": result_str,
+                        "data": structured_output_json,
                         "vm_id": str(uuid.uuid4()),
                         "type": "result",
                         "timestamp": datetime.now().isoformat()
@@ -924,7 +925,7 @@ class LocalServer:
                     success=True,
                     result={
                         "message": "",
-                        "data": result_str,
+                        "data": structured_output_json,
                         "vm_id": str(uuid.uuid4()),
                         "type": "result",
                         "timestamp": datetime.now().isoformat()

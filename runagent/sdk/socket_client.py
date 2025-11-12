@@ -121,8 +121,30 @@ class SocketClient:
                             self._debug("Stream started")
                             continue
                     elif message_type == "data":
-                        # Yield the actual chunk data
-                        yield message.get("content")
+                        content = message.get("content")
+                        if content is None:
+                            yield None
+                        else:
+                            # Try structured deserialization first
+                            if isinstance(content, str):
+                                try:
+                                    yield self.serializer.deserialize_object_from_structured(content)
+                                    continue
+                                except Exception:
+                                    pass
+                                try:
+                                    yield self.serializer.deserialize_object(content)
+                                    continue
+                                except Exception:
+                                    yield content
+                                    continue
+                            # Non-string content (fallback/legacy)
+                            try:
+                                yield self.serializer.deserialize_object(content)
+                            except Exception:
+                                yield content
+                    else:
+                        self._debug(f"[WARN] Unknown message type: {message_type}")
         except Exception as e:
             # Clean up WebSocket connection errors
             error_msg = str(e)
@@ -196,8 +218,28 @@ class SocketClient:
                             self._debug("Stream started")
                             continue
                     elif message_type == "data":
-                        # Yield the actual chunk data
-                        yield message.get("content")
+                        content = message.get("content")
+                        if content is None:
+                            yield None
+                        else:
+                            if isinstance(content, str):
+                                try:
+                                    yield self.serializer.deserialize_object_from_structured(content)
+                                    continue
+                                except Exception:
+                                    pass
+                                try:
+                                    yield self.serializer.deserialize_object(content)
+                                    continue
+                                except Exception:
+                                    yield content
+                                    continue
+                            try:
+                                yield self.serializer.deserialize_object(content)
+                            except Exception:
+                                yield content
+                    else:
+                        self._debug(f"[WARN] Unknown message type: {message_type}")
         except Exception as e:
             # Clean up WebSocket connection errors
             error_msg = str(e)

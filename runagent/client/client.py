@@ -80,7 +80,15 @@ class RunAgentClient:
             else:
                 # Fallback to old format for backward compatibility
                 response_data = response.get("output_data")
-            return self.serializer.deserialize_object(response_data)
+
+            if response_data is None:
+                return None
+
+            try:
+                return self.serializer.deserialize_object_from_structured(response_data)
+            except Exception:
+                # Backward compatibility with legacy plain JSON responses
+                return self.serializer.deserialize_object(response_data)
 
         else:
             # Handle new error format with ErrorDetail object
