@@ -46,7 +46,7 @@ def format_error_message(error_info):
 
         
 @click.command()
-@click.option("--yes", is_flag=True, help="Skip confirmation")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
 def teardown(yes):
     """Complete teardown - Remove RunAgent configuration AND database"""
     try:
