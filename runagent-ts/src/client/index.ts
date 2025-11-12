@@ -230,11 +230,38 @@ export class RunAgentClient {
     );
 
     if (response.success !== false) {
-      const responseData = response.output_data;
-      return this.serializer.deserializeObject(responseData as JsonValue);
-    } else {
-      throw new Error(response.error || 'Agent execution failed');
+      let payload: unknown = null;
+
+      if (typeof response.data === 'string') {
+        payload = this.serializer.deserializeObject(response.data);
+      } else if (
+        response.data &&
+        typeof response.data === 'object' &&
+        'result_data' in (response.data as Record<string, unknown>)
+      ) {
+        const resultData = (response.data as Record<string, unknown>)['result_data'];
+        if (
+          resultData &&
+          typeof resultData === 'object' &&
+          'data' in (resultData as Record<string, unknown>)
+        ) {
+          payload = this.serializer.deserializeObject(
+            (resultData as Record<string, unknown>)['data'] as JsonValue
+          );
+        }
+      } else if (response.output_data !== undefined) {
+        payload = this.serializer.deserializeObject(response.output_data as JsonValue);
+      }
+
+      return payload ?? null;
     }
+
+    const errorMessage =
+      typeof response.error === 'string'
+        ? response.error
+        : (response.error as { message?: string })?.message ?? 'Agent execution failed';
+
+    throw new Error(errorMessage);
   }
 
   private async *_runStream(

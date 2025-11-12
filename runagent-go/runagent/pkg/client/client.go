@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -241,9 +242,23 @@ func (c *Client) Run(ctx context.Context, input map[string]interface{}) (interfa
 		}
 	}
 
-	// Return output_data if it exists, otherwise return the whole response
+	// Handle data field (simplified structured output or legacy execution payload)
+	if dataField, exists := response["data"]; exists {
+		switch data := dataField.(type) {
+		case string:
+			return c.serializer.DeserializeStructuredString(data), nil
+		case map[string]interface{}:
+			if resultData, ok := data["result_data"].(map[string]interface{}); ok {
+				if output, ok := resultData["data"]; ok {
+					return c.serializer.DeserializeObject(output, false), nil
+				}
+			}
+		}
+	}
+
+	// Legacy fallback: return output_data if it exists
 	if outputData, exists := response["output_data"]; exists {
-		return outputData, nil
+		return c.serializer.DeserializeObject(outputData, false), nil
 	}
 
 	return response, nil
@@ -446,6 +461,38 @@ func NewCoreSerializer() *CoreSerializer {
 	return &CoreSerializer{}
 }
 
+// DeserializeStructuredString converts structured serializer output to native Go types
+func (s *CoreSerializer) DeserializeStructuredString(structured string) interface{} {
+	var structuredMap map[string]interface{}
+	if err := json.Unmarshal([]byte(structured), &structuredMap); err != nil {
+		if unquoted, err2 := strconv.Unquote(structured); err2 == nil {
+			return unquoted
+		}
+		return structured
+	}
+
+	payload, payloadExists := structuredMap["payload"]
+	if !payloadExists {
+		return structuredMap
+	}
+
+	switch p := payload.(type) {
+	case string:
+		if len(p) > 0 {
+			var decoded interface{}
+			if err := json.Unmarshal([]byte(p), &decoded); err == nil {
+				return decoded
+			}
+			if unquoted, err := strconv.Unquote(p); err == nil {
+				return unquoted
+			}
+		}
+		return p
+	default:
+		return p
+	}
+}
+
 // SerializeMessage serializes a WebSocket message
 func (s *CoreSerializer) SerializeMessage(message WebSocketMessage) (string, error) {
 	messageDict := map[string]interface{}{
@@ -504,5 +551,8 @@ func (s *CoreSerializer) DeserializeMessage(jsonStr string) (*WebSocketMessage, 
 
 // DeserializeObject deserializes a JSON object
 func (s *CoreSerializer) DeserializeObject(jsonResp interface{}, reconstruct bool) interface{} {
+	if str, ok := jsonResp.(string); ok {
+		return s.DeserializeStructuredString(str)
+	}
 	return jsonResp // Simple pass-through for now
 }

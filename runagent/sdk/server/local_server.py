@@ -20,7 +20,7 @@ from enum import Enum
 from runagent.sdk.db import DBService
 from runagent.sdk.server.framework import get_executor
 from runagent.utils.agent import detect_framework, get_agent_config
-from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponse, AgentRunResponseV2, ExecutionData, ErrorDetail, WebSocketActionType, WebSocketAgentRequest
+from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponseMinimal, ErrorDetail, WebSocketActionType, WebSocketAgentRequest
 from runagent.utils.imports import PackageImporter
 from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
@@ -667,10 +667,10 @@ class LocalServer:
             
         @self.app.exception_handler(HTTPException)
         async def http_exception_handler(request, exc):
-            """Convert HTTPException to the new error format"""
+            """Convert HTTPException to the simplified error format"""
             return JSONResponse(
                 status_code=exc.status_code,
-                content=AgentRunResponseV2(
+                content=AgentRunResponseMinimal(
                     success=False,
                     data=None,
                     message=None,
@@ -687,10 +687,10 @@ class LocalServer:
 
         @self.app.exception_handler(Exception)
         async def general_exception_handler(request, exc):
-            """Convert general exceptions to the new error format"""
+            """Convert general exceptions to the simplified error format"""
             return JSONResponse(
                 status_code=500,
-                content=AgentRunResponseV2(
+                content=AgentRunResponseMinimal(
                     success=False,
                     data=None,
                     message=None,
@@ -707,7 +707,7 @@ class LocalServer:
 
         @self.app.post(
             f"/api/v1/agents/{self.agent_id}/run",
-            response_model=AgentRunResponseV2
+            response_model=AgentRunResponseMinimal
         )
         # (self.create_endpoint_handler_with_tracking(runner, self.agent_id, entrypoint.tag))
         async def run_agent(request: AgentRunRequest):
@@ -751,7 +751,7 @@ class LocalServer:
             error_detail = None
             result_data = None
             serializable_output = None
-            middleware_synced = False
+            
 
             try:
                 console.print(f"Running agent: {self.agent_id} (invocation: {invocation_id}...)")
@@ -853,7 +853,6 @@ class LocalServer:
                         
                         if sync_result:
                             console.print(f"✅ [green]Execution synced to middleware successfully[/green]")
-                            middleware_synced = True
                         else:
                             console.print(f"⚠️ [yellow]Middleware sync returned False[/yellow]")
                             
@@ -884,58 +883,9 @@ class LocalServer:
                     f"{execution_time:.2f}s (invocation: {invocation_id}...)"
                 )
 
-                # Create execution data for the new response format
-                execution_data = ExecutionData(
-                    execution_id=invocation_id,
-                    agent_id=self.agent_id,
-                    user_id=None,
-                    deployment_id=None,
-                    entrypoint_id=request.entrypoint_tag,
-                    status="completed",
-                    started_at=datetime.fromtimestamp(start_time).isoformat(),
-                    completed_at=datetime.now().isoformat(),
-                    runtime_seconds=execution_time,
-                    input_data={
-                        "input_args": request.input_args,
-                        "input_kwargs": request.input_kwargs
-                    },
-                    result_data={
-                        "message": "",
-                        "data": structured_output_json,
-                        "vm_id": str(uuid.uuid4()),
-                        "type": "result",
-                        "timestamp": datetime.now().isoformat()
-                    },
-                    execution_metadata={
-                        "entrypoint_tag": request.entrypoint_tag,
-                        "project_id": None,
-                        "deployment_id": None,
-                        "timeout_seconds": 60,
-                        "async_execution": False,
-                        "execution_config": {},
-                        "middleware_synced": middleware_synced
-                    },
-                    error_message=None,
-                    is_local=True,
-                    agent_name=self.agent_name,
-                    project_id=None,
-                    project_name=None,
-                    endpoint=None,
-                    priority="normal",
+                return AgentRunResponseMinimal(
                     success=True,
-                    result={
-                        "message": "",
-                        "data": structured_output_json,
-                        "vm_id": str(uuid.uuid4()),
-                        "type": "result",
-                        "timestamp": datetime.now().isoformat()
-                    },
-                    error=None
-                )
-
-                return AgentRunResponseV2(
-                    success=True,
-                    data=execution_data,
+                    data=structured_output_json,
                     message="Agent execution completed successfully",
                     error=None,
                     timestamp=datetime.now().isoformat(),
@@ -1004,7 +954,6 @@ class LocalServer:
                         
                         if sync_result:
                             console.print(f"✅ [green]Failed execution synced to middleware[/green]")
-                            middleware_synced = True
                         else:
                             console.print(f"⚠️ [yellow]Middleware sync returned False[/yellow]")
                             
@@ -1033,44 +982,7 @@ class LocalServer:
 
                 console.print(f"{error_detail} (invocation: {invocation_id[:8]}...)")
 
-                # Create execution data for the new response format (error case)
-                execution_data = ExecutionData(
-                    execution_id=invocation_id,
-                    agent_id=self.agent_id,
-                    user_id=None,
-                    deployment_id=None,
-                    entrypoint_id=request.entrypoint_tag,
-                    status="failed",
-                    started_at=datetime.fromtimestamp(start_time).isoformat(),
-                    completed_at=datetime.now().isoformat(),
-                    runtime_seconds=execution_time,
-                    input_data={
-                        "input_args": request.input_args,
-                        "input_kwargs": request.input_kwargs
-                    },
-                    result_data=None,
-                    execution_metadata={
-                        "entrypoint_tag": request.entrypoint_tag,
-                        "project_id": None,
-                        "deployment_id": None,
-                        "timeout_seconds": 60,
-                        "async_execution": False,
-                        "execution_config": {},
-                        "middleware_synced": middleware_synced
-                    },
-                    error_message=error_detail,
-                    is_local=True,
-                    agent_name=self.agent_name,
-                    project_id=None,
-                    project_name=None,
-                    endpoint=None,
-                    priority="normal",
-                    success=False,
-                    result=None,
-                    error=error_detail
-                )
-
-                return AgentRunResponseV2(
+                return AgentRunResponseMinimal(
                     success=False,
                     data=None,
                     message=None,

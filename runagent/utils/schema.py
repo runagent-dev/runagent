@@ -223,6 +223,17 @@ class AgentRunResponseV2(BaseModel):
     request_id: str
 
 
+class AgentRunResponseMinimal(BaseModel):
+    """Simplified response model for agent execution returning structured output"""
+
+    success: bool
+    data: t.Optional[str] = None
+    message: t.Optional[str] = None
+    error: t.Optional[ErrorDetail] = None
+    timestamp: str
+    request_id: str
+
+
 class AgentInfo(BaseModel):
     """Agent information and endpoints"""
 

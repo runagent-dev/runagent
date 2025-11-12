@@ -58,6 +58,26 @@ The input must be valid JSON:
 }
 ```
 
+## Response Format
+
+The CLI and SDK now return a minimal payload when the execution completes:
+
+```json
+{
+  "success": true,
+  "data": "{\"type\": \"string\", \"payload\": \"...\"}",
+  "message": "Agent execution completed successfully",
+  "error": null,
+  "timestamp": "2025-11-12T22:23:35.216480",
+  "request_id": "adffa696-6273-4c5b-a933-883d830fd72c"
+}
+```
+
+- `data` contains the agent output encoded with `serialize_object_to_structured`, so the CLI/SDK can deterministically decode every result type.
+- Full execution metadata (runtime, VM, invocation ID, etc.) remains available through the local invocation history endpoints and the RunAgent dashboard/middleware.
+
+Error responses keep the same envelope but include an `error` object with diagnostic fields.
+
 ## See Also
 
 - [`runagent deploy`](/cli/commands/deploy) - Deploy an agent first
