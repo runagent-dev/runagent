@@ -74,13 +74,30 @@ class RunAgentClient:
         if os.getenv('DISABLE_TRY_CATCH'):
             print(f"response: {response}")
         if response.get("success"):
-            # Handle new response format with nested data
-            if "data" in response and "result_data" in response["data"]:
-                response_data = response["data"]["result_data"].get("data")
-            else:
-                # Fallback to old format for backward compatibility
-                response_data = response.get("output_data")
-            return self.serializer.deserialize_object(response_data)
+            response_payload = None
+
+            data_field = response.get("data")
+
+            # Legacy detailed execution payload
+            if isinstance(data_field, dict) and "result_data" in data_field:
+                response_payload = data_field["result_data"].get("data")
+            # Simplified payload: data is the structured output string
+            elif isinstance(data_field, str):
+                response_payload = data_field
+            # Backward compatibility for very old responses
+            elif "output_data" in response:
+                response_payload = response.get("output_data")
+
+            if response_payload is None:
+                return None
+
+            if isinstance(response_payload, str):
+                try:
+                    return self.serializer.deserialize_object_from_structured(response_payload)
+                except Exception:
+                    pass
+
+            return self.serializer.deserialize_object(response_payload)
 
         else:
             # Handle new error format with ErrorDetail object

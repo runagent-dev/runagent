@@ -27,6 +27,28 @@ export class CoreSerializer {
     try {
       const deserializedData = typeof jsonResp === 'string' ? JSON.parse(jsonResp) : jsonResp;
 
+      if (
+        deserializedData &&
+        typeof deserializedData === 'object' &&
+        deserializedData !== null &&
+        'type' in (deserializedData as Record<string, unknown>) &&
+        'payload' in (deserializedData as Record<string, unknown>)
+      ) {
+        const structured = deserializedData as { type?: string; payload?: unknown };
+        const payload = structured.payload;
+
+        if (typeof payload === 'string') {
+          try {
+            const parsedPayload = JSON.parse(payload);
+            return this._reconstructNestedJson(parsedPayload);
+          } catch {
+            return payload;
+          }
+        }
+
+        return this._reconstructNestedJson(payload);
+      }
+
       if (!reconstruct) {
         return this._reconstructNestedJson(
           (deserializedData as Record<string, unknown>)?.content || deserializedData

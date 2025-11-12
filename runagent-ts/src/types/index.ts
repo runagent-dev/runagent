@@ -10,12 +10,22 @@ export interface RunAgentConfig {
     apiPrefix?: string;
   }
   
-export interface ApiResponse<T = unknown> {
-    success: boolean;
-    output_data?: T;
-    error?: string;
-    data?: T;
-  }
+export interface ApiResponse<T = JsonValue> {
+  success: boolean;
+  data?: T;
+  output_data?: T;
+  error?:
+    | string
+    | {
+        code?: string;
+        message?: string;
+        details?: unknown;
+        field?: string | null;
+      };
+  message?: string | null;
+  timestamp?: string | null;
+  request_id?: string | null;
+}
   
 export interface WebSocketMessage<T = unknown> {
     id: string;

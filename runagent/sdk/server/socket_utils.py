@@ -191,15 +191,15 @@ class AgentWebSocketHandler:
                         except Exception as e:
                             console.print(f"Warning: Could not store chunk {chunk_count}: {e}")
                     
-                    # Send chunk to client
+                    # Send chunk to client using structured serialization
                     try:
-                        await websocket.send_text(json.dumps({
+                        structured_chunk = self.serializer.serialize_object_to_structured(serializable_chunk)
+                        await websocket.send_json({
                             "type": "data",
-                            "content": serializable_chunk
-                        }))
+                            "content": structured_chunk
+                        })
                     except Exception as send_error:
                         console.print(f"Error sending chunk {chunk_count}: {send_error}")
-                        # Try sending error message
                         await websocket.send_json({
                             "type": "error",
                             "error": f"Chunk serialization failed: {str(send_error)}"
@@ -315,7 +315,7 @@ class AgentWebSocketHandler:
                         import traceback
                         traceback.print_exc()
                 
-                # Send completion status
+                # Send completion status (remote-compatible)
                 await websocket.send_json({
                     "type": "status",
                     "status": "stream_completed",

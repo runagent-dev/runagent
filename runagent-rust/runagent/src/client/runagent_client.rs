@@ -243,8 +243,18 @@ impl RunAgentClient {
             .await?;
 
         if response.get("success").and_then(|s| s.as_bool()).unwrap_or(false) {
-            // Handle new response format with nested data (matching Python SDK)
             if let Some(data) = response.get("data") {
+                // Simplified payload: data is a structured output string
+                if let Some(data_str) = data.as_str() {
+                    if let Ok(parsed) = serde_json::from_str::<Value>(data_str) {
+                        return self.serializer.deserialize_object(parsed);
+                    }
+                    return self
+                        .serializer
+                        .deserialize_object(Value::String(data_str.to_string()));
+                }
+
+                // Legacy detailed execution payload
                 if let Some(result_data) = data.get("result_data") {
                     if let Some(output_data) = result_data.get("data") {
                         // Check if the output contains a generator object string
