@@ -85,9 +85,12 @@ def deploy(path: Path, overwrite: bool):
         result = sdk.deploy_remote(folder=str(path), overwrite=overwrite)
 
         if result.get("success"):
+            agent_id = result.get('agent_id')
+            dashboard_url = result.get('dashboard_url') or f"https://app.run-agent.ai/dashboard/agents/{agent_id}"
+            
             console.print(f"\n✅ [green]Deployment successful![/green]")
-            console.print(f"Agent ID: [bold magenta]{result.get('agent_id')}[/bold magenta]")
-            console.print(f"Endpoint: [link]{result.get('endpoint')}[/link]")
+            console.print(f"Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+            console.print(f"Agent URL: [link]{dashboard_url}[/link]")
         else:
             error_info = result.get("error")
             console.print(f"❌ [red]Deployment failed:[/red] {format_error_message(error_info)}")

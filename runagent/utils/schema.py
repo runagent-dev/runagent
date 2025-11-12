@@ -75,11 +75,11 @@ class RunAgentConfig(BaseModel):
     template: str = Field(..., description="Template name")
     version: str = Field(..., description="Agent version")
     created_at: datetime = Field(..., description="Creation timestamp")
-    template_source: t.Optional[TemplateSource] = Field(
+    template_source: TemplateSource = Field(
         ..., description="Template source details"
     )
-    agent_architecture: AgentArchitecture = Field(
-        ..., description="Agent architecture details"
+    agent_architecture: t.Optional[AgentArchitecture] = Field(
+        default=None, description="Agent architecture details"
     )
     env_vars: t.Optional[t.Dict[str, str]] = Field(
         default_factory=dict, description="Environment variables"
@@ -96,7 +96,9 @@ class RunAgentConfig(BaseModel):
 
     def to_dict(self) -> dict:
         """Convert to dictionary with custom serialization"""
-        data = self.model_dump()
+        # Use model_dump with exclude_none=False to include all fields
+        # Use exclude_unset=False to include all fields (even defaults)
+        data = self.model_dump(exclude_none=False, exclude_unset=False)
         
         # Convert enum to string value
         if isinstance(data.get('framework'), Framework):
@@ -105,8 +107,31 @@ class RunAgentConfig(BaseModel):
         # Convert datetime to ISO string if needed
         if isinstance(data.get('created_at'), datetime):
             data['created_at'] = data['created_at'].isoformat()
-            
-        return data
+        
+        # Convert AgentArchitecture to dict if present
+        if isinstance(data.get('agent_architecture'), AgentArchitecture):
+            arch = data['agent_architecture']
+            data['agent_architecture'] = {
+                'entrypoints': [ep.model_dump() if hasattr(ep, 'model_dump') else ep.dict() if hasattr(ep, 'dict') else ep for ep in arch.entrypoints]
+            }
+        
+        # Convert TemplateSource to dict if present
+        if isinstance(data.get('template_source'), TemplateSource):
+            ts = data['template_source']
+            data['template_source'] = ts.model_dump() if hasattr(ts, 'model_dump') else ts.dict()
+        
+        # Remove None values for optional fields (but keep empty lists/dicts)
+        cleaned_data = {}
+        for key, value in data.items():
+            if value is not None:
+                cleaned_data[key] = value
+        
+        return cleaned_data
+    
+    def model_dump_json(self, **kwargs) -> str:
+        """Convert to JSON string with proper serialization"""
+        import json
+        return json.dumps(self.to_dict(), indent=2, **kwargs)
 
 
 class WebSocketActionType(str, Enum):

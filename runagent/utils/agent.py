@@ -151,6 +151,19 @@ def validate_agent(
 
     config = get_agent_config(folder_path)
     # framework = config.framework
+    
+    # If no agent_architecture or empty entrypoints, validation passes (for existing codebase without entrypoints)
+    if config.agent_architecture is None or not config.agent_architecture.entrypoints:
+        return True, {
+            "valid": True,
+            "folder_exists": True,
+            "files_found": [],
+            "missing_files": [],
+            "success_msgs": ["No entrypoints configured (existing codebase mode)"],
+            "error_msgs": [],
+            "warning_msgs": ["Add entrypoints to runagent.config.json to enable agent execution"],
+        }
+    
     if config.framework.is_pythonic():
         is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
     else:

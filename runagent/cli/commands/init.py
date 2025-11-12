@@ -12,21 +12,23 @@ from rich.prompt import Prompt
 
 from runagent.cli.branding import print_header
 from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
+from runagent.constants import AGENT_CONFIG_FILE_NAME, TEMPLATE_REPO_URL
 from runagent.sdk import RunAgent
 from runagent.sdk.db import DBService
 from runagent.sdk.exceptions import TemplateError
 from runagent.utils.agent import get_agent_config, get_agent_config_with_defaults
 from runagent.utils.agent_id import generate_agent_id, generate_config_fingerprint
 from runagent.utils.enums.framework import Framework
+from runagent.utils.schema import RunAgentConfig, TemplateSource
 
 console = Console()
 
 
 @click.command()
 @click.option("--template", default="default", help="Template variant (default, advanced, etc.) - for non-interactive")
-@click.option("--blank", is_flag=True, help="Start from blank template - for non-interactive")
+@click.option("--minimal", is_flag=True, help="Start from minimal template - for non-interactive")
+@click.option("--existing", is_flag=True, help="Initialize existing codebase as RunAgent project - for non-interactive")
 @click.option("--from-template", help="Specific template to use (e.g., langchain/problem_solver)")
-@click.option("--from-github", help="GitHub repository URL to clone")
 @click.option("--use-auth", type=click.Choice(['none', 'api_key']), help="Authentication type to use")
 @click.option("--name", help="Agent name - for non-interactive")
 @click.option("--description", help="Agent description - for non-interactive")
@@ -44,7 +46,7 @@ console = Console()
     default=".",
     required=False,
 )
-def init(path, template, blank, from_template, from_github, use_auth, name, description, overwrite, **kwargs):
+def init(path, template, minimal, existing, from_template, use_auth, name, description, overwrite, **kwargs):
     """
     Initialize a new RunAgent project
     
@@ -54,9 +56,9 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
     
     \b
     Non-interactive examples:
-      $ runagent init . --blank --name "My Agent" --description "Does XYZ"
+      $ runagent init . --minimal --name "My Agent" --description "Does XYZ"
+      $ runagent init /path/to/existing --existing --name "My Agent" --description "Does XYZ"
       $ runagent init . --from-template langchain/problem_solver
-      $ runagent init . --from-github https://github.com/user/repo
       $ runagent init . --langgraph --template advanced --name "My Agent"
       $ runagent init /path/to/project --use-auth api_key
     """
@@ -73,7 +75,7 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
         
         # Determine if interactive mode
         has_non_interactive_options = (
-            blank or from_template or from_github or 
+            minimal or existing or from_template or 
             (name and description) or use_auth
         )
         is_interactive = not has_non_interactive_options
@@ -95,9 +97,9 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                     'start_type',
                     message="Select starting point",
                     choices=[
-                        ('Blank Project (Own codebase)', 'blank'),
+                        ('Existing Codebase', 'existing'),
+                        ('Minimal Project', 'minimal'),
                         ('From Template (recommended)', 'template'),
-                        ('From GitHub Repository', 'github'),
                     ],
                     default=('From Template (recommended)', 'template'),
                     carousel=True
@@ -110,9 +112,15 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
             
             start_type = start_answer['start_type']
             
-            if start_type == 'blank':
-                # Blank project - use default/default
-                template_source = "blank"
+            if start_type == 'existing':
+                # Existing codebase - path must exist
+                template_source = "existing"
+                selected_template = None
+                framework = Framework.DEFAULT  # Will be detected or set later
+                
+            elif start_type == 'minimal':
+                # Minimal project - use default/default
+                template_source = "minimal"
                 selected_template = "default/default"
                 framework = Framework.DEFAULT
                 
@@ -149,26 +157,14 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 # For now, use default template
                 selected_template = f"{framework.value}/default"
                 template_source = "template"
-                
-            elif start_type == 'github':
-                # GitHub project - get repository URL
-                github_url = Prompt.ask(
-                    "[cyan]GitHub repository URL[/cyan]",
-                    default=""
-                )
-                
-                if not github_url:
-                    console.print("[dim]Initialization cancelled.[/dim]")
-                    return
-                
-                template_source = "github"
-                selected_template = github_url
-                # Framework will be detected from the cloned repository
-                framework = Framework.DEFAULT  # Will be updated after cloning
         else:
             # Non-interactive mode
-            if blank:
-                template_source = "blank"
+            if existing:
+                template_source = "existing"
+                selected_template = None
+                framework = Framework.DEFAULT  # Will be detected or set later
+            elif minimal:
+                template_source = "minimal"
                 selected_template = "default/default"
                 framework = Framework.DEFAULT
             elif from_template:
@@ -183,26 +179,65 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                         framework = Framework.DEFAULT
                 else:
                     framework = Framework.DEFAULT
-            elif from_github:
-                template_source = "github"
-                selected_template = from_github
-                framework = Framework.DEFAULT  # Will be detected after cloning
             else:
                 # Default to template mode
                 template_source = "template"
                 selected_template = template
                 framework = get_selected_framework(kwargs) or Framework.DEFAULT
         
-        # Step 2: Get project details
-
-        is_custom_path = project_path.resolve() != Path.cwd()
+        # Step 2: Get project details and path
+        
+        # For existing codebase, path handling is different
+        if template_source == "existing":
+            # For existing codebase, the path must exist
+            # In non-interactive mode, use the provided path
+            # In interactive mode, ask for the path first, then name/description
+            if is_interactive:
+                # Ask for path first (before name/description)
+                path_input = Prompt.ask(
+                    "[cyan]Project path[/cyan]",
+                    default=str(project_path.resolve())
+                )
+                project_path = Path(path_input).resolve()
+            
+            # Check if path exists
+            if not project_path.exists():
+                raise click.ClickException(
+                    f"Path does not exist: {project_path}\n"
+                    "For existing codebase, the directory must already exist."
+                )
+            
+            if not project_path.is_dir():
+                raise click.ClickException(
+                    f"Path is not a directory: {project_path}\n"
+                    "For existing codebase, the path must be a directory."
+                )
+            
+            # Check if it's already a RunAgent project
+            config_path = project_path / AGENT_CONFIG_FILE_NAME
+            if config_path.exists():
+                raise click.ClickException(
+                    f"RunAgent project already exists at {project_path}\n"
+                    f"Found existing {AGENT_CONFIG_FILE_NAME} file.\n"
+                    "This directory is already initialized as a RunAgent project."
+                )
+            
+            # Set default name based on folder name
+            is_custom_path = True
+            suggested_name = project_path.name
+            
+        else:
+            # For minimal/template projects, use existing logic
+            is_custom_path = project_path.resolve() != Path.cwd()
+        
+        # Get name and description
         if is_interactive or not (name and description):
             console.print("\n[bold]Project Details:[/bold]\n")
             
-            # Suggest name based on path
-            # Check if project path is current working directory
-            # is_cwd = project_path.resolve() == Path.cwd()
-            suggested_name = project_path.name if is_custom_path else "runagent-starter"
+            if template_source == "existing":
+                suggested_name = project_path.name
+            else:
+                suggested_name = project_path.name if is_custom_path else "runagent-starter"
             
             agent_name = Prompt.ask(
                 "[cyan]Agent name[/cyan]",
@@ -214,9 +249,8 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 default="My AI agent"
             )
         
-        # Step 3: Get project path (if not already specified)
-        if is_interactive or not is_custom_path:
-            # console.print()
+        # Step 3: Get project path (if not already specified and not existing codebase)
+        if template_source != "existing" and (is_interactive or not is_custom_path):
             custom_path = project_path / agent_name.lower().replace(" ", "-")
             suggested_path = project_path.resolve() if is_custom_path else custom_path
             path_input = Prompt.ask(
@@ -248,16 +282,18 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
             
             auth_type = auth_answer['auth_type']
         
-        # Ensure the path exists
-        project_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure the path exists (except for existing codebase which must already exist)
+        if template_source != "existing":
+            project_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Show configuration summary
+        template_display = selected_template if selected_template else "N/A"
         console.print(Panel(
             f"[bold]Project Configuration:[/bold]\n\n"
             f"[dim]Name:[/dim] [cyan]{agent_name}[/cyan]\n"
             f"[dim]Description:[/dim] [white]{agent_description}[/white]\n"
             f"[dim]Source:[/dim] [magenta]{template_source}[/magenta]\n"
-            f"[dim]Template:[/dim] [yellow]{selected_template}[/yellow]\n"
+            f"[dim]Template:[/dim] [yellow]{template_display}[/yellow]\n"
             f"[dim]Framework:[/dim] [blue]{framework.value}[/blue]\n"
             f"[dim]Auth:[/dim] [green]{auth_type}[/green]\n"
             f"[dim]Path:[/dim] [blue]{project_path}[/blue]",
@@ -266,8 +302,13 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
         ))
         
         # Initialize project based on source type
-        if template_source == "blank":
-            # Initialize blank project
+        success = False
+        if template_source == "existing":
+            # For existing codebase, just create the config file
+            # No template download needed
+            success = True  # We'll handle config creation below
+        elif template_source == "minimal":
+            # Initialize minimal project (formerly blank)
             success = sdk.init_project(
                 folder_path=project_path,
                 framework=framework.value,
@@ -282,15 +323,11 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
                 template=selected_template.split("/")[1] if "/" in selected_template else "default",
                 overwrite=overwrite
             )
-        elif template_source == "github":
-            # TODO: Clone from GitHub
-            console.print(f"[yellow]GitHub cloning not yet implemented for: {selected_template}[/yellow]")
-            success = False
         
-        if not success:
+        if not success and template_source != "existing":
             raise Exception("Project initialization failed")
         
-        # Generate agent ID and update config file
+        # Generate agent ID and create/update config file
         try:
             # Suppress Pydantic datetime warnings during config update
             warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
@@ -298,8 +335,85 @@ def init(path, template, blank, from_template, from_github, use_auth, name, desc
             # Generate unique agent ID
             agent_id = generate_agent_id()
             
-            config_path = project_path / "runagent.config.json"
-            if config_path.exists():
+            config_path = project_path / AGENT_CONFIG_FILE_NAME
+            
+            if template_source == "existing":
+                # For existing codebase, create new config from scratch
+                # Empty entrypoints list, but assign agent_id
+                from runagent.utils.schema import AgentArchitecture
+                
+                # Create valid template_source for existing codebase
+                template_source_obj = TemplateSource(
+                    repo_url=TEMPLATE_REPO_URL,
+                    author="runagent-cli",
+                    path=str(project_path)
+                )
+                
+                config = RunAgentConfig(
+                    agent_name=agent_name,
+                    description=agent_description,
+                    framework=framework,
+                    template="",  # Empty for existing codebase
+                    version="1.0.0",
+                    created_at=datetime.now(),
+                    template_source=template_source_obj,
+                    agent_architecture=AgentArchitecture(entrypoints=[]),  # Empty entrypoints list
+                    env_vars={},
+                    agent_id=agent_id,
+                    auth_settings={"type": auth_type}
+                )
+                
+                # Use model_dump() to get dict, then write directly
+                config_dict = config.to_dict()
+                
+                # Write config file
+                with open(config_path, 'w') as f:
+                    json.dump(config_dict, f, indent=2)
+                
+                console.print(f"\n[dim]✅ Generated agent ID: [cyan]{agent_id}[/cyan][/dim]")
+                console.print("[dim]✅ Created RunAgent configuration file[/dim]")
+                console.print(f"[dim]✅ Set authentication type: [green]{auth_type}[/green][/dim]")
+                console.print("[yellow]⚠️  No entrypoints configured. Add entrypoints to runagent.config.json to enable agent execution.[/yellow]")
+                
+                # Create database entry for the initialized agent
+                try:
+                    # Load config with defaults
+                    config_with_defaults = get_agent_config_with_defaults(project_path)
+                    
+                    # Generate config fingerprint
+                    config_fingerprint = generate_config_fingerprint(project_path)
+                    
+                    # Create database service and add agent
+                    db_service = DBService()
+                    
+                    # Get active project ID from user metadata
+                    active_project_id = db_service.get_active_project_id()
+                    
+                    result = db_service.add_agent(
+                        agent_id=agent_id,
+                        agent_path=str(project_path),
+                        host="",  # Will be updated when deployed
+                        port=0000,  # Will be updated when deployed
+                        framework=framework.value,
+                        status="initialized",  # New status for initialized agents
+                        agent_name=config_with_defaults.get('agent_name'),
+                        description=config_with_defaults.get('description'),
+                        template=config_with_defaults.get('template'),
+                        version=config_with_defaults.get('version'),
+                        initialized_at=config_with_defaults.get('created_at'),
+                        config_fingerprint=config_fingerprint,
+                        project_id=active_project_id,  # Get from user metadata, not config
+                    )
+                    
+                    if result.get('success'):
+                        console.print("[dim]✅ Agent registered in database[/dim]")
+                    else:
+                        console.print(f"[yellow]Could not register agent in database: {result.get('error', 'Unknown error')}[/yellow]")
+                        
+                except Exception as db_error:
+                    console.print(f"[yellow]Could not register agent in database: {db_error}[/yellow]")
+                
+            elif config_path.exists():
                 # Load config using the schema (handles missing fields gracefully)
                 config = get_agent_config(project_path)
                 
