@@ -166,7 +166,7 @@ def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
     elif extra_params:
         console.print("   Extra parameters:")
         for key, value in extra_params.items():
-            console.print(f"     --{key} = {value}")
+            console.print(f"     {key} = [green]{value}[/green]")
         input_params = extra_params
     
     else:

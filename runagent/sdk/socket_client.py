@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import uuid
 from typing import Any, AsyncIterator, Iterator, Optional
 
@@ -74,52 +75,59 @@ class SocketClient:
         if not self.is_local and self.api_key:
             extra_headers["Authorization"] = f"Bearer {self.api_key}"
         
-        async with websockets.connect(
-            uri,
-            extra_headers=extra_headers if extra_headers else None,
-            ping_interval=20,
-            ping_timeout=60,
-            close_timeout=10,
-            max_size=10 * 1024 * 1024
-        ) as websocket:
-            # Send start stream request in the exact format required
-            request_data = {
-                "entrypoint_tag": entrypoint_tag,
-                "input_args": list(input_args),  # Ensure JSON serializable
-                "input_kwargs": dict(input_kwargs),  # Ensure JSON serializable
-                "timeout_seconds": 600,  
-                "async_execution": False
-            }
-            
-            self._debug(f"Sending request: {request_data}")
-            
-            # Send the request as direct JSON
-            await websocket.send(json.dumps(request_data))
-            
-            # Receive and yield chunks
-            async for raw_message in websocket:
-                try:
-                    message = json.loads(raw_message)
-                except json.JSONDecodeError:
-                    self._debug(f"[WARN] Invalid JSON message: {raw_message}")
-                    continue
+        try:
+            async with websockets.connect(
+                uri,
+                extra_headers=extra_headers if extra_headers else None,
+                ping_interval=20,
+                ping_timeout=60,
+                close_timeout=10,
+                max_size=10 * 1024 * 1024
+            ) as websocket:
+                # Send start stream request in the exact format required
+                request_data = {
+                    "entrypoint_tag": entrypoint_tag,
+                    "input_args": list(input_args),  # Ensure JSON serializable
+                    "input_kwargs": dict(input_kwargs),  # Ensure JSON serializable
+                    "timeout_seconds": 600,  
+                    "async_execution": False
+                }
                 
-                message_type = message.get("type")
+                self._debug(f"Sending request: {request_data}")
                 
-                if message_type == "error":
-                    error_msg = message.get('error') or message.get('detail', 'Unknown error')
-                    raise Exception(f"Stream error: {error_msg}")
-                elif message_type == "status":
-                    status = message.get("status")
-                    if status == "stream_completed":
-                        self._debug("Stream completed")
-                        break
-                    elif status == "stream_started":
-                        self._debug("Stream started")
+                # Send the request as direct JSON
+                await websocket.send(json.dumps(request_data))
+                
+                # Receive and yield chunks
+                async for raw_message in websocket:
+                    try:
+                        message = json.loads(raw_message)
+                    except json.JSONDecodeError:
+                        self._debug(f"[WARN] Invalid JSON message: {raw_message}")
                         continue
-                elif message_type == "data":
-                    # Yield the actual chunk data
-                    yield message.get("content")
+                    
+                    message_type = message.get("type")
+                    
+                    if message_type == "error":
+                        error_msg = message.get('error') or message.get('detail', 'Unknown error')
+                        cleaned_msg = self._clean_error_message(error_msg)
+                        raise Exception(cleaned_msg)
+                    elif message_type == "status":
+                        status = message.get("status")
+                        if status == "stream_completed":
+                            self._debug("Stream completed")
+                            break
+                        elif status == "stream_started":
+                            self._debug("Stream started")
+                            continue
+                    elif message_type == "data":
+                        # Yield the actual chunk data
+                        yield message.get("content")
+        except Exception as e:
+            # Clean up WebSocket connection errors
+            error_msg = str(e)
+            cleaned_msg = self._clean_error_message(error_msg)
+            raise Exception(cleaned_msg)
 
     def run_stream(self, agent_id: str, entrypoint_tag: str, input_args, input_kwargs) -> Iterator[Any]:
         """Stream agent execution results (sync version)"""
@@ -140,54 +148,97 @@ class SocketClient:
             extra_headers["Authorization"] = f"Bearer {self.api_key}"
         
         # Add proper timeout and keepalive settings
-        with connect(
-            uri,
-            additional_headers=extra_headers if extra_headers else None,
-            ping_interval=20,      # Send ping every 20 seconds
-            ping_timeout=60,       # Wait up to 60 seconds for pong
-            close_timeout=10,      # Timeout for closing handshake
-            max_size=10 * 1024 * 1024,  # 10MB max message size
-            open_timeout=30  # FIXED: Add connection timeout
-        ) as websocket:
+        try:
+            with connect(
+                uri,
+                additional_headers=extra_headers if extra_headers else None,
+                ping_interval=20,      # Send ping every 20 seconds
+                ping_timeout=60,       # Wait up to 60 seconds for pong
+                close_timeout=10,      # Timeout for closing handshake
+                max_size=10 * 1024 * 1024,  # 10MB max message size
+                open_timeout=30  # FIXED: Add connection timeout
+            ) as websocket:
 
-            # Send start stream request in the exact format required
-            request_data = {
-                "entrypoint_tag": entrypoint_tag,
-                "input_args": list(input_args) if input_args else [],
-                "input_kwargs": dict(input_kwargs) if input_kwargs else {},
-                "timeout_seconds": 600,  
-                "async_execution": False
-            }
-            
-            self._debug(f"Sending request: {request_data}")
-            
-            # Send the request as direct JSON
-            websocket.send(json.dumps(request_data))
-            
-            # Receive and yield chunks
-            for raw_message in websocket:
-                try:
-                    message = json.loads(raw_message)
-                except json.JSONDecodeError:
-                    self._debug(f"[WARN] Invalid JSON message: {raw_message}")
-                    continue
+                # Send start stream request in the exact format required
+                request_data = {
+                    "entrypoint_tag": entrypoint_tag,
+                    "input_args": list(input_args) if input_args else [],
+                    "input_kwargs": dict(input_kwargs) if input_kwargs else {},
+                    "timeout_seconds": 600,  
+                    "async_execution": False
+                }
                 
-                message_type = message.get("type")
+                self._debug(f"Sending request: {request_data}")
                 
-                if message_type == "error":
-                    error_msg = message.get('error') or message.get('detail', 'Unknown error')
-                    raise Exception(f"Stream error: {error_msg}")
-                elif message_type == "status":
-                    status = message.get("status")
-                    if status == "stream_completed":
-                        self._debug("Stream completed")
-                        break
-                    elif status == "stream_started":
-                        self._debug("Stream started")
+                # Send the request as direct JSON
+                websocket.send(json.dumps(request_data))
+                
+                # Receive and yield chunks
+                for raw_message in websocket:
+                    try:
+                        message = json.loads(raw_message)
+                    except json.JSONDecodeError:
+                        self._debug(f"[WARN] Invalid JSON message: {raw_message}")
                         continue
-                elif message_type == "data":
-                    # Yield the actual chunk data
-                    yield message.get("content")
+                    
+                    message_type = message.get("type")
+                    
+                    if message_type == "error":
+                        error_msg = message.get('error') or message.get('detail', 'Unknown error')
+                        cleaned_msg = self._clean_error_message(error_msg)
+                        raise Exception(cleaned_msg)
+                    elif message_type == "status":
+                        status = message.get("status")
+                        if status == "stream_completed":
+                            self._debug("Stream completed")
+                            break
+                        elif status == "stream_started":
+                            self._debug("Stream started")
+                            continue
+                    elif message_type == "data":
+                        # Yield the actual chunk data
+                        yield message.get("content")
+        except Exception as e:
+            # Clean up WebSocket connection errors
+            error_msg = str(e)
+            cleaned_msg = self._clean_error_message(error_msg)
+            raise Exception(cleaned_msg)
+
+    def _clean_error_message(self, error_message: str) -> str:
+        """Clean up error messages by removing redundant prefixes"""
+        if not error_message:
+            return "Unknown error"
+        
+        # Remove common redundant prefixes
+        prefixes_to_remove = [
+            "received 1011 (internal error) ",
+            "Internal server error: ",
+            "Server error: ",
+            "Database error: ",
+            "HTTP Error: ",
+            "Stream error: ",
+            "Streaming failed: ",
+        ]
+        
+        cleaned = error_message
+        for prefix in prefixes_to_remove:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+        
+        # Remove status codes that appear at the start (e.g., "500: ", "403: ")
+        cleaned = re.sub(r'^\d{3}:\s*', '', cleaned)
+        
+        # Remove duplicate error messages (e.g., "error; then sent error")
+        if "; then sent" in cleaned.lower():
+            # Extract just the first part before "; then sent"
+            cleaned = cleaned.split("; then sent")[0].strip()
+        
+        # Check if this is a permission error and provide a clean message
+        if ("403" in cleaned or "permission" in cleaned.lower() or 
+            "access denied" in cleaned.lower() or "do not have permission" in cleaned.lower()):
+            return "You do not have permission to access this agent"
+        
+        return cleaned.strip() if cleaned.strip() else error_message
 
     def _debug(self, message: str) -> None:
         if os.getenv("RUNAGENT_DEBUG") or os.getenv("DISABLE_TRY_CATCH"):

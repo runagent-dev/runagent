@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import tempfile
 import time
 import zipfile
@@ -1446,6 +1447,29 @@ class RestClient:
         return None
 
 
+    def _clean_error_message(self, error_message: str) -> str:
+        """Clean up error messages by removing redundant prefixes"""
+        if not error_message:
+            return "Unknown error"
+        
+        # Remove common redundant prefixes
+        prefixes_to_remove = [
+            "Server error: ",
+            "Database error: ",
+            "HTTP Error: ",
+            "Agent execution failed: ",
+        ]
+        
+        cleaned = error_message
+        for prefix in prefixes_to_remove:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+        
+        # Remove status codes that appear at the start (e.g., "403: ")
+        cleaned = re.sub(r'^\d{3}:\s*', '', cleaned)
+        
+        return cleaned.strip() if cleaned.strip() else error_message
+
     def run_agent(
         self,
         agent_id: str,
@@ -1491,14 +1515,61 @@ class RestClient:
                         pass
                     return result
 
-            except (ClientError, ServerError, ConnectionError) as e:
+            except AuthenticationError as e:
+                # Handle authentication/permission errors (401, 403)
+                error_message = self._clean_error_message(e.message)
+                error_code = "AUTHENTICATION_ERROR"
+                if "403" in error_message or "permission" in error_message.lower() or "access denied" in error_message.lower():
+                    error_code = "PERMISSION_ERROR"
+                    # Create a clean, single error message for permission errors
+                    error_message = "You do not have permission to access this agent"
+                return {
+                    "success": False, 
+                    "data": None,
+                    "message": None,
+                    "error": {
+                        "code": error_code,
+                        "message": error_message,
+                        "details": None,
+                        "field": None
+                    },
+                    "timestamp": None,
+                    "request_id": None
+                }
+            except ServerError as e:
+                # Check if server error message contains permission/403 info (even if status is 500)
+                error_message = e.message
+                error_code = "SERVER_ERROR"
+                if ("403" in error_message or "permission" in error_message.lower() or 
+                    "access denied" in error_message.lower() or "do not have permission" in error_message.lower()):
+                    error_code = "PERMISSION_ERROR"
+                    # Create a clean, single error message for permission errors
+                    error_message = "You do not have permission to access this agent"
+                else:
+                    # Clean up server error messages to remove redundant prefixes
+                    error_message = self._clean_error_message(error_message)
+                return {
+                    "success": False, 
+                    "data": None,
+                    "message": None,
+                    "error": {
+                        "code": error_code,
+                        "message": error_message,
+                        "details": None,
+                        "field": None
+                    },
+                    "timestamp": None,
+                    "request_id": None
+                }
+            except (ClientError, ConnectionError) as e:
+                error_message = self._clean_error_message(e.message)
                 return {
                     "success": False, 
                     "data": None,
                     "message": None,
                     "error": {
                         "code": "CONNECTION_ERROR",
-                        "message": f"Agent execution failed: {e.message}",
+                        "message": error_message,
                         "details": None,
                         "field": None
                     },

@@ -108,8 +108,9 @@ class RunAgentClient:
                 self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
             )
         except Exception as e:
-            # Handle streaming errors with proper formatting
-            raise Exception(f"Streaming failed: {str(e)}")
+            # Error message is already cleaned by socket_client._clean_error_message
+            # Just re-raise with the cleaned message
+            raise Exception(str(e))
 
     def _run_stream(self, *input_args, **input_kwargs):
         """Legacy method - use run_stream instead"""
@@ -117,6 +118,18 @@ class RunAgentClient:
 
     def _build_suggestion(self, code: str, message: str) -> str | None:
         message_lower = (message or "").lower()
+
+        # Check for permission/access errors first (403, permission denied, etc.)
+        if (code == "PERMISSION_ERROR" or code == "AUTHENTICATION_ERROR" or 
+            "403" in message or "permission" in message_lower or 
+            "access denied" in message_lower or "do not have permission" in message_lower):
+            dashboard_hint = f"https://app.run-agent.ai/dashboard/agents/{self.agent_id}"
+            return (
+                "This agent doesn't belong to your account or your API key doesn't have permission to access it. "
+                f"Verify the agent ID is correct and that you have access to it. "
+                f"You can check your agents in the dashboard: {dashboard_hint}. "
+                f"If this is someone else's agent, you'll need to use their API key or have them share access."
+            )
 
         if "not found" in message_lower:
             tag_match = re.search(r"['\"](?P<tag>[A-Za-z0-9_\-]+)['\"]", message or "") if "entrypoint" in message_lower else None

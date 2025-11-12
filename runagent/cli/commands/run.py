@@ -199,7 +199,7 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
         for key, value in extra_params.items():
             # Try to parse value as JSON for complex types
             # TODO: Will add type inference later
-            console.print(f"     --{key} = [green]{value}[/green]")
+            console.print(f"     {key} = [green]{value}[/green]")
         input_params = extra_params
     
     else:
