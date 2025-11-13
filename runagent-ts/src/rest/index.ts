@@ -84,6 +84,10 @@ export class RestClient {
           error: {
             code,
             message: errorMessage,
+            suggestion:
+              code === 'PERMISSION_ERROR'
+                ? 'Verify the agent ID and ensure your API key has access to this agent.'
+                : 'Check that RUNAGENT_API_KEY is set correctly and has not expired.',
           },
         };
       }
@@ -94,6 +98,8 @@ export class RestClient {
           error: {
             code: 'VALIDATION_ERROR',
             message: errorMessage,
+            suggestion:
+              'Inspect the input arguments and ensure they match the agent entrypoint schema.',
           },
         };
       }
@@ -104,6 +110,8 @@ export class RestClient {
           error: {
             code: 'CONNECTION_ERROR',
             message: errorMessage,
+            suggestion:
+              'Check your network connection and confirm the RunAgent service URL is reachable.',
           },
         };
       }
@@ -114,6 +122,7 @@ export class RestClient {
           error: {
             code: 'SERVER_ERROR',
             message: errorMessage,
+            suggestion: 'Try the request again. If the issue persists, contact RunAgent support.',
           },
         };
       }
@@ -124,6 +133,8 @@ export class RestClient {
           error: {
             code: 'CLIENT_ERROR',
             message: errorMessage,
+            suggestion:
+              'Review the request payload or configuration for potential mistakes.',
           },
         };
       }
@@ -133,6 +144,7 @@ export class RestClient {
         error: {
           code: 'UNKNOWN_ERROR',
           message: errorMessage,
+          suggestion: 'Retry the request or inspect the agent logs for more detail.',
         },
       };
     }

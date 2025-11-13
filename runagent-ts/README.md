@@ -55,7 +55,7 @@ For browser builds, you can expose these via bundler secrets or a custom `global
 ### 1. Remote agent
 
 ```ts
-import { RunAgentClient } from 'runagent';
+import { RunAgentClient, RunAgentExecutionError } from 'runagent';
 
 const client = new RunAgentClient({
   agentId: 'agent-id-from-dashboard',
@@ -77,7 +77,7 @@ console.log(result);
 ### 2. Remote streaming
 
 ```ts
-import { RunAgentClient } from 'runagent';
+import { RunAgentClient, RunAgentExecutionError } from 'runagent';
 
 const client = new RunAgentClient({
   agentId: 'agent-id-from-dashboard',
@@ -179,6 +179,21 @@ for await (const chunk of client.runStream({ message: 'Need help' })) {
 
 - `getExtraParams(): Record<string, unknown> | undefined`  
   Returns any metadata passed in `extraParams`. Reserved for forward compatibility.
+
+- **Errors**  
+  Both `run()` and `runStream()` throw `RunAgentExecutionError` when the agent reports a failure (or when the transport breaks). Inspect `error.code`, `error.message`, and `error.suggestion` to deliver actionable feedback:
+
+  ```ts
+  try {
+    const result = await client.run({ prompt: '...' });
+  } catch (error) {
+    if (error instanceof RunAgentExecutionError) {
+      console.error(error.code, error.message, error.suggestion);
+    } else {
+      throw error;
+    }
+  }
+  ```
 
 ### Constructor precedence rules
 
