@@ -3,9 +3,6 @@ name: Create GitHub Release and Publish SDKs
 on:
   push:
     branches: [main]  # Trigger on ANY push to main (including PR merges)
-  pull_request:
-    types: [closed]   # Also trigger when PRs are merged
-    branches: [main]
 jobs:
   detect-release:
     runs-on: ubuntu-latest
