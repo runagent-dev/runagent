@@ -1,0 +1,58 @@
+name: SDK Release Router
+
+on:
+  workflow_call:
+    inputs:
+      sdk:
+        description: Identifier for the SDK (e.g., python, typescript)
+        required: true
+        type: string
+      working-directory:
+        description: Path where build commands should run
+        required: true
+        type: string
+      tag:
+        description: Git tag for this release (e.g., v0.1.0)
+        required: true
+        type: string
+      version:
+        description: Package version without the leading v (e.g., 0.1.0)
+        required: true
+        type: string
+      python-version:
+        description: Python version to use when sdk == python
+        required: false
+        type: string
+        default: "3.11"
+      node-version:
+        description: Node.js version to use when sdk == typescript
+        required: false
+        type: string
+        default: "20"
+    secrets:
+      PYPI_API_TOKEN:
+        required: false
+      NPM_TOKEN:
+        required: false
+
+jobs:
+  python:
+    if: inputs.sdk == 'python' && inputs.version != ''
+    uses: ./.github/workflows/python-release.yml
+    with:
+      working-directory: ${{ inputs.working-directory }}
+      tag: ${{ inputs.tag }}
+      version: ${{ inputs.version }}
+      python-version: ${{ inputs.python-version }}
+    secrets: inherit
+
+  typescript:
+    if: inputs.sdk == 'typescript' && inputs.version != ''
+    uses: ./.github/workflows/typescript-release.yml
+    with:
+      working-directory: ${{ inputs.working-directory }}
+      tag: ${{ inputs.tag }}
+      version: ${{ inputs.version }}
+      node-version: ${{ inputs.node-version }}
+    secrets: inherit
+
