@@ -22,6 +22,7 @@ export interface ApiResponse<T = JsonValue> {
     | {
         code?: string;
         message?: string;
+        suggestion?: string | null;
         details?: unknown;
         field?: string | null;
       };

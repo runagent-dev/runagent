@@ -12,8 +12,10 @@ import type {
   RunAgentConfig,
   AgentArchitecture,
   JsonValue,
+  ApiResponse,
 } from '../types/index.js';
 import type { RunAgentRegistry } from '../database/index.js';
+import { RunAgentExecutionError } from '../errors/index.js';
 
 type WebSocketClientType = BrowserWebSocketClient | NodeWebSocketClient;
 
@@ -242,9 +244,10 @@ export class RunAgentClient {
     }
 
     if (!host || !port) {
-      throw new Error(
-        `Unable to determine host/port for local agent ${this.agentId}. ` +
-          `Provide 'host' and 'port' in RunAgentClient config or register the agent locally.`
+      throw new RunAgentExecutionError(
+        'AGENT_ADDRESS_NOT_FOUND',
+        `Unable to determine host/port for local agent ${this.agentId}`,
+        "Provide 'host' and 'port' in RunAgentClient config or register the agent locally."
       );
     }
 
@@ -288,7 +291,8 @@ export class RunAgentClient {
     await this.ensureInitialized();
 
     if (this.entrypointTag.endsWith('_stream')) {
-      throw new Error(
+      throw new RunAgentExecutionError(
+        'STREAM_ENTRYPOINT',
         `Entrypoint \`${this.entrypointTag}\` is streaming. Use runStream() instead.`
       );
     }
@@ -302,7 +306,8 @@ export class RunAgentClient {
     await this.ensureInitialized();
 
     if (!this.entrypointTag.endsWith('_stream')) {
-      throw new Error(
+      throw new RunAgentExecutionError(
+        'NON_STREAM_ENTRYPOINT',
         `Entrypoint \`${this.entrypointTag}\` is not streaming. Use run() instead.`
       );
     }
@@ -358,13 +363,11 @@ export class RunAgentClient {
       return payload ?? null;
     }
 
-    const errorMessage =
-      typeof response.error === 'string'
-        ? response.error
-        : (response.error as { message?: string })?.message ??
-          'Agent execution failed';
-
-    throw new Error(errorMessage);
+    throw this.buildExecutionError(
+      response.error,
+      response.message,
+      'EXECUTION_ERROR'
+    );
   }
 
   private executeStream(
@@ -423,5 +426,41 @@ export class RunAgentClient {
    */
   static async getRegistryInstance(): Promise<RunAgentRegistry | null> {
     return await this.getRegistry(true);
+  }
+
+  private buildExecutionError(
+    errorInfo: ApiResponse['error'],
+    fallbackMessage?: string | null,
+    defaultCode = 'UNKNOWN_ERROR'
+  ): RunAgentExecutionError {
+    const fallback = this.sanitizeMessage(fallbackMessage) ?? 'Unknown error';
+
+    if (!errorInfo) {
+      return new RunAgentExecutionError(defaultCode, fallback);
+    }
+
+    if (typeof errorInfo === 'string') {
+      return new RunAgentExecutionError(
+        defaultCode,
+        this.sanitizeMessage(errorInfo) ?? fallback
+      );
+    }
+
+    const { code, message, suggestion, details } = errorInfo;
+    const normalizedMessage =
+      this.sanitizeMessage(message) ?? fallback;
+
+    return new RunAgentExecutionError(
+      code ?? defaultCode,
+      normalizedMessage,
+      suggestion,
+      details
+    );
+  }
+
+  private sanitizeMessage(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 }

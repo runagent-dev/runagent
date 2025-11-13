@@ -1,5 +1,6 @@
 import { CoreSerializer } from '../serializer/index.js';
 import type { ExecutionRequest, JsonValue } from '../types/index.js';
+import { RunAgentExecutionError } from '../errors/index.js';
 
 interface WebSocketConfig {
   baseSocketUrl?: string;
@@ -20,6 +21,7 @@ interface StreamMessage {
   status?: string;
   payload?: unknown;
   error?: unknown;
+  message?: unknown;
 }
 
 export abstract class BaseWebSocketClient {
@@ -128,6 +130,14 @@ export abstract class BaseWebSocketClient {
         ? ((message.data as Record<string, unknown>).status as string)
         : undefined;
 
+    const messageField =
+      message.message ??
+      (typeof message.data === 'object' &&
+      message.data !== null &&
+      'message' in (message.data as Record<string, unknown>)
+        ? (message.data as Record<string, unknown>).message
+        : undefined);
+
     const error =
       message.error ??
       message.detail ??
@@ -144,7 +154,7 @@ export abstract class BaseWebSocketClient {
       message.delta ??
       undefined;
 
-    return { type, status, payload, error };
+    return { type, status, payload, error, message: messageField };
   }
 
   protected cleanErrorMessage(error: unknown): string {
@@ -211,5 +221,97 @@ export abstract class BaseWebSocketClient {
     }
 
     return payload;
+  }
+
+  protected buildStreamError(streamMessage: StreamMessage): RunAgentExecutionError {
+    const rawError =
+      streamMessage.error ??
+      streamMessage.message ??
+      streamMessage.payload ??
+      'Unknown error';
+
+    const cleanedMessage = this.cleanErrorMessage(rawError);
+
+    let suggestion: string | null | undefined;
+    let details: unknown;
+
+    const payloadCandidate =
+      typeof streamMessage.payload === 'object' && streamMessage.payload !== null
+        ? (streamMessage.payload as Record<string, unknown>)
+        : undefined;
+
+    if (payloadCandidate) {
+      if (typeof payloadCandidate.message === 'string' && !streamMessage.error) {
+        const cleanedPayloadMessage = this.cleanErrorMessage(
+          payloadCandidate.message
+        );
+        if (cleanedPayloadMessage) {
+          return new RunAgentExecutionError(
+            payloadCandidate.code as string || 'STREAM_ERROR',
+            cleanedPayloadMessage,
+            typeof payloadCandidate.suggestion === 'string'
+              ? payloadCandidate.suggestion
+              : undefined,
+            payloadCandidate.details
+          );
+        }
+      }
+
+      if (typeof payloadCandidate.suggestion === 'string') {
+        suggestion = payloadCandidate.suggestion;
+      }
+      if ('details' in payloadCandidate) {
+        details = payloadCandidate.details;
+      }
+    }
+
+    return new RunAgentExecutionError(
+      'STREAM_ERROR',
+      cleanedMessage || 'Stream failed',
+      suggestion,
+      details
+    );
+  }
+
+  protected handleStatusMessage(
+    streamMessage: StreamMessage
+  ): { action: 'continue' } | { action: 'complete' } | { action: 'error'; error: RunAgentExecutionError } {
+    const status = streamMessage.status?.toLowerCase();
+
+    if (!status || status === 'stream_started' || status === 'stream_progress' || status === 'stream_update') {
+      return { action: 'continue' };
+    }
+
+    if (status === 'stream_completed') {
+      return { action: 'complete' };
+    }
+
+    if (
+      status === 'stream_error' ||
+      status === 'stream_failed' ||
+      status === 'stream_interrupted'
+    ) {
+      return { action: 'error', error: this.buildStreamError(streamMessage) };
+    }
+
+    if (status === 'stream_retry') {
+      const message =
+        typeof streamMessage.payload === 'object' &&
+        streamMessage.payload !== null &&
+        typeof (streamMessage.payload as Record<string, unknown>).message === 'string'
+          ? ((streamMessage.payload as Record<string, unknown>).message as string)
+          : 'Stream temporarily unavailable; retrying';
+
+      return {
+        action: 'error',
+        error: new RunAgentExecutionError(
+          'STREAM_RETRY',
+          this.cleanErrorMessage(message),
+          'Retry the request after a short delay.'
+        ),
+      };
+    }
+
+    return { action: 'continue' };
   }
 }

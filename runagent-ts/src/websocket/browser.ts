@@ -1,4 +1,5 @@
 import { BaseWebSocketClient } from './base.js';
+import { RunAgentExecutionError } from '../errors/index.js';
 
 
 // declare global {
@@ -99,15 +100,19 @@ export class BrowserWebSocketClient extends BaseWebSocketClient {
         const streamMessage = this.parseStreamMessage(event.data as string);
 
         if (streamMessage.type === 'status') {
-          if (streamMessage.status === 'stream_completed') {
+          const statusAction = this.handleStatusMessage(streamMessage);
+          if (statusAction.action === 'complete') {
             finished = true;
             resolveAll();
+          } else if (statusAction.action === 'error') {
+            error = statusAction.error;
+            rejectAll(error);
           }
           return;
         }
 
         if (streamMessage.type === 'error') {
-          error = new Error(this.cleanErrorMessage(streamMessage.error));
+          error = this.buildStreamError(streamMessage);
           rejectAll(error);
           return;
         }
@@ -123,18 +128,38 @@ export class BrowserWebSocketClient extends BaseWebSocketClient {
           messageQueue.push(payload);
         }
       } catch (err) {
-        error = err instanceof Error ? err : new Error('Unknown error');
-        rejectAll(error);
+        const normalized =
+          err instanceof RunAgentExecutionError
+            ? err
+            : new RunAgentExecutionError(
+                'STREAM_ERROR',
+                this.cleanErrorMessage(
+                  err instanceof Error ? err.message : err ?? 'Unknown error'
+                )
+              );
+        error = normalized;
+        rejectAll(normalized);
       }
     };
 
     const closeHandler = () => {
+      if (!finished && !error) {
+        error = new RunAgentExecutionError(
+          'CONNECTION_ERROR',
+          'Stream connection closed unexpectedly'
+        );
+        rejectAll(error);
+      } else {
+        resolveAll();
+      }
       finished = true;
-      resolveAll();
     };
 
     const errorHandler = (err: Event) => {
-      error = new Error(`WebSocket error: ${err}`);
+      error = new RunAgentExecutionError(
+        'CONNECTION_ERROR',
+        this.cleanErrorMessage(err.toString())
+      );
       rejectAll(error);
     };
 
