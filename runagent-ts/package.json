@@ -8,6 +8,10 @@
   "main": "./dist/runagent-client.cjs",
   "module": "./dist/runagent-client.js",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runagent-dev/runagent"
+  },
   "exports": {
     ".": {
       "import": {
