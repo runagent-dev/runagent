@@ -38,7 +38,10 @@ interface IteratorResolverItem {
 }
 
 export class BrowserWebSocketClient extends BaseWebSocketClient {
-  createWebSocket(url: string): WebSocket {
+  createWebSocket(
+    url: string,
+    _headers?: Record<string, string>
+  ): WebSocket {
     return new WebSocket(url);
   }
 
@@ -93,39 +96,31 @@ export class BrowserWebSocketClient extends BaseWebSocketClient {
 
     const messageHandler = (event: MessageEvent) => {
       try {
-        console.log('received=> ', event.data);
-        const safeMsg = this.serializer.deserializeMessage(event.data as string);
+        const streamMessage = this.parseStreamMessage(event.data as string);
 
-        if (safeMsg.error) {
-          error = new Error(`Stream error: ${safeMsg.error}`);
+        if (streamMessage.type === 'status') {
+          if (streamMessage.status === 'stream_completed') {
+            finished = true;
+            resolveAll();
+          }
+          return;
+        }
+
+        if (streamMessage.type === 'error') {
+          error = new Error(this.cleanErrorMessage(streamMessage.error));
           rejectAll(error);
           return;
         }
 
-        if (safeMsg.type === 'status') {
-          const status = (safeMsg.data as Record<string, unknown>)?.status;
-          if (status === 'stream_completed') {
-            finished = true;
-            resolveAll();
-            return;
-          } else if (status === 'stream_started') {
-            return;
+        const payload = this.deserializeStreamPayload(streamMessage.payload);
+
+        if (resolvers.length > 0) {
+          const resolver = resolvers.shift();
+          if (resolver) {
+            resolver.resolve({ done: false, value: payload });
           }
-        } else if (safeMsg.type === 'ERROR') {
-          error = new Error(`Agent error: ${JSON.stringify(safeMsg.data)}`);
-          rejectAll(error);
-          return;
         } else {
-          if (resolvers.length > 0) {
-            console.log('resolving immediately');
-            const resolver = resolvers.shift();
-            if (resolver) {
-              resolver.resolve({ done: false, value: safeMsg.data });
-            }
-          } else {
-            console.log('queueing message');
-            messageQueue.push(safeMsg.data);
-          }
+          messageQueue.push(payload);
         }
       } catch (err) {
         error = err instanceof Error ? err : new Error('Unknown error');

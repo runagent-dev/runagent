@@ -5,13 +5,6 @@ interface IteratorResolverItem {
   reject: (error: Error) => void;
 }
 
-interface NodeWebSocket {
-  on(event: string, callback: (...args: unknown[]) => void): void;
-  send(data: string): void;
-  close(): void;
-  readyState: number;
-}
-
 export class NodeWebSocketClient extends BaseWebSocketClient {
   private WebSocketClass: any = null;
 
@@ -36,13 +29,16 @@ export class NodeWebSocketClient extends BaseWebSocketClient {
     }
   }
 
-  async createWebSocket(url: string): Promise<NodeWebSocket> {
+  async createWebSocket(
+    url: string,
+    headers?: Record<string, string>
+  ): Promise<any> {
     const WebSocket = await this.loadWebSocket();
-    return new WebSocket(url) as NodeWebSocket;
+    return new WebSocket(url, headers ? { headers } : undefined);
   }
 
   protected async waitForConnection(websocket: unknown): Promise<void> {
-    const ws = websocket as NodeWebSocket;
+    const ws = websocket as any;
     return new Promise((resolve, reject) => {
       ws.on('open', () => resolve());
       ws.on('error', (...args: unknown[]) => {
@@ -53,23 +49,23 @@ export class NodeWebSocketClient extends BaseWebSocketClient {
   }
 
   protected sendMessage(websocket: unknown, message: string): void {
-    const ws = websocket as NodeWebSocket;
+    const ws = websocket as any;
     ws.send(message);
   }
 
   protected isWebSocketOpen(websocket: unknown): boolean {
-    const ws = websocket as NodeWebSocket;
+    const ws = websocket as any;
     return ws.readyState === 1; // WebSocket.OPEN
   }
 
   protected closeWebSocket(websocket: unknown): void {
-    const ws = websocket as NodeWebSocket;
+    const ws = websocket as any;
     ws.close();
   }
 
   // Rest of the methods remain the same...
   protected async *createWebSocketIterator(websocket: unknown): AsyncGenerator<unknown, void, unknown> {
-    const ws = websocket as NodeWebSocket;
+    const ws = websocket as any;
     const messageQueue: unknown[] = [];
     const resolvers: IteratorResolverItem[] = [];
     let finished = false;
@@ -96,39 +92,32 @@ export class NodeWebSocketClient extends BaseWebSocketClient {
     const messageHandler = (...args: unknown[]) => {
       const data = args[0] as Buffer | string;
       try {
-        console.log('received=> ', data.toString());
-        const safeMsg = this.serializer.deserializeMessage(data.toString());
+        const raw = typeof data === 'string' ? data : data.toString();
+        const streamMessage = this.parseStreamMessage(raw);
 
-        if (safeMsg.error) {
-          error = new Error(`Stream error: ${safeMsg.error}`);
+        if (streamMessage.type === 'status') {
+          if (streamMessage.status === 'stream_completed') {
+            finished = true;
+            resolveAll();
+          }
+          return;
+        }
+
+        if (streamMessage.type === 'error') {
+          error = new Error(this.cleanErrorMessage(streamMessage.error));
           rejectAll(error);
           return;
         }
 
-        if (safeMsg.type === 'status') {
-          const status = (safeMsg.data as Record<string, unknown>)?.status;
-          if (status === 'stream_completed') {
-            finished = true;
-            resolveAll();
-            return;
-          } else if (status === 'stream_started') {
-            return;
+        const payload = this.deserializeStreamPayload(streamMessage.payload);
+
+        if (resolvers.length > 0) {
+          const resolver = resolvers.shift();
+          if (resolver) {
+            resolver.resolve({ done: false, value: payload });
           }
-        } else if (safeMsg.type === 'ERROR') {
-          error = new Error(`Agent error: ${JSON.stringify(safeMsg.data)}`);
-          rejectAll(error);
-          return;
         } else {
-          if (resolvers.length > 0) {
-            console.log('resolving immediately');
-            const resolver = resolvers.shift();
-            if (resolver) {
-              resolver.resolve({ done: false, value: safeMsg.data });
-            }
-          } else {
-            console.log('queueing message');
-            messageQueue.push(safeMsg.data);
-          }
+          messageQueue.push(payload);
         }
       } catch (err) {
         error = err instanceof Error ? err : new Error('Unknown error');

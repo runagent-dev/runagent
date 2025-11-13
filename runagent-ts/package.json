@@ -34,14 +34,15 @@
     "vite-plugin-dts": "^3.0.0"
   },
   "peerDependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "better-sqlite3": "^12.2.0"
   },
   "peerDependenciesMeta": {
     "ws": {
       "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
     }
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.2.0"
   }
 }
