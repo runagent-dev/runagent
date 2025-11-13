@@ -96,9 +96,14 @@ jobs:
           fi
           echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Remove injected npm auth token (use OIDC)
+        run: npm config delete //registry.npmjs.org/:_authToken || true
+
       - name: Publish package to npm
         if: steps.check-npm.outputs.should_publish == 'true'
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ""
 
       - name: Skip publish (already exists)
         if: steps.check-npm.outputs.should_publish != 'true'

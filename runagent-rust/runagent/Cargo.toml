@@ -1,6 +1,6 @@
 [package]
 name = "runagent"
-version = "0.1.28"
+version = "0.1.29"
 edition = "2021"
 description = "RunAgent SDK for Rust - Client SDK for interacting with deployed AI agents"
 license = "MIT"
