@@ -90,6 +90,9 @@ jobs:
     needs: detect-release
     if: needs.detect-release.outputs.should_release == 'true'
     uses: ./.github/workflows/reusable-sdk-release.yml
+    permissions:
+      contents: read
+      id-token: write
     with:
       sdk: python
       working-directory: .
@@ -102,6 +105,9 @@ jobs:
     needs: detect-release
     if: needs.detect-release.outputs.should_release == 'true'
     uses: ./.github/workflows/reusable-sdk-release.yml
+    permissions:
+      contents: read
+      id-token: write
     with:
       sdk: typescript
       working-directory: runagent-ts
