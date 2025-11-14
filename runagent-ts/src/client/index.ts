@@ -271,6 +271,18 @@ export class RunAgentClient {
       );
 
       if (!selectedEntrypoint) {
+        const availableEntrypoints =
+          this.agentArchitecture.entrypoints
+            ?.map((entrypoint) => entrypoint.tag)
+            .filter(Boolean) || [];
+
+        console.error('[RunAgentClient] Entrypoint not found.', {
+          requested: this.entrypointTag,
+          agentId: this.agentId,
+          availableEntrypoints,
+          architecture: this.agentArchitecture,
+        });
+
         throw new Error(
           `Entrypoint \`${this.entrypointTag}\` not found in agent ${this.agentId}`
         );
