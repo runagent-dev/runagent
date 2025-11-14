@@ -1,14 +1,14 @@
 {
-  "agent_name": "A Rust backend agent for Agno",
-  "description": "A simple placeholder agent",
+  "agent_name": "Agno agent testing",
+  "description": "My AI agent",
   "framework": "agno",
-  "template": "default",
+  "template": "",
   "version": "1.0.0",
-  "created_at": "2025-06-25 13:42:03",
+  "created_at": "2025-11-14T16:17:22.317584",
   "template_source": {
     "repo_url": "https://github.com/runagent-dev/runagent.git",
-    "path": "templates/default",
-    "author": "sawradip"
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/templates/agno/default"
   },
   "agent_architecture": {
     "entrypoints": [
@@ -24,6 +24,9 @@
       }
     ]
   },
-  "agent_id": "abc4f000-0000-0000-0000-000000000000"
+  "env_vars": {},
+  "agent_id": "ac29bd73-b3d3-42c8-a98f-5d7aec7ee919",
+  "auth_settings": {
+    "type": "api_key"
+  }
 }
-

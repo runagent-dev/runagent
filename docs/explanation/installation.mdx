@@ -31,10 +31,28 @@ RunAgent provides Python, JavaScript, Rust, and Go SDKs along with a powerful CL
     runagent --version
     ```
   </Step>
-  <Step title="Login (Optional)">
-    For cloud deployment features (coming soon), login to get your API key:
+  <Step title="Setup Authentication (Optional)">
+    For cloud deployment and middleware sync features, configure your authentication:
     ```bash
-    runagent login
+    runagent setup
+    ```
+    
+    This will prompt you to choose between:
+    - **Express Setup (Browser login)**: Opens your browser for secure authentication
+    - **Manual Setup**: Enter your API key directly
+    
+    <Note>
+      **Express Setup** uses device code authentication - you'll get a code to enter in your browser, and the CLI will automatically complete the setup once you authenticate.
+    </Note>
+    
+    To view your current configuration:
+    ```bash
+    runagent whoami
+    ```
+    
+    To reconfigure:
+    ```bash
+    runagent setup --again
     ```
     </Step>
     </Steps>

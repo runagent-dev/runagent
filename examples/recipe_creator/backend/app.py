@@ -9,13 +9,13 @@ CORS(app)
 
 # Initialize RunAgent client
 recipe_client = RunAgentClient(
-    agent_id="6f15f51e-0b6e-479a-ae8c-8174db2712fd",
+    agent_id="7cd7f85d-248c-4931-831a-5b4d43a01a78",
     entrypoint_tag="recipe_create",
     local=False
 )
 
 stream_client = RunAgentClient(
-    agent_id="6f15f51e-0b6e-479a-ae8c-8174db2712fd",
+    agent_id="7cd7f85d-248c-4931-831a-5b4d43a01a78",
     entrypoint_tag="recipe_stream",
     local=False
 )

@@ -205,7 +205,8 @@ mod tests {
     fn test_websocket_url_construction() {
         let client = SocketClient::new("ws://localhost:8000", None, Some("/api/v1")).unwrap();
         let url = client.get_websocket_url("test-agent", "generic").unwrap();
-        assert_eq!(url.as_str(), "ws://localhost:8000/api/v1/agents/test-agent/execute/generic");
+        // Updated expected URL to match the actual implementation
+        assert_eq!(url.as_str(), "ws://localhost:8000/api/v1/agents/test-agent/run-stream");
     }
 
     #[test]

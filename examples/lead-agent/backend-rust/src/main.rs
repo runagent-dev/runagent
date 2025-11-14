@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tower_http::cors::{CorsLayer, AllowOrigin};
 
 // RunAgent configuration
-const RUNAGENT_ID: &str = "93eaf000-0000-0000-0000-000000000000";
+const RUNAGENT_ID: &str = "bd87871d-b4c4-4ec1-990b-bef0ea4766f7";
 
 // Request/Response types
 #[derive(Deserialize)]
@@ -150,22 +150,26 @@ async fn score_leads(
             println!("[DEBUG] Agent result type: {}", result);
             println!("[DEBUG] Agent result keys: {:?}", result.as_object().map(|o| o.keys().collect::<Vec<_>>()));
             
-            // Check if result is a JSON string that needs parsing
-            let final_result = if let Some(result_str) = result.as_str() {
-                match serde_json::from_str::<Value>(result_str) {
-                    Ok(parsed) => {
-                        println!("[DEBUG] Parsed JSON string result");
-                        parsed
+            // Extract payload field if it exists (RunAgent wraps result in {"payload": "...", "type": "object"})
+            let final_result = if let Some(obj) = result.as_object() {
+                if let Some(payload_value) = obj.get("payload") {
+                    if let Some(payload_str) = payload_value.as_str() {
+                        // Try to parse the payload JSON string
+                        serde_json::from_str::<Value>(payload_str).unwrap_or(result)
+                    } else {
+                        result
                     }
-                    Err(e) => {
-                        println!("[DEBUG] Failed to parse JSON string: {}", e);
-                        println!("[DEBUG] Result string length: {}", result_str.len());
-                        println!("[DEBUG] Result string preview (first 500 chars): {}", 
-                                 result_str.chars().take(500).collect::<String>());
-                        // If parsing fails, return the raw string as a JSON value
+                } else {
+                    // Check if result is a JSON string that needs parsing
+                    if let Some(result_str) = result.as_str() {
+                        serde_json::from_str::<Value>(result_str).unwrap_or(result)
+                    } else {
                         result
                     }
                 }
+            } else if let Some(result_str) = result.as_str() {
+                // Result is a string, try to parse it
+                serde_json::from_str::<Value>(result_str).unwrap_or(result)
             } else {
                 result
             };

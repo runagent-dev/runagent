@@ -1,0 +1,308 @@
+---
+title: 'Lead Scoring Agent'
+description: 'Build an AI-powered lead scoring system with automated email generation'
+icon: 'chart-line'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Completed the [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## What You'll Build
+
+In this tutorial, you'll create a lead scoring agent that:
+- Scores candidates based on job descriptions using AI
+- Ranks leads automatically with intelligent analysis
+- Generates personalized emails for top candidates
+- Provides a complete SaaS solution with frontend and backend
+- Uses CrewAI flows for multi-agent orchestration
+
+## The Lead Scoring Challenge
+
+Recruiting and lead qualification is time-consuming:
+- **Manual screening**: Reviewing hundreds of resumes manually
+- **Inconsistent scoring**: Different recruiters score differently
+- **Email personalization**: Writing personalized emails takes hours
+- **Scalability**: Hard to scale manual processes
+
+RunAgent solves this by automating the entire lead scoring workflow with AI agents that can analyze, score, and communicate with candidates.
+
+## Architecture Overview
+
+The lead scoring agent uses a multi-layered architecture:
+
+```
+┌─────────────────┐
+│   React Frontend │
+│   (Port 5173)   │
+└────────┬────────┘
+         │ HTTP REST API
+         ↓
+┌─────────────────┐
+│  Flask Backend  │
+│   (Port 8000)   │
+└────────┬────────┘
+         │ RunAgent Python SDK
+         ↓
+┌─────────────────┐
+│  RunAgent Agent │
+│  (CrewAI Flow)  │
+└─────────────────┘
+```
+
+## Step 1: Understanding the Agent Structure
+
+The lead scoring agent uses CrewAI flows to orchestrate multiple AI agents:
+
+**Key Components:**
+- **LeadDataCollectionCrew**: Collects and validates lead data
+- **LeadAnalysisCrew**: Analyzes candidate profiles
+- **LeadScoringCrew**: Scores candidates based on job requirements
+- **EmailGenerationCrew**: Creates personalized emails
+
+**Entrypoints:**
+- `lead_score_flow`: Main flow that orchestrates the entire process
+- `score_candidate`: Score a single candidate
+
+## Step 2: Agent Configuration
+
+The agent is configured using `runagent.config.json`:
+
+```json
+{
+  "agent_name": "lead-scoring",
+  "description": "AI-powered lead scoring with email generation",
+  "framework": "crewai",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "lead_score_flow",
+        "tag": "lead_score_flow"
+      },
+      {
+        "file": "main.py",
+        "module": "score_candidate",
+        "tag": "score_candidate"
+      }
+    ]
+  }
+}
+```
+
+## Step 3: Core Agent Logic (Gist)
+
+The agent processes candidates through multiple stages:
+
+```python
+# Simplified flow structure
+def lead_score_flow(
+    candidates: List[Dict],
+    job_description: str,
+    top_n: int = 3,
+    generate_emails: bool = True,
+    additional_instructions: str = ""
+) -> Dict[str, Any]:
+    """
+    Main flow that:
+    1. Collects and validates candidate data
+    2. Analyzes each candidate's profile
+    3. Scores candidates based on job requirements
+    4. Ranks candidates and selects top N
+    5. Generates personalized emails
+    """
+    # Data collection
+    validated_candidates = collect_lead_data(candidates)
+    
+    # Analysis and scoring
+    scored_candidates = score_leads(
+        validated_candidates,
+        job_description,
+        additional_instructions
+    )
+    
+    # Ranking
+    top_candidates = rank_candidates(scored_candidates, top_n)
+    
+    # Email generation
+    if generate_emails:
+        emails = generate_emails(top_candidates, job_description)
+        return {
+            "scored_candidates": scored_candidates,
+            "top_candidates": top_candidates,
+            "emails": emails
+        }
+    
+    return {
+        "scored_candidates": scored_candidates,
+        "top_candidates": top_candidates
+    }
+```
+
+## Step 4: Backend Integration
+
+The Flask backend provides REST API endpoints:
+
+```python
+# Backend API structure
+@app.route('/api/score-leads', methods=['POST'])
+def score_leads():
+    """
+    Endpoint that:
+    - Receives candidates and job description
+    - Calls RunAgent agent
+    - Returns scored results
+    """
+    client = RunAgentClient(
+        agent_id=agent_id,
+        entrypoint_tag="lead_score_flow",
+        local=False
+    )
+    
+    result = client.run(
+        candidates=candidates,
+        job_description=job_description,
+        top_n=top_n,
+        generate_emails=generate_emails
+    )
+    
+    return jsonify(result)
+```
+
+## Step 5: Frontend Integration
+
+The React frontend provides a user-friendly interface:
+
+**Key Features:**
+- CSV upload for candidate data
+- Job description input
+- Real-time scoring results
+- Email preview and download
+- Top candidates visualization
+
+## Step 6: Deployment
+
+### Local Deployment
+
+```bash
+# 1. Deploy the RunAgent agent
+cd examples/lead-agent/lead-score-flow
+runagent serve .
+
+# 2. Start the backend
+cd ../backend
+python app.py
+
+# 3. Start the frontend
+cd ../frontend
+npm run dev
+```
+
+### Production Deployment
+
+The agent can be deployed to RunAgent Cloud:
+
+```bash
+runagent deploy .
+```
+
+## What You've Accomplished
+
+You've built a complete lead scoring SaaS solution:
+
+<CardGroup cols={2}>
+  <Card title="🤖 AI-Powered Scoring" icon="robot">
+    Automated candidate scoring using multi-agent AI workflows
+  </Card>
+  <Card title="📊 Intelligent Ranking" icon="chart-bar">
+    Automatic ranking of candidates based on job fit
+  </Card>
+  <Card title="✉️ Email Generation" icon="envelope">
+    Personalized email generation for top candidates
+  </Card>
+  <Card title="🌐 Full-Stack Solution" icon="globe">
+    Complete SaaS application with frontend and backend
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Multi-Agent Orchestration
+- Uses CrewAI flows to coordinate multiple specialized agents
+- Each agent handles a specific aspect of the scoring process
+- Parallel processing for efficient candidate evaluation
+
+### Intelligent Scoring
+- Analyzes candidate profiles against job requirements
+- Considers skills, experience, and cultural fit
+- Provides detailed scoring breakdowns
+
+### Email Personalization
+- Generates context-aware emails for each candidate
+- Incorporates specific candidate details
+- Maintains professional tone and structure
+
+## Example Usage
+
+```python
+from runagent import RunAgentClient
+
+client = RunAgentClient(
+    agent_id="your_agent_id",
+    entrypoint_tag="lead_score_flow",
+    local=False
+)
+
+result = client.run(
+    candidates=[
+        {
+            "id": 1,
+            "name": "John Doe",
+            "email": "john@example.com",
+            "bio": "Experienced React developer",
+            "skills": "React, Node.js, TypeScript"
+        }
+    ],
+    job_description="Looking for a senior React developer...",
+    top_n=3,
+    generate_emails=True
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Customize Scoring" icon="cog" href="/how-to/advanced-tasks">
+    Customize scoring criteria and weights
+  </Card>
+  <Card title="Add Features" icon="plus" href="/how-to/advanced-tasks">
+    Add features like candidate tracking and analytics
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/runagent-cloud/cloud-deployment">
+    Deploy to production with proper scaling
+  </Card>
+  <Card title="View Full Example" icon="code" href="https://github.com/runagent-dev/runagent/tree/main/examples/lead-agent">
+    Explore the complete example code
+  </Card>
+</CardGroup>
+
+## Repository
+
+View the complete example code and documentation:
+
+**Repository**: [https://github.com/runagent-dev/runagent/tree/main/examples/lead-agent](https://github.com/runagent-dev/runagent/tree/main/examples/lead-agent)
+
+The repository includes:
+- Complete agent implementation with CrewAI flows
+- Flask backend API
+- React frontend application
+- Deployment guides and documentation
+- Example CSV files and test data
+
+<Note>
+**🎉 Great job!** You've learned how to build a production-ready lead scoring system using RunAgent and CrewAI. This demonstrates the power of multi-agent orchestration for complex business workflows!
+</Note>
+
+<NeedHelp context="Lead Scoring Agent" />

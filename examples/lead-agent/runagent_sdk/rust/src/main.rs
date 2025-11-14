@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing Lead Score Agent with Rust SDK");
     
     // Replace with your actual agent ID from `runagent serve`
-    let agent_id = "dd520db6-5ff6-4b2b-9eea-e3c50453b4d9";
+    let agent_id = "bd87871d-b4c4-4ec1-990b-bef0ea4766f7";
     
     println!("\n🚀 Testing Lead Score Flow");
     println!("============================");
@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = RunAgentClient::new(
         agent_id, 
         "lead_score_flow",  // entrypoint_tag
-        true,  // local = true
+        false,  // local = true
     ).await?;
     
     // Call the lead score flow with parameters
