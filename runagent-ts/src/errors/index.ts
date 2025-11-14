@@ -50,3 +50,22 @@ export class HttpException extends Error {
       this.name = 'ConnectionError';
     }
   }
+
+export class RunAgentExecutionError extends Error {
+  public code: string;
+  public suggestion?: string | null;
+  public details?: unknown;
+
+  constructor(
+    code: string,
+    message: string,
+    suggestion?: string | null,
+    details?: unknown
+  ) {
+    super(message || 'Unknown error');
+    this.name = 'RunAgentExecutionError';
+    this.code = code || 'UNKNOWN_ERROR';
+    this.suggestion = suggestion;
+    this.details = details;
+  }
+}

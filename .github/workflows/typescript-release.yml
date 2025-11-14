@@ -1,0 +1,111 @@
+name: TypeScript SDK Release
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Path where build commands should run
+        required: true
+        type: string
+      tag:
+        description: Git tag for this release (e.g., v0.1.0)
+        required: true
+        type: string
+      version:
+        description: Package version without the leading v (e.g., 0.1.0)
+        required: true
+        type: string
+      node-version:
+        description: Node.js version used to build the package
+        required: false
+        type: string
+        default: "20"
+    secrets:
+      NPM_TOKEN:
+        required: false
+
+jobs:
+  publish:
+    name: Publish TypeScript SDK
+    runs-on: ubuntu-latest
+    if: inputs.version != ''
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show release context
+        run: |
+          echo "Tag: ${{ inputs.tag }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Working directory: ${{ inputs.working-directory }}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Build package
+        run: npm run build
+
+      - name: Verify package version matches tag
+        id: verify-ts-version
+        run: |
+          TAG_VERSION="${{ inputs.version }}"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "Detected package version: $PACKAGE_VERSION"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch! Tag: $TAG_VERSION, Package: $PACKAGE_VERSION"
+            exit 1
+          fi
+          echo "✅ TypeScript version matches tag"
+
+      - name: Check if package version already exists on npm
+        id: check-npm
+        run: |
+          VERSION="${{ inputs.version }}"
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          echo "Package name: $PACKAGE_NAME"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/$PACKAGE_NAME/$VERSION")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "⚠️ $PACKAGE_NAME v$VERSION already exists on npm"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ $PACKAGE_NAME v$VERSION not found on npm"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Remove injected npm auth token (use OIDC)
+        run: npm config delete //registry.npmjs.org/:_authToken || true
+
+      - name: Publish package to npm
+        if: steps.check-npm.outputs.should_publish == 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ""
+
+      - name: Skip publish (already exists)
+        if: steps.check-npm.outputs.should_publish != 'true'
+        run: echo "Skipping npm publish because version already exists."
+

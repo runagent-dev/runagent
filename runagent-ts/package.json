@@ -1,6 +1,6 @@
 {
   "name": "runagent",
-  "version": "0.1.26",
+  "version": "0.1.32",
   "type": "module",
   "files": [
     "dist"
@@ -8,6 +8,10 @@
   "main": "./dist/runagent-client.cjs",
   "module": "./dist/runagent-client.js",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runagent-dev/runagent"
+  },
   "exports": {
     ".": {
       "import": {
@@ -34,14 +38,15 @@
     "vite-plugin-dts": "^3.0.0"
   },
   "peerDependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "better-sqlite3": "^12.2.0"
   },
   "peerDependenciesMeta": {
     "ws": {
       "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
     }
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.2.0"
   }
 }

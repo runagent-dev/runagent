@@ -1,8 +1,8 @@
-declare const __IS_NODE__: boolean;
-declare const __IS_BROWSER__: boolean;
+declare const __IS_NODE__: boolean | undefined;
+declare const __IS_BROWSER__: boolean | undefined;
 
-const isNode = __IS_NODE__;
-const isBrowser = __IS_BROWSER__;
+const isNode = Boolean(__IS_NODE__);
+const isBrowser = Boolean(__IS_BROWSER__);
 
 import { RestClient } from '../rest/index.js';
 import { BrowserWebSocketClient } from '../websocket/browser.js';
@@ -12,66 +12,123 @@ import type {
   RunAgentConfig,
   AgentArchitecture,
   JsonValue,
+  ApiResponse,
 } from '../types/index.js';
-import { RunAgentRegistry } from '../database/index.js';
-
-// Environment detection
-// const isNode = (() => {
-//   try {
-//     return (
-//       typeof process !== 'undefined' &&
-//       typeof process.versions !== 'undefined' &&
-//       typeof process.versions.node !== 'undefined'
-//     );
-//   } catch {
-//     return false;
-//   }
-// })();
-
-// const isBrowser = (() => {
-//   try {
-//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//     return typeof (globalThis as any).window !== 'undefined';
-//   } catch {
-//     return false;
-//   }
-// })();
+import type { RunAgentRegistry } from '../database/index.js';
+import { RunAgentExecutionError } from '../errors/index.js';
 
 type WebSocketClientType = BrowserWebSocketClient | NodeWebSocketClient;
+
+const DEFAULT_REMOTE_BASE_URL = 'https://backend.run-agent.ai';
+const DEFAULT_API_PREFIX = '/api/v1';
+const DEFAULT_TIMEOUT_SECONDS = 300;
+const API_KEY_ENV = 'RUNAGENT_API_KEY';
+const BASE_URL_ENV = 'RUNAGENT_BASE_URL';
+
+interface ClientEndpoints {
+  restBaseUrl: string;
+  socketBaseUrl: string;
+  apiPrefix: string;
+  isLocal: boolean;
+}
+
+const sanitizeBaseUrl = (baseUrl: string): string =>
+  baseUrl.replace(/\/$/, '');
+
+const toWebSocketBase = (baseUrl: string): string => {
+  if (baseUrl.startsWith('wss://') || baseUrl.startsWith('ws://')) {
+    return sanitizeBaseUrl(baseUrl);
+  }
+  if (baseUrl.startsWith('https://')) {
+    return sanitizeBaseUrl(baseUrl.replace(/^https:\/\//, 'wss://'));
+  }
+  if (baseUrl.startsWith('http://')) {
+    return sanitizeBaseUrl(baseUrl.replace(/^http:\/\//, 'ws://'));
+  }
+  return `wss://${sanitizeBaseUrl(baseUrl)}`;
+};
+
+const getEnvVar = (name: string): string | undefined => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const globalProcessEnv = (globalThis as any)?.process?.env;
+    if (globalProcessEnv && typeof globalProcessEnv[name] === 'string') {
+      return globalProcessEnv[name] as string;
+    }
+  } catch {
+    // Ignore environment probing errors
+  }
+
+  try {
+    // Allow browser builds to inject env via globalThis.RUNAGENT_ENV
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const runtimeEnv = (globalThis as any)?.RUNAGENT_ENV;
+    if (runtimeEnv && typeof runtimeEnv[name] === 'string') {
+      return runtimeEnv[name] as string;
+    }
+  } catch {
+    // Ignore missing global object
+  }
+
+  return undefined;
+};
 
 export class RunAgentClient {
   private serializer: CoreSerializer;
   private local: boolean;
   private agentId: string;
   private entrypointTag: string;
-  private config: RunAgentConfig; // Store original config
-  // private apiKey?: string;
-  private restClient!: RestClient; // Will be initialized in initialize()
-  private socketClient!: WebSocketClientType; // Will be initialized in initialize()
+  private config: RunAgentConfig;
+  private restClient?: RestClient;
+  private socketClient?: WebSocketClientType;
   private agentArchitecture?: AgentArchitecture;
   private static registry: RunAgentRegistry | null = null;
-  private static registryInitialized: boolean = false;
+  private static registryInitialized = false;
+  private initialized = false;
+  private apiKey?: string;
+  private baseUrl?: string;
+  private baseSocketUrl?: string;
+  private timeoutSeconds: number;
+  private extraParams?: Record<string, unknown>;
+  private enableRegistry: boolean;
 
-  /**
-   * Get or create registry instance (Node.js only)
-   */
-  private static async getRegistry(): Promise<RunAgentRegistry | null> {
-    if (isBrowser) {
-      return null; // Registry not available in browser
+  constructor(config: RunAgentConfig) {
+    this.serializer = new CoreSerializer();
+    this.config = config;
+    this.agentId = config.agentId;
+    this.entrypointTag = config.entrypointTag;
+    this.local = config.local ?? false;
+    this.timeoutSeconds = config.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
+    this.extraParams = config.extraParams;
+    this.enableRegistry = config.enableRegistry ?? isNode;
+
+    this.apiKey = config.apiKey ?? getEnvVar(API_KEY_ENV);
+    this.baseUrl = config.baseUrl ?? getEnvVar(BASE_URL_ENV);
+    this.baseSocketUrl = config.baseSocketUrl;
+
+    if (!this.baseUrl && !this.local) {
+      this.baseUrl = DEFAULT_REMOTE_BASE_URL;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Initialization helpers
+  // ------------------------------------------------------------------
+
+  private static async getRegistry(
+    enableRegistry: boolean
+  ): Promise<RunAgentRegistry | null> {
+    if (!enableRegistry || !isNode) {
+      return null;
     }
 
     if (!this.registry && !this.registryInitialized) {
       try {
-        // Check if registry features are available
-        const isAvailable = await RunAgentRegistry.isAvailable();
-        if (isAvailable) {
+        const { RunAgentRegistry } = await import('../database/index.js');
+        const available = await RunAgentRegistry.isAvailable();
+        if (available) {
           this.registry = new RunAgentRegistry();
           await this.registry.initialize();
-          console.log('🗃️ Agent registry initialized successfully');
-        } else {
-          console.log(
-            '📋 Agent registry unavailable (better-sqlite3 not installed)'
-          );
         }
       } catch (error) {
         console.warn('📋 Failed to initialize agent registry:', error);
@@ -83,14 +140,11 @@ export class RunAgentClient {
     return this.registry;
   }
 
-  /**
-   * Try to lookup agent in registry, with graceful fallback
-   */
   private async lookupAgent(
     agentId: string
   ): Promise<{ host: string; port: number } | null> {
     try {
-      const registry = await RunAgentClient.getRegistry();
+      const registry = await RunAgentClient.getRegistry(this.enableRegistry);
       if (registry) {
         return registry.lookupAgent(agentId);
       }
@@ -100,77 +154,113 @@ export class RunAgentClient {
     return null;
   }
 
-  constructor(config: RunAgentConfig) {
-    this.serializer = new CoreSerializer();
-    this.local = config.local ?? false;
-    this.agentId = config.agentId;
-    this.entrypointTag = config.entrypointTag;
-    this.config = config; // Store original config
-    // this.apiKey = config.apiKey;
+  private initializeClients(endpoints: ClientEndpoints): void {
+    this.restClient = new RestClient({
+      baseUrl: endpoints.restBaseUrl,
+      apiKey: endpoints.isLocal ? undefined : this.apiKey,
+      apiPrefix: endpoints.apiPrefix,
+      isLocal: endpoints.isLocal,
+      timeoutSeconds: this.timeoutSeconds,
+    });
 
-    if (!this.local) {
-      throw new Error(
-        'Non-local (remote) RunAgent deployment is not available yet. Coming soon.'
-      );
-    }
+    const socketConfig = {
+      baseSocketUrl: endpoints.socketBaseUrl,
+      apiKey: endpoints.isLocal ? undefined : this.apiKey,
+      apiPrefix: endpoints.apiPrefix,
+      isLocal: endpoints.isLocal,
+      timeoutSeconds: this.timeoutSeconds,
+    };
 
-    // For browser, initialize clients immediately if host/port provided
-    if (isBrowser && config.host && config.port) {
-      this.initializeClients(config.host, config.port);
+    this.socketClient = isNode
+      ? new NodeWebSocketClient(socketConfig)
+      : new BrowserWebSocketClient(socketConfig);
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
     }
   }
 
   async initialize(): Promise<RunAgentClient> {
-    // Step 1: Determine connection details
-    let agentHost: string;
-    let agentPort: number;
-
-    if (isBrowser) {
-      // Browser: host + port are mandatory for local mode
-      if (!this.config.host || !this.config.port) {
-        throw new Error(
-          "For browser environments, both 'host' and 'port' are required when local=true"
-        );
-      }
-      agentHost = this.config.host;
-      agentPort = this.config.port;
-      console.log(`🌐 Browser mode - connecting to: ${agentHost}:${agentPort}`);
-
-      // Initialize clients if not already done
-      if (!this.restClient) {
-        this.initializeClients(agentHost, agentPort);
-      }
-    } else {
-      // Node.js: support both direct connection and agent discovery
-      if (this.config.host && this.config.port) {
-        // Direct connection mode
-        agentHost = this.config.host;
-        agentPort = this.config.port;
-        console.log(`🔌 Direct connection: ${agentHost}:${agentPort}`);
-      } else {
-        // Try agent discovery first
-        const agentInfo = await this.lookupAgent(this.agentId);
-
-        if (agentInfo) {
-          agentHost = agentInfo.host;
-          agentPort = agentInfo.port;
-          console.log(
-            `🔍 Discovered agent ${this.agentId}: ${agentHost}:${agentPort}`
-          );
-        } else {
-          // No registry lookup successful - require explicit config
-          throw new Error(
-            `Failed to discover agent ${this.agentId}. ` +
-              `Please provide explicit 'host' and 'port' in config, or ensure agent is registered.`
-          );
-        }
-      }
-
-      // Initialize clients
-      this.initializeClients(agentHost, agentPort);
+    if (this.initialized) {
+      return this;
     }
 
-    // Step 2: Get agent architecture
+    const apiPrefix = this.config.apiPrefix ?? DEFAULT_API_PREFIX;
+
+    if (this.local) {
+      const resolved = await this.resolveLocalConnection();
+      this.initializeClients({
+        restBaseUrl: resolved.baseUrl,
+        socketBaseUrl: resolved.socketBaseUrl,
+        apiPrefix,
+        isLocal: true,
+      });
+    } else {
+      const resolvedBaseUrl = sanitizeBaseUrl(
+        this.baseUrl ?? DEFAULT_REMOTE_BASE_URL
+      );
+      let socketBaseUrl = sanitizeBaseUrl(
+        this.baseSocketUrl ?? toWebSocketBase(resolvedBaseUrl)
+      );
+
+      if (socketBaseUrl.endsWith(apiPrefix)) {
+        socketBaseUrl = sanitizeBaseUrl(
+          socketBaseUrl.slice(0, socketBaseUrl.length - apiPrefix.length)
+        );
+      }
+
+      if (!socketBaseUrl) {
+        socketBaseUrl = toWebSocketBase(resolvedBaseUrl);
+      }
+
+      this.initializeClients({
+        restBaseUrl: resolvedBaseUrl,
+        socketBaseUrl,
+        apiPrefix,
+        isLocal: false,
+      });
+    }
+
+    await this.loadAgentMetadata();
+    this.initialized = true;
+    return this;
+  }
+
+  private async resolveLocalConnection(): Promise<{
+    baseUrl: string;
+    socketBaseUrl: string;
+  }> {
+    let host = this.config.host;
+    let port = this.config.port;
+
+    if (!host || !port) {
+      const info = await this.lookupAgent(this.agentId);
+      if (info) {
+        host = info.host;
+        port = info.port;
+      }
+    }
+
+    if (!host || !port) {
+      throw new RunAgentExecutionError(
+        'AGENT_ADDRESS_NOT_FOUND',
+        `Unable to determine host/port for local agent ${this.agentId}`,
+        "Provide 'host' and 'port' in RunAgentClient config or register the agent locally."
+      );
+    }
+
+    const baseUrl = sanitizeBaseUrl(`http://${host}:${port}`);
+    const socketBaseUrl = sanitizeBaseUrl(`ws://${host}:${port}`);
+
+    return { baseUrl, socketBaseUrl };
+  }
+
+  private async loadAgentMetadata(): Promise<void> {
+    if (!this.restClient) {
+      throw new Error('REST client not initialized');
+    }
     try {
       this.agentArchitecture = await this.restClient.getAgentArchitecture(
         this.agentId
@@ -185,47 +275,73 @@ export class RunAgentClient {
           `Entrypoint \`${this.entrypointTag}\` not found in agent ${this.agentId}`
         );
       }
-
-      console.log(`✅ Agent ${this.agentId} initialized successfully`);
-      return this;
     } catch (error) {
       console.error('❌ Failed to initialize agent:', error);
-      throw error;
+      if (error instanceof RunAgentExecutionError) {
+        throw error;
+      }
+      const message =
+        error instanceof Error ? error.message : 'Unknown initialization error';
+      throw new RunAgentExecutionError(
+        'INITIALIZATION_ERROR',
+        this.sanitizeMessage(message) ?? 'Failed to initialize agent',
+        'Verify the agent configuration and connection settings.'
+      );
     }
   }
 
-  /**
-   * Initialize REST and WebSocket clients
-   */
-  private initializeClients(host: string, port: number): void {
-    const agentBaseUrl = `http://${host}:${port}`;
-    const agentSocketUrl = `ws://${host}:${port}`;
+  // ------------------------------------------------------------------
+  // Public execution methods
+  // ------------------------------------------------------------------
 
-    this.restClient = new RestClient({
-      baseUrl: agentBaseUrl,
-      apiPrefix: '/api/v1',
-    });
+  async run(
+    inputKwargs: Record<string, unknown> = {}
+  ): Promise<unknown> {
+    await this.ensureInitialized();
 
-    if (isNode) {
-      this.socketClient = new NodeWebSocketClient({
-        baseSocketUrl: agentSocketUrl,
-        apiPrefix: '/api/v1',
-      });
-    } else {
-      this.socketClient = new BrowserWebSocketClient({
-        baseSocketUrl: agentSocketUrl,
-        apiPrefix: '/api/v1',
-      });
+    if (this.entrypointTag.endsWith('_stream')) {
+      throw new RunAgentExecutionError(
+        'STREAM_ENTRYPOINT',
+        `Entrypoint \`${this.entrypointTag}\` is streaming. Use runStream() instead.`
+      );
     }
+
+    return this.executeRun(inputKwargs);
   }
 
-  private async _run(inputKwargs: Record<string, unknown>): Promise<unknown> {
+  async *runStream(
+    inputKwargs: Record<string, unknown> = {}
+  ): AsyncGenerator<unknown, void, unknown> {
+    await this.ensureInitialized();
+
+    if (!this.entrypointTag.endsWith('_stream')) {
+      throw new RunAgentExecutionError(
+        'NON_STREAM_ENTRYPOINT',
+        `Entrypoint \`${this.entrypointTag}\` is not streaming. Use run() instead.`
+      );
+    }
+
+    yield* this.executeStream(inputKwargs);
+  }
+
+  // ------------------------------------------------------------------
+  // Internal execution helpers
+  // ------------------------------------------------------------------
+
+  private async executeRun(
+    inputKwargs: Record<string, unknown>
+  ): Promise<unknown> {
+    if (!this.restClient) {
+      throw new Error('REST client not initialized');
+    }
+
     const response = await this.restClient.runAgent(
       this.agentId,
       this.entrypointTag,
       {
         inputArgs: [],
-        inputKwargs: inputKwargs,
+        inputKwargs,
+        timeoutSeconds: this.timeoutSeconds,
       }
     );
 
@@ -256,35 +372,35 @@ export class RunAgentClient {
       return payload ?? null;
     }
 
-    const errorMessage =
-      typeof response.error === 'string'
-        ? response.error
-        : (response.error as { message?: string })?.message ?? 'Agent execution failed';
-
-    throw new Error(errorMessage);
+    throw this.buildExecutionError(
+      response.error,
+      response.message,
+      'EXECUTION_ERROR'
+    );
   }
 
-  private async *_runStream(
+  private executeStream(
     inputKwargs: Record<string, unknown>
   ): AsyncGenerator<unknown, void, unknown> {
-    yield* this.socketClient.runStream(this.agentId, this.entrypointTag, {
-      inputArgs: [],
-      inputKwargs: inputKwargs,
-    });
-  }
-
-  // Main run method - matches your Python interface exactly!
-  async run(
-    inputKwargs: Record<string, unknown>
-  ): Promise<unknown | AsyncGenerator<unknown, void, unknown>> {
-    if (this.entrypointTag.endsWith('_stream')) {
-      return this._runStream(inputKwargs);
-    } else {
-      return this._run(inputKwargs);
+    if (!this.socketClient) {
+      throw new Error('WebSocket client not initialized');
     }
+
+    return this.socketClient.runStream(
+      this.agentId,
+      this.entrypointTag,
+      {
+        inputArgs: [],
+        inputKwargs,
+        timeoutSeconds: this.timeoutSeconds,
+      }
+    );
   }
 
-  // Utility methods
+  // ------------------------------------------------------------------
+  // Utility getters
+  // ------------------------------------------------------------------
+
   get environment(): 'node' | 'browser' {
     return isNode ? 'node' : 'browser';
   }
@@ -297,18 +413,63 @@ export class RunAgentClient {
     return isBrowser;
   }
 
-  /**
-   * Check if registry features are available
-   */
-  static async hasRegistry(): Promise<boolean> {
-    if (isBrowser) return false;
-    return await RunAgentRegistry.isAvailable();
+  getExtraParams(): Record<string, unknown> | undefined {
+    return this.extraParams;
   }
 
   /**
-   * Get registry instance (for advanced users)
+   * Check if registry features are available.
+   */
+  static async hasRegistry(): Promise<boolean> {
+    if (!isNode) return false;
+    try {
+      const { RunAgentRegistry } = await import('../database/index.js');
+      return await RunAgentRegistry.isAvailable();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get registry instance (for advanced Node.js users).
    */
   static async getRegistryInstance(): Promise<RunAgentRegistry | null> {
-    return await this.getRegistry();
+    return await this.getRegistry(true);
+  }
+
+  private buildExecutionError(
+    errorInfo: ApiResponse['error'],
+    fallbackMessage?: string | null,
+    defaultCode = 'UNKNOWN_ERROR'
+  ): RunAgentExecutionError {
+    const fallback = this.sanitizeMessage(fallbackMessage) ?? 'Unknown error';
+
+    if (!errorInfo) {
+      return new RunAgentExecutionError(defaultCode, fallback);
+    }
+
+    if (typeof errorInfo === 'string') {
+      return new RunAgentExecutionError(
+        defaultCode,
+        this.sanitizeMessage(errorInfo) ?? fallback
+      );
+    }
+
+    const { code, message, suggestion, details } = errorInfo;
+    const normalizedMessage =
+      this.sanitizeMessage(message) ?? fallback;
+
+    return new RunAgentExecutionError(
+      code ?? defaultCode,
+      normalizedMessage,
+      suggestion,
+      details
+    );
+  }
+
+  private sanitizeMessage(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 }

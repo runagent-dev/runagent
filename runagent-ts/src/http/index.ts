@@ -27,25 +27,25 @@ import {
   //   function fetch(url: string, init?: RequestInit): Promise<Response>;
   // }
   
-  export class HttpHandler {
-    private apiKey?: string;
-    private baseUrl: string;
-    private defaultHeaders: Record<string, string>;
-  
-    constructor(apiKey?: string, baseUrl: string = '') {
-      this.apiKey = apiKey;
-      this.baseUrl = baseUrl.replace(/\/$/, '');
-  
-      this.defaultHeaders = {
-        accept: 'application/json',
-        'content-type': 'application/json',
-      };
-  
-      if (this.apiKey) {
-        this.defaultHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-        this.defaultHeaders['User-Agent'] = 'RunAgent-TS/1.0';
-      }
+export class HttpHandler {
+  private apiKey?: string;
+  private baseUrl: string;
+  private defaultHeaders: Record<string, string>;
+
+  constructor(apiKey?: string, baseUrl: string = '', _isLocal = true) {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl.replace(/\/$/, '');
+
+    this.defaultHeaders = {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'User-Agent': 'RunAgent-TS/1.0',
+    };
+
+    if (this.apiKey) {
+      this.defaultHeaders['Authorization'] = `Bearer ${this.apiKey}`;
     }
+  }
   
     private _getUrl(path: string): string {
       return `${this.baseUrl}/${path.replace(/^\//, '')}`;

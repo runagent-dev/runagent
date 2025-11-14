@@ -1,14 +1,17 @@
 export interface RunAgentConfig {
-    agentId: string;
-    entrypointTag: string;
-    local?: boolean;
-    host?: string;
-    port?: number;
-    apiKey?: string;
-    baseUrl?: string;
-    baseSocketUrl?: string;
-    apiPrefix?: string;
-  }
+  agentId: string;
+  entrypointTag: string;
+  local?: boolean;
+  host?: string;
+  port?: number;
+  apiKey?: string;
+  baseUrl?: string;
+  baseSocketUrl?: string;
+  apiPrefix?: string;
+  timeoutSeconds?: number;
+  extraParams?: Record<string, unknown>;
+  enableRegistry?: boolean;
+}
   
 export interface ApiResponse<T = JsonValue> {
   success: boolean;
@@ -19,6 +22,7 @@ export interface ApiResponse<T = JsonValue> {
     | {
         code?: string;
         message?: string;
+        suggestion?: string | null;
         details?: unknown;
         field?: string | null;
       };
@@ -36,22 +40,28 @@ export interface WebSocketMessage<T = unknown> {
     error?: string;
   }
   
+export interface AgentEntrypoint {
+  tag: string;
+  name?: string;
+  description?: string;
+  file?: string;
+  module?: string;
+  extractor?: Record<string, unknown>;
+}
+
 export interface AgentArchitecture {
-    entrypoints: Array<{
-      tag: string;
-      name?: string;
-      description?: string;
-    }>;
-  }
+  agent_id?: string;
+  agentId?: string;
+  entrypoints: AgentEntrypoint[];
+}
   
 export interface ExecutionRequest {
-    action: string;
-    agent_id: string;
-    input_data: {
-      input_args: unknown[];
-      input_kwargs: Record<string, unknown>;
-    };
-  }
+  entrypoint_tag: string;
+  input_args: unknown[];
+  input_kwargs: Record<string, unknown>;
+  timeout_seconds?: number;
+  async_execution?: boolean;
+}
   
 export interface SerializedObject {
     content: unknown;
