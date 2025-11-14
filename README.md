@@ -348,15 +348,29 @@ func main() {
 
 ---
 
-## 🚀 RunAgent Cloud Deployment
-
 <div align="center">
 
-### **Now Available: Production-Ready Cloud Infrastructure**
+## <b><code>🚀 RunAgent Cloud Deployment</code></b>
+
+**Now Available: Production-Ready Cloud Infrastructure**
 
 Deploy to production in seconds with enterprise-grade infrastructure
 
-[**Sign Up →**](https://app.run-agent.ai/auth/signin) • [**Dashboard →**](https://app.run-agent.ai/dashboard) • [**Documentation →**](https://docs.run-agent.ai/runagent-cloud/overview)
+<br>
+
+<table>
+<tr>
+<td align="center" width="200">
+<a href="https://app.run-agent.ai/auth/signin"><b>Sign Up</b></a>
+</td>
+<td align="center" width="200">
+<a href="https://app.run-agent.ai/dashboard"><b>Dashboard</b></a>
+</td>
+<td align="center" width="200">
+<a href="https://docs.run-agent.ai/runagent-cloud/overview"><b>Documentation</b></a>
+</td>
+</tr>
+</table>
 
 </div>
 
