@@ -363,8 +363,53 @@ func (c *Client) GetAgentArchitecture(ctx context.Context) (*types.AgentArchitec
 		return nil, types.NewServerError(fmt.Sprintf("Server returned status %d", resp.StatusCode))
 	}
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read architecture response: %w", err)
+	}
+
+	var envelope struct {
+		Success bool `json:"success"`
+		Data struct {
+			AgentID     string             `json:"agent_id"`
+			Entrypoints []types.EntryPoint `json:"entrypoints"`
+		} `json:"data"`
+		Message string      `json:"message"`
+		Error   interface{} `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &envelope); err == nil && (envelope.Success || envelope.Message != "" || envelope.Error != nil) {
+		if envelope.Success {
+			architecture := &types.AgentArchitecture{
+				AgentID:     envelope.Data.AgentID,
+				Entrypoints: envelope.Data.Entrypoints,
+			}
+			return architecture, nil
+		}
+
+		var message string
+		switch errInfo := envelope.Error.(type) {
+		case map[string]interface{}:
+			if m, ok := errInfo["message"].(string); ok {
+				message = m
+			}
+		case string:
+			message = errInfo
+		}
+
+		if message == "" {
+			message = envelope.Message
+		}
+		if message == "" {
+			message = "failed to retrieve agent architecture"
+		}
+
+		return nil, types.NewServerError(message)
+	}
+
+	// Fallback to legacy format without envelope
 	var architecture types.AgentArchitecture
-	if err := json.NewDecoder(resp.Body).Decode(&architecture); err != nil {
+	if err := json.Unmarshal(body, &architecture); err != nil {
 		return nil, fmt.Errorf("failed to decode architecture: %w", err)
 	}
 

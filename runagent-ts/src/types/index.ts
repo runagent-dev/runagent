@@ -40,13 +40,20 @@ export interface WebSocketMessage<T = unknown> {
     error?: string;
   }
   
+export interface AgentEntrypoint {
+  tag: string;
+  name?: string;
+  description?: string;
+  file?: string;
+  module?: string;
+  extractor?: Record<string, unknown>;
+}
+
 export interface AgentArchitecture {
-    entrypoints: Array<{
-      tag: string;
-      name?: string;
-      description?: string;
-    }>;
-  }
+  agent_id?: string;
+  agentId?: string;
+  entrypoints: AgentEntrypoint[];
+}
   
 export interface ExecutionRequest {
   entrypoint_tag: string;

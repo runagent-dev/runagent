@@ -277,7 +277,16 @@ export class RunAgentClient {
       }
     } catch (error) {
       console.error('❌ Failed to initialize agent:', error);
-      throw error;
+      if (error instanceof RunAgentExecutionError) {
+        throw error;
+      }
+      const message =
+        error instanceof Error ? error.message : 'Unknown initialization error';
+      throw new RunAgentExecutionError(
+        'INITIALIZATION_ERROR',
+        this.sanitizeMessage(message) ?? 'Failed to initialize agent',
+        'Verify the agent configuration and connection settings.'
+      );
     }
   }
 

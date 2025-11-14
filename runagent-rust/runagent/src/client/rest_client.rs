@@ -221,6 +221,39 @@ impl RestClient {
     pub async fn get_agent_architecture(&self, agent_id: &str) -> RunAgentResult<Value> {
         let path = format!("agents/{}/architecture", agent_id);
         self.get(&path).await
+            .and_then(|response| {
+                if let Some(success) = response.get("success").and_then(|v| v.as_bool()) {
+                    if success {
+                        if let Some(data) = response.get("data") {
+                            return Ok(data.clone());
+                        }
+                        return Err(RunAgentError::server(
+                            "Architecture response missing data".to_string(),
+                        ));
+                    }
+
+                    let message = response
+                        .get("error")
+                        .and_then(|err| {
+                            if err.is_object() {
+                                err.get("message").and_then(|m| m.as_str()).map(|s| s.to_string())
+                            } else {
+                                err.as_str().map(|s| s.to_string())
+                            }
+                        })
+                        .or_else(|| {
+                            response
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .map(|s| s.to_string())
+                        })
+                        .unwrap_or_else(|| "Failed to retrieve agent architecture".to_string());
+
+                    return Err(RunAgentError::server(message));
+                }
+
+                Ok(response)
+            })
             .map_err(|e| {
                 if e.category() == "validation" && e.to_string().contains("Not found") {
                     RunAgentError::validation(format!(
