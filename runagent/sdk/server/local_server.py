@@ -587,8 +587,17 @@ class LocalServer:
         async def get_agent_architecture():
             """Get agent architecture endpoint"""
             return {
-                "agent_id": self.agent_id,
-                "entrypoints": [ep.dict() for ep in self.agent_config.agent_architecture.entrypoints]
+                "success": True,
+                "data": {
+                    "agent_id": self.agent_id,
+                    "entrypoints": [
+                        ep.dict() for ep in self.agent_config.agent_architecture.entrypoints
+                    ],
+                },
+                "message": "Agent architecture retrieved successfully",
+                "error": None,
+                "timestamp": datetime.now().isoformat(),
+                "request_id": str(uuid.uuid4()),
             }
 
         # NEW: Invocation history endpoints

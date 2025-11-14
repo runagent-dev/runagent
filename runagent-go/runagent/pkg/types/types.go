@@ -43,13 +43,17 @@ func NewConfigError(message string) *RunAgentError {
 
 // EntryPoint represents an agent entrypoint
 type EntryPoint struct {
-	File   string `json:"file"`
-	Module string `json:"module"`
-	Tag    string `json:"tag"`
+	File       string                 `json:"file,omitempty"`
+	Module     string                 `json:"module,omitempty"`
+	Tag        string                 `json:"tag"`
+	Name       string                 `json:"name,omitempty"`
+	Description string                `json:"description,omitempty"`
+	Extractor  map[string]interface{} `json:"extractor,omitempty"`
 }
 
 // AgentArchitecture represents agent configuration
 type AgentArchitecture struct {
+	AgentID     string       `json:"agent_id,omitempty"`
 	Entrypoints []EntryPoint `json:"entrypoints"`
 }
 

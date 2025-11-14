@@ -1598,7 +1598,21 @@ class RestClient:
         """Get the architecture information for a specific agent"""
         try:
             response = self.http.get(f"/agents/{agent_id}/architecture")
-            return response.json()
+            payload = response.json()
+
+            if isinstance(payload, dict) and "success" in payload:
+                if payload.get("success"):
+                    return payload.get("data") or {}
+
+                error_info = payload.get("error")
+                if isinstance(error_info, dict):
+                    message = error_info.get("message") or payload.get("message") or "Failed to get architecture"
+                else:
+                    message = error_info or payload.get("message") or "Failed to get architecture"
+
+                raise ValueError(message)
+
+            return payload
         except Exception as e:
             if os.getenv('DISABLE_TRY_CATCH'):
                 raise
