@@ -93,14 +93,25 @@
           {
             "group": "Deployment",
             "pages": [
-              "deployment/local-development",
-              "deployment/cloud-deployment"
+              "deployment/local-development"
             ]
           },
           {
             "group": "Advanced Tasks",
             "pages": [
               "how-to/advanced-tasks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "RunAgent Cloud",
+        "groups": [
+          {
+            "group": "RunAgent Cloud",
+            "pages": [
+              "runagent-cloud/overview",
+              "runagent-cloud/cloud-deployment"
             ]
           }
         ]

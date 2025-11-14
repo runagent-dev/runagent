@@ -1,0 +1,392 @@
+---
+title: 'Recipe Creator Agent'
+description: 'Build an AI agent that creates personalized recipes based on available ingredients'
+icon: 'utensils'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+<Info>
+  **Prerequisites**: Completed the [Deploy Your First Agent](/tutorials/deploy-your-first-agent) tutorial
+</Info>
+
+## What You'll Build
+
+In this tutorial, you'll create a recipe creator agent that:
+- Generates personalized recipes from available ingredients
+- Considers dietary restrictions and preferences
+- Respects time constraints for meal preparation
+- Provides detailed cooking instructions
+- Supports both sync and streaming responses
+
+## The Recipe Creation Challenge
+
+Creating recipes that match available ingredients is challenging:
+- **Ingredient matching**: Finding recipes that use what you have
+- **Dietary restrictions**: Accommodating allergies and preferences
+- **Time constraints**: Creating recipes that fit your schedule
+- **Personalization**: Adapting recipes to individual tastes
+- **Instructions**: Providing clear, step-by-step guidance
+
+RunAgent solves this by creating an intelligent agent that understands context and generates personalized recipes on demand.
+
+## Architecture Overview
+
+The recipe creator agent uses a simple but powerful architecture:
+
+```
+┌─────────────────┐
+│   User Input    │
+│ (Ingredients,   │
+│  Restrictions,  │
+│  Time Limit)    │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│  Recipe Agent   │
+│ (Generates      │
+│  Recipe)        │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│  Recipe Output  │
+│ (Name,          │
+│  Ingredients,   │
+│  Instructions)  │
+└─────────────────┘
+```
+
+## Step 1: Understanding the Agent Structure
+
+The recipe creator agent provides two entrypoints:
+
+**Entrypoints:**
+- `recipe_create`: Synchronous recipe generation
+- `recipe_stream`: Streaming recipe generation for real-time display
+
+**Key Features:**
+- Ingredient-based recipe generation
+- Dietary restriction handling
+- Time limit consideration
+- Detailed cooking instructions
+- Nutritional information (optional)
+
+## Step 2: Agent Configuration
+
+The agent is configured using `runagent.config.json`:
+
+```json
+{
+  "agent_name": "recipe-creator",
+  "description": "AI-powered recipe generation from ingredients",
+  "framework": "custom",
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "recipe_create",
+        "tag": "recipe_create"
+      },
+      {
+        "file": "main.py",
+        "module": "recipe_stream",
+        "tag": "recipe_stream"
+      }
+    ]
+  }
+}
+```
+
+## Step 3: Core Agent Logic (Gist)
+
+The agent generates recipes based on multiple inputs:
+
+```python
+# Simplified agent structure
+def recipe_create(
+    ingredients: str,
+    dietary_restrictions: str = "",
+    time_limit: str = ""
+) -> Dict[str, Any]:
+    """
+    Generates a complete recipe:
+    1. Analyzes available ingredients
+    2. Considers dietary restrictions
+    3. Respects time constraints
+    4. Generates recipe name, ingredients list, and instructions
+    5. Returns structured recipe data
+    """
+    # Process inputs
+    ingredient_list = parse_ingredients(ingredients)
+    restrictions = parse_restrictions(dietary_restrictions)
+    time_constraint = parse_time_limit(time_limit)
+    
+    # Generate recipe
+    recipe = generate_recipe(
+        ingredients=ingredient_list,
+        restrictions=restrictions,
+        time_limit=time_constraint
+    )
+    
+    return {
+        "name": recipe["name"],
+        "ingredients": recipe["ingredients"],
+        "instructions": recipe["instructions"],
+        "prep_time": recipe["prep_time"],
+        "cook_time": recipe["cook_time"],
+        "servings": recipe["servings"],
+        "dietary_info": recipe["dietary_info"]
+    }
+
+def recipe_stream(
+    ingredients: str,
+    dietary_restrictions: str = "",
+    time_limit: str = ""
+) -> Iterator[str]:
+    """
+    Streams recipe generation in real-time:
+    1. Streams recipe name
+    2. Streams ingredients list
+    3. Streams instructions step by step
+    4. Provides real-time feedback
+    """
+    yield "🍳 Creating your personalized recipe...\n\n"
+    
+    # Stream recipe name
+    recipe_name = generate_recipe_name(ingredients, dietary_restrictions)
+    yield f"**Recipe:** {recipe_name}\n\n"
+    
+    # Stream ingredients
+    yield "**Ingredients:**\n"
+    for ingredient in get_ingredients(ingredients, dietary_restrictions):
+        yield f"- {ingredient}\n"
+    yield "\n"
+    
+    # Stream instructions
+    yield "**Instructions:**\n"
+    for i, step in enumerate(get_instructions(ingredients, time_limit), 1):
+        yield f"{i}. {step}\n"
+    
+    yield "\n✨ Enjoy your meal!"
+```
+
+## Step 4: Backend Integration
+
+The Flask backend provides REST API endpoints:
+
+```python
+# Backend API structure
+@app.route('/api/recipe', methods=['POST'])
+def create_recipe():
+    """
+    Synchronous recipe creation endpoint
+    """
+    client = RunAgentClient(
+        agent_id=agent_id,
+        entrypoint_tag="recipe_create",
+        local=False
+    )
+    
+    result = client.run(
+        ingredients=ingredients,
+        dietary_restrictions=dietary_restrictions,
+        time_limit=time_limit
+    )
+    
+    return jsonify(result)
+
+@app.route('/api/recipe/stream', methods=['POST'])
+def create_recipe_stream():
+    """
+    Streaming recipe creation endpoint
+    """
+    client = RunAgentClient(
+        agent_id=agent_id,
+        entrypoint_tag="recipe_stream",
+        local=False
+    )
+    
+    def generate():
+        for chunk in client.run(
+            ingredients=ingredients,
+            dietary_restrictions=dietary_restrictions,
+            time_limit=time_limit
+        ):
+            yield f"data: {json.dumps(chunk)}\n\n"
+    
+    return Response(generate(), mimetype='text/event-stream')
+```
+
+## Step 5: Frontend Integration
+
+The React frontend provides a user-friendly interface:
+
+**Key Features:**
+- Ingredient input (text or list)
+- Dietary restrictions selector
+- Time limit input
+- Recipe display with formatting
+- Streaming recipe generation
+- Example recipe suggestions
+- Recipe history (optional)
+
+## Step 6: Deployment
+
+### Local Deployment
+
+```bash
+# 1. Deploy the RunAgent agent
+cd examples/recipe_creator/agents
+runagent serve .
+
+# 2. Start the backend
+cd ../backend
+python app.py
+
+# 3. Start the frontend
+cd ../frontend
+npm run dev
+```
+
+### Production Deployment
+
+The agent can be deployed to RunAgent Cloud:
+
+```bash
+runagent deploy .
+```
+
+## What You've Accomplished
+
+You've built a complete recipe creation system:
+
+<CardGroup cols={2}>
+  <Card title="🍳 Recipe Generation" icon="utensils">
+    Creates personalized recipes from available ingredients
+  </Card>
+  <Card title="⚡ Real-Time Streaming" icon="bolt">
+    Streams recipe generation for better user experience
+  </Card>
+  <Card title="🥗 Dietary Support" icon="leaf">
+    Handles dietary restrictions and preferences
+  </Card>
+  <Card title="⏱️ Time-Aware" icon="clock">
+    Considers time constraints for meal preparation
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Ingredient-Based Generation
+- Analyzes available ingredients
+- Suggests complementary ingredients
+- Creates recipes that maximize ingredient usage
+- Provides ingredient substitutions when needed
+
+### Dietary Restriction Handling
+- Supports vegetarian, vegan, gluten-free, etc.
+- Accommodates allergies and intolerances
+- Suggests alternative ingredients
+- Maintains recipe quality with restrictions
+
+### Time-Aware Recipes
+- Respects time constraints
+- Suggests quick recipes for busy schedules
+- Provides prep and cook time estimates
+- Offers time-saving tips
+
+### Streaming Support
+- Real-time recipe generation
+- Progressive display of information
+- Better user experience
+- Immediate feedback
+
+## Example Usage
+
+```python
+from runagent import RunAgentClient
+
+# Synchronous recipe creation
+client = RunAgentClient(
+    agent_id="your_agent_id",
+    entrypoint_tag="recipe_create",
+    local=False
+)
+
+recipe = client.run(
+    ingredients="chicken breast, broccoli, rice, garlic",
+    dietary_restrictions="",
+    time_limit="30 minutes"
+)
+
+# Streaming recipe creation
+stream_client = RunAgentClient(
+    agent_id="your_agent_id",
+    entrypoint_tag="recipe_stream",
+    local=False
+)
+
+for chunk in stream_client.run(
+    ingredients="pasta, mushrooms, spinach, cream",
+    dietary_restrictions="vegetarian",
+    time_limit="25 minutes"
+):
+    print(chunk, end="", flush=True)
+```
+
+## Example Recipes
+
+The agent can generate various types of recipes:
+
+**Quick Meals:**
+- 15-minute pasta dishes
+- One-pan meals
+- Quick stir-fries
+
+**Dietary-Specific:**
+- Vegan alternatives
+- Gluten-free options
+- Low-carb meals
+
+**Ingredient-Focused:**
+- Recipes using specific ingredients
+- Leftover transformations
+- Seasonal ingredient recipes
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Add Features" icon="plus" href="/how-to/advanced-tasks">
+    Add features like nutritional info and meal planning
+  </Card>
+  <Card title="Enhance AI" icon="brain" href="/how-to/advanced-tasks">
+    Improve recipe quality with better prompts
+  </Card>
+  <Card title="Production Deployment" icon="cloud" href="/runagent-cloud/cloud-deployment">
+    Deploy to production with proper scaling
+  </Card>
+  <Card title="View Full Example" icon="code" href="https://github.com/runagent-dev/runagent/tree/main/examples/recipe_creator">
+    Explore the complete example code
+  </Card>
+</CardGroup>
+
+## Repository
+
+View the complete example code and documentation:
+
+**Repository**: [https://github.com/runagent-dev/runagent/tree/main/examples/recipe_creator](https://github.com/runagent-dev/runagent/tree/main/examples/recipe_creator)
+
+The repository includes:
+- Complete agent implementation
+- Flask backend API with streaming support
+- React frontend application
+- Example recipe queries
+- Configuration files
+
+<Note>
+**🎉 Great job!** You've learned how to build a practical recipe creation system using RunAgent. This demonstrates how AI agents can solve everyday problems with personalized solutions!
+</Note>
+
+<NeedHelp context="Recipe Creator Agent" />

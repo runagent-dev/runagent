@@ -1,28 +1,32 @@
 {
-    "agent_name": "Lead Score Flow",
-    "description": "AI-powered lead scoring and response system using CrewAI",
-    "framework": "crewai",
-    "template": "lead_score",
-    "version": "1.0.0",
-    "created_at": "2025-10-26",
-    "template_source": {
-      "repo_url": "https://github.com/runagent-dev/runagent.git",
-      "path": "flows/lead-score-flow",
-      "author": "runagent"
-    },
-    "agent_architecture": {
-      "entrypoints": [
-        {
-          "file": "main.py",
-          "module": "run_flow",
-          "tag": "lead_score_flow"
-        },
-        {
-          "file": "main.py",
-          "module": "score_single_candidate",
-          "tag": "score_candidate"
-        }
-      ]
-    },
-    "agent_id": "89aef000-0000-0000-0000-000000000000"
+  "agent_name": "HR Talent Hunt",
+  "description": "Candidate lead generation for HR",
+  "framework": "crewai",
+  "template": "",
+  "version": "1.0.0",
+  "created_at": "2025-11-13T10:15:37.208223",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/examples/lead-agent/lead-score-flow"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "run_flow",
+        "tag": "lead_score_flow"
+      },
+      {
+        "file": "main.py",
+        "module": "score_single_candidate",
+        "tag": "score_candidate"
+      }
+    ]
+  },
+  "env_vars": {},
+  "agent_id": "bd87871d-b4c4-4ec1-990b-bef0ea4766f7",
+  "auth_settings": {
+    "type": "api_key"
   }
+}

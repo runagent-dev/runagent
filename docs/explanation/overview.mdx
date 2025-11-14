@@ -6,20 +6,109 @@ icon: 'lightbulb'
 
 import NeedHelp from '/snippets/need-help.mdx';
 
-Short, diagram-first pages that explain how RunAgent works and why.
+> Understanding the "why" and "how" behind RunAgent. These pages explain the concepts, architecture, and design decisions that make RunAgent work.
 
-<Cards num={3}>
-  <Card title="Core Concepts" href="./core-concepts" />
-  <Card title="Architecture Overview" href="./architecture-overview" />
-  <Card title="Production considerations" href="./production-considerations" />
-  <Card title="Security model" href="./security" />
-  <Card title="Changelog" href="./changelog" />
-  <Card title="Roadmap" href="./roadmap" />
-  <Card title="(Vision) Agent-to-Agent" href="./agent-to-agent" />
-</Cards>
+## What's in This Section?
+
+The Explanation section contains **theory-first, diagram-rich pages** that dive deep into how RunAgent works. Unlike tutorials (which show you how to do things) or how-tos (which solve specific problems), these pages explain the underlying concepts and architecture.
 
 <Tip>
-Keep theory here. Tutorials/how-tos should only include brief callouts.
+**Keep theory here.** Tutorials and how-tos should only include brief callouts. This section is for deep dives into concepts and architecture.
 </Tip>
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Why RunAgent?" href="./why-runagent" arrow>
+    Understand the problems RunAgent solves and why it exists
+  </Card>
+  <Card title="Key Concepts at a Glance" href="./key-concepts-at-a-glance" arrow>
+    Quick cheat sheet of core concepts in one page
+  </Card>
+  <Card title="Introduction" href="./introduction" arrow>
+    High-level overview of RunAgent's capabilities and benefits
+  </Card>
+</CardGroup>
+
+## Core Concepts & Architecture
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" href="./core-concepts">
+    **Entrypoints, tags, agent lifecycle, and more.** Understand the fundamental building blocks that make RunAgent work.
+  </Card>
+  <Card title="Architecture Overview" href="./architecture-overview">
+    **How RunAgent works under the hood.** Learn about the system architecture, request flow, and component interactions.
+  </Card>
+  <Card title="Frameworks Overview" href="./frameworks-overview">
+    **Framework integration patterns.** See how RunAgent works with LangGraph, CrewAI, and other AI frameworks.
+  </Card>
+  <Card title="Feature Overview" href="./feature-overview">
+    **What RunAgent can do today.** A comprehensive map of current capabilities and upcoming features.
+  </Card>
+</CardGroup>
+
+## Production & Operations
+
+<CardGroup cols={2}>
+  <Card title="Production Considerations" href="./production-considerations">
+    **Deploying to production.** Scaling, monitoring, error handling, and best practices for production deployments.
+  </Card>
+  <Card title="Security Model" href="./security">
+    **Security architecture and best practices.** Learn about sandboxing, authentication, and securing your agents.
+  </Card>
+</CardGroup>
+
+## Project Information
+
+<CardGroup cols={2}>
+  <Card title="Changelog" href="./changelog">
+    **What's new and what changed.** Track updates, new features, and breaking changes.
+  </Card>
+  <Card title="Roadmap" href="./roadmap">
+    **What's coming next.** See planned features, improvements, and the future direction of RunAgent.
+  </Card>
+</CardGroup>
+
+## Vision & Future
+
+<CardGroup cols={1}>
+  <Card title="(Vision) Agent-to-Agent" href="./agent-to-agent">
+    **The future of agent coordination.** How agents will communicate and collaborate with each other.
+  </Card>
+</CardGroup>
+
+## How to Use This Section
+
+<AccordionGroup>
+  <Accordion title="New to RunAgent?">
+    Start with **[Why RunAgent?](./why-runagent)** to understand the problems it solves, then read **[Key Concepts at a Glance](./key-concepts-at-a-glance)** for a quick overview. After that, dive into **[Core Concepts](./core-concepts)** for detailed explanations.
+  </Accordion>
+  
+  <Accordion title="Building Production Systems?">
+    Read **[Production Considerations](./production-considerations)** for scaling and monitoring guidance, and **[Security Model](./security)** for security best practices.
+  </Accordion>
+  
+  <Accordion title="Integrating Frameworks?">
+    Check **[Frameworks Overview](./frameworks-overview)** to see how RunAgent integrates with LangGraph, CrewAI, and other frameworks.
+  </Accordion>
+  
+  <Accordion title="Want to Understand the Architecture?">
+    **[Architecture Overview](./architecture-overview)** explains how RunAgent works internally, including request flow, component interactions, and system design.
+  </Accordion>
+</AccordionGroup>
+
+## Related Sections
+
+<CardGroup cols={3}>
+  <Card title="Tutorials" href="/tutorials/overview" arrow>
+    Step-by-step guides to build real applications
+  </Card>
+  <Card title="How-to Guides" href="/how-to/overview" arrow>
+    Solutions to specific problems and use cases
+  </Card>
+  <Card title="Reference" href="/reference/overview" arrow>
+    API documentation and SDK references
+  </Card>
+</CardGroup>
 
 <NeedHelp context="Explanation" />
