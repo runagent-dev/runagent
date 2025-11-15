@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/runagent-dev/runagent-go/pkg/types"
+	"github.com/runagent-dev/runagent/runagent-go/runagent/pkg/types"
 )
 
 // Server represents a local RunAgent server
