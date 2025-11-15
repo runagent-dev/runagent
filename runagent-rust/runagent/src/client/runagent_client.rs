@@ -21,9 +21,37 @@ pub struct RunAgentClient {
     socket_client: SocketClient,
     serializer: CoreSerializer,
     agent_architecture: Option<Value>,
+    extra_params: Option<HashMap<String, Value>>,
 
     #[cfg(feature = "db")]
     db_service: Option<DatabaseService>,
+}
+
+/// Configuration options for building a RunAgent client
+pub struct RunAgentClientOptions<'a> {
+    pub agent_id: &'a str,
+    pub entrypoint_tag: &'a str,
+    pub local: bool,
+    pub host: Option<&'a str>,
+    pub port: Option<u16>,
+    pub base_url: Option<&'a str>,
+    pub api_key: Option<String>,
+    pub extra_params: Option<HashMap<String, Value>>,
+}
+
+impl<'a> RunAgentClientOptions<'a> {
+    pub fn new(agent_id: &'a str, entrypoint_tag: &'a str, local: bool) -> Self {
+        Self {
+            agent_id,
+            entrypoint_tag,
+            local,
+            host: None,
+            port: None,
+            base_url: None,
+            api_key: None,
+            extra_params: None,
+        }
+    }
 }
 
 impl RunAgentClient {
@@ -43,13 +71,16 @@ impl RunAgentClient {
                 let db_service = DatabaseService::new(None).await?;
                 if let Some(agent_info) = db_service.get_agent(agent_id).await? {
                     tracing::info!("🔍 Found agent in database: {}:{}", agent_info.host, agent_info.port);
-                    return Self::with_address(
-                        agent_id, 
-                        entrypoint_tag, 
-                        local, 
-                        Some(&agent_info.host), 
-                        Some(agent_info.port as u16)
-                    ).await;
+                    return Self::from_options(RunAgentClientOptions {
+                        agent_id,
+                        entrypoint_tag,
+                        local,
+                        host: Some(&agent_info.host),
+                        port: Some(agent_info.port as u16),
+                        base_url: None,
+                        api_key: None,
+                        extra_params: None,
+                    }).await;
                 } else {
                     return Err(RunAgentError::validation(format!(
                         "Agent {} not found in local DB. Use with_address() to connect directly.", 
@@ -69,7 +100,16 @@ impl RunAgentClient {
         }
         
         // For remote connections, proceed without database lookup
-        Self::with_address(agent_id, entrypoint_tag, local, None, None).await
+        Self::from_options(RunAgentClientOptions {
+            agent_id,
+            entrypoint_tag,
+            local,
+            host: None,
+            port: None,
+            base_url: None,
+            api_key: None,
+            extra_params: None,
+        }).await
     }
 
     /// Create a new RunAgent client with specific host and port
@@ -80,113 +120,102 @@ impl RunAgentClient {
         host: Option<&str>,
         port: Option<u16>,
     ) -> RunAgentResult<Self> {
-        let serializer = CoreSerializer::new(10.0)?;
+        Self::from_options(RunAgentClientOptions {
+            agent_id,
+            entrypoint_tag,
+            local,
+            host,
+            port,
+            base_url: None,
+            api_key: None,
+            extra_params: None,
+        }).await
+    }
 
+    /// Create a new RunAgent client with explicit remote configuration
+    pub async fn with_remote_config(
+        agent_id: &str,
+        entrypoint_tag: &str,
+        base_url: &str,
+        api_key: Option<String>,
+    ) -> RunAgentResult<Self> {
+        Self::from_options(RunAgentClientOptions {
+            agent_id,
+            entrypoint_tag,
+            local: false,
+            host: None,
+            port: None,
+            base_url: Some(base_url),
+            api_key,
+            extra_params: None,
+        }).await
+    }
+
+    /// Build a RunAgent client from detailed options
+    pub async fn from_options(options: RunAgentClientOptions<'_>) -> RunAgentResult<Self> {
+        let serializer = CoreSerializer::new(10.0)?;
         #[cfg(feature = "db")]
-        let db_service = if local {
+        let db_service = if options.local {
             Some(DatabaseService::new(None).await?)
         } else {
             None
         };
-        
-        let (rest_client, socket_client) = if local {
-            let (agent_host, agent_port) = if let (Some(h), Some(p)) = (host, port) {
-                tracing::info!("🔌 Using explicit address: {}:{}", h, p);
-                (h.to_string(), p)
-            } else {
-                #[cfg(feature = "db")]
-                {
-                    if let Some(ref db) = db_service {
-                        let agent_info = db.get_agent(agent_id).await?
-                            .ok_or_else(|| RunAgentError::validation(format!("Agent {} not found in local DB", agent_id)))?;
-                        
-                        tracing::info!("🔍 Auto-resolved address for agent {}: {}:{}", agent_id, agent_info.host, agent_info.port);
-                        (agent_info.host, agent_info.port as u16)
-                    } else {
-                        return Err(RunAgentError::config("Database feature not enabled but required for local agent lookup"));
-                    }
-                }
-                #[cfg(not(feature = "db"))]
-                {
-                    return Err(RunAgentError::config("Database feature not enabled but required for local agent lookup"));
-                }
-            };
+        #[cfg(not(feature = "db"))]
+        let db_service: Option<DatabaseService> = None;
 
-            let agent_base_url = format!("http://{}:{}", agent_host, agent_port);
-            let agent_socket_url = format!("ws://{}:{}", agent_host, agent_port);
+        let (rest_client, socket_client) = if options.local {
+            let host = options.host.ok_or_else(|| {
+                RunAgentError::validation(
+                    "Host is required for local clients. Provide host/port or use RunAgentClient::new for database lookup.",
+                )
+            })?;
+            let port = options.port.ok_or_else(|| {
+                RunAgentError::validation(
+                    "Port is required for local clients. Provide host/port or use RunAgentClient::new for database lookup.",
+                )
+            })?;
+
+            tracing::info!("🔌 Using explicit address: {}:{}", host, port);
+
+            let agent_base_url = format!("http://{}:{}", host, port);
+            let agent_socket_url = format!("ws://{}:{}", host, port);
 
             let rest_client = RestClient::new(&agent_base_url, None, Some("/api/v1"))?;
             let socket_client = SocketClient::new(&agent_socket_url, None, Some("/api/v1"))?;
 
             (rest_client, socket_client)
         } else {
-            let rest_client = RestClient::default()?;
-            let socket_client = SocketClient::default()?;
-            (rest_client, socket_client)
+            Self::create_remote_clients(options.base_url, options.api_key.clone())?
         };
 
         let mut client = Self {
-            agent_id: agent_id.to_string(),
-            entrypoint_tag: entrypoint_tag.to_string(),
-            local,
+            agent_id: options.agent_id.to_string(),
+            entrypoint_tag: options.entrypoint_tag.to_string(),
+            local: options.local,
             rest_client,
             socket_client,
             serializer,
             agent_architecture: None,
+            extra_params: options.extra_params.clone(),
 
             #[cfg(feature = "db")]
             db_service,
         };
 
-        // Get agent architecture (skip validation to match Python SDK behavior)
-        match client.get_agent_architecture_internal().await {
-            Ok(architecture) => {
-                client.agent_architecture = Some(architecture);
-                tracing::debug!("Agent architecture loaded, skipping client-side validation");
-            }
-            Err(e) => {
-                tracing::debug!("Failed to get agent architecture, skipping validation: {}", e);
-                // Set a minimal architecture to avoid validation errors
-                client.agent_architecture = Some(serde_json::json!({
-                    "entrypoints": [{"tag": "simulate_stream", "file": "main.py", "module": "simulate_stream"}]
-                }));
-            }
-        }
+        client.initialize_architecture().await?;
 
         Ok(client)
     }
 
+    async fn initialize_architecture(&mut self) -> RunAgentResult<()> {
+        let architecture = self.get_agent_architecture_internal().await?;
+        self.agent_architecture = Some(architecture);
+        self.validate_entrypoint()?;
+        Ok(())
+    }
+
     async fn get_agent_architecture_internal(&self) -> RunAgentResult<Value> {
-        match self.rest_client.get_agent_architecture(&self.agent_id).await {
-            Ok(architecture) => Ok(architecture),
-            Err(_) => {
-                // Fallback: provide default architecture with common entrypoints
-                Ok(serde_json::json!({
-                    "entrypoints": [
-                        {
-                            "tag": "generic",
-                            "file": "main.py",
-                            "module": "run"
-                        },
-                        {
-                            "tag": "generic_stream",
-                            "file": "main.py", 
-                            "module": "run_stream"
-                        },
-                        {
-                            "tag": "simulate_stream",
-                            "file": "main.py",
-                            "module": "simulate_stream"
-                        },
-                        {
-                            "tag": "run",
-                            "file": "main.py",
-                            "module": "run"
-                        }
-                    ]
-                }))
-            }
-        }
+        self.rest_client.get_agent_architecture(&self.agent_id).await
     }
 
     fn validate_entrypoint(&self) -> RunAgentResult<()> {
@@ -200,6 +229,17 @@ impl RunAgentClient {
                 });
 
                 if !found {
+                    let available: Vec<String> = entrypoints
+                        .iter()
+                        .filter_map(|ep| ep.get("tag").and_then(|t| t.as_str()))
+                        .map(|s| s.to_string())
+                        .collect();
+                    tracing::error!(
+                        "Entrypoint `{}` not found for agent {}. Available: {:?}",
+                        self.entrypoint_tag,
+                        self.agent_id,
+                        available
+                    );
                     return Err(RunAgentError::validation(format!(
                         "Entrypoint `{}` not found in agent {}",
                         self.entrypoint_tag, self.agent_id
@@ -324,6 +364,12 @@ impl RunAgentClient {
         input_args: &[Value],
         input_kwargs: &[(&str, Value)],
     ) -> RunAgentResult<Pin<Box<dyn Stream<Item = RunAgentResult<Value>> + Send>>> {
+        if !self.entrypoint_tag.ends_with("_stream") {
+            return Err(RunAgentError::validation(
+                "Use run() for non-stream entrypoints".to_string(),
+            ));
+        }
+
         let input_kwargs_map: HashMap<String, Value> = input_kwargs
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
@@ -357,8 +403,37 @@ impl RunAgentClient {
         &self.entrypoint_tag
     }
 
+    /// Get any extra params supplied during initialization
+    pub fn extra_params(&self) -> Option<&HashMap<String, Value>> {
+        self.extra_params.as_ref()
+    }
+
     /// Check if using local deployment
     pub fn is_local(&self) -> bool {
         self.local
+    }
+}
+
+impl RunAgentClient {
+    fn create_remote_clients(
+        base_url_override: Option<&str>,
+        api_key_override: Option<String>,
+    ) -> RunAgentResult<(RestClient, SocketClient)> {
+        if let Some(base_url) = base_url_override {
+            let rest_client = RestClient::new(base_url, api_key_override.clone(), Some("/api/v1"))?;
+            let socket_base = if base_url.starts_with("https://") {
+                base_url.replace("https://", "wss://")
+            } else if base_url.starts_with("http://") {
+                base_url.replace("http://", "ws://")
+            } else {
+                format!("wss://{}", base_url)
+            };
+            let socket_client = SocketClient::new(&socket_base, api_key_override, Some("/api/v1"))?;
+            Ok((rest_client, socket_client))
+        } else {
+            let rest_client = RestClient::default()?;
+            let socket_client = SocketClient::default()?;
+            Ok((rest_client, socket_client))
+        }
     }
 }
