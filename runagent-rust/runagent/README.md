@@ -26,82 +26,190 @@ futures = "0.3"
 
 ## Configuration Overview
 
+The SDK uses a single constructor pattern. All configuration is done through `RunAgentClientConfig`:
+
 ```rust
-RunAgentClient::new(agent_id, entrypoint_tag, local);
-RunAgentClient::with_address(agent_id, entrypoint_tag, true, Some("127.0.0.1"), Some(8450));
-RunAgentClient::with_remote_config(agent_id, entrypoint_tag, "https://backend.run-agent.ai", Some(api_key));
+use runagent::RunAgentClientConfig;
+
+// Local agent with explicit address
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_local(true)
+        .with_address("127.0.0.1", 8450)
+        .with_enable_registry(false)
+).await?;
+
+// Remote agent
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
+).await?;
 ```
 
 | Setting         | Cloud            | Local (auto discovery) | Local (explicit)  |
 |-----------------|------------------|------------------------|-------------------|
-| `local`         | `false`          | `true`                 | `true`            |
-| Host / Port     | derived from URL | looked up via SQLite   | `with_address`    |
+| `local`         | `false` (default) | `true`                 | `true`            |
+| Host / Port     | derived from URL | looked up via SQLite   | `with_address()`  |
 | Base URL        | `RUNAGENT_BASE_URL` \|\| default | n/a | n/a                |
 | API Key         | `RUNAGENT_API_KEY` (required) | optional | optional          |
+| Registry        | n/a              | `true` (default)       | `false`           |
 
-- `RUNAGENT_API_KEY`: Bearer token for remote agents.
+- `RUNAGENT_API_KEY`: Bearer token for remote agents (can be set via env var or `with_api_key()`).
 - `RUNAGENT_BASE_URL`: Override the default cloud endpoint (e.g. staging).
-- For local discovery install the crate with the `db` feature and ensure the CLI has registered the agent in `~/.runagent/runagent_local.db`.
+- For local discovery, install the crate with the `db` feature and ensure the CLI has registered the agent in `~/.runagent/runagent_local.db`.
 
 ---
 
 ## Usage
 
-### Cloud (non-streaming)
+### Sync (Blocking) - Simplest
+
+#### Non-streaming
 
 ```rust
-use runagent::client::RunAgentClient;
+use runagent::blocking::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 
-#[tokio::main]
-async fn main() -> runagent::RunAgentResult<()> {
-    dotenvy::from_filename("local.env").ok(); // optional
+fn main() -> runagent::RunAgentResult<()> {
+    // Direct struct construction
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: "agent-id".to_string(),
+        entrypoint_tag: "entrypoint".to_string(),
+        api_key: Some("your-api-key".to_string()),
+        base_url: Some("http://localhost:8333/".to_string()),
+        ..RunAgentClientConfig::default() // Omits None values
+    })?;
 
-    let client = RunAgentClient::new("agent-id", "support_flow", false).await?;
-    let response = client.run(&[("message", json!("Hello!"))]).await?;
-
+    let response = client.run(&[("message", json!("Hello!"))])?;
     println!("Response: {}", response);
     Ok(())
 }
 ```
 
-### Cloud (streaming)
+#### Streaming
 
 ```rust
-use runagent::client::RunAgentClient;
+use runagent::blocking::{RunAgentClient, RunAgentClientConfig};
+use serde_json::json;
+
+fn main() -> runagent::RunAgentResult<()> {
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: "agent-id".to_string(),
+        entrypoint_tag: "entrypoint_stream".to_string(),
+        api_key: Some("your-api-key".to_string()),
+        ..RunAgentClientConfig::default()
+    })?;
+
+    // Streaming collects all chunks into a vector
+    let chunks = client.run_stream(&[("message", json!("Hello!"))])?;
+    for chunk in chunks {
+        println!(">> {}", chunk?);
+    }
+    Ok(())
+}
+```
+
+### Async (Recommended)
+
+#### Non-streaming
+
+```rust
+use runagent::{RunAgentClient, RunAgentClientConfig};
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> runagent::RunAgentResult<()> {
+    // Direct struct construction
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: "agent-id".to_string(),
+        entrypoint_tag: "entrypoint".to_string(),
+        api_key: Some("your-api-key".to_string()),
+        base_url: Some("http://localhost:8333/".to_string()),
+        ..RunAgentClientConfig::default()
+    }).await?;
+
+    let response = client.run(&[("message", json!("Hello!"))]).await?;
+    println!("Response: {}", response);
+    Ok(())
+}
+```
+
+#### Streaming
+
+```rust
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> runagent::RunAgentResult<()> {
-    let client = RunAgentClient::new("agent-id", "support_flow_stream", false).await?;
-    let mut stream = client.run_stream(&[("message", json!("Need help"))]).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: "agent-id".to_string(),
+        entrypoint_tag: "entrypoint_stream".to_string(),
+        api_key: Some("your-api-key".to_string()),
+        ..RunAgentClientConfig::default()
+    }).await?;
 
+    // Real streaming - processes chunks as they arrive
+    let mut stream = client.run_stream(&[("message", json!("Hello!"))]).await?;
     while let Some(chunk) = stream.next().await {
         println!(">> {}", chunk?);
     }
-
     Ok(())
 }
 ```
 
-### Local (auto discovery)
+### Alternative: Builder Pattern
+
+You can also use the builder pattern instead of direct struct construction:
 
 ```rust
-let client = RunAgentClient::new("local-agent-id", "minimal", true).await?;
-let result = client.run(&[("message", json!("Hello there"))]).await?;
+use runagent::{RunAgentClient, RunAgentClientConfig};
+
+// Async
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_api_key("your-api-key")
+        .with_base_url("http://localhost:8333/")
+).await?;
+
+// Sync
+use runagent::blocking::RunAgentClient;
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_api_key("your-api-key")
+        .with_base_url("http://localhost:8333/")
+)?;
 ```
 
-### Local (explicit host/port)
+### Local Agents
+
+#### With explicit address
 
 ```rust
-let client = RunAgentClient::with_address(
-    "local-agent-id",
-    "minimal",
-    true,
-    Some("127.0.0.1"),
-    Some(8450),
-).await?;
+use runagent::{RunAgentClient, RunAgentClientConfig};
+
+let client = RunAgentClient::new(RunAgentClientConfig {
+    agent_id: "local-agent-id".to_string(),
+    entrypoint_tag: "minimal".to_string(),
+    local: Some(true),
+    host: Some("127.0.0.1".to_string()),
+    port: Some(8452),
+    enable_registry: Some(false), // Skip DB lookup
+    ..RunAgentClientConfig::default()
+}).await?;
+```
+
+#### With auto-discovery (requires `db` feature)
+
+```rust
+let client = RunAgentClient::new(RunAgentClientConfig {
+    agent_id: "local-agent-id".to_string(),
+    entrypoint_tag: "minimal".to_string(),
+    local: Some(true),
+    // enable_registry defaults to true for local agents
+    ..RunAgentClientConfig::default()
+}).await?;
 ```
 
 > **Guardrails**: tags ending with `_stream` can only be run via `run_stream*`. Non-stream tags must be run via `run*`. The client raises clear errors (`STREAM_ENTRYPOINT`, `NON_STREAM_ENTRYPOINT`) with suggestions.
@@ -136,11 +244,28 @@ During initialization the client calls `/api/v1/agents/{id}/architecture` and ex
 
 ## API Reference
 
+### Client Creation
+
 | Method | Description |
 |--------|-------------|
-| `RunAgentClient::new(agent_id, entrypoint_tag, local)` | Create a client (auto-detect host for local agents if DB feature is enabled). |
-| `RunAgentClient::with_address(agent_id, entrypoint_tag, local, host, port)` | Connect to a local agent at a specific address. |
-| `RunAgentClient::with_remote_config(agent_id, entrypoint_tag, base_url, api_key)` | Override remote base URL/API key. |
+| `RunAgentClient::new(config: RunAgentClientConfig)` | Single constructor for all client types. |
+
+### Configuration Builder
+
+| Method | Description |
+|--------|-------------|
+| `RunAgentClientConfig::new(agent_id, entrypoint_tag)` | Create config with required fields. |
+| `.with_local(bool)` | Set local flag (default: `false`). |
+| `.with_address(host, port)` | Set explicit host/port for local agents. |
+| `.with_api_key(key)` | Set API key (overrides env var). |
+| `.with_base_url(url)` | Override default base URL. |
+| `.with_enable_registry(bool)` | Enable/disable database lookup (default: `true` for local). |
+| `.with_extra_params(params)` | Set extra parameters for future use. |
+
+### Client Methods
+
+| Method | Description |
+|--------|-------------|
 | `run` / `run_with_args` | Execute non-streaming entrypoints. |
 | `run_stream` / `run_stream_with_args` | Execute streaming entrypoints (async stream of `Value`). |
 | `health_check` | Check if the agent is reachable. |
@@ -158,7 +283,7 @@ All methods return `RunAgentResult<T>` where `RunAgentError::Execution { code, m
 | `NON_STREAM_ENTRYPOINT` | Call `run*` or deploy a `_stream` entrypoint. |
 | `AGENT_NOT_FOUND_LOCAL` | Ensure the agent is registered locally (`runagent serve` or `runagent config --register-agent`). |
 | `AGENT_NOT_FOUND_REMOTE` | Verify the agent ID and that your API key has access. |
-| `AUTHENTICATION_ERROR` | Set `RUNAGENT_API_KEY` or pass `api_key` to `with_remote_config`. |
+| `AUTHENTICATION_ERROR` | Set `RUNAGENT_API_KEY` env var or use `.with_api_key()` in config. |
 | `ARCHITECTURE_MISSING` | Redeploy the agent; ensure entrypoints are defined in `runagent.config.json`. |
 
 ---

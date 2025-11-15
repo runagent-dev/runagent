@@ -1,9 +1,28 @@
 //! Database service for agent lookups
 
-use crate::constants::{DATABASE_FILE_NAME, LOCAL_CACHE_DIRECTORY};
 use crate::types::{RunAgentError, RunAgentResult};
+use once_cell::sync::Lazy;
 use sqlx::{sqlite::SqlitePool, Row};
 use std::path::PathBuf;
+
+/// Database file name
+const DATABASE_FILE_NAME: &str = "runagent_local.db";
+
+/// Environment variable for cache directory
+const ENV_LOCAL_CACHE_DIRECTORY: &str = "RUNAGENT_CACHE_DIR";
+
+/// Local cache directory (computed at runtime)
+static LOCAL_CACHE_DIRECTORY: Lazy<PathBuf> = Lazy::new(|| {
+    // Check environment variable first
+    if let Ok(env_path) = std::env::var(ENV_LOCAL_CACHE_DIRECTORY) {
+        return PathBuf::from(env_path);
+    }
+    
+    // Default to ~/.runagent
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".runagent")
+});
 
 /// Agent information stored in database
 #[derive(Debug, Clone)]

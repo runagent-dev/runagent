@@ -30,8 +30,72 @@ impl CoreSerializer {
         Ok(json_str)
     }
 
-    /// Deserialize JSON string to object
+    /// Prepare value for deserialization
+    /// 
+    /// If the value is a JSON string, parses it first.
+    /// Otherwise returns the value as-is.
+    /// This handles cases where responses come as JSON strings.
+    pub fn prepare_for_deserialization(&self, value: Value) -> Value {
+        if let Some(str_val) = value.as_str() {
+            // Try to parse as JSON first
+            match serde_json::from_str::<Value>(str_val) {
+                Ok(parsed) => parsed,
+                Err(_) => value, // Not JSON, return as-is
+            }
+        } else {
+            value // Already parsed
+        }
+    }
+
+    /// Deserialize JSON response to object
+    /// 
+    /// Handles multiple response formats:
+    /// 1. `{type, payload}` structure - extracts and deserializes payload
+    /// 2. String payload - parses JSON string
+    /// 3. Direct value - reconstructs nested JSON
+    /// 
+    /// Handles multiple response formats including `{type, payload}` structures.
     pub fn deserialize_object(&self, json_resp: Value) -> RunAgentResult<Value> {
+        // Handle {type, payload} structure
+        if let Value::Object(ref map) = json_resp {
+            if map.contains_key("type") && map.contains_key("payload") {
+                let payload_val = map.get("payload").unwrap();
+                
+                // If payload is a string, try to parse it as JSON
+                if let Some(payload_str) = payload_val.as_str() {
+                    // The payload is a JSON-encoded string, parse it to get the actual value
+                    // Example: payload_str = "\"Hello\"" -> parsed = "Hello"
+                    match serde_json::from_str::<Value>(payload_str) {
+                        Ok(parsed) => {
+                            // Parse succeeded - return the parsed value
+                            return Ok(parsed);
+                        }
+                        Err(_) => {
+                            // Parse failed - return the string as-is
+                            return Ok(Value::String(payload_str.to_string()));
+                        }
+                    }
+                }
+                
+                // Payload is not a string - reconstruct it directly
+                return self.reconstruct_nested_json(payload_val.clone());
+            }
+            
+            // Handle {content} structure (legacy format)
+            if let Some(content) = map.get("content") {
+                return self.reconstruct_nested_json(content.clone());
+            }
+        }
+        
+        // If it's a string, try to parse it first
+        if let Some(str_val) = json_resp.as_str() {
+            match serde_json::from_str::<Value>(str_val) {
+                Ok(parsed) => return self.reconstruct_nested_json(parsed),
+                Err(_) => return Ok(Value::String(str_val.to_string())),
+            }
+        }
+        
+        // Default: reconstruct nested JSON
         self.reconstruct_nested_json(json_resp)
     }
 

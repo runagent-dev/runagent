@@ -24,158 +24,218 @@ pub struct RunAgentClient {
     extra_params: Option<HashMap<String, Value>>,
 
     #[cfg(feature = "db")]
+    #[allow(dead_code)] // Reserved for future use
     db_service: Option<DatabaseService>,
 }
 
-/// Configuration options for building a RunAgent client
-pub struct RunAgentClientOptions<'a> {
-    pub agent_id: &'a str,
-    pub entrypoint_tag: &'a str,
-    pub local: bool,
-    pub host: Option<&'a str>,
+/// Configuration for creating a RunAgent client
+/// 
+/// All fields except `agent_id` and `entrypoint_tag` are optional.
+/// 
+/// # Direct Construction
+/// 
+/// ```rust,no_run
+/// use runagent::RunAgentClient;
+/// 
+/// let client = RunAgentClient::new(runagent::RunAgentClientConfig {
+///     agent_id: "agent-id".to_string(),
+///     entrypoint_tag: "entrypoint".to_string(),
+///     local: None,
+///     host: None,
+///     port: None,
+///     api_key: Some("key".to_string()),
+///     base_url: Some("http://localhost:8333/".to_string()),
+///     extra_params: None,
+///     enable_registry: None,
+/// }).await?;
+/// ```
+/// 
+/// # Builder Pattern (Alternative)
+/// 
+/// ```rust,no_run
+/// let client = RunAgentClient::new(
+///     runagent::RunAgentClientConfig::new("agent-id", "entrypoint")
+///         .with_api_key("key")
+///         .with_base_url("http://localhost:8333/")
+/// ).await?;
+/// ```
+#[derive(Debug, Clone)]
+pub struct RunAgentClientConfig {
+    /// Agent ID (required)
+    pub agent_id: String,
+    /// Entrypoint tag (required)
+    pub entrypoint_tag: String,
+    /// Whether this is a local agent (default: false)
+    pub local: Option<bool>,
+    /// Host for local agents (optional, will lookup from DB if not provided and local=true)
+    pub host: Option<String>,
+    /// Port for local agents (optional, will lookup from DB if not provided and local=true)
     pub port: Option<u16>,
-    pub base_url: Option<&'a str>,
+    /// API key for remote agents (optional, can also use RUNAGENT_API_KEY env var)
     pub api_key: Option<String>,
+    /// Base URL for remote agents (optional, defaults to https://backend.run-agent.ai)
+    pub base_url: Option<String>,
+    /// Extra parameters for future use
     pub extra_params: Option<HashMap<String, Value>>,
+    /// Enable database registry lookup (default: true for local agents)
+    pub enable_registry: Option<bool>,
 }
 
-impl<'a> RunAgentClientOptions<'a> {
-    pub fn new(agent_id: &'a str, entrypoint_tag: &'a str, local: bool) -> Self {
+impl RunAgentClientConfig {
+    /// Create a new config with required fields
+    pub fn new(agent_id: impl Into<String>, entrypoint_tag: impl Into<String>) -> Self {
         Self {
-            agent_id,
-            entrypoint_tag,
-            local,
+            agent_id: agent_id.into(),
+            entrypoint_tag: entrypoint_tag.into(),
+            local: None,
             host: None,
             port: None,
-            base_url: None,
             api_key: None,
+            base_url: None,
             extra_params: None,
+            enable_registry: None,
         }
+    }
+
+    /// Create a config with defaults for optional fields
+    /// 
+    /// This allows you to use `..RunAgentClientConfig::default()` syntax
+    /// to omit None values when constructing directly.
+    pub fn default() -> Self {
+        Self {
+            agent_id: String::new(), // Dummy - will be overridden
+            entrypoint_tag: String::new(), // Dummy - will be overridden
+            local: None,
+            host: None,
+            port: None,
+            api_key: None,
+            base_url: None,
+            extra_params: None,
+            enable_registry: None,
+        }
+    }
+
+    /// Set local flag
+    pub fn with_local(mut self, local: bool) -> Self {
+        self.local = Some(local);
+        self
+    }
+
+    /// Set host and port for local agents
+    pub fn with_address(mut self, host: impl Into<String>, port: u16) -> Self {
+        self.host = Some(host.into());
+        self.port = Some(port);
+        self
+    }
+
+    /// Set API key
+    pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
+        self.api_key = Some(api_key.into());
+        self
+    }
+
+    /// Set base URL
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = Some(base_url.into());
+        self
+    }
+
+    /// Set extra parameters
+    pub fn with_extra_params(mut self, extra_params: HashMap<String, Value>) -> Self {
+        self.extra_params = Some(extra_params);
+        self
+    }
+
+    /// Enable or disable registry lookup
+    pub fn with_enable_registry(mut self, enable: bool) -> Self {
+        self.enable_registry = Some(enable);
+        self
     }
 }
 
 impl RunAgentClient {
-    /// Create a new RunAgent client
+    /// Create a new RunAgent client from configuration
     /// 
-    /// For local agents, tries to lookup host/port from database if available.
-    /// For remote agents, configuration is loaded from environment variables.
-    pub async fn new(
-        agent_id: &str,
-        entrypoint_tag: &str,
-        local: bool,
-    ) -> RunAgentResult<Self> {
-        #[cfg(feature = "db")]
-        {
-            if local {
-                // Try database lookup first
-                let db_service = DatabaseService::new(None).await?;
-                if let Some(agent_info) = db_service.get_agent(agent_id).await? {
-                    tracing::info!("🔍 Found agent in database: {}:{}", agent_info.host, agent_info.port);
-                    return Self::from_options(RunAgentClientOptions {
-                        agent_id,
-                        entrypoint_tag,
-                        local,
-                        host: Some(&agent_info.host),
-                        port: Some(agent_info.port as u16),
-                        base_url: None,
-                        api_key: None,
-                        extra_params: None,
-                    }).await;
-                } else {
-                    return Err(RunAgentError::validation(format!(
-                        "Agent {} not found in local DB. Use with_address() to connect directly.", 
-                        agent_id
-                    )));
+    /// This is the single entry point for creating clients.
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust,no_run
+    /// // Local agent with explicit address
+    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///     .with_local(true)
+    ///     .with_address("127.0.0.1", 8450)
+    ///     .with_enable_registry(false)
+    /// ).await?;
+    /// 
+    /// // Remote agent
+    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///     .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
+    /// ).await?;
+    /// ```
+    pub async fn new(config: RunAgentClientConfig) -> RunAgentResult<Self> {
+        use crate::constants::{DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL};
+        
+        let local = config.local.unwrap_or(false);
+        let enable_registry = config.enable_registry.unwrap_or(local);
+        
+        // Resolve host/port for local agents
+        let (host, port) = if local {
+            // If host/port provided, use them
+            if let (Some(h), Some(p)) = (&config.host, &config.port) {
+                (Some(h.clone()), Some(*p))
+            } else if enable_registry {
+                // Try database lookup if enabled
+                #[cfg(feature = "db")]
+                {
+                    let db_service = DatabaseService::new(None).await?;
+                    if let Some(agent_info) = db_service.get_agent(&config.agent_id).await? {
+                        tracing::info!("🔍 Found agent in database: {}:{}", agent_info.host, agent_info.port);
+                        (Some(agent_info.host), Some(agent_info.port as u16))
+                    } else {
+                        (config.host.clone(), config.port)
+                    }
                 }
+                #[cfg(not(feature = "db"))]
+                {
+                    (config.host.clone(), config.port)
+                }
+            } else {
+                (config.host.clone(), config.port)
             }
-        }
-        
-        #[cfg(not(feature = "db"))]
-        {
-            if local {
-                return Err(RunAgentError::config(
-                    "Database feature not enabled. Use with_address() to connect directly."
-                ));
-            }
-        }
-        
-        // For remote connections, proceed without database lookup
-        Self::from_options(RunAgentClientOptions {
-            agent_id,
-            entrypoint_tag,
-            local,
-            host: None,
-            port: None,
-            base_url: None,
-            api_key: None,
-            extra_params: None,
-        }).await
-    }
+        } else {
+            (None, None)
+        };
 
-    /// Create a new RunAgent client with specific host and port
-    pub async fn with_address(
-        agent_id: &str,
-        entrypoint_tag: &str,
-        local: bool,
-        host: Option<&str>,
-        port: Option<u16>,
-    ) -> RunAgentResult<Self> {
-        Self::from_options(RunAgentClientOptions {
-            agent_id,
-            entrypoint_tag,
-            local,
-            host,
-            port,
-            base_url: None,
-            api_key: None,
-            extra_params: None,
-        }).await
-    }
+        // Resolve API key (config > env var)
+        let api_key = config.api_key.or_else(|| {
+            std::env::var(ENV_RUNAGENT_API_KEY).ok()
+        });
 
-    /// Create a new RunAgent client with explicit remote configuration
-    pub async fn with_remote_config(
-        agent_id: &str,
-        entrypoint_tag: &str,
-        base_url: &str,
-        api_key: Option<String>,
-    ) -> RunAgentResult<Self> {
-        Self::from_options(RunAgentClientOptions {
-            agent_id,
-            entrypoint_tag,
-            local: false,
-            host: None,
-            port: None,
-            base_url: Some(base_url),
-            api_key,
-            extra_params: None,
-        }).await
-    }
+        // Resolve base URL (config > env var > default)
+        let base_url = config.base_url.or_else(|| {
+            std::env::var(ENV_RUNAGENT_BASE_URL).ok()
+        }).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
 
-    /// Build a RunAgent client from detailed options
-    pub async fn from_options(options: RunAgentClientOptions<'_>) -> RunAgentResult<Self> {
         let serializer = CoreSerializer::new(10.0)?;
         #[cfg(feature = "db")]
-        let db_service = if options.local {
-            Some(DatabaseService::new(None).await?)
-        } else {
-            None
-        };
+        let db_service: Option<DatabaseService> = None;
         #[cfg(not(feature = "db"))]
         let db_service: Option<DatabaseService> = None;
 
-        let (rest_client, socket_client) = if options.local {
-            let host = options.host.ok_or_else(|| {
+        let (rest_client, socket_client) = if local {
+            let host = host.ok_or_else(|| {
                 RunAgentError::validation(
-                    "Host is required for local clients. Provide host/port or use RunAgentClient::new for database lookup.",
+                    "Host is required for local clients. Provide host/port in config or enable registry for database lookup.",
                 )
             })?;
-            let port = options.port.ok_or_else(|| {
+            let port = port.ok_or_else(|| {
                 RunAgentError::validation(
-                    "Port is required for local clients. Provide host/port or use RunAgentClient::new for database lookup.",
+                    "Port is required for local clients. Provide host/port in config or enable registry for database lookup.",
                 )
             })?;
 
-            tracing::info!("🔌 Using explicit address: {}:{}", host, port);
+            tracing::info!("🔌 Using address: {}:{}", host, port);
 
             let agent_base_url = format!("http://{}:{}", host, port);
             let agent_socket_url = format!("ws://{}:{}", host, port);
@@ -185,18 +245,18 @@ impl RunAgentClient {
 
             (rest_client, socket_client)
         } else {
-            Self::create_remote_clients(options.base_url, options.api_key.clone())?
+            Self::create_remote_clients(Some(&base_url), api_key)?
         };
 
         let mut client = Self {
-            agent_id: options.agent_id.to_string(),
-            entrypoint_tag: options.entrypoint_tag.to_string(),
-            local: options.local,
+            agent_id: config.agent_id,
+            entrypoint_tag: config.entrypoint_tag,
+            local,
             rest_client,
             socket_client,
             serializer,
             agent_architecture: None,
-            extra_params: options.extra_params.clone(),
+            extra_params: config.extra_params,
 
             #[cfg(feature = "db")]
             db_service,
@@ -283,51 +343,44 @@ impl RunAgentClient {
             .await?;
 
         if response.get("success").and_then(|s| s.as_bool()).unwrap_or(false) {
-            if let Some(data) = response.get("data") {
-                // Simplified payload: data is a structured output string
-                if let Some(data_str) = data.as_str() {
-                    if let Ok(parsed) = serde_json::from_str::<Value>(data_str) {
-                        return self.serializer.deserialize_object(parsed);
-                    }
-                    return self
-                        .serializer
-                        .deserialize_object(Value::String(data_str.to_string()));
-                }
+            // Process response data
+            let mut payload: Option<Value> = None;
 
-                // Legacy detailed execution payload
-                if let Some(result_data) = data.get("result_data") {
+            if let Some(data) = response.get("data") {
+                // Case 1: data is a string (simplified payload - could be JSON string with {type, payload})
+                if data.as_str().is_some() {
+                    // Use common deserializer preparation logic
+                    let prepared = self.serializer.prepare_for_deserialization(data.clone());
+                    payload = Some(prepared);
+                }
+                // Case 2: data has result_data.data (legacy detailed execution payload)
+                else if let Some(result_data) = data.get("result_data") {
                     if let Some(output_data) = result_data.get("data") {
-                        // Check if the output contains a generator object string
-                        if let Some(content_str) = output_data.as_str() {
-                            if content_str.contains("generator object") {
-                                tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
-                                // Return the raw string for now
-                                return Ok(output_data.clone());
-                            }
-                            // If it's a JSON string, try to parse it first
-                            if let Ok(parsed) = serde_json::from_str::<Value>(content_str) {
-                                return self.serializer.deserialize_object(parsed);
-                            }
-                        }
-                        return self.serializer.deserialize_object(output_data.clone());
+                        payload = Some(output_data.clone());
                     }
+                }
+                // Case 3: data is an object (could be {type, payload} structure)
+                else if data.is_object() {
+                    payload = Some(data.clone());
                 }
             }
-            // Fallback to old format for backward compatibility
-            if let Some(output_data) = response.get("output_data") {
-                // Check if the output contains a generator object string
-                if let Some(content_str) = output_data.as_str() {
+            // Case 4: Fallback to output_data (backward compatibility)
+            else if let Some(output_data) = response.get("output_data") {
+                payload = Some(output_data.clone());
+            }
+
+            // Deserialize the payload using serializer (handles {type, payload} structure)
+            if let Some(payload_val) = payload {
+                // Check for generator object warning
+                if let Some(content_str) = payload_val.as_str() {
                     if content_str.contains("generator object") {
                         tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
-                        // Return the raw string for now
-                        return Ok(output_data.clone());
-                    }
-                    // If it's a JSON string, try to parse it first
-                    if let Ok(parsed) = serde_json::from_str::<Value>(content_str) {
-                        return self.serializer.deserialize_object(parsed);
+                        return Ok(payload_val);
                     }
                 }
-                return self.serializer.deserialize_object(output_data.clone());
+                // Deserialize the payload - this should extract payload from {type, payload} structure
+                let deserialized = self.serializer.deserialize_object(payload_val)?;
+                return Ok(deserialized);
             }
             Ok(Value::Null)
         } else {

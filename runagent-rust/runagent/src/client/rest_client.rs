@@ -230,7 +230,7 @@ impl RestClient {
                 return Err(RunAgentError::execution(
                     "ARCHITECTURE_MISSING",
                     "Architecture response missing data",
-                    Some("Redeploy the agent or ensure entrypoints are configured."),
+                    Some("Redeploy the agent or ensure entrypoints are configured.".to_string()),
                     Some(response),
                 ));
             }
