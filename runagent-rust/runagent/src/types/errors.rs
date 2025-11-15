@@ -1,5 +1,6 @@
 //! Error types for the RunAgent SDK
 
+use serde_json::Value;
 use std::fmt;
 use thiserror::Error;
 
@@ -37,6 +38,15 @@ pub enum RunAgentError {
     /// Configuration errors
     #[error("Configuration error: {message}")]
     Config { message: String },
+
+    /// Execution/SDK errors with structured details
+    #[error("{code}: {message}")]
+    Execution {
+        code: String,
+        message: String,
+        suggestion: Option<String>,
+        details: Option<Value>,
+    },
 
     /// IO errors
     #[error("IO error: {0}")]
@@ -112,6 +122,21 @@ impl RunAgentError {
         }
     }
 
+    /// Create a new execution error with structured metadata
+    pub fn execution<S: Into<String>>(
+        code: S,
+        message: S,
+        suggestion: Option<String>,
+        details: Option<Value>,
+    ) -> Self {
+        Self::Execution {
+            code: code.into(),
+            message: message.into(),
+            suggestion,
+            details,
+        }
+    }
+
     /// Create a new generic error
     pub fn generic<S: Into<String>>(message: S) -> Self {
         Self::Generic {
@@ -130,6 +155,7 @@ impl RunAgentError {
             Self::Deployment { .. } => "deployment",
             Self::Database { .. } => "database",
             Self::Config { .. } => "config",
+            Self::Execution { .. } => "execution",
             Self::Io(_) => "io",
             Self::Json(_) => "json",
             Self::Http(_) => "http",
@@ -142,7 +168,7 @@ impl RunAgentError {
         matches!(
             self,
             Self::Connection { .. } | Self::Server { .. } | Self::Http(_)
-        )
+        ) || matches!(self, Self::Execution { code, .. } if code == "CONNECTION_ERROR" || code == "SERVER_ERROR")
     }
 }
 
