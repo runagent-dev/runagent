@@ -1,8 +1,7 @@
 //! Configuration management for the RunAgent SDK
 
 use crate::constants::{
-    DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL, LOCAL_CACHE_DIRECTORY,
-    USER_DATA_FILE_NAME,
+    DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL,
 };
 use crate::types::{RunAgentError, RunAgentResult};
 use serde::{Deserialize, Serialize};
@@ -38,22 +37,12 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Load configuration from various sources
+    /// Load configuration from environment variables
+    /// All configuration is now stored in SQLite database, this only loads from env vars
     pub fn load() -> RunAgentResult<Self> {
         let mut config = Self::default();
 
-        // 1. Load from config file
-        if let Ok(file_config) = Self::load_from_file() {
-            config.api_key = file_config.api_key.or(config.api_key);
-            config.base_url = if file_config.base_url.is_empty() {
-                config.base_url
-            } else {
-                file_config.base_url
-            };
-            config.user_info.extend(file_config.user_info);
-        }
-
-        // 2. Override with environment variables
+        // Load from environment variables
         if let Ok(env_api_key) = std::env::var(ENV_RUNAGENT_API_KEY) {
             config.api_key = Some(env_api_key);
         }
@@ -62,7 +51,7 @@ impl Config {
             config.base_url = env_base_url;
         }
 
-        // 3. Ensure base_url has proper format
+        // Ensure base_url has proper format
         if !config.base_url.starts_with("http://") && !config.base_url.starts_with("https://") {
             config.base_url = format!("https://{}", config.base_url);
         }
@@ -70,47 +59,12 @@ impl Config {
         Ok(config)
     }
 
-    /// Load configuration from file
-    fn load_from_file() -> RunAgentResult<Self> {
-        let config_path = Self::get_config_file_path();
-        
-        if config_path.exists() {
-            let content = fs::read_to_string(&config_path)
-                .map_err(|e| RunAgentError::config(format!("Failed to read config file: {}", e)))?;
-            
-            match serde_json::from_str::<Self>(&content) {
-                Ok(parsed_config) => Ok(parsed_config),
-                Err(_) => Ok(Self::default())
-            }
-        } else {
-            Ok(Self::default())
-        }
-    }
-
-    /// Save configuration to file
-    pub fn save(&self) -> RunAgentResult<()> {
-        let config_path = Self::get_config_file_path();
-        
-        // Create parent directories if they don't exist
-        if let Some(parent) = config_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| RunAgentError::config(format!("Failed to create config directory: {}", e)))?;
-        }
-
-        let content = serde_json::to_string_pretty(self)
-            .map_err(|e| RunAgentError::config(format!("Failed to serialize config: {}", e)))?;
-
-        fs::write(&config_path, content)
-            .map_err(|e| RunAgentError::config(format!("Failed to write config file: {}", e)))?;
-
-        Ok(())
-    }
-
     /// Setup and validate configuration
+    /// Note: Configuration is stored in SQLite database, not in files
     pub fn setup(
         api_key: Option<String>,
         base_url: Option<String>,
-        save: bool,
+        _save: bool,
     ) -> RunAgentResult<Self> {
         let mut config = Self::load()?;
 
@@ -137,10 +91,7 @@ impl Config {
             return Err(RunAgentError::authentication("Authentication failed with provided credentials"));
         }
 
-        // Save if requested
-        if save {
-            config.save()?;
-        }
+        // Note: save parameter is ignored - configuration is stored in SQLite database
 
         Ok(config)
     }
@@ -171,22 +122,8 @@ impl Config {
         status.insert("api_key_set".to_string(), serde_json::json!(self.api_key.is_some()));
         status.insert("base_url".to_string(), serde_json::json!(self.base_url));
         status.insert("user_info".to_string(), serde_json::json!(self.user_info));
-        status.insert("config_file".to_string(), serde_json::json!(Self::get_config_file_path()));
-        status.insert("config_file_exists".to_string(), serde_json::json!(Self::get_config_file_path().exists()));
 
         status
-    }
-
-    /// Clear all configuration
-    pub fn clear() -> RunAgentResult<()> {
-        let config_path = Self::get_config_file_path();
-        
-        if config_path.exists() {
-            fs::remove_file(&config_path)
-                .map_err(|e| RunAgentError::config(format!("Failed to remove config file: {}", e)))?;
-        }
-
-        Ok(())
     }
 
     /// Get API key
@@ -202,11 +139,6 @@ impl Config {
     /// Get user information
     pub fn user_info(&self) -> &HashMap<String, serde_json::Value> {
         &self.user_info
-    }
-
-    /// Get config file path
-    fn get_config_file_path() -> PathBuf {
-        LOCAL_CACHE_DIRECTORY.join(USER_DATA_FILE_NAME)
     }
 
     /// Create agent configuration file
@@ -270,66 +202,6 @@ impl Config {
         Ok(Some(config))
     }
 
-    /// Backup current configuration
-    pub fn backup() -> RunAgentResult<Option<String>> {
-        let config_path = Self::get_config_file_path();
-        
-        if !config_path.exists() {
-            return Ok(None);
-        }
-
-        let config = Self::load_from_file()?;
-        
-        // Remove sensitive data from backup
-        let mut backup_config = config;
-        backup_config.api_key = None;
-
-        let backup_dir = LOCAL_CACHE_DIRECTORY.join("backups");
-        fs::create_dir_all(&backup_dir)
-            .map_err(|e| RunAgentError::config(format!("Failed to create backup directory: {}", e)))?;
-
-        let timestamp = chrono::Utc::now().timestamp();
-        let backup_file = backup_dir.join(format!("config_backup_{}.json", timestamp));
-
-        let content = serde_json::to_string_pretty(&backup_config)
-            .map_err(|e| RunAgentError::config(format!("Failed to serialize backup: {}", e)))?;
-
-        fs::write(&backup_file, content)
-            .map_err(|e| RunAgentError::config(format!("Failed to write backup: {}", e)))?;
-
-        Ok(Some(backup_file.to_string_lossy().to_string()))
-    }
-
-    /// Set user configuration value
-    pub fn set_user_config(key: &str, value: serde_json::Value) -> RunAgentResult<()> {
-        let mut config = Self::load()?;
-        config.user_info.insert(key.to_string(), value);
-        config.save()
-    }
-
-    /// Get user configuration value
-    pub fn get_user_config(key: &str) -> RunAgentResult<Option<serde_json::Value>> {
-        let config = Self::load()?;
-        Ok(config.user_info.get(key).cloned())
-    }
-
-    /// Set base URL
-    pub fn set_base_url(base_url: &str) -> RunAgentResult<()> {
-        let mut config = Self::load()?;
-        config.base_url = if base_url.starts_with("http://") || base_url.starts_with("https://") {
-            base_url.to_string()
-        } else {
-            format!("https://{}", base_url)
-        };
-        config.save()
-    }
-
-    /// Set API key
-    pub fn set_api_key(api_key: &str) -> RunAgentResult<()> {
-        let mut config = Self::load()?;
-        config.api_key = Some(api_key.to_string());
-        config.save()
-    }
 
     /// Save deployment information
     pub fn save_deployment_info(

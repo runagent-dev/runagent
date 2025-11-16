@@ -234,9 +234,35 @@ pub mod utils;
 #[cfg(feature = "db")]
 pub mod db;
 
+/// Blocking (synchronous) wrapper for RunAgentClient
+///
+/// This module provides a synchronous interface that wraps the async client.
+/// It's useful for simple scripts or when you can't use async/await.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use runagent::blocking::{RunAgentClient, RunAgentClientConfig};
+/// use serde_json::json;
+///
+/// fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(
+///         RunAgentClientConfig::new("agent-id", "entrypoint")
+///             .with_api_key(Some("key".to_string()))
+///     )?;
+///
+///     let result = client.run(&[("message", json!("Hello"))])?;
+///     Ok(())
+/// }
+/// ```
+pub mod blocking;
+
 // Re-export commonly used types and functions
-pub use client::{RunAgentClient, RestClient, SocketClient};
+pub use client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
 pub use types::{RunAgentError, RunAgentResult};
+
+// Re-export blocking client for convenience
+pub use blocking::RunAgentClient as BlockingRunAgentClient;
 
 #[cfg(feature = "db")]
 pub use db::DatabaseService;
@@ -387,9 +413,8 @@ impl RunAgentConfig {
 /// // Now you have access to RunAgentClient, RunAgentError, etc.
 /// ```
 pub mod prelude {
-    pub use crate::client::{RunAgentClient, RestClient, SocketClient};
+    pub use crate::client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
     pub use crate::types::{RunAgentError, RunAgentResult};
-    pub use crate::RunAgentConfig;
     
     #[cfg(feature = "db")]
     pub use crate::db::DatabaseService;

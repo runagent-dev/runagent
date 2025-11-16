@@ -42,6 +42,13 @@
 - Allow overrides via constructor or `RUNAGENT_BASE_URL` env var.
 - Respect per-request overrides for self-hosted or staging deployments.
 
+### Architecture Metadata Contract
+- Treat `/api/v1/agents/{id}/architecture` as an envelope `{ success, data, message, error, timestamp, request_id }`. Handle both the new envelope and the legacy payload transparently.
+- When `success === false`, raise the backend-provided `code/message` and surface any `suggestion`/`details` so users know how to recover (e.g. `AGENT_NOT_FOUND_REMOTE`, `AUTHENTICATION_ERROR`).
+- When `success === true`, normalize `data` into a single `AgentArchitecture` structure that includes `agent_id`/`agentId` plus the full entrypoint metadata (`tag`, `file`, `module`, `extractor`, `description`, etc.).
+- If `data` or `data.entrypoints` is missing, throw a clear `ARCHITECTURE_MISSING` error instructing users to redeploy or supply proper entrypoints.
+- When an entrypoint lookup fails, log or expose the list of entrypoint tags returned by the server to simplify debugging typo/mismatch issues.
+
 ### Authentication
 - Use Bearer tokens everywhere; reuse the CLI convention (`Authorization: Bearer ${api_key}`) and query-string token fallback for WebSockets.
 - Environment variable name: `RUNAGENT_API_KEY`.
@@ -134,6 +141,13 @@
 5. Error handling reference table.
 6. Advanced topics (custom base URL, extra params, retries).
 7. Troubleshooting (common connection/auth issues).
+
+### Additional Consistency Requirements
+- **Architecture endpoint contract**: every SDK must treat `/api/v1/agents/{id}/architecture` as an envelope `{ success, data, message, error, timestamp, request_id }`, propagate backend `error.code/message/suggestion/details`, normalize the `data` payload (including `agent_id`/`agentId`, `file`, `module`, `extractor`, etc.), and throw a clear `ARCHITECTURE_MISSING` error when `data.entrypoints` is absent.
+- **Run vs. runStream guardrails**: enforce that `_stream` tags only work with `runStream()` (`STREAM_ENTRYPOINT` error with a helpful suggestion) and non-stream tags only work with `run()` (`NON_STREAM_ENTRYPOINT` error). This mirrors the CLI and prevents silent misuse.
+- **Structured error surfaces**: expose a canonical error type (`RunAgentError`/`RunAgentExecutionError`) that always carries `code`, `message`, `suggestion`, and optional `details`, and reuse the shared code taxonomy (`AUTHENTICATION_ERROR`, `PERMISSION_ERROR`, `VALIDATION_ERROR`, `CONNECTION_ERROR`, `SERVER_ERROR`, `AGENT_NOT_FOUND_LOCAL`, `AGENT_NOT_FOUND_REMOTE`, `STREAM_ENTRYPOINT`, `NON_STREAM_ENTRYPOINT`, `ARCHITECTURE_MISSING`, etc.).
+- **Diagnostics for entrypoint mismatches**: when the requested entrypoint isn’t found, log or otherwise expose the set of tags returned by the backend so developers can quickly spot typos or missing deployments.
+- **Repository hygiene**: every SDK repo must ship a `README` (installation, configuration, local vs. remote, run vs. runStream examples) and a `PUBLISH.md` (version bump instructions, build/test checklist, npm publish guidance). This keeps packaging and documentation consistent across languages.
 
 ### References
 ```24:37:runagent/constants.py
