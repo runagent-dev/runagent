@@ -126,3 +126,18 @@ func decodeStructuredString(value string) interface{} {
 
 	return value
 }
+
+// decodeStructuredObject handles objects that may contain a "payload" field
+// where payload can be a stringified JSON or native JSON. This mirrors the
+// normalization in other SDKs so callers get the inner content directly.
+func decodeStructuredObject(obj map[string]interface{}) interface{} {
+	if payload, ok := obj["payload"]; ok {
+		switch p := payload.(type) {
+		case string:
+			return decodeStructuredString(p)
+		default:
+			return p
+		}
+	}
+	return obj
+}

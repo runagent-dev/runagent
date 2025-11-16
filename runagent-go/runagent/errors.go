@@ -2,6 +2,7 @@ package runagent
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ErrorType captures the standardized error taxonomy shared across SDKs.
@@ -98,6 +99,8 @@ func newExecutionError(status int, apiErr *apiErrorPayload) *RunAgentExecutionEr
 		}
 	}
 
+	apiErr = enrichErrorPayload(apiErr)
+
 	runErr := &RunAgentError{
 		Type:       apiErr.Type,
 		Code:       apiErr.Code,
@@ -111,5 +114,56 @@ func newExecutionError(status int, apiErr *apiErrorPayload) *RunAgentExecutionEr
 	return &RunAgentExecutionError{
 		RunAgentError: runErr,
 		HTTPStatus:    status,
+	}
+}
+
+// enrichErrorPayload adds friendly suggestions for common error shapes.
+func enrichErrorPayload(e *apiErrorPayload) *apiErrorPayload {
+	if e == nil {
+		return nil
+	}
+	msg := strings.ToLower(e.Message)
+	code := strings.ToUpper(e.Code)
+
+	switch {
+	case strings.Contains(msg, "unexpected keyword argument"):
+		if e.Suggestion == "" {
+			e.Suggestion = "Check the entrypoint's expected parameter names. If your agent expects 'message', pass Kw(\"message\", ...)."
+		}
+	case strings.Contains(msg, "entrypoint") && strings.Contains(msg, "not found"):
+		if e.Suggestion == "" {
+			e.Suggestion = "Verify the entrypoint tag and use GetArchitecture(ctx) to list available tags."
+		}
+	case code == "AUTHENTICATION_ERROR":
+		if e.Suggestion == "" {
+			e.Suggestion = "Set RUNAGENT_API_KEY or pass Config.APIKey for remote calls."
+		}
+	case code == "NON_STREAM_ENTRYPOINT":
+		if e.Suggestion == "" {
+			e.Suggestion = "Use client.Run(...) for non-stream tags."
+		}
+	case code == "STREAM_ENTRYPOINT":
+		if e.Suggestion == "" {
+			e.Suggestion = "Use client.RunStream(...) for *_stream tags."
+		}
+	}
+	return e
+}
+
+// formatFriendlyError renders a helpful panic message including suggestions when available.
+func formatFriendlyError(err error) string {
+	switch e := err.(type) {
+	case *RunAgentExecutionError:
+		if e.Suggestion != "" {
+			return fmt.Sprintf("RunAgent error: %s (%s)\nSuggestion: %s", e.Message, e.Type, e.Suggestion)
+		}
+		return fmt.Sprintf("RunAgent error: %s (%s)", e.Message, e.Type)
+	case *RunAgentError:
+		if e.Suggestion != "" {
+			return fmt.Sprintf("RunAgent error: %s (%s)\nSuggestion: %s", e.Message, e.Type, e.Suggestion)
+		}
+		return fmt.Sprintf("RunAgent error: %s (%s)", e.Message, e.Type)
+	default:
+		return fmt.Sprintf("RunAgent error: %v", err)
 	}
 }

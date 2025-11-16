@@ -55,6 +55,41 @@ When `Local` is true (or `RUNAGENT_LOCAL=true`), the SDK reads `~/.runagent/runa
 
 ---
 
+### Local vs Remote: Host/Port Optionality
+
+- Remote (cloud or self-hosted base URL):
+  - Do not set `Host`/`Port`. Provide `APIKey` (or set `RUNAGENT_API_KEY`), and optionally `BaseURL`.
+  - Example:
+    ```go
+    client, _ := runagent.NewRunAgentClient(runagent.Config{
+        AgentID:       "id",
+        EntrypointTag: "minimal",
+        APIKey:        os.Getenv("RUNAGENT_API_KEY"),
+        // BaseURL optional; defaults to https://backend.run-agent.ai
+    })
+    ```
+- Local:
+  - `Host`/`Port` are optional. If either is missing, the SDK discovers the value(s) from `~/.runagent/runagent_local.db` for the given `AgentID`.
+  - If discovery fails (agent not registered), you’ll get a clear `VALIDATION_ERROR` suggesting to pass `Host`/`Port` or register the agent locally.
+  - Examples:
+    ```go
+    // Rely fully on DB discovery (no host/port)
+    client, _ := runagent.NewRunAgentClient(runagent.Config{
+        AgentID: "local-id",
+        EntrypointTag: "generic",
+        Local: runagent.Bool(true),
+    })
+    // Provide only Host, let Port be discovered
+    client, _ = runagent.NewRunAgentClient(runagent.Config{
+        AgentID: "local-id",
+        EntrypointTag: "generic",
+        Local: runagent.Bool(true),
+        Host: "127.0.0.1",
+    })
+    ```
+
+---
+
 ### Quickstart (Remote)
 
 ```go
@@ -118,10 +153,8 @@ if err != nil {
 defer stream.Close()
 
 for {
-    chunk, more, err := stream.Next(ctx)
-    if err != nil || !more {
-        break
-    }
+    // Panic with a friendly message on errors (quickstart ergonomics)
+    chunk := stream.NextOrPanic(ctx)
     fmt.Print(chunk)
 }
 ```

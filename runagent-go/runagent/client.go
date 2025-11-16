@@ -306,7 +306,23 @@ func parseRunResponse(status int, body []byte) (interface{}, error) {
 
 	if data, ok := envelope["data"]; ok {
 		if result := unwrapDataField(data); result != nil {
+			// If the result is a structured object with payload, normalize it further
+			if m, ok := result.(map[string]interface{}); ok {
+				normalized := decodeStructuredObject(m)
+				return normalized, nil
+			}
 			return result, nil
+		}
+	}
+
+	// Payload-only structured responses
+	if payload, exists := envelope["payload"]; exists {
+		switch p := payload.(type) {
+		case string:
+			decoded := decodeStructuredString(p)
+			return decoded, nil
+		default:
+			return p, nil
 		}
 	}
 
@@ -400,7 +416,8 @@ func unwrapDataField(data interface{}) interface{} {
 		if inner, ok := typed["content"]; ok {
 			return inner
 		}
-		return typed
+		// Structured object with payload field
+		return decodeStructuredObject(typed)
 	default:
 		return typed
 	}
@@ -542,7 +559,7 @@ func translateHTTPError(status int, body []byte) error {
 	var payload map[string]interface{}
 	if err := json.Unmarshal(body, &payload); err == nil {
 		if parsed := extractAPIError(payload); parsed != nil {
-			apiErr = parsed
+			apiErr = enrichErrorPayload(parsed)
 		}
 	}
 
