@@ -220,7 +220,19 @@ impl RestClient {
     /// Get agent architecture information
     pub async fn get_agent_architecture(&self, agent_id: &str) -> RunAgentResult<Value> {
         let path = format!("agents/{}/architecture", agent_id);
-        let response = self.get(&path).await?;
+        let url = self.get_url(&path)?;
+        tracing::debug!("Fetching agent architecture for {} at {}", agent_id, url);
+        let response = self.get(&path).await
+            .map_err(|e| {
+                if e.category() == "validation" && e.to_string().contains("Not found") {
+                    RunAgentError::validation(format!(
+                        "Agent {} not found at {}. Check that:\n  - The agent ID is correct\n  - The agent exists and is deployed\n  - Your API key has access to this agent\n  - The base URL ({}) is correct",
+                        agent_id, url, self.base_url
+                    ))
+                } else {
+                    e
+                }
+            })?;
 
         if let Some(success) = response.get("success").and_then(|v| v.as_bool()) {
             if success {

@@ -17,8 +17,18 @@ def agent_print_response(prompt: str):
     # Get the response object
     response = agent.run(prompt)
     
-    # Return structured data that can be serialized
-    return response
+    # Extract the actual content from the response object
+    # The response object has a .content attribute or .messages attribute
+    if hasattr(response, 'content'):
+        return response.content
+    elif hasattr(response, 'messages') and response.messages:
+        # Get the last message content
+        return response.messages[-1].content if hasattr(response.messages[-1], 'content') else str(response.messages[-1])
+    elif hasattr(response, 'text'):
+        return response.text
+    else:
+        # Fallback: convert to string
+        return str(response)
 
 def agent_print_response_stream(prompt: str):
     """Streaming response that yields serializable chunks"""

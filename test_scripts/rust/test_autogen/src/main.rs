@@ -1,4 +1,4 @@
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 
 #[tokio::main]
@@ -13,19 +13,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================================");
     
     // Connect to AutoGen agent with invoke entrypoint
-    let client = RunAgentClient::new(
-        agent_id, 
-        "autogen_invoke", 
-        true,  // local = true
-    ).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "autogen_invoke".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     // AutoGen expects a 'task' parameter
-    let response = client.run_with_args(
-        &[], // no positional args
-        &[
-            ("task", json!("What is AutoGen?"))
-        ]
-    ).await?;
+    let response = client.run(&[
+        ("task", json!("What is AutoGen?"))
+    ]).await?;
     
     println!("✅ AutoGen Response received:");
     println!("{}", serde_json::to_string_pretty(&response)?);
@@ -40,9 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
-use futures::StreamExt; // Add this import
+use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,7 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🚀 Testing AutoGen with Response Parsing");
     println!("========================================");
     
-    let token_client = RunAgentClient::new(agent_id, "autogen_token_stream", true).await?;
+    let token_client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "autogen_token_stream".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let mut token_stream = token_client.run_stream(&[
         ("task", json!("Write a brief summary of machine learning"))

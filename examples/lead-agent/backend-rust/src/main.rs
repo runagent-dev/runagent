@@ -8,9 +8,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_http::cors::{CorsLayer, AllowOrigin};
+use runagent::{RunAgentClient, RunAgentClientConfig};
 
 // RunAgent configuration
-const RUNAGENT_ID: &str = "bd87871d-b4c4-4ec1-990b-bef0ea4766f7";
+const RUNAGENT_ID: &str = "be87871d-b4c4-4ec1-990b-bef0ea4766f7";
 
 // Request/Response types
 #[derive(Deserialize)]
@@ -107,11 +108,13 @@ async fn score_leads(
     }
 
     // Initialize RunAgent client using configured agent ID
-    let client = match runagent::client::RunAgentClient::new(
-        RUNAGENT_ID,
-        "lead_score_flow",
-        false, // Set to false when using RunAgent Cloud
-    )
+    // API key will be picked up from RUNAGENT_API_KEY environment variable
+    let client = match RunAgentClient::new(RunAgentClientConfig {
+        agent_id: RUNAGENT_ID.to_string(),
+        entrypoint_tag: "lead_score_flow".to_string(),
+        local: Some(false), // Set to false when using RunAgent Cloud
+        ..RunAgentClientConfig::default()
+    })
     .await
     {
         Ok(client) => client,
@@ -144,7 +147,7 @@ async fn score_leads(
     params.push(("candidates", json!(normalized_candidates)));
 
     // Run the lead scoring flow
-    match client.run_with_args(&[], &params).await {
+    match client.run(&params).await {
         Ok(result) => {
             // Debug: Log the result structure
             println!("[DEBUG] Agent result type: {}", result);
@@ -215,11 +218,13 @@ async fn score_single(
     }
 
     // Initialize RunAgent client using configured agent ID
-    let client = match runagent::client::RunAgentClient::new(
-        RUNAGENT_ID,
-        "score_candidate",
-        true, // local = true for single candidate scoring
-    )
+    // For local agents, API key is optional
+    let client = match RunAgentClient::new(RunAgentClientConfig {
+        agent_id: RUNAGENT_ID.to_string(),
+        entrypoint_tag: "score_candidate".to_string(),
+        local: Some(true), // local = true for single candidate scoring
+        ..RunAgentClientConfig::default()
+    })
     .await
     {
         Ok(client) => client,
@@ -252,7 +257,7 @@ async fn score_single(
     }
 
     // Score single candidate
-    match client.run_with_args(&[], &params).await {
+    match client.run(&params).await {
         Ok(result) => Ok(JsonResponse(result)),
         Err(e) => {
             eprintln!("Error in score_single_candidate: {:?}", e);

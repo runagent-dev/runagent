@@ -262,7 +262,7 @@ pub use client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient}
 pub use types::{RunAgentError, RunAgentResult};
 
 // Re-export blocking client for convenience
-pub use blocking::RunAgentClient as BlockingRunAgentClient;
+pub use blocking::{RunAgentClient as BlockingRunAgentClient, BlockingStream};
 
 #[cfg(feature = "db")]
 pub use db::DatabaseService;
