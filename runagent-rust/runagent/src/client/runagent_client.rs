@@ -35,29 +35,40 @@ pub struct RunAgentClient {
 /// # Direct Construction
 /// 
 /// ```rust,no_run
-/// use runagent::RunAgentClient;
+/// use runagent::{RunAgentClient, RunAgentClientConfig};
 /// 
-/// let client = RunAgentClient::new(runagent::RunAgentClientConfig {
-///     agent_id: "agent-id".to_string(),
-///     entrypoint_tag: "entrypoint".to_string(),
-///     local: None,
-///     host: None,
-///     port: None,
-///     api_key: Some("key".to_string()),
-///     base_url: Some("http://localhost:8333/".to_string()),
-///     extra_params: None,
-///     enable_registry: None,
-/// }).await?;
+/// #[tokio::main]
+/// async fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(RunAgentClientConfig {
+///         agent_id: "agent-id".to_string(),
+///         entrypoint_tag: "entrypoint".to_string(),
+///         local: None,
+///         host: None,
+///         port: None,
+///         api_key: Some("key".to_string()),
+///         base_url: Some("http://localhost:8333/".to_string()),
+///         extra_params: None,
+///         enable_registry: None,
+///     }).await?;
+///     Ok(())
+/// }
 /// ```
 /// 
 /// # Builder Pattern (Alternative)
 /// 
 /// ```rust,no_run
-/// let client = RunAgentClient::new(
-///     runagent::RunAgentClientConfig::new("agent-id", "entrypoint")
-///         .with_api_key("key")
-///         .with_base_url("http://localhost:8333/")
-/// ).await?;
+/// use runagent::{RunAgentClient, RunAgentClientConfig};
+/// use std::env;
+/// 
+/// #[tokio::main]
+/// async fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(
+///         RunAgentClientConfig::new("agent-id", "entrypoint")
+///             .with_api_key(env::var("RUNAGENT_API_KEY").unwrap_or_else(|_| "key".to_string()))
+///             .with_base_url("http://localhost:8333/")
+///     ).await?;
+///     Ok(())
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct RunAgentClientConfig {
@@ -161,17 +172,24 @@ impl RunAgentClient {
     /// # Examples
     /// 
     /// ```rust,no_run
-    /// // Local agent with explicit address
-    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
-    ///     .with_local(true)
-    ///     .with_address("127.0.0.1", 8450)
-    ///     .with_enable_registry(false)
-    /// ).await?;
+    /// use runagent::{RunAgentClient, RunAgentClientConfig};
+    /// use std::env;
     /// 
-    /// // Remote agent
-    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
-    ///     .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
-    /// ).await?;
+    /// #[tokio::main]
+    /// async fn main() -> runagent::RunAgentResult<()> {
+    ///     // Local agent with explicit address
+    ///     let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///         .with_local(true)
+    ///         .with_address("127.0.0.1", 8450)
+    ///         .with_enable_registry(false)
+    ///     ).await?;
+    ///     
+    ///     // Remote agent
+    ///     let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///         .with_api_key(env::var("RUNAGENT_API_KEY").unwrap_or_else(|_| "key".to_string()))
+    ///     ).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn new(config: RunAgentClientConfig) -> RunAgentResult<Self> {
         use crate::constants::{DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL};

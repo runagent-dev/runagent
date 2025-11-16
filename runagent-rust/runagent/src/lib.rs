@@ -15,7 +15,7 @@
 //! ### Basic Agent Interaction
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
@@ -24,7 +24,12 @@
 //!     runagent::init_logging();
 //!
 //!     // Create a client for a local agent
-//!     let client = RunAgentClient::new("my-agent-id", "generic", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Run the agent with input
 //!     let response = client.run(&[
@@ -40,13 +45,18 @@
 //! ### Streaming Agent Interaction
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use futures::StreamExt;
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("my-agent-id", "generic_stream", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic_stream".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Create a streaming connection
 //!     let mut stream = client.run_stream(&[
@@ -68,19 +78,20 @@
 //! ### Connecting to Local Agents
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Connect to a local agent running on localhost:8450
-//!     let client = RunAgentClient::with_address(
-//!         "my-agent-id",
-//!         "generic",
-//!         true,
-//!         Some("127.0.0.1"),
-//!         Some(8450)
-//!     ).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic".to_string(),
+//!         local: Some(true),
+//!         host: Some("127.0.0.1".to_string()),
+//!         port: Some(8450),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     let response = client.run(&[
 //!         ("message", json!("Hello, world!"))
@@ -96,12 +107,17 @@
 //! ### LangChain Integration
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("langchain-agent", "invoke", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "langchain-agent".to_string(),
+//!         entrypoint_tag: "invoke".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // LangChain invoke pattern
 //!     let response = client.run(&[
@@ -120,13 +136,18 @@
 //! ### LangGraph Workflows
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //! use futures::StreamExt;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("langgraph-agent", "stream", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "langgraph-agent".to_string(),
+//!         entrypoint_tag: "stream".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Stream LangGraph execution
 //!     let mut stream = client.run_stream(&[
@@ -248,7 +269,7 @@ pub mod db;
 /// fn main() -> runagent::RunAgentResult<()> {
 ///     let client = RunAgentClient::new(
 ///         RunAgentClientConfig::new("agent-id", "entrypoint")
-///             .with_api_key(Some("key".to_string()))
+///             .with_api_key("key")
 ///     )?;
 ///
 ///     let result = client.run(&[("message", json!("Hello"))])?;

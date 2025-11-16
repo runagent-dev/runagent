@@ -12,7 +12,7 @@
 //! fn main() -> runagent::RunAgentResult<()> {
 //!     let client = RunAgentClient::new(
 //!         RunAgentClientConfig::new("agent-id", "entrypoint")
-//!             .with_api_key(Some("key".to_string()))
+//!             .with_api_key("key")
 //!     )?;
 //!
 //!     let result = client.run(&[("message", json!("Hello"))])?;
@@ -88,7 +88,7 @@ impl RunAgentClient {
     /// fn main() -> runagent::RunAgentResult<()> {
     ///     let client = RunAgentClient::new(
     ///         RunAgentClientConfig::new("agent-id", "entrypoint_stream")
-    ///             .with_api_key(Some("key".to_string()))
+    ///             .with_api_key("key")
     ///     )?;
     ///
     ///     let mut stream = client.run_stream(&[("message", json!("Hello"))])?;
@@ -161,14 +161,24 @@ impl RunAgentClient {
 /// # Example
 ///
 /// ```rust,no_run
-/// use runagent::blocking::BlockingStream;
+/// use runagent::blocking::{RunAgentClient, RunAgentClientConfig, BlockingStream};
+/// use serde_json::json;
 ///
-/// let mut stream: BlockingStream = /* ... */;
-/// while let Some(chunk) = stream.next() {
-///     match chunk {
-///         Ok(value) => println!("Chunk: {}", value),
-///         Err(e) => eprintln!("Error: {}", e),
+/// fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(RunAgentClientConfig {
+///         agent_id: "agent-id".to_string(),
+///         entrypoint_tag: "entrypoint_stream".to_string(),
+///         ..RunAgentClientConfig::default()
+///     })?;
+///     
+///     let mut stream = client.run_stream(&[("message", json!("Hello"))])?;
+///     while let Some(chunk) = stream.next() {
+///         match chunk {
+///             Ok(value) => println!("Chunk: {}", value),
+///             Err(e) => eprintln!("Error: {}", e),
+///         }
 ///     }
+///     Ok(())
 /// }
 /// ```
 pub struct BlockingStream {
