@@ -4,6 +4,34 @@ The Go SDK mirrors the Python CLI client so Go services can trigger hosted or lo
 
 ---
 
+### Feature Overview
+
+- Native Go arguments:
+  - Positional: `Arg(...)`, `Args(...)`
+  - Keyword: `Kw(k, v)`, `Kws(map[string]any)`
+  - Structs become kwargs via `json` tags
+  - Single primitives become a single positional arg
+- Streaming and non-streaming guardrails:
+  - `Run` rejects `*_stream` tags with a helpful error
+  - `RunStream` rejects non-stream tags with a helpful error
+- Local vs Remote:
+  - Local DB discovery from `~/.runagent/runagent_local.db` (override with `Host`/`Port`)
+  - Remote uses `RUNAGENT_BASE_URL` (default `https://backend.run-agent.ai`) and Bearer token
+- Authentication:
+  - `Authorization: Bearer RUNAGENT_API_KEY` automatically for remote calls
+  - WS token fallback `?token=...` for streams
+- Error taxonomy:
+  - `AUTHENTICATION_ERROR`, `CONNECTION_ERROR`, `VALIDATION_ERROR`, `SERVER_ERROR`, `UNKNOWN_ERROR`
+  - Execution errors include `Code`, `Suggestion`, `Details` when provided by backend
+- Architecture:
+  - `GetArchitecture(ctx)` normalizes envelope and legacy formats and enforces `ARCHITECTURE_MISSING` when needed
+- Config precedence:
+  - Explicit `Config` fields → environment → defaults
+- Extra params:
+  - `Config.ExtraParams` stored and retrievable via `client.ExtraParams()`
+
+---
+
 ### Installation
 
 ```bash
@@ -54,11 +82,7 @@ func main() {
     ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
     defer cancel()
 
-    result, err := client.Run(ctx, runagent.RunInput{
-        InputKwargs: map[string]interface{}{
-            "message": "Summarize Q4 retention metrics",
-        },
-    })
+    result, err := client.Run(ctx, runagent.Kw("message", "Summarize Q4 retention metrics"))
     if err != nil {
         panic(err)
     }
@@ -87,9 +111,7 @@ If `Host`/`Port` are omitted, the SDK looks up the agent in `~/.runagent/runagen
 ### Streaming Responses
 
 ```go
-stream, err := client.RunStream(ctx, runagent.RunInput{
-    InputKwargs: map[string]interface{}{"prompt": "Stream a haiku about Go"},
-})
+stream, err := client.RunStream(ctx, runagent.Kw("prompt", "Stream a haiku about Go"))
 if err != nil {
     log.Fatal(err)
 }

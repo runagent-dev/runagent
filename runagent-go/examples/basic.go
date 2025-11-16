@@ -26,12 +26,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	solutionResult, err := client.Run(ctx, runagent.RunInput{
-		InputKwargs: map[string]interface{}{
-			"role":    "user",
-			"message": "Analyze the benefits of remote work for software teams",
-		},
-	})
+	solutionResult, err := client.Run(ctx,
+		runagent.Kw("role", "user"),
+		runagent.Kw("message", "Analyze the benefits of remote work for software teams"),
+	)
 	if err != nil {
 		log.Fatalf("Failed to run agent: %v", err)
 	}

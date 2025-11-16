@@ -26,12 +26,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	stream, err := client.RunStream(ctx, runagent.RunInput{
-		InputKwargs: map[string]interface{}{
-			"role":    "user",
-			"message": "Write a detailed analysis of remote work benefits for software development teams",
-		},
-	})
+	stream, err := client.RunStream(ctx,
+		runagent.Kw("role", "user"),
+		runagent.Kw("message", "Write a detailed analysis of remote work benefits for software development teams"),
+	)
 	if err != nil {
 		log.Fatalf("Failed to start streaming: %v", err)
 	}

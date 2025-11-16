@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"net/url"
 	"os"
 	"strconv"
@@ -122,8 +123,28 @@ func NewRunAgentClient(cfg Config) (*RunAgentClient, error) {
 	}, nil
 }
 
-// Run invokes the agent using the REST API.
-func (c *RunAgentClient) Run(ctx context.Context, input RunInput) (interface{}, error) {
+// Run invokes the agent using native Go-shaped arguments.
+// Examples:
+//  - positional: Run(ctx, Arg("q"), Arg(4))
+//  - keyword:    Run(ctx, Kws(map[string]any{"m":3}))
+//  - mixed:      Run(ctx, Args("q",4), Kw("m",3))
+//  - struct:     Run(ctx, MyStruct{...}) -> kwargs via json tags
+//  - single:     Run(ctx, "hello") -> ["hello"], {}
+func (c *RunAgentClient) Run(ctx context.Context, values ...any) (interface{}, error) {
+	// Guardrail: non-stream only
+	if c.entrypointTag == "generic_stream" || c.entrypointTag == "stream" || strings.HasSuffix(strings.ToLower(c.entrypointTag), "_stream") {
+		return nil, newError(
+			ErrorTypeValidation,
+			"stream entrypoint must be invoked with RunStream",
+			withCode("STREAM_ENTRYPOINT"),
+			withSuggestion("Use client.RunStream(...) for *_stream tags"),
+		)
+	}
+
+	input, err := coerceToRunInput(values...)
+	if err != nil {
+		return nil, err
+	}
 	payload := input.toAPIPayload(c.entrypointTag, c.timeoutSecs, c.asyncDefault)
 
 	body, err := json.Marshal(payload)
@@ -173,13 +194,41 @@ func (c *RunAgentClient) Run(ctx context.Context, input RunInput) (interface{}, 
 	return parseRunResponse(resp.StatusCode, respBody)
 }
 
-// RunStream starts a streaming execution via WebSocket.
-func (c *RunAgentClient) RunStream(ctx context.Context, input RunInput, opts ...StreamOptions) (*StreamIterator, error) {
-	timeout := constants.DefaultStreamTimeout
-	if len(opts) > 0 && opts[0].TimeoutSeconds > 0 {
-		timeout = opts[0].TimeoutSeconds
+// RunNative invokes the agent using native Go-shaped arguments without requiring RunInput.
+// Usage:
+//  - positional: RunNative(ctx, Arg("q"), Arg(4))
+//  - keyword:    RunNative(ctx, Kws(map[string]any{"m": 3, "n": 4}))
+//  - mixed:      RunNative(ctx, Args("q", 4), Kw("m", 3), Kw("n", 4))
+//  - struct:     RunNative(ctx, MyStruct{...}) -> kwargs via json tags
+//  - single:     RunNative(ctx, "hello") -> ["hello"], {}
+func (c *RunAgentClient) RunNative(ctx context.Context, values ...any) (interface{}, error) {
+	input, err := coerceToRunInput(values...)
+	if err != nil {
+		return nil, err
+	}
+	return c.Run(ctx, input)
+}
+
+// RunStream starts a streaming execution via WebSocket using native arguments.
+func (c *RunAgentClient) RunStream(ctx context.Context, values ...any) (*StreamIterator, error) {
+	// Guardrail: stream only
+	if !(c.entrypointTag == "generic_stream" || c.entrypointTag == "stream" || strings.HasSuffix(strings.ToLower(c.entrypointTag), "_stream")) {
+		return nil, newError(
+			ErrorTypeValidation,
+			"non-stream entrypoint must be invoked with Run",
+			withCode("NON_STREAM_ENTRYPOINT"),
+			withSuggestion("Use client.Run(...) for non-stream tags"),
+		)
 	}
 
+	input, err := coerceToRunInput(values...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Optional final StreamOptions can be passed via Kw("__timeout_seconds__", x)
+	// but we keep defaults; consider functional options in future.
+	timeout := constants.DefaultStreamTimeout
 	payload := input.toAPIPayload(c.entrypointTag, timeout, false)
 	payload.AsyncExecution = false
 
@@ -224,6 +273,15 @@ func (c *RunAgentClient) RunStream(ctx context.Context, input RunInput, opts ...
 	}
 
 	return newStreamIterator(conn), nil
+}
+
+// RunStreamNative starts a streaming execution using native Go-shaped arguments.
+func (c *RunAgentClient) RunStreamNative(ctx context.Context, values ...any) (*StreamIterator, error) {
+	input, err := coerceToRunInput(values...)
+	if err != nil {
+		return nil, err
+	}
+	return c.RunStream(ctx, input)
 }
 
 // ExtraParams returns the extra metadata provided at construction.
@@ -502,4 +560,203 @@ func translateHTTPError(status int, body []byte) error {
 
 func userAgent() string {
 	return fmt.Sprintf("runagent-go/%s", Version)
+}
+
+// ---- Flexible argument tokens and coercion ----
+
+type argToken struct{ v any }
+type argsToken struct{ v []any }
+type kwToken struct {
+	k string
+	v any
+}
+type kwsToken struct{ m map[string]any }
+
+// Arg appends one positional argument.
+func Arg(v any) argToken { return argToken{v: v} }
+
+// Args appends multiple positional arguments.
+func Args(v ...any) argsToken { return argsToken{v: v} }
+
+// Kw adds one keyword argument.
+func Kw(key string, value any) kwToken { return kwToken{k: key, v: value} }
+
+// Kws merges many keyword arguments from a map.
+func Kws(m map[string]any) kwsToken { return kwsToken{m: m} }
+
+func coerceToRunInput(values ...any) (RunInput, error) {
+	var input RunInput
+	var haveArgs bool
+	var haveKw bool
+
+	appendArg := func(v any) {
+		input.InputArgs = append(input.InputArgs, v)
+		haveArgs = true
+	}
+	addKw := func(k string, v any) {
+		if input.InputKwargs == nil {
+			input.InputKwargs = map[string]any{}
+		}
+		input.InputKwargs[k] = v
+		haveKw = true
+	}
+
+	for _, v := range values {
+		switch t := v.(type) {
+		case argToken:
+			appendArg(t.v)
+		case argsToken:
+			for _, item := range t.v {
+				appendArg(item)
+			}
+		case kwToken:
+			addKw(t.k, t.v)
+		case kwsToken:
+			for k, val := range t.m {
+				addKw(k, val)
+			}
+		case map[string]any:
+			for k, val := range t {
+				addKw(k, val)
+			}
+		default:
+			// Reject raw []any to avoid ambiguity with Args(...).
+			if isSliceOfAny(t) {
+				return RunInput{}, newError(
+					ErrorTypeValidation,
+					"pass positional slice via Args(...), not raw []any",
+					withSuggestion("Use runagent.Args(v1, v2, ...)"),
+				)
+			}
+			// Structs→kwargs via json round-trip; primitives→single arg.
+			if isStructLike(t) {
+				m, err := structToMap(t)
+				if err != nil {
+					return RunInput{}, newError(ErrorTypeValidation, "failed to encode struct into kwargs", withCause(err))
+				}
+				for k, val := range m {
+					addKw(k, val)
+				}
+			} else {
+				appendArg(t)
+			}
+		}
+	}
+
+	// Ensure non-nil fields
+	if !haveArgs {
+		input.InputArgs = []any{}
+	}
+	if !haveKw {
+		input.InputKwargs = map[string]any{}
+	}
+
+	return input, nil
+}
+
+func isSliceOfAny(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.IsValid() && rv.Kind() == reflect.Slice && rv.Type().Elem().Kind() == reflect.Interface
+}
+
+func isStructLike(v any) bool {
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return false
+	}
+	k := rv.Kind()
+	return k == reflect.Struct
+}
+
+func structToMap(v any) (map[string]any, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// GetArchitecture fetches the agent architecture and normalizes both envelope and legacy formats.
+func (c *RunAgentClient) GetArchitecture(ctx context.Context) (*AgentArchitecture, error) {
+	endpoint := fmt.Sprintf("%s/agents/%s/architecture", c.baseRESTURL, c.agentID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, newError(ErrorTypeUnknown, "failed to create request", withCause(err))
+	}
+	if !c.local {
+		if c.apiKey == "" {
+			return nil, newError(
+				ErrorTypeAuthentication,
+				"api_key is required for remote calls",
+				withSuggestion("Set RUNAGENT_API_KEY or pass Config.APIKey"),
+			)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+	}
+	req.Header.Set("User-Agent", userAgent())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, newError(ErrorTypeConnection, "failed to reach RunAgent service", withCause(err))
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, newError(ErrorTypeUnknown, "failed to read response body", withCause(err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, translateHTTPError(resp.StatusCode, body)
+	}
+
+	// Try envelope format
+	var envelope struct {
+		Success bool `json:"success"`
+		Data struct {
+			AgentID     string       `json:"agent_id"`
+			Entrypoints []EntryPoint `json:"entrypoints"`
+		} `json:"data"`
+		Message string      `json:"message"`
+		Error   interface{} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err == nil && (envelope.Success || envelope.Message != "" || envelope.Error != nil) {
+		if envelope.Success {
+			if len(envelope.Data.Entrypoints) == 0 {
+				return nil, newError(
+					ErrorTypeValidation,
+					"architecture missing entrypoints",
+					withCode("ARCHITECTURE_MISSING"),
+					withSuggestion("Redeploy the agent with entrypoints configured"),
+				)
+			}
+			return &AgentArchitecture{
+				AgentID:     envelope.Data.AgentID,
+				Entrypoints: envelope.Data.Entrypoints,
+			}, nil
+		}
+		if apiErr := parseAPIError(envelope.Error); apiErr != nil {
+			return nil, newExecutionError(resp.StatusCode, apiErr)
+		}
+		return nil, newError(ErrorTypeServer, "failed to retrieve agent architecture")
+	}
+
+	// Fallback to legacy
+	var legacy AgentArchitecture
+	if err := json.Unmarshal(body, &legacy); err != nil {
+		return nil, newError(ErrorTypeUnknown, "failed to decode architecture", withCause(err))
+	}
+	if len(legacy.Entrypoints) == 0 {
+		return nil, newError(
+			ErrorTypeValidation,
+			"architecture missing entrypoints",
+			withCode("ARCHITECTURE_MISSING"),
+			withSuggestion("Redeploy the agent with entrypoints configured"),
+		)
+	}
+	return &legacy, nil
 }

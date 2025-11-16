@@ -63,6 +63,22 @@ type streamFrame struct {
 	Error   json.RawMessage `json:"error"`
 }
 
+// EntryPoint describes a deployable entrypoint.
+type EntryPoint struct {
+	File        string                 `json:"file,omitempty"`
+	Module      string                 `json:"module,omitempty"`
+	Tag         string                 `json:"tag"`
+	Name        string                 `json:"name,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Extractor   map[string]interface{} `json:"extractor,omitempty"`
+}
+
+// AgentArchitecture provides entrypoint metadata for an agent.
+type AgentArchitecture struct {
+	AgentID     string       `json:"agent_id,omitempty"`
+	Entrypoints []EntryPoint `json:"entrypoints"`
+}
+
 func (i RunInput) toAPIPayload(entrypoint string, fallbackTimeout int, defaultAsync bool) apiRunRequest {
 	timeout := fallbackTimeout
 	if i.TimeoutSeconds > 0 {
