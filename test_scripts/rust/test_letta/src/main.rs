@@ -36,7 +36,7 @@
 
 
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -48,7 +48,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("================================");
     
     // Test streaming with RAG tool usage
-    let client = RunAgentClient::new(agent_id, "basic_stream", true).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "basic_stream".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let mut stream = client.run_stream(&[
         ("message", json!("Tell me about Mercury retrograde and its effects on relationships."))

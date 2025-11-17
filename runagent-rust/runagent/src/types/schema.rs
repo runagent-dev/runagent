@@ -5,6 +5,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 // use uuid::Uuid;
 
 /// Template source configuration
@@ -279,9 +280,13 @@ pub struct DatabaseConfig {
 
 impl Default for DatabaseConfig {
     fn default() -> Self {
+        // Use default path for database
+        let db_path = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".runagent")
+            .join("runagent_local.db");
         Self {
-            url: format!("sqlite://{}/runagent_local.db", 
-                crate::constants::LOCAL_CACHE_DIRECTORY.to_string_lossy()),
+            url: format!("sqlite://{}", db_path.to_string_lossy()),
             max_connections: 10,
             min_connections: 1,
             connect_timeout: 30,

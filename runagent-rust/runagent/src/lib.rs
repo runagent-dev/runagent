@@ -15,7 +15,7 @@
 //! ### Basic Agent Interaction
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
@@ -24,7 +24,12 @@
 //!     runagent::init_logging();
 //!
 //!     // Create a client for a local agent
-//!     let client = RunAgentClient::new("my-agent-id", "generic", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Run the agent with input
 //!     let response = client.run(&[
@@ -40,13 +45,18 @@
 //! ### Streaming Agent Interaction
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use futures::StreamExt;
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("my-agent-id", "generic_stream", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic_stream".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Create a streaming connection
 //!     let mut stream = client.run_stream(&[
@@ -68,19 +78,20 @@
 //! ### Connecting to Local Agents
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Connect to a local agent running on localhost:8450
-//!     let client = RunAgentClient::with_address(
-//!         "my-agent-id",
-//!         "generic",
-//!         true,
-//!         Some("127.0.0.1"),
-//!         Some(8450)
-//!     ).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "my-agent-id".to_string(),
+//!         entrypoint_tag: "generic".to_string(),
+//!         local: Some(true),
+//!         host: Some("127.0.0.1".to_string()),
+//!         port: Some(8450),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     let response = client.run(&[
 //!         ("message", json!("Hello, world!"))
@@ -96,12 +107,17 @@
 //! ### LangChain Integration
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("langchain-agent", "invoke", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "langchain-agent".to_string(),
+//!         entrypoint_tag: "invoke".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // LangChain invoke pattern
 //!     let response = client.run(&[
@@ -120,13 +136,18 @@
 //! ### LangGraph Workflows
 //!
 //! ```rust,no_run
-//! use runagent::prelude::*;
+//! use runagent::{RunAgentClient, RunAgentClientConfig};
 //! use serde_json::json;
 //! use futures::StreamExt;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = RunAgentClient::new("langgraph-agent", "stream", true).await?;
+//!     let client = RunAgentClient::new(RunAgentClientConfig {
+//!         agent_id: "langgraph-agent".to_string(),
+//!         entrypoint_tag: "stream".to_string(),
+//!         local: Some(true),
+//!         ..RunAgentClientConfig::default()
+//!     }).await?;
 //!     
 //!     // Stream LangGraph execution
 //!     let mut stream = client.run_stream(&[
@@ -234,9 +255,35 @@ pub mod utils;
 #[cfg(feature = "db")]
 pub mod db;
 
+/// Blocking (synchronous) wrapper for RunAgentClient
+///
+/// This module provides a synchronous interface that wraps the async client.
+/// It's useful for simple scripts or when you can't use async/await.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use runagent::blocking::{RunAgentClient, RunAgentClientConfig};
+/// use serde_json::json;
+///
+/// fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(
+///         RunAgentClientConfig::new("agent-id", "entrypoint")
+///             .with_api_key("key")
+///     )?;
+///
+///     let result = client.run(&[("message", json!("Hello"))])?;
+///     Ok(())
+/// }
+/// ```
+pub mod blocking;
+
 // Re-export commonly used types and functions
-pub use client::{RunAgentClient, RestClient, SocketClient};
+pub use client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
 pub use types::{RunAgentError, RunAgentResult};
+
+// Re-export blocking client for convenience
+pub use blocking::{RunAgentClient as BlockingRunAgentClient, BlockingStream};
 
 #[cfg(feature = "db")]
 pub use db::DatabaseService;
@@ -387,9 +434,8 @@ impl RunAgentConfig {
 /// // Now you have access to RunAgentClient, RunAgentError, etc.
 /// ```
 pub mod prelude {
-    pub use crate::client::{RunAgentClient, RestClient, SocketClient};
+    pub use crate::client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
     pub use crate::types::{RunAgentError, RunAgentResult};
-    pub use crate::RunAgentConfig;
     
     #[cfg(feature = "db")]
     pub use crate::db::DatabaseService;

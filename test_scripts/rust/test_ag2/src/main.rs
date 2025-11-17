@@ -1,4 +1,4 @@
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 
 #[tokio::main]
@@ -13,13 +13,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================================");
     
     // Connect directly with host and port since we know where the server is running
-    let client = RunAgentClient::new(
-        agent_id, 
-        "ag2_invoke", 
-        true,  // local = true
-        // Some("127.0.0.1"), 
-        // Some(8452)  // Use the port from your server output
-    ).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "ag2_invoke".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     // println!("🔗 Connected to agent at 127.0.0.1:8452");
     
@@ -41,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -50,7 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let agent_id = "145dcae4-4c14-4c8b-bd11-cd6f40fb20ae";
     
     println!("🌊 ag2 Streaming Test");
-    let client = RunAgentClient::new(agent_id, "ag2_stream", true).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "ag2_stream".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let mut stream = client.run_stream(&[
         ("message", json!("The solar system has 2 planets.")),

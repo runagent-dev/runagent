@@ -100,6 +100,9 @@ impl SocketClient {
         write.send(Message::Text(serialized_msg)).await
             .map_err(|e| RunAgentError::connection(format!("Failed to send start message: {}", e)))?;
 
+        // Clone serializer for use in async stream
+        let serializer = self.serializer.clone();
+        
         // Create stream that processes incoming messages (matching Python SDK behavior)
         let stream = async_stream::stream! {
             while let Some(message) = read.next().await {
@@ -129,9 +132,22 @@ impl SocketClient {
                                         break;
                                     }
                                     Some("data") => {
-                                        // Yield the content field (matching Python SDK)
+                                        // Extract content and deserialize it using the common deserializer
                                         if let Some(content) = msg.get("content") {
-                                            yield Ok(content.clone());
+                                            // Use common deserializer preparation logic (handles JSON strings)
+                                            let prepared = serializer.prepare_for_deserialization(content.clone());
+                                            
+                                            // Deserialize using the common serializer (handles {type, payload} structure)
+                                            match serializer.deserialize_object(prepared) {
+                                                Ok(deserialized) => yield Ok(deserialized),
+                                                Err(e) => {
+                                                    yield Err(RunAgentError::server(format!("Deserialization error: {}", e)));
+                                                    break;
+                                                }
+                                            }
+                                        } else {
+                                            // If no content, yield the whole message
+                                            yield Ok(msg);
                                         }
                                     }
                                     _ => {

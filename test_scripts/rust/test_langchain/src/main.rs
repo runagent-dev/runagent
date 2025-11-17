@@ -44,7 +44,7 @@
 // ******************************Streaming Part with LangChain****************************************
 
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -53,7 +53,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let agent_id = "b78cef0b-b57e-455d-a61e-6dc36e6e2ca9";
     
     println!("🌊 LangChain Streaming Test");
-    let client = RunAgentClient::new(agent_id, "generic_stream", true).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "generic_stream".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let mut stream = client.run_stream(&[
         ("message", json!("Tell me a paragraph about journey by boat")),

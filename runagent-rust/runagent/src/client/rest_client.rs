@@ -220,50 +220,74 @@ impl RestClient {
     /// Get agent architecture information
     pub async fn get_agent_architecture(&self, agent_id: &str) -> RunAgentResult<Value> {
         let path = format!("agents/{}/architecture", agent_id);
-        self.get(&path).await
-            .and_then(|response| {
-                if let Some(success) = response.get("success").and_then(|v| v.as_bool()) {
-                    if success {
-                        if let Some(data) = response.get("data") {
-                            return Ok(data.clone());
-                        }
-                        return Err(RunAgentError::server(
-                            "Architecture response missing data".to_string(),
-                        ));
-                    }
-
-                    let message = response
-                        .get("error")
-                        .and_then(|err| {
-                            if err.is_object() {
-                                err.get("message").and_then(|m| m.as_str()).map(|s| s.to_string())
-                            } else {
-                                err.as_str().map(|s| s.to_string())
-                            }
-                        })
-                        .or_else(|| {
-                            response
-                                .get("message")
-                                .and_then(|m| m.as_str())
-                                .map(|s| s.to_string())
-                        })
-                        .unwrap_or_else(|| "Failed to retrieve agent architecture".to_string());
-
-                    return Err(RunAgentError::server(message));
-                }
-
-                Ok(response)
-            })
+        let url = self.get_url(&path)?;
+        tracing::debug!("Fetching agent architecture for {} at {}", agent_id, url);
+        let response = self.get(&path).await
             .map_err(|e| {
                 if e.category() == "validation" && e.to_string().contains("Not found") {
                     RunAgentError::validation(format!(
-                        "Agent {} not found on server. Check that the agent exists and is deployed. Error: {}",
-                        agent_id, e
+                        "Agent {} not found at {}. Check that:\n  - The agent ID is correct\n  - The agent exists and is deployed\n  - Your API key has access to this agent\n  - The base URL ({}) is correct",
+                        agent_id, url, self.base_url
                     ))
                 } else {
                     e
                 }
-            })
+            })?;
+
+        if let Some(success) = response.get("success").and_then(|v| v.as_bool()) {
+            if success {
+                if let Some(data) = response.get("data") {
+                    return Ok(data.clone());
+                }
+                return Err(RunAgentError::execution(
+                    "ARCHITECTURE_MISSING",
+                    "Architecture response missing data",
+                    Some("Redeploy the agent or ensure entrypoints are configured.".to_string()),
+                    Some(response),
+                ));
+            }
+
+            let (code, message, suggestion) = if let Some(error_obj) = response.get("error") {
+                if let Some(obj) = error_obj.as_object() {
+                    (
+                        obj.get("code")
+                            .and_then(|c| c.as_str())
+                            .unwrap_or("UNKNOWN_ERROR")
+                            .to_string(),
+                        obj.get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Failed to retrieve agent architecture")
+                            .to_string(),
+                        obj.get("suggestion")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s.to_string()),
+                    )
+                } else if let Some(msg) = error_obj.as_str() {
+                    ("UNKNOWN_ERROR".to_string(), msg.to_string(), None)
+                } else {
+                    ("UNKNOWN_ERROR".to_string(), "Failed to retrieve agent architecture".to_string(), None)
+                }
+            } else {
+                (
+                    "UNKNOWN_ERROR".to_string(),
+                    response
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("Failed to retrieve agent architecture")
+                        .to_string(),
+                    None,
+                )
+            };
+
+            return Err(RunAgentError::execution(
+                code,
+                message,
+                suggestion,
+                Some(response),
+            ));
+        }
+
+        Ok(response)
     }
 
     /// Health check

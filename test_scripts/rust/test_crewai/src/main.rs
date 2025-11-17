@@ -1,4 +1,4 @@
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 
 #[tokio::main]
@@ -13,19 +13,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================================");
     
     // Connect to CrewAI agent
-    let client = RunAgentClient::new(
-        agent_id, 
-        "research_crew", 
-        true,  // local = true
-    ).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "research_crew".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     // CrewAI expects a 'topic' parameter
-    let response = client.run_with_args(
-        &[], // no positional args
-        &[
-            ("topic", json!("AI Agent Deployment"))
-        ]
-    ).await?;
+    let response = client.run(&[
+        ("topic", json!("AI Agent Deployment"))
+    ]).await?;
     
     println!("✅ CrewAI Response received:");
     println!("{}", serde_json::to_string_pretty(&response)?);
@@ -39,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // crewai streaming bug
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -51,7 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Test 1: Regular CrewAI streaming
     println!("\n📡 Testing research_crew (Full Object Stream)");
-    let client = RunAgentClient::new(agent_id, "research_crew", true).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "research_crew".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let mut stream = client.run_stream(&[
         ("topic", json!("AI Agent Deployment"))
