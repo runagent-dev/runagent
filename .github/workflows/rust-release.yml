@@ -1,0 +1,102 @@
+name: Rust SDK Release
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Path where cargo commands should run
+        required: true
+        type: string
+      tag:
+        description: Git tag for this release (e.g., v0.1.0)
+        required: true
+        type: string
+      version:
+        description: Crate version without the leading v (e.g., 0.1.0)
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish Rust SDK
+    runs-on: ubuntu-latest
+    if: inputs.version != ''
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show release context
+        run: |
+          echo "Tag: ${{ inputs.tag }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Working directory: ${{ inputs.working-directory }}"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Authenticate to crates.io (trusted publishing)
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Verify crate version matches tag
+        id: verify-rust-version
+        run: |
+          TAG_VERSION="${{ inputs.version }}"
+          PACKAGE_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | sed -E 's/^version\s*=\s*"([^"]+)".*/\1/')
+          echo "Detected crate version: $PACKAGE_VERSION"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch! Tag: $TAG_VERSION, Cargo.toml: $PACKAGE_VERSION"
+            exit 1
+          fi
+          echo "✅ Rust crate version matches tag"
+
+      - name: Get crate name
+        id: get-crate
+        run: |
+          NAME=$(grep -E '^name\s*=' Cargo.toml | head -1 | sed -E 's/^name\s*=\s*"([^"]+)".*/\1/')
+          echo "crate_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Crate name: $NAME"
+
+      - name: Check if crate version already exists on crates.io
+        id: check-crates
+        run: |
+          VERSION="${{ inputs.version }}"
+          NAME="${{ steps.get-crate.outputs.crate_name }}"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://crates.io/api/v1/crates/$NAME/$VERSION")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "⚠️ $NAME v$VERSION already exists on crates.io"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ $NAME v$VERSION not found on crates.io"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint and test (clippy + tests)
+        run: |
+          cargo fmt -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-features
+
+      - name: Package dry run
+        run: cargo publish --dry-run
+
+      - name: Publish crate to crates.io
+        if: steps.check-crates.outputs.should_publish == 'true'
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Skip publish (already exists)
+        if: steps.check-crates.outputs.should_publish != 'true'
+        run: echo "Skipping crates.io publish because version already exists."
+
+

@@ -29,10 +29,17 @@ on:
         required: false
         type: string
         default: "20"
+      rust:
+        description: Enable Rust publish path (sdk == rust)
+        required: false
+        type: string
+        default: ""
     secrets:
       PYPI_API_TOKEN:
         required: false
       NPM_TOKEN:
+        required: false
+      CARGO_REGISTRY_TOKEN:
         required: false
 
 jobs:
@@ -54,5 +61,14 @@ jobs:
       tag: ${{ inputs.tag }}
       version: ${{ inputs.version }}
       node-version: ${{ inputs.node-version }}
+    secrets: inherit
+
+  rust:
+    if: inputs.sdk == 'rust' && inputs.version != ''
+    uses: ./.github/workflows/rust-release.yml
+    with:
+      working-directory: ${{ inputs.working-directory }}
+      tag: ${{ inputs.tag }}
+      version: ${{ inputs.version }}
     secrets: inherit
 
