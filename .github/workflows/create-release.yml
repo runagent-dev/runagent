@@ -15,7 +15,6 @@ jobs:
       contents: write
       pull-requests: read
       issues: read
-      id-token: write  # Not needed for API token approach, but kept for compatibility
     
     steps:
     - uses: actions/checkout@v4
@@ -89,7 +88,6 @@ jobs:
     uses: ./.github/workflows/python-release.yml
     permissions:
       contents: read
-      id-token: write
     with:
       working-directory: .
       tag: ${{ needs.detect-release.outputs.latest_tag }}
