@@ -202,21 +202,27 @@ update_rust_version() {
 
 update_go_version() {
     local version=$1
-    local version_file="runagent-go/runagent/version.go"
+    local version_file="runagent-go/version.go"
     local go_mod_file="runagent-go/go.mod"
     
-    mkdir -p "$(dirname "$version_file")"
-    cat > "$version_file" << EOF
+    if [[ ! -f "$version_file" ]]; then
+        cat > "$version_file" << EOF
 package runagent
 
 // Version represents the current version of the RunAgent Go SDK
 const Version = "$version"
 EOF
+    else
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/const Version = \".*\"/const Version = \"$version\"/" "$version_file"
+        else
+            sed -i "s/const Version = \".*\"/const Version = \"$version\"/" "$version_file"
+        fi
+    fi
 
     if [[ ! -f "$go_mod_file" ]]; then
-        mkdir -p "$(dirname "$go_mod_file")"
         cat > "$go_mod_file" << EOF
-module github.com/runagent-dev/runagent/runagent-go
+module github.com/runagent-dev/runagent-go
 
 go 1.20
 

@@ -45,7 +45,7 @@ jobs:
         run: |
           TAG_VERSION="${{ inputs.version }}"
           # Extract version from version.go file
-          PACKAGE_VERSION=$(grep -E '^\s*const\s+Version\s*=' runagent/version.go | sed -E 's/.*Version\s*=\s*"([^"]+)".*/\1/')
+          PACKAGE_VERSION=$(grep -E '^\s*const\s+Version\s*=' version.go | sed -E 's/.*Version\s*=\s*"([^"]+)".*/\1/')
           echo "Detected Go SDK version: $PACKAGE_VERSION"
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
             echo "❌ Version mismatch! Tag: $TAG_VERSION, version.go: $PACKAGE_VERSION"
