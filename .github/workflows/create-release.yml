@@ -86,12 +86,11 @@ jobs:
     name: Publish Python SDK
     needs: detect-release
     if: needs.detect-release.outputs.should_release == 'true'
-    uses: ./.github/workflows/reusable-sdk-release.yml
+    uses: ./.github/workflows/python-release.yml
     permissions:
       contents: read
       id-token: write
     with:
-      sdk: python
       working-directory: .
       tag: ${{ needs.detect-release.outputs.latest_tag }}
       version: ${{ needs.detect-release.outputs.version }}
@@ -101,12 +100,11 @@ jobs:
     name: Publish TypeScript SDK
     needs: detect-release
     if: needs.detect-release.outputs.should_release == 'true'
-    uses: ./.github/workflows/reusable-sdk-release.yml
+    uses: ./.github/workflows/typescript-release.yml
     permissions:
       contents: read
       id-token: write
     with:
-      sdk: typescript
       working-directory: runagent-ts
       tag: ${{ needs.detect-release.outputs.latest_tag }}
       version: ${{ needs.detect-release.outputs.version }}
@@ -116,12 +114,11 @@ jobs:
     name: Publish Rust SDK
     needs: detect-release
     if: needs.detect-release.outputs.should_release == 'true'
-    uses: ./.github/workflows/reusable-sdk-release.yml
+    uses: ./.github/workflows/rust-release.yml
     permissions:
       contents: read
       id-token: write
     with:
-      sdk: rust
       working-directory: runagent-rust/runagent
       tag: ${{ needs.detect-release.outputs.latest_tag }}
       version: ${{ needs.detect-release.outputs.version }}
