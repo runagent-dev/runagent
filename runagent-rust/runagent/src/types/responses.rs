@@ -185,17 +185,20 @@ mod tests {
 
     #[test]
     fn test_api_response_with_message() {
-        let response = ApiResponse::success("data")
-            .with_message("Operation completed successfully");
+        let response =
+            ApiResponse::success("data").with_message("Operation completed successfully");
         assert!(response.success);
-        assert_eq!(response.message, Some("Operation completed successfully".to_string()));
+        assert_eq!(
+            response.message,
+            Some("Operation completed successfully".to_string())
+        );
     }
 
     #[test]
     fn test_paginated_response() {
         let items = vec!["item1", "item2", "item3"];
         let response = PaginatedResponse::new(items, 10, 1, 5);
-        
+
         assert_eq!(response.total, 10);
         assert_eq!(response.page, 1);
         assert_eq!(response.per_page, 5);

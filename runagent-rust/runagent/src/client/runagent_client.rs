@@ -29,14 +29,14 @@ pub struct RunAgentClient {
 }
 
 /// Configuration for creating a RunAgent client
-/// 
+///
 /// All fields except `agent_id` and `entrypoint_tag` are optional.
-/// 
+///
 /// # Direct Construction
-/// 
+///
 /// ```rust,no_run
 /// use runagent::{RunAgentClient, RunAgentClientConfig};
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> runagent::RunAgentResult<()> {
 ///     let client = RunAgentClient::new(RunAgentClientConfig {
@@ -53,13 +53,13 @@ pub struct RunAgentClient {
 ///     Ok(())
 /// }
 /// ```
-/// 
+///
 /// # Builder Pattern (Alternative)
-/// 
+///
 /// ```rust,no_run
 /// use runagent::{RunAgentClient, RunAgentClientConfig};
 /// use std::env;
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> runagent::RunAgentResult<()> {
 ///     let client = RunAgentClient::new(
@@ -109,12 +109,12 @@ impl RunAgentClientConfig {
     }
 
     /// Create a config with defaults for optional fields
-    /// 
+    ///
     /// This allows you to use `..RunAgentClientConfig::default()` syntax
     /// to omit None values when constructing directly.
     pub fn default() -> Self {
         Self {
-            agent_id: String::new(), // Dummy - will be overridden
+            agent_id: String::new(),       // Dummy - will be overridden
             entrypoint_tag: String::new(), // Dummy - will be overridden
             local: None,
             host: None,
@@ -166,15 +166,15 @@ impl RunAgentClientConfig {
 
 impl RunAgentClient {
     /// Create a new RunAgent client from configuration
-    /// 
+    ///
     /// This is the single entry point for creating clients.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use runagent::{RunAgentClient, RunAgentClientConfig};
     /// use std::env;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> runagent::RunAgentResult<()> {
     ///     // Local agent with explicit address
@@ -193,10 +193,10 @@ impl RunAgentClient {
     /// ```
     pub async fn new(config: RunAgentClientConfig) -> RunAgentResult<Self> {
         use crate::constants::{DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL};
-        
+
         let local = config.local.unwrap_or(false);
         let enable_registry = config.enable_registry.unwrap_or(local);
-        
+
         // Resolve host/port for local agents
         let (host, port) = if local {
             // If host/port provided, use them
@@ -208,7 +208,11 @@ impl RunAgentClient {
                 {
                     let db_service = DatabaseService::new(None).await?;
                     if let Some(agent_info) = db_service.get_agent(&config.agent_id).await? {
-                        tracing::info!("🔍 Found agent in database: {}:{}", agent_info.host, agent_info.port);
+                        tracing::info!(
+                            "🔍 Found agent in database: {}:{}",
+                            agent_info.host,
+                            agent_info.port
+                        );
                         (Some(agent_info.host), Some(agent_info.port as u16))
                     } else {
                         (config.host.clone(), config.port)
@@ -226,14 +230,15 @@ impl RunAgentClient {
         };
 
         // Resolve API key (config > env var)
-        let api_key = config.api_key.or_else(|| {
-            std::env::var(ENV_RUNAGENT_API_KEY).ok()
-        });
+        let api_key = config
+            .api_key
+            .or_else(|| std::env::var(ENV_RUNAGENT_API_KEY).ok());
 
         // Resolve base URL (config > env var > default)
-        let base_url = config.base_url.or_else(|| {
-            std::env::var(ENV_RUNAGENT_BASE_URL).ok()
-        }).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+        let base_url = config
+            .base_url
+            .or_else(|| std::env::var(ENV_RUNAGENT_BASE_URL).ok())
+            .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
 
         if !local {
             tracing::info!("🌐 Connecting to remote agent at {}", base_url);
@@ -302,7 +307,9 @@ impl RunAgentClient {
     }
 
     async fn get_agent_architecture_internal(&self) -> RunAgentResult<Value> {
-        self.rest_client.get_agent_architecture(&self.agent_id).await
+        self.rest_client
+            .get_agent_architecture(&self.agent_id)
+            .await
     }
 
     fn validate_entrypoint(&self) -> RunAgentResult<()> {
@@ -369,7 +376,11 @@ impl RunAgentClient {
             )
             .await?;
 
-        if response.get("success").and_then(|s| s.as_bool()).unwrap_or(false) {
+        if response
+            .get("success")
+            .and_then(|s| s.as_bool())
+            .unwrap_or(false)
+        {
             // Process response data
             let mut payload: Option<Value> = None;
 
@@ -379,7 +390,9 @@ impl RunAgentClient {
                     // Check for generator object BEFORE processing (case-insensitive)
                     if let Some(data_str) = data.as_str() {
                         let lower_str = data_str.to_lowercase();
-                        if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                        if lower_str.contains("generator object")
+                            || lower_str.contains("<generator")
+                        {
                             let streaming_tag = format!("{}_stream", self.entrypoint_tag);
                             return Err(RunAgentError::validation(format!(
                                 "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
@@ -399,7 +412,9 @@ impl RunAgentClient {
                         // Check for generator object in nested data (case-insensitive)
                         if let Some(output_str) = output_data.as_str() {
                             let lower_str = output_str.to_lowercase();
-                            if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                            if lower_str.contains("generator object")
+                                || lower_str.contains("<generator")
+                            {
                                 let streaming_tag = format!("{}_stream", self.entrypoint_tag);
                                 return Err(RunAgentError::validation(format!(
                                     "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
@@ -462,7 +477,7 @@ impl RunAgentClient {
                 if let Some(error_obj) = error_info.as_object() {
                     if let (Some(message), Some(code)) = (
                         error_obj.get("message").and_then(|m| m.as_str()),
-                        error_obj.get("code").and_then(|c| c.as_str())
+                        error_obj.get("code").and_then(|c| c.as_str()),
                     ) {
                         return Err(RunAgentError::server(format!("[{}] {}", code, message)));
                     }
@@ -502,13 +517,20 @@ impl RunAgentClient {
             .collect();
 
         self.socket_client
-            .run_stream(&self.agent_id, &self.entrypoint_tag, input_args, &input_kwargs_map)
+            .run_stream(
+                &self.agent_id,
+                &self.entrypoint_tag,
+                input_args,
+                &input_kwargs_map,
+            )
             .await
     }
 
     /// Get the agent's architecture information
     pub async fn get_agent_architecture(&self) -> RunAgentResult<Value> {
-        self.rest_client.get_agent_architecture(&self.agent_id).await
+        self.rest_client
+            .get_agent_architecture(&self.agent_id)
+            .await
     }
 
     /// Check if the agent is available

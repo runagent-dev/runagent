@@ -17,7 +17,7 @@ static LOCAL_CACHE_DIRECTORY: Lazy<PathBuf> = Lazy::new(|| {
     if let Ok(env_path) = std::env::var(ENV_LOCAL_CACHE_DIRECTORY) {
         return PathBuf::from(env_path);
     }
-    
+
     // Default to ~/.runagent
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -43,20 +43,20 @@ pub struct DatabaseService {
 impl DatabaseService {
     /// Create a new database service
     pub async fn new(db_path: Option<PathBuf>) -> RunAgentResult<Self> {
-        let db_path = db_path.unwrap_or_else(|| {
-            LOCAL_CACHE_DIRECTORY.join(DATABASE_FILE_NAME)
-        });
+        let db_path = db_path.unwrap_or_else(|| LOCAL_CACHE_DIRECTORY.join(DATABASE_FILE_NAME));
 
         // Ensure directory exists
         if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| RunAgentError::database(format!("Failed to create db directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                RunAgentError::database(format!("Failed to create db directory: {}", e))
+            })?;
         }
 
         let database_url = format!("sqlite:{}", db_path.display());
-        
-        let pool = SqlitePool::connect(&database_url).await
-            .map_err(|e| RunAgentError::database(format!("Failed to connect to database: {}", e)))?;
+
+        let pool = SqlitePool::connect(&database_url).await.map_err(|e| {
+            RunAgentError::database(format!("Failed to connect to database: {}", e))
+        })?;
 
         // Initialize database schema
         Self::init_schema(&pool).await?;
@@ -129,4 +129,3 @@ impl Drop for DatabaseService {
         // Note: sqlx pool handles cleanup automatically
     }
 }
-

@@ -16,7 +16,7 @@ fn main() -> runagent::RunAgentResult<()> {
         RunAgentClientConfig::new(agent_id, entrypoint_tag)
             .with_local(true)
             .with_address("127.0.0.1", 8452)
-            .with_enable_registry(false) // Skip DB lookup since we have explicit address
+            .with_enable_registry(false), // Skip DB lookup since we have explicit address
     )?;
 
     let response = client.run(&[("message", json!("Hello!"))])?;
@@ -24,4 +24,3 @@ fn main() -> runagent::RunAgentResult<()> {
     println!("Response: {}", response);
     Ok(())
 }
-

@@ -98,10 +98,7 @@ impl RunAgentClient {
     ///     Ok(())
     /// }
     /// ```
-    pub fn run_stream(
-        &self,
-        input_kwargs: &[(&str, Value)],
-    ) -> RunAgentResult<BlockingStream> {
+    pub fn run_stream(&self, input_kwargs: &[(&str, Value)]) -> RunAgentResult<BlockingStream> {
         let stream = self.runtime.block_on(self.inner.run_stream(input_kwargs))?;
         Ok(BlockingStream::new(stream))
     }
@@ -193,9 +190,9 @@ impl BlockingStream {
         use futures::StreamExt;
         use std::sync::mpsc;
         use std::thread;
-        
+
         let (tx, rx) = mpsc::channel();
-        
+
         // Spawn a background task that continuously polls the stream
         let handle = thread::spawn(move || {
             // Create a new runtime for the background thread
@@ -209,7 +206,7 @@ impl BlockingStream {
                 }
             });
         });
-        
+
         Self {
             receiver: rx,
             _handle: handle,
@@ -224,4 +221,3 @@ impl Iterator for BlockingStream {
         self.receiver.recv().ok()
     }
 }
-

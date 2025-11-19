@@ -24,14 +24,17 @@ impl CoreSerializer {
         let json_str = serde_json::to_string(&serialized_data)?;
 
         if !self.check_size_limit(&json_str) {
-            tracing::warn!("Serialized object exceeds size limit: {} bytes", json_str.len());
+            tracing::warn!(
+                "Serialized object exceeds size limit: {} bytes",
+                json_str.len()
+            );
         }
 
         Ok(json_str)
     }
 
     /// Prepare value for deserialization
-    /// 
+    ///
     /// If the value is a JSON string, parses it first.
     /// Otherwise returns the value as-is.
     /// This handles cases where responses come as JSON strings.
@@ -48,19 +51,19 @@ impl CoreSerializer {
     }
 
     /// Deserialize JSON response to object
-    /// 
+    ///
     /// Handles multiple response formats:
     /// 1. `{type, payload}` structure - extracts and deserializes payload
     /// 2. String payload - parses JSON string
     /// 3. Direct value - reconstructs nested JSON
-    /// 
+    ///
     /// Handles multiple response formats including `{type, payload}` structures.
     pub fn deserialize_object(&self, json_resp: Value) -> RunAgentResult<Value> {
         // Handle {type, payload} structure
         if let Value::Object(ref map) = json_resp {
             if map.contains_key("type") && map.contains_key("payload") {
                 let payload_val = map.get("payload").unwrap();
-                
+
                 // If payload is a string, try to parse it as JSON
                 if let Some(payload_str) = payload_val.as_str() {
                     // The payload is a JSON-encoded string, parse it to get the actual value
@@ -76,17 +79,17 @@ impl CoreSerializer {
                         }
                     }
                 }
-                
+
                 // Payload is not a string - reconstruct it directly
                 return self.reconstruct_nested_json(payload_val.clone());
             }
-            
+
             // Handle {content} structure (legacy format)
             if let Some(content) = map.get("content") {
                 return self.reconstruct_nested_json(content.clone());
             }
         }
-        
+
         // If it's a string, try to parse it first
         if let Some(str_val) = json_resp.as_str() {
             match serde_json::from_str::<Value>(str_val) {
@@ -94,7 +97,7 @@ impl CoreSerializer {
                 Err(_) => return Ok(Value::String(str_val.to_string())),
             }
         }
-        
+
         // Default: reconstruct nested JSON
         self.reconstruct_nested_json(json_resp)
     }
@@ -102,21 +105,27 @@ impl CoreSerializer {
     /// Serialize SafeMessage to JSON string
     pub fn serialize_message(&self, message: &SafeMessage) -> RunAgentResult<String> {
         let message_dict = message.to_dict();
-        
+
         // Deep serialize the data field to handle nested objects
         let mut serialized_dict = message_dict;
         if let Some(data) = serialized_dict.get("data") {
             serialized_dict.insert("data".to_string(), self.deep_serialize_value(data.clone())?);
         }
-        
+
         if let Some(metadata) = serialized_dict.get("metadata") {
-            serialized_dict.insert("metadata".to_string(), self.deep_serialize_value(metadata.clone())?);
+            serialized_dict.insert(
+                "metadata".to_string(),
+                self.deep_serialize_value(metadata.clone())?,
+            );
         }
 
         let json_str = serde_json::to_string(&serialized_dict)?;
 
         if !self.check_size_limit(&json_str) {
-            tracing::warn!("Serialized message exceeds size limit: {} bytes", json_str.len());
+            tracing::warn!(
+                "Serialized message exceeds size limit: {} bytes",
+                json_str.len()
+            );
         }
 
         Ok(json_str)
@@ -125,19 +134,26 @@ impl CoreSerializer {
     /// Deserialize JSON string to SafeMessage
     pub fn deserialize_message(&self, json_str: &str) -> RunAgentResult<SafeMessage> {
         let deserialized_data: Value = serde_json::from_str(json_str)?;
-        
-        let obj = deserialized_data.as_object()
+
+        let obj = deserialized_data
+            .as_object()
             .ok_or_else(|| RunAgentError::validation("JSON must deserialize to an object"))?;
 
         // Reconstruct nested JSON structures in data and metadata
         let mut message_data = obj.clone();
-        
+
         if let Some(data) = message_data.get("data") {
-            message_data.insert("data".to_string(), self.reconstruct_nested_json(data.clone())?);
+            message_data.insert(
+                "data".to_string(),
+                self.reconstruct_nested_json(data.clone())?,
+            );
         }
-        
+
         if let Some(metadata) = message_data.get("metadata") {
-            message_data.insert("metadata".to_string(), self.reconstruct_nested_json(metadata.clone())?);
+            message_data.insert(
+                "metadata".to_string(),
+                self.reconstruct_nested_json(metadata.clone())?,
+            );
         }
 
         let safe_message: SafeMessage = serde_json::from_value(Value::Object(message_data.into()))?;
@@ -175,7 +191,9 @@ impl CoreSerializer {
     fn value_to_string(&self, obj: &Value) -> String {
         match obj {
             Value::String(s) => s.clone(),
-            _ => serde_json::to_string(obj).unwrap_or_else(|_| format!("<Unserializable {:?}>", obj)),
+            _ => {
+                serde_json::to_string(obj).unwrap_or_else(|_| format!("<Unserializable {:?}>", obj))
+            }
         }
     }
 
@@ -188,9 +206,17 @@ impl CoreSerializer {
     }
 
     /// Create a serialization response with metadata
-    fn create_response_with_metadata(&self, strategy: &str, content: Value, original: &Value) -> HashMap<String, Value> {
+    fn create_response_with_metadata(
+        &self,
+        strategy: &str,
+        content: Value,
+        original: &Value,
+    ) -> HashMap<String, Value> {
         let mut response = self.create_response(strategy, content);
-        response.insert("type".to_string(), Value::String(self.get_value_type(original)));
+        response.insert(
+            "type".to_string(),
+            Value::String(self.get_value_type(original)),
+        );
         response.insert("metadata".to_string(), self.extract_metadata(original));
         response
     }
@@ -210,12 +236,18 @@ impl CoreSerializer {
     /// Extract metadata about the value
     fn extract_metadata(&self, obj: &Value) -> Value {
         let mut metadata = HashMap::new();
-        
+
         let obj_str = serde_json::to_string(obj).unwrap_or_default();
         let obj_size = obj_str.len();
-        
-        metadata.insert("object_type".to_string(), Value::String(self.get_value_type(obj)));
-        metadata.insert("object_size".to_string(), Value::Number(serde_json::Number::from(obj_size)));
+
+        metadata.insert(
+            "object_type".to_string(),
+            Value::String(self.get_value_type(obj)),
+        );
+        metadata.insert(
+            "object_size".to_string(),
+            Value::Number(serde_json::Number::from(obj_size)),
+        );
         metadata.insert("is_null".to_string(), Value::Bool(obj.is_null()));
         metadata.insert("is_array".to_string(), Value::Bool(obj.is_array()));
         metadata.insert("is_object".to_string(), Value::Bool(obj.is_object()));
@@ -294,7 +326,7 @@ mod tests {
     fn test_object_serialization() {
         let serializer = CoreSerializer::new(10.0).unwrap();
         let obj = serde_json::json!({"key": "value", "number": 42});
-        
+
         let result = serializer.serialize_object(obj);
         assert!(result.is_ok());
     }
