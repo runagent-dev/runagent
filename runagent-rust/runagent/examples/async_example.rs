@@ -16,12 +16,12 @@ async fn main() -> runagent::RunAgentResult<()> {
         RunAgentClientConfig::new(agent_id, entrypoint_tag)
             .with_local(true)
             .with_address("127.0.0.1", 8452)
-            .with_enable_registry(false) // Skip DB lookup since we have explicit address
-    ).await?;
+            .with_enable_registry(false), // Skip DB lookup since we have explicit address
+    )
+    .await?;
 
     let response = client.run(&[("message", json!("Hello!"))]).await?;
 
     println!("Response: {}", response);
     Ok(())
 }
-

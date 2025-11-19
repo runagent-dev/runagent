@@ -228,13 +228,13 @@
 //!         Err(e) => Err(e),
 //!     }
 //! }
-//! 
-//! fn some_operation() -> RunAgentResult<String> { 
-//!     Ok("test".to_string()) 
+//!
+//! fn some_operation() -> RunAgentResult<String> {
+//!     Ok("test".to_string())
 //! }
-//! 
-//! fn retry_operation() -> RunAgentResult<()> { 
-//!     Ok(()) 
+//!
+//! fn retry_operation() -> RunAgentResult<()> {
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -279,11 +279,11 @@ pub mod db;
 pub mod blocking;
 
 // Re-export commonly used types and functions
-pub use client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
+pub use client::{RestClient, RunAgentClient, RunAgentClientConfig, SocketClient};
 pub use types::{RunAgentError, RunAgentResult};
 
 // Re-export blocking client for convenience
-pub use blocking::{RunAgentClient as BlockingRunAgentClient, BlockingStream};
+pub use blocking::{BlockingStream, RunAgentClient as BlockingRunAgentClient};
 
 #[cfg(feature = "db")]
 pub use db::DatabaseService;
@@ -306,7 +306,7 @@ pub fn init_logging() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("runagent=info".parse().unwrap())
+                .add_directive("runagent=info".parse().unwrap()),
         )
         .init();
 }
@@ -430,13 +430,13 @@ impl RunAgentConfig {
 ///
 /// ```rust,no_run
 /// use runagent::prelude::*;
-/// 
+///
 /// // Now you have access to RunAgentClient, RunAgentError, etc.
 /// ```
 pub mod prelude {
-    pub use crate::client::{RunAgentClient, RunAgentClientConfig, RestClient, SocketClient};
+    pub use crate::client::{RestClient, RunAgentClient, RunAgentClientConfig, SocketClient};
     pub use crate::types::{RunAgentError, RunAgentResult};
-    
+
     #[cfg(feature = "db")]
     pub use crate::db::DatabaseService;
 }
@@ -447,7 +447,9 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert!(!VERSION.is_empty());
+        #[allow(clippy::const_is_empty)]
+        let is_not_empty = !VERSION.is_empty();
+        assert!(is_not_empty);
     }
 
     #[test]

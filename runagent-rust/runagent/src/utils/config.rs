@@ -1,8 +1,6 @@
 //! Configuration management for the RunAgent SDK
 
-use crate::constants::{
-    DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL,
-};
+use crate::constants::{DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL};
 use crate::types::{RunAgentError, RunAgentResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -88,7 +86,9 @@ impl Config {
 
         // Test authentication (placeholder - would make actual API call)
         if !config.test_authentication()? {
-            return Err(RunAgentError::authentication("Authentication failed with provided credentials"));
+            return Err(RunAgentError::authentication(
+                "Authentication failed with provided credentials",
+            ));
         }
 
         // Note: save parameter is ignored - configuration is stored in SQLite database
@@ -116,10 +116,19 @@ impl Config {
     /// Get detailed configuration status
     pub fn get_status(&self) -> HashMap<String, serde_json::Value> {
         let mut status = HashMap::new();
-        
-        status.insert("configured".to_string(), serde_json::json!(self.is_configured()));
-        status.insert("authenticated".to_string(), serde_json::json!(self.is_authenticated()));
-        status.insert("api_key_set".to_string(), serde_json::json!(self.api_key.is_some()));
+
+        status.insert(
+            "configured".to_string(),
+            serde_json::json!(self.is_configured()),
+        );
+        status.insert(
+            "authenticated".to_string(),
+            serde_json::json!(self.is_authenticated()),
+        );
+        status.insert(
+            "api_key_set".to_string(),
+            serde_json::json!(self.api_key.is_some()),
+        );
         status.insert("base_url".to_string(), serde_json::json!(self.base_url));
         status.insert("user_info".to_string(), serde_json::json!(self.user_info));
 
@@ -147,17 +156,20 @@ impl Config {
         config_content: &HashMap<String, serde_json::Value>,
     ) -> RunAgentResult<String> {
         use crate::constants::AGENT_CONFIG_FILE_NAME;
-        
+
         let config_file = PathBuf::from(project_dir).join(AGENT_CONFIG_FILE_NAME);
 
         // Update existing config if it exists
         let mut final_config = if config_file.exists() {
-            let existing_content = fs::read_to_string(&config_file)
-                .map_err(|e| RunAgentError::config(format!("Failed to read existing config: {}", e)))?;
-            
-            let mut existing_config: HashMap<String, serde_json::Value> = serde_json::from_str(&existing_content)
-                .map_err(|e| RunAgentError::config(format!("Failed to parse existing config: {}", e)))?;
-            
+            let existing_content = fs::read_to_string(&config_file).map_err(|e| {
+                RunAgentError::config(format!("Failed to read existing config: {}", e))
+            })?;
+
+            let mut existing_config: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&existing_content).map_err(|e| {
+                    RunAgentError::config(format!("Failed to parse existing config: {}", e))
+                })?;
+
             // Merge configs, new values take precedence
             existing_config.extend(config_content.clone());
             existing_config
@@ -169,7 +181,7 @@ impl Config {
         if !final_config.contains_key("created_at") {
             final_config.insert(
                 "created_at".to_string(),
-                serde_json::json!(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())
+                serde_json::json!(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
             );
         }
 
@@ -184,9 +196,11 @@ impl Config {
     }
 
     /// Get agent configuration
-    pub fn get_agent_config(project_dir: &str) -> RunAgentResult<Option<HashMap<String, serde_json::Value>>> {
+    pub fn get_agent_config(
+        project_dir: &str,
+    ) -> RunAgentResult<Option<HashMap<String, serde_json::Value>>> {
         use crate::constants::AGENT_CONFIG_FILE_NAME;
-        
+
         let config_file = PathBuf::from(project_dir).join(AGENT_CONFIG_FILE_NAME);
 
         if !config_file.exists() {
@@ -202,7 +216,6 @@ impl Config {
         Ok(Some(config))
     }
 
-
     /// Save deployment information
     pub fn save_deployment_info(
         agent_id: &str,
@@ -212,22 +225,27 @@ impl Config {
             .map_err(|e| RunAgentError::config(format!("Failed to get current directory: {}", e)))?
             .join(".deployments");
 
-        fs::create_dir_all(&deployments_dir)
-            .map_err(|e| RunAgentError::config(format!("Failed to create deployments directory: {}", e)))?;
+        fs::create_dir_all(&deployments_dir).map_err(|e| {
+            RunAgentError::config(format!("Failed to create deployments directory: {}", e))
+        })?;
 
         let info_file = deployments_dir.join(format!("{}.json", agent_id));
-        
-        let content = serde_json::to_string_pretty(info)
-            .map_err(|e| RunAgentError::config(format!("Failed to serialize deployment info: {}", e)))?;
 
-        fs::write(&info_file, content)
-            .map_err(|e| RunAgentError::config(format!("Failed to write deployment info: {}", e)))?;
+        let content = serde_json::to_string_pretty(info).map_err(|e| {
+            RunAgentError::config(format!("Failed to serialize deployment info: {}", e))
+        })?;
+
+        fs::write(&info_file, content).map_err(|e| {
+            RunAgentError::config(format!("Failed to write deployment info: {}", e))
+        })?;
 
         Ok(info_file.to_string_lossy().to_string())
     }
 
     /// Get deployment information
-    pub fn get_deployment_info(agent_id: &str) -> RunAgentResult<Option<HashMap<String, serde_json::Value>>> {
+    pub fn get_deployment_info(
+        agent_id: &str,
+    ) -> RunAgentResult<Option<HashMap<String, serde_json::Value>>> {
         let deployments_dir = std::env::current_dir()
             .map_err(|e| RunAgentError::config(format!("Failed to get current directory: {}", e)))?
             .join(".deployments");
@@ -241,8 +259,10 @@ impl Config {
         let content = fs::read_to_string(&info_file)
             .map_err(|e| RunAgentError::config(format!("Failed to read deployment info: {}", e)))?;
 
-        let info: HashMap<String, serde_json::Value> = serde_json::from_str(&content)
-            .map_err(|e| RunAgentError::config(format!("Failed to parse deployment info: {}", e)))?;
+        let info: HashMap<String, serde_json::Value> =
+            serde_json::from_str(&content).map_err(|e| {
+                RunAgentError::config(format!("Failed to parse deployment info: {}", e))
+            })?;
 
         Ok(Some(info))
     }
@@ -278,7 +298,7 @@ mod tests {
             Some("api.example.com".to_string()),
             false,
         );
-        
+
         // This would test URL formatting in a real implementation
         // For now, we just verify the function doesn't panic
         assert!(config.is_err() || config.is_ok());
@@ -305,7 +325,7 @@ mod tests {
     fn test_status_generation() {
         let config = Config::default();
         let status = config.get_status();
-        
+
         assert!(status.contains_key("configured"));
         assert!(status.contains_key("api_key_set"));
         assert!(status.contains_key("base_url"));

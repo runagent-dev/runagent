@@ -41,13 +41,10 @@ impl RestClient {
     }
 
     /// Create a default REST client using configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> RunAgentResult<Self> {
         let config = Config::load()?;
-        Self::new(
-            &config.base_url(),
-            config.api_key(),
-            Some("/api/v1"),
-        )
+        Self::new(&config.base_url(), config.api_key(), Some("/api/v1"))
     }
 
     fn get_url(&self, path: &str) -> RunAgentResult<Url> {
@@ -58,7 +55,7 @@ impl RestClient {
 
     async fn handle_response(&self, response: Response) -> RunAgentResult<Value> {
         let status = response.status();
-        
+
         if status.is_success() {
             let json: Value = response.json().await?;
             Ok(json)
@@ -97,12 +94,15 @@ impl RestClient {
             };
 
             // Check if error message contains permission/403 info even if status is 500
-            if error_msg.contains("permission") || error_msg.contains("403") || error_msg.contains("do not have permission") {
+            if error_msg.contains("permission")
+                || error_msg.contains("403")
+                || error_msg.contains("do not have permission")
+            {
                 return Err(RunAgentError::authentication(format!(
                     "Access denied: {}. This usually means:\n  - The agent doesn't belong to your account\n  - Your API key doesn't have permission to access this agent\n  - The agent ID is incorrect", error_msg
                 )));
             }
-            
+
             match status.as_u16() {
                 401 => Err(RunAgentError::authentication(error_msg)),
                 403 => Err(RunAgentError::authentication(format!(
@@ -124,13 +124,12 @@ impl RestClient {
         params: Option<&HashMap<String, String>>,
     ) -> RunAgentResult<Value> {
         let mut url = self.get_url(path)?;
-        
+
         // Add API key as token query parameter if available (matching WebSocket behavior)
         if let Some(ref api_key) = self.api_key {
-            url.query_pairs_mut()
-                .append_pair("token", api_key);
+            url.query_pairs_mut().append_pair("token", api_key);
         }
-        
+
         let mut request_builder = self.client.request(method, url);
 
         // Add query parameters
@@ -147,7 +146,8 @@ impl RestClient {
 
         // Add Authorization header if API key is available
         if let Some(ref api_key) = self.api_key {
-            request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+            request_builder =
+                request_builder.header("Authorization", format!("Bearer {}", api_key));
         }
 
         let response = request_builder.send().await?;
@@ -202,8 +202,13 @@ impl RestClient {
 
         let path = format!("agents/{}/run", agent_id);
         let url = self.get_url(&path)?;
-        tracing::debug!("Running agent {} with entrypoint {} at {}", agent_id, entrypoint_tag, url);
-        
+        tracing::debug!(
+            "Running agent {} with entrypoint {} at {}",
+            agent_id,
+            entrypoint_tag,
+            url
+        );
+
         self.post(&path, &data).await
             .map_err(|e| {
                 if e.category() == "validation" && e.to_string().contains("Not found") {
@@ -265,7 +270,11 @@ impl RestClient {
                 } else if let Some(msg) = error_obj.as_str() {
                     ("UNKNOWN_ERROR".to_string(), msg.to_string(), None)
                 } else {
-                    ("UNKNOWN_ERROR".to_string(), "Failed to retrieve agent architecture".to_string(), None)
+                    (
+                        "UNKNOWN_ERROR".to_string(),
+                        "Failed to retrieve agent architecture".to_string(),
+                        None,
+                    )
                 }
             } else {
                 (
@@ -298,39 +307,45 @@ impl RestClient {
     /// Validate API connection
     pub async fn validate_api_connection(&self) -> RunAgentResult<Value> {
         match self.health_check().await {
-                    Ok(_response) => {
-                        let mut result = serde_json::json!({
-                            "success": true,
-                            "api_connected": true,
-                            "base_url": self.base_url
-                        });
+            Ok(_response) => {
+                let mut result = serde_json::json!({
+                    "success": true,
+                    "api_connected": true,
+                    "base_url": self.base_url
+                });
 
-                        if self.api_key.is_some() {
-                            // Test authentication if API key is provided
-                            match self.get_local_db_limits().await {
-                                Ok(limits_result) => {
-                                    result["api_authenticated"] = limits_result.get("api_validated").unwrap_or(&Value::Bool(false)).clone();
-                                    result["enhanced_limits"] = limits_result.get("enhanced_limits").unwrap_or(&Value::Bool(false)).clone();
-                                }
-                                Err(_) => {
-                                    result["api_authenticated"] = Value::Bool(false);
-                                    result["enhanced_limits"] = Value::Bool(false);
-                                }
-                            }
-                        } else {
+                if self.api_key.is_some() {
+                    // Test authentication if API key is provided
+                    match self.get_local_db_limits().await {
+                        Ok(limits_result) => {
+                            result["api_authenticated"] = limits_result
+                                .get("api_validated")
+                                .unwrap_or(&Value::Bool(false))
+                                .clone();
+                            result["enhanced_limits"] = limits_result
+                                .get("enhanced_limits")
+                                .unwrap_or(&Value::Bool(false))
+                                .clone();
+                        }
+                        Err(_) => {
                             result["api_authenticated"] = Value::Bool(false);
                             result["enhanced_limits"] = Value::Bool(false);
-                            result["message"] = Value::String("No API key provided".to_string());
                         }
-
-                        Ok(result)
                     }
-                    Err(e) => Ok(serde_json::json!({
-                        "success": false,
-                        "api_connected": false,
-                        "error": format!("API health check failed: {}", e)
-                    })),
+                } else {
+                    result["api_authenticated"] = Value::Bool(false);
+                    result["enhanced_limits"] = Value::Bool(false);
+                    result["message"] = Value::String("No API key provided".to_string());
                 }
+
+                Ok(result)
+            }
+            Err(e) => Ok(serde_json::json!({
+                "success": false,
+                "api_connected": false,
+                "error": format!("API health check failed: {}", e)
+            })),
+        }
     }
 
     /// Get local database limits from backend API
@@ -350,12 +365,22 @@ impl RestClient {
 
         match self.get("limits/agents").await {
             Ok(response) => {
-                let max_agents = response.get("max_agents").and_then(|v| v.as_i64()).unwrap_or(5);
+                let max_agents = response
+                    .get("max_agents")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(5);
                 let enhanced = max_agents > 5;
                 let unlimited = max_agents == -1;
 
                 if enhanced {
-                    tracing::info!("Enhanced limits active: {} agents", if unlimited { "unlimited".to_string() } else { max_agents.to_string() });
+                    tracing::info!(
+                        "Enhanced limits active: {} agents",
+                        if unlimited {
+                            "unlimited".to_string()
+                        } else {
+                            max_agents.to_string()
+                        }
+                    );
                 }
 
                 Ok(serde_json::json!({
@@ -404,8 +429,10 @@ impl RestClient {
         // For now, return a placeholder
         let _folder_path = folder_path;
         let _metadata = metadata;
-        
-        Err(RunAgentError::generic("Upload functionality not yet implemented"))
+
+        Err(RunAgentError::generic(
+            "Upload functionality not yet implemented",
+        ))
     }
 
     /// Start a remote agent

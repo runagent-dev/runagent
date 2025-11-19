@@ -1,5 +1,5 @@
 //! Schema types for the RunAgent SDK
-//! 
+//!
 //! These types mirror the Python SDK's Pydantic models
 
 use chrono::{DateTime, Utc};
@@ -62,7 +62,7 @@ pub struct RunAgentConfig {
 }
 
 /// Input arguments for agent execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentInputArgs {
     /// Input arguments list
     #[serde(default)]
@@ -70,15 +70,6 @@ pub struct AgentInputArgs {
     /// Input keyword arguments
     #[serde(default)]
     pub input_kwargs: HashMap<String, serde_json::Value>,
-}
-
-impl Default for AgentInputArgs {
-    fn default() -> Self {
-        Self {
-            input_args: Vec::new(),
-            input_kwargs: HashMap::new(),
-        }
-    }
 }
 
 /// WebSocket action types
@@ -169,11 +160,7 @@ pub struct SafeMessage {
 }
 
 impl SafeMessage {
-    pub fn new(
-        id: String,
-        message_type: MessageType,
-        data: serde_json::Value,
-    ) -> Self {
+    pub fn new(id: String, message_type: MessageType, data: serde_json::Value) -> Self {
         Self {
             id,
             message_type,
@@ -201,15 +188,15 @@ impl SafeMessage {
         dict.insert("type".to_string(), serde_json::json!(self.message_type));
         dict.insert("timestamp".to_string(), serde_json::json!(self.timestamp));
         dict.insert("data".to_string(), self.data.clone());
-        
+
         if let Some(metadata) = &self.metadata {
             dict.insert("metadata".to_string(), serde_json::json!(metadata));
         }
-        
+
         if let Some(error) = &self.error {
             dict.insert("error".to_string(), serde_json::json!(error));
         }
-        
+
         dict
     }
 }
@@ -341,7 +328,8 @@ mod tests {
 
     #[test]
     fn test_safe_message_with_error() {
-        let msg = SafeMessage::with_error("error-id".to_string(), "Something went wrong".to_string());
+        let msg =
+            SafeMessage::with_error("error-id".to_string(), "Something went wrong".to_string());
         assert_eq!(msg.id, "error-id");
         assert!(matches!(msg.message_type, MessageType::Error));
         assert!(msg.error.is_some());
@@ -366,7 +354,7 @@ mod tests {
 
         let json = serde_json::to_string(&entry_point).unwrap();
         let deserialized: EntryPoint = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(entry_point.file, deserialized.file);
         assert_eq!(entry_point.module, deserialized.module);
         assert_eq!(entry_point.tag, deserialized.tag);
