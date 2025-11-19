@@ -119,6 +119,7 @@ jobs:
     uses: ./.github/workflows/reusable-sdk-release.yml
     permissions:
       contents: read
+      id-token: write
     with:
       sdk: rust
       working-directory: runagent-rust/runagent
