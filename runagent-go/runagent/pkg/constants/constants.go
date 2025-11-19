@@ -14,16 +14,27 @@ const (
 	DefaultTemplate  = "basic"
 
 	// Environment variables
-	EnvAPIKey   = "RUNAGENT_API_KEY"
-	EnvBaseURL  = "RUNAGENT_BASE_URL"
-	EnvCacheDir = "RUNAGENT_CACHE_DIR"
-	EnvLogLevel = "RUNAGENT_LOGGING_LEVEL"
+	EnvAPIKey     = "RUNAGENT_API_KEY"
+	EnvBaseURL    = "RUNAGENT_BASE_URL"
+	EnvCacheDir   = "RUNAGENT_CACHE_DIR"
+	EnvLogLevel   = "RUNAGENT_LOGGING_LEVEL"
+	EnvLocalAgent = "RUNAGENT_LOCAL"
+	EnvAgentHost  = "RUNAGENT_HOST"
+	EnvAgentPort  = "RUNAGENT_PORT"
+	EnvTimeout    = "RUNAGENT_TIMEOUT"
 
 	// Default values
-	DefaultBaseURL      = "http://52.237.88.147:8330/"
-	AgentConfigFileName = "runagent.config.json"
-	UserDataFileName    = "user_data.json"
-	DatabaseFileName    = "runagent_local.db"
+	DefaultBaseURL        = "https://backend.run-agent.ai"
+	DefaultAPIPrefix      = "/api/v1"
+	DefaultSocketProtocol = "wss"
+	DefaultRESTProtocol   = "https"
+	DefaultLocalHost      = "127.0.0.1"
+	DefaultLocalPort      = 8450
+	DefaultTimeoutSeconds = 300
+	DefaultStreamTimeout  = 600
+	AgentConfigFileName   = "runagent.config.json"
+	UserDataFileName      = "user_data.json"
+	DatabaseFileName      = "runagent_local.db"
 
 	// Port configuration
 	DefaultPortStart = 8450

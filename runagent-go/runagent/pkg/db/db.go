@@ -8,7 +8,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/runagent-dev/runagent-go/pkg/constants"
+	"github.com/runagent-dev/runagent/runagent-go/runagent/pkg/constants"
 )
 
 // Agent represents an agent in the database

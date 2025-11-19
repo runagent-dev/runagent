@@ -1,12 +1,12 @@
 [package]
 name = "runagent"
-version = "0.1.34"
+version = "0.1.36"
 edition = "2021"
 description = "RunAgent SDK for Rust - Client SDK for interacting with deployed AI agents"
 license = "MIT"
 repository = "https://github.com/runagent-dev/runagent"
-homepage = "https://runagent.ai"
-documentation = "https://docs.rs/runagent"
+homepage = "https://run-agent.ai"
+documentation = "https://docs.run-agent.ai"
 readme = "README.md"
 keywords = ["ai", "agents", "llm", "sdk", "deployment"]
 categories = ["api-bindings", "development-tools", "web-programming"]

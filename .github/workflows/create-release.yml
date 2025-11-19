@@ -112,12 +112,27 @@ jobs:
       version: ${{ needs.detect-release.outputs.version }}
     secrets: inherit
 
+  publish-rust:
+    name: Publish Rust SDK
+    needs: detect-release
+    if: needs.detect-release.outputs.should_release == 'true'
+    uses: ./.github/workflows/reusable-sdk-release.yml
+    permissions:
+      contents: read
+    with:
+      sdk: rust
+      working-directory: runagent-rust/runagent
+      tag: ${{ needs.detect-release.outputs.latest_tag }}
+      version: ${{ needs.detect-release.outputs.version }}
+    secrets: inherit
+
   create-release:
     name: Create GitHub Release
     needs:
       - detect-release
       - publish-python
       - publish-typescript
+      - publish-rust
     if: needs.detect-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
