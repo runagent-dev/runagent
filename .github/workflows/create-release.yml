@@ -124,6 +124,19 @@ jobs:
       version: ${{ needs.detect-release.outputs.version }}
     secrets: inherit
 
+  publish-go:
+    name: Publish Go SDK
+    needs: detect-release
+    if: needs.detect-release.outputs.should_release == 'true'
+    uses: ./.github/workflows/go-release.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: runagent-go
+      tag: ${{ needs.detect-release.outputs.latest_tag }}
+      version: ${{ needs.detect-release.outputs.version }}
+    secrets: inherit
+
   create-release:
     name: Create GitHub Release
     needs:
@@ -131,8 +144,10 @@ jobs:
       - publish-python
       - publish-typescript
       - publish-rust
+      - publish-go
     if: needs.detect-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
