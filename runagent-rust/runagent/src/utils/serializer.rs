@@ -307,10 +307,10 @@ mod tests {
             MessageType::Status,
             serde_json::json!({"status": "ok"}),
         );
-        
+
         let result = serializer.serialize_message(&message);
         assert!(result.is_ok());
-        
+
         let serialized = result.unwrap();
         let deserialized = serializer.deserialize_message(&serialized);
         assert!(deserialized.is_ok());
@@ -321,7 +321,7 @@ mod tests {
         let serializer = CoreSerializer::new(0.001).unwrap(); // Very small limit
         let small_str = "test";
         let large_str = "a".repeat(2000);
-        
+
         assert!(serializer.check_size_limit(small_str));
         assert!(!serializer.check_size_limit(&large_str));
     }
@@ -329,13 +329,13 @@ mod tests {
     #[test]
     fn test_json_serializable_check() {
         let serializer = CoreSerializer::new(10.0).unwrap();
-        
+
         let simple_obj = serde_json::json!({"key": "value"});
         assert!(serializer.is_json_serializable(&simple_obj));
-        
+
         let null_obj = Value::Null;
         assert!(serializer.is_json_serializable(&null_obj));
-        
+
         let array_obj = serde_json::json!([1, 2, 3]);
         assert!(serializer.is_json_serializable(&array_obj));
     }
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn test_nested_reconstruction() {
         let serializer = CoreSerializer::new(10.0).unwrap();
-        
+
         let nested_data = serde_json::json!({
             "level1": {
                 "level2": {
@@ -351,10 +351,10 @@ mod tests {
                 }
             }
         });
-        
+
         let result = serializer.reconstruct_nested_json(nested_data.clone());
         assert!(result.is_ok());
-        
+
         let reconstructed = result.unwrap();
         assert_eq!(reconstructed, nested_data);
     }

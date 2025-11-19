@@ -35,7 +35,7 @@ The Go SDK mirrors the Python CLI client so Go services can trigger hosted or lo
 ### Installation
 
 ```bash
-go get github.com/runagent-dev/runagent/runagent-go/runagent
+go get github.com/runagent-dev/runagent-go
 ```
 
 Requires Go 1.21+.
@@ -101,7 +101,7 @@ import (
     "time"
     "os"
 
-    "github.com/runagent-dev/runagent/runagent-go/runagent"
+    "github.com/runagent-dev/runagent-go"
 )
 
 func main() {

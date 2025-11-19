@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/runagent-dev/runagent/runagent-go/runagent"
+	"github.com/runagent-dev/runagent-go"
 )
 
 func main() {
