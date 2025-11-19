@@ -41,6 +41,7 @@ impl RestClient {
     }
 
     /// Create a default REST client using configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> RunAgentResult<Self> {
         let config = Config::load()?;
         Self::new(&config.base_url(), config.api_key(), Some("/api/v1"))

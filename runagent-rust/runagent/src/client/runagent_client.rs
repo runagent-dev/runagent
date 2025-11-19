@@ -92,12 +92,12 @@ pub struct RunAgentClientConfig {
     pub enable_registry: Option<bool>,
 }
 
-impl RunAgentClientConfig {
-    /// Create a new config with required fields
-    pub fn new(agent_id: impl Into<String>, entrypoint_tag: impl Into<String>) -> Self {
+#[allow(clippy::derivable_impls)]
+impl Default for RunAgentClientConfig {
+    fn default() -> Self {
         Self {
-            agent_id: agent_id.into(),
-            entrypoint_tag: entrypoint_tag.into(),
+            agent_id: String::new(),       // Dummy - will be overridden
+            entrypoint_tag: String::new(), // Dummy - will be overridden
             local: None,
             host: None,
             port: None,
@@ -107,15 +107,14 @@ impl RunAgentClientConfig {
             enable_registry: None,
         }
     }
+}
 
-    /// Create a config with defaults for optional fields
-    ///
-    /// This allows you to use `..RunAgentClientConfig::default()` syntax
-    /// to omit None values when constructing directly.
-    pub fn default() -> Self {
+impl RunAgentClientConfig {
+    /// Create a new config with required fields
+    pub fn new(agent_id: impl Into<String>, entrypoint_tag: impl Into<String>) -> Self {
         Self {
-            agent_id: String::new(),       // Dummy - will be overridden
-            entrypoint_tag: String::new(), // Dummy - will be overridden
+            agent_id: agent_id.into(),
+            entrypoint_tag: entrypoint_tag.into(),
             local: None,
             host: None,
             port: None,

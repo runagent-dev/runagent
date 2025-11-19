@@ -447,7 +447,9 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert!(!VERSION.is_empty());
+        #[allow(clippy::const_is_empty)]
+        let is_not_empty = !VERSION.is_empty();
+        assert!(is_not_empty);
     }
 
     #[test]

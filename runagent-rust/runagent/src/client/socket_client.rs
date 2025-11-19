@@ -36,6 +36,7 @@ impl SocketClient {
     }
 
     /// Create a default WebSocket client using configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> RunAgentResult<Self> {
         let config = Config::load()?;
         let base_url = config.base_url();

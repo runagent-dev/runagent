@@ -156,7 +156,7 @@ impl CoreSerializer {
             );
         }
 
-        let safe_message: SafeMessage = serde_json::from_value(Value::Object(message_data.into()))?;
+        let safe_message: SafeMessage = serde_json::from_value(Value::Object(message_data))?;
         Ok(safe_message)
     }
 
@@ -178,6 +178,7 @@ impl CoreSerializer {
     }
 
     /// Check if a value is directly JSON serializable
+    #[allow(clippy::only_used_in_recursion)]
     fn is_json_serializable(&self, obj: &Value) -> bool {
         // JSON values are already serializable by definition
         match obj {
@@ -256,6 +257,7 @@ impl CoreSerializer {
     }
 
     /// Deep serialize any value, handling nested structures
+    #[allow(clippy::only_used_in_recursion)]
     fn deep_serialize_value(&self, value: Value) -> RunAgentResult<Value> {
         match value {
             Value::Object(map) => {
@@ -277,6 +279,7 @@ impl CoreSerializer {
     }
 
     /// Reconstruct nested JSON structures
+    #[allow(clippy::only_used_in_recursion)]
     fn reconstruct_nested_json(&self, data: Value) -> RunAgentResult<Value> {
         match data {
             Value::Object(ref map) => {

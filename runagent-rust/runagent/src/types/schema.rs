@@ -62,7 +62,7 @@ pub struct RunAgentConfig {
 }
 
 /// Input arguments for agent execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentInputArgs {
     /// Input arguments list
     #[serde(default)]
@@ -70,15 +70,6 @@ pub struct AgentInputArgs {
     /// Input keyword arguments
     #[serde(default)]
     pub input_kwargs: HashMap<String, serde_json::Value>,
-}
-
-impl Default for AgentInputArgs {
-    fn default() -> Self {
-        Self {
-            input_args: Vec::new(),
-            input_kwargs: HashMap::new(),
-        }
-    }
 }
 
 /// WebSocket action types
