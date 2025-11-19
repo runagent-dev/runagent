@@ -1,4 +1,4 @@
-module github.com/runagent-dev/runagent/runagent-go
+module github.com/runagent-dev/runagent-go
 
 go 1.23.4
 

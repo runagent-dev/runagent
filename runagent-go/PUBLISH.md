@@ -1,6 +1,6 @@
 ## Publishing `runagent-go`
 
-The Go SDK is distributed through this monorepo using Go modules. Releasing a new version requires tagging the repository so `go get github.com/runagent-dev/runagent/runagent-go/runagent@vX.Y.Z` resolves to the new code.
+The Go SDK is distributed through this repository using Go modules. Releasing a new version requires tagging the repository so `go get github.com/runagent-dev/runagent-go@vX.Y.Z` resolves to the new code.
 
 ---
 
@@ -15,7 +15,7 @@ The Go SDK is distributed through this monorepo using Go modules. Releasing a ne
 ### 2. Preflight Checklist
 
 1. **Bump the SDK version**  
-   - Update `runagent/runagent-go/runagent/version.go`.  
+   - Update `version.go` in the root directory.  
    - Follow semver (increment patch for fixes, minor for new features, major for breaking changes).
 2. **Changelog / release notes**  
    - Update the main repo changelog or docs to record the release.
@@ -29,8 +29,8 @@ The Go SDK is distributed through this monorepo using Go modules. Releasing a ne
 
 ```bash
 # From runagent-go/
-go test ./runagent/...
-golangci-lint run ./runagent/...   # optional but recommended
+go test ./...
+golangci-lint run ./...   # optional but recommended
 ```
 
 For extra assurance, run the example binaries:
@@ -45,13 +45,13 @@ go run ./examples/streaming.go
 ### 4. Commit & Tag
 
 ```bash
-git add runagent-go
+git add .
 git commit -m "chore(go): release v0.1.34"
 
-# Tag with the `sdk-go-` prefix so automation can detect it
-git tag sdk-go-v0.1.34
+# Tag with version prefix
+git tag v0.1.34
 git push origin main
-git push origin sdk-go-v0.1.34
+git push origin v0.1.34
 ```
 
 > If releasing from a feature branch, merge it first (or push the tag from the release branch) so `main` reflects the published state.
@@ -62,7 +62,7 @@ git push origin sdk-go-v0.1.34
 
 - Announce the release internally and update documentation links (docs site, README tables, etc.).
 - Monitor `go proxy` and `pkg.go.dev` (usually available within minutes after pushing the tag).
-- Verify `go list -m github.com/runagent-dev/runagent/runagent-go/runagent@latest` resolves to the new version.
+- Verify `go list -m github.com/runagent-dev/runagent-go@latest` resolves to the new version.
 
 ---
 

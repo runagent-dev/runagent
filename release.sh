@@ -370,16 +370,13 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Generate changelog BEFORE creating tag
-generate_changelog
-
-# Handle existing tag
+# Handle existing tag FIRST (before generating changelog)
 if handle_existing_tag "$VERSION"; then
     echo "✅ Tag v$VERSION updated successfully!"
     exit 0
 fi
 
-# Stage and commit changes (including changelog)
+# Stage and commit version changes FIRST (without changelog)
 git add .
 
 if git diff --staged --quiet; then
@@ -387,17 +384,25 @@ if git diff --staged --quiet; then
     exit 1
 fi
 
-# Commit changes first
+# Commit version changes first
 git commit -m "chore: bump version to v$VERSION
 
-- Updated all SDK versions to $VERSION
-- Generated changelog with git-cliff" -q
+- Updated all SDK versions to $VERSION" -q
 
-# Create new tag
+# Create tag BEFORE generating changelog (so git-cliff knows about it)
 git tag -a "v$VERSION" -m "Release v$VERSION
 RunAgent Universal Release v$VERSION
 
 All SDKs updated to version $VERSION"
+
+# NOW generate changelog (tag exists, so git-cliff can reference it properly)
+generate_changelog
+
+# Stage and commit changelog separately
+git add CHANGELOG.md
+if ! git diff --staged --quiet; then
+    git commit -m "docs: update changelog for v$VERSION" -q
+fi
 
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
