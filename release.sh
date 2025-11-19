@@ -206,7 +206,7 @@ update_go_version() {
     local go_mod_file="runagent-go/go.mod"
     
     if [[ ! -f "$version_file" ]]; then
-        cat > "$version_file" << EOF
+    cat > "$version_file" << EOF
 package runagent
 
 // Version represents the current version of the RunAgent Go SDK
