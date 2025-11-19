@@ -1,0 +1,79 @@
+name: Go SDK Release
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Path where Go SDK files are located
+        required: true
+        type: string
+      tag:
+        description: Git tag for this release (e.g., v0.1.0)
+        required: true
+        type: string
+      version:
+        description: SDK version without the leading v (e.g., 0.1.0)
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish Go SDK
+    runs-on: ubuntu-latest
+    environment: release
+    if: inputs.version != ''
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show release context
+        run: |
+          echo "Tag: ${{ inputs.tag }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Working directory: ${{ inputs.working-directory }}"
+
+      - name: Verify Go version matches tag
+        id: verify-go-version
+        run: |
+          TAG_VERSION="${{ inputs.version }}"
+          # Extract version from version.go file
+          PACKAGE_VERSION=$(grep -E '^\s*const\s+Version\s*=' runagent/version.go | sed -E 's/.*Version\s*=\s*"([^"]+)".*/\1/')
+          echo "Detected Go SDK version: $PACKAGE_VERSION"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch! Tag: $TAG_VERSION, version.go: $PACKAGE_VERSION"
+            exit 1
+          fi
+          echo "✅ Go SDK version matches tag"
+
+      - name: Get tag commit SHA
+        id: get-ref
+        run: |
+          TAG_REF=$(git rev-parse "${{ inputs.tag }}")
+          echo "tag_sha=$TAG_REF" >> "$GITHUB_OUTPUT"
+          echo "Tag SHA: $TAG_REF"
+
+      - name: Trigger sync workflow in target repo
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/runagent-dev/runagent-go/dispatches \
+            -d '{
+              "event_type": "sync-go-sdk",
+              "client_payload": {
+                "tag": "${{ inputs.tag }}",
+                "version": "${{ inputs.version }}",
+                "ref": "${{ steps.get-ref.outputs.tag_sha }}"
+              }
+            }'
+          echo "✅ Triggered sync workflow in runagent-dev/runagent-go"
+
+

@@ -1,0 +1,104 @@
+# IMPORTANT: This file needs to be copied to the target repository:
+# runagent-dev/runagent-go/.github/workflows/sync-from-main.yml
+#
+# This workflow runs in the target repo (runagent-dev/runagent-go) and
+# syncs files from the source repo (runagent-dev/runagent) when triggered
+# via repository_dispatch.
+
+name: Sync Go SDK from Main Repo
+
+on:
+  repository_dispatch:
+    types: [sync-go-sdk]
+
+jobs:
+  sync:
+    name: Sync Go SDK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show sync context
+        run: |
+          echo "Tag: ${{ github.event.client_payload.tag }}"
+          echo "Version: ${{ github.event.client_payload.version }}"
+          echo "Ref: ${{ github.event.client_payload.ref }}"
+
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          TAG="${{ github.event.client_payload.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG already exists in target repo"
+            echo "should_sync=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ Tag $TAG not found, will sync"
+            echo "should_sync=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clone source repository
+        if: steps.check-tag.outputs.should_sync == 'true'
+        run: |
+          SOURCE_REF="${{ github.event.client_payload.ref }}"
+          git clone --depth 1 --branch "${{ github.event.client_payload.tag }}" \
+            https://github.com/runagent-dev/runagent.git /tmp/source-repo
+          echo "✅ Cloned source repo at tag ${{ github.event.client_payload.tag }}"
+
+      - name: Copy runagent-go folder contents
+        if: steps.check-tag.outputs.should_sync == 'true'
+        run: |
+          # Remove existing files (except .git and .github)
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
+          
+          # Copy all contents from source repo's runagent-go folder
+          cp -r /tmp/source-repo/runagent-go/* .
+          
+          # List what was copied
+          echo "📦 Copied files:"
+          ls -la
+
+      - name: Configure Git
+        if: steps.check-tag.outputs.should_sync == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit changes
+        if: steps.check-tag.outputs.should_sync == 'true'
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "⚠️ No changes to commit"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: sync ${{ github.event.client_payload.tag }} from main repo"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+        id: commit
+
+      - name: Push changes
+        if: steps.check-tag.outputs.should_sync == 'true' && steps.commit.outputs.has_changes == 'true'
+        run: |
+          git push origin main
+          echo "✅ Pushed changes to main branch"
+
+      - name: Create and push tag
+        if: steps.check-tag.outputs.should_sync == 'true'
+        run: |
+          TAG="${{ github.event.client_payload.tag }}"
+          VERSION="${{ github.event.client_payload.version }}"
+          git tag -a "$TAG" -m "Release $TAG - Go SDK"
+          git push origin "$TAG"
+          echo "✅ Created and pushed tag $TAG"
+
+      - name: Skip sync (tag already exists)
+        if: steps.check-tag.outputs.should_sync != 'true'
+        run: echo "Skipping sync because tag ${{ github.event.client_payload.tag }} already exists."
+
+

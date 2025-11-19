@@ -20,6 +20,7 @@ jobs:
   publish:
     name: Publish Rust SDK
     runs-on: ubuntu-latest
+    environment: release
     if: inputs.version != ''
     permissions:
       contents: read
