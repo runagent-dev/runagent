@@ -90,9 +90,9 @@ jobs:
       - name: Publish package to PyPI
         if: steps.check-python.outputs.should_publish == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-        # with:
-        #   password: ${{ secrets.PYPI_API_TOKEN }}
-        #   print-hash: true
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          print-hash: true
 
       - name: Skip publish (already exists)
         if: steps.check-python.outputs.should_publish != 'true'
