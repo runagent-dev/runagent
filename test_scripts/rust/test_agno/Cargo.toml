@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # RunAgent Rust SDK from crates.io
-runagent = "0.1.33"
+runagent = { path = "/home/azureuser/runagent/runagent-rust/runagent" }
 
 # Required dependencies
 tokio = { version = "1.0", features = ["full"] }

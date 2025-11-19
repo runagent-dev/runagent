@@ -9,7 +9,7 @@
 
 <h2 align="center">Secured, reliable AI agent deployment at scale</h2>
 
-<h3 align="center">Write agent once, use everywhere</h3>
+<h4 align="center">Run your stack. Let us run your agents.</h4>
 
 <p align="center">
   <a href="https://docs.run-agent.ai">
@@ -17,20 +17,59 @@
   </a>
 </p>
 
-<p align="center">
-  <a href="https://pypi.org/project/runagent/">
-    <img src="https://img.shields.io/pypi/v/runagent" alt="PyPI" />
-  </a>
-  <a href="https://pypi.org/project/runagent/">
-    <img src="https://img.shields.io/pypi/dm/runagent" alt="PyPI - Downloads" />
-  </a>
-  <a href="https://pypi.org/project/runagent/">
-    <img src="https://img.shields.io/pypi/pyversions/runagent.svg" alt="Python Versions" />
-  </a>
-  <a href="https://discord.gg/Q9P9AdHVHz">
-    <img src="https://img.shields.io/discord/1389567838825480192?color=7289DA&label=Discord&logo=discord&logoColor=white" alt="Discord" />
-  </a>
-</p>
+<div align="center">
+
+<table>
+  <thead>
+    <tr>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-py">runagent-py</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-js">runagent-js</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-rs">runagent-rs</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-go">runagent-go</a></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center">
+        <a href="https://pepy.tech/projects/runagent">
+          <img src="https://static.pepy.tech/personalized-badge/runagent?period=total&units=ABBREVIATION&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads">
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://www.npmjs.com/package/runagent">
+          <img src="https://img.shields.io/npm/dt/runagent" alt="npm downloads">
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://crates.io/crates/runagent">
+          <img src="https://img.shields.io/crates/d/runagent" alt="Crates.io downloads">
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://github.com/runagent-dev/runagent-go">
+          <img src="https://img.shields.io/github/stars/runagent-dev/runagent-go?style=social" alt="GitHub stars">
+        </a>
+      </td>
+    </tr>
+      <tr>
+      <td align="center">
+        <img src="https://img.shields.io/pypi/v/runagent" alt="PyPI version">
+      </td>
+      <td align="center">
+        <img src="https://img.shields.io/npm/v/runagent" alt="npm version">
+      </td>
+      <td align="center">
+        <img src="https://img.shields.io/crates/v/runagent" alt="Crates.io version">
+      </td>
+      <td align="center">
+        <a href="https://pkg.go.dev/github.com/runagent-dev/runagent-go">
+          <img src="https://pkg.go.dev/badge/github.com/runagent-dev/runagent-go.svg" alt="Go Reference">
+        </a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 ---
 

@@ -35,29 +35,40 @@ pub struct RunAgentClient {
 /// # Direct Construction
 /// 
 /// ```rust,no_run
-/// use runagent::RunAgentClient;
+/// use runagent::{RunAgentClient, RunAgentClientConfig};
 /// 
-/// let client = RunAgentClient::new(runagent::RunAgentClientConfig {
-///     agent_id: "agent-id".to_string(),
-///     entrypoint_tag: "entrypoint".to_string(),
-///     local: None,
-///     host: None,
-///     port: None,
-///     api_key: Some("key".to_string()),
-///     base_url: Some("http://localhost:8333/".to_string()),
-///     extra_params: None,
-///     enable_registry: None,
-/// }).await?;
+/// #[tokio::main]
+/// async fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(RunAgentClientConfig {
+///         agent_id: "agent-id".to_string(),
+///         entrypoint_tag: "entrypoint".to_string(),
+///         local: None,
+///         host: None,
+///         port: None,
+///         api_key: Some("key".to_string()),
+///         base_url: Some("http://localhost:8333/".to_string()),
+///         extra_params: None,
+///         enable_registry: None,
+///     }).await?;
+///     Ok(())
+/// }
 /// ```
 /// 
 /// # Builder Pattern (Alternative)
 /// 
 /// ```rust,no_run
-/// let client = RunAgentClient::new(
-///     runagent::RunAgentClientConfig::new("agent-id", "entrypoint")
-///         .with_api_key("key")
-///         .with_base_url("http://localhost:8333/")
-/// ).await?;
+/// use runagent::{RunAgentClient, RunAgentClientConfig};
+/// use std::env;
+/// 
+/// #[tokio::main]
+/// async fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(
+///         RunAgentClientConfig::new("agent-id", "entrypoint")
+///             .with_api_key(env::var("RUNAGENT_API_KEY").unwrap_or_else(|_| "key".to_string()))
+///             .with_base_url("http://localhost:8333/")
+///     ).await?;
+///     Ok(())
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct RunAgentClientConfig {
@@ -161,17 +172,24 @@ impl RunAgentClient {
     /// # Examples
     /// 
     /// ```rust,no_run
-    /// // Local agent with explicit address
-    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
-    ///     .with_local(true)
-    ///     .with_address("127.0.0.1", 8450)
-    ///     .with_enable_registry(false)
-    /// ).await?;
+    /// use runagent::{RunAgentClient, RunAgentClientConfig};
+    /// use std::env;
     /// 
-    /// // Remote agent
-    /// let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
-    ///     .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
-    /// ).await?;
+    /// #[tokio::main]
+    /// async fn main() -> runagent::RunAgentResult<()> {
+    ///     // Local agent with explicit address
+    ///     let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///         .with_local(true)
+    ///         .with_address("127.0.0.1", 8450)
+    ///         .with_enable_registry(false)
+    ///     ).await?;
+    ///     
+    ///     // Remote agent
+    ///     let client = RunAgentClient::new(RunAgentClientConfig::new("agent-id", "entrypoint")
+    ///         .with_api_key(env::var("RUNAGENT_API_KEY").unwrap_or_else(|_| "key".to_string()))
+    ///     ).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn new(config: RunAgentClientConfig) -> RunAgentResult<Self> {
         use crate::constants::{DEFAULT_BASE_URL, ENV_RUNAGENT_API_KEY, ENV_RUNAGENT_BASE_URL};
@@ -216,6 +234,15 @@ impl RunAgentClient {
         let base_url = config.base_url.or_else(|| {
             std::env::var(ENV_RUNAGENT_BASE_URL).ok()
         }).unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+
+        if !local {
+            tracing::info!("🌐 Connecting to remote agent at {}", base_url);
+            if api_key.is_some() {
+                tracing::debug!("🔑 API key provided");
+            } else {
+                tracing::warn!("⚠️  No API key provided - using default limits");
+            }
+        }
 
         let serializer = CoreSerializer::new(10.0)?;
         #[cfg(feature = "db")]
@@ -349,6 +376,19 @@ impl RunAgentClient {
             if let Some(data) = response.get("data") {
                 // Case 1: data is a string (simplified payload - could be JSON string with {type, payload})
                 if data.as_str().is_some() {
+                    // Check for generator object BEFORE processing (case-insensitive)
+                    if let Some(data_str) = data.as_str() {
+                        let lower_str = data_str.to_lowercase();
+                        if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                            let streaming_tag = format!("{}_stream", self.entrypoint_tag);
+                            return Err(RunAgentError::validation(format!(
+                                "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
+                                Try using the streaming endpoint: `{}`\n\
+                                Or use `run_stream()` method instead of `run()`.",
+                                streaming_tag
+                            )));
+                        }
+                    }
                     // Use common deserializer preparation logic
                     let prepared = self.serializer.prepare_for_deserialization(data.clone());
                     payload = Some(prepared);
@@ -356,6 +396,19 @@ impl RunAgentClient {
                 // Case 2: data has result_data.data (legacy detailed execution payload)
                 else if let Some(result_data) = data.get("result_data") {
                     if let Some(output_data) = result_data.get("data") {
+                        // Check for generator object in nested data (case-insensitive)
+                        if let Some(output_str) = output_data.as_str() {
+                            let lower_str = output_str.to_lowercase();
+                            if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                                let streaming_tag = format!("{}_stream", self.entrypoint_tag);
+                                return Err(RunAgentError::validation(format!(
+                                    "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
+                                    Try using the streaming endpoint: `{}`\n\
+                                    Or use `run_stream()` method instead of `run()`.",
+                                    streaming_tag
+                                )));
+                            }
+                        }
                         payload = Some(output_data.clone());
                     }
                 }
@@ -366,16 +419,36 @@ impl RunAgentClient {
             }
             // Case 4: Fallback to output_data (backward compatibility)
             else if let Some(output_data) = response.get("output_data") {
+                // Check for generator object in output_data (case-insensitive)
+                if let Some(output_str) = output_data.as_str() {
+                    let lower_str = output_str.to_lowercase();
+                    if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                        let streaming_tag = format!("{}_stream", self.entrypoint_tag);
+                        return Err(RunAgentError::validation(format!(
+                            "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
+                            Try using the streaming endpoint: `{}`\n\
+                            Or use `run_stream()` method instead of `run()`.",
+                            streaming_tag
+                        )));
+                    }
+                }
                 payload = Some(output_data.clone());
             }
 
             // Deserialize the payload using serializer (handles {type, payload} structure)
             if let Some(payload_val) = payload {
-                // Check for generator object warning
+                // Check for generator object warning (case-insensitive, after deserialization)
                 if let Some(content_str) = payload_val.as_str() {
-                    if content_str.contains("generator object") {
-                        tracing::warn!("Agent returned generator object instead of content. Consider using streaming endpoint for this agent.");
-                        return Ok(payload_val);
+                    let lower_str = content_str.to_lowercase();
+                    if lower_str.contains("generator object") || lower_str.contains("<generator") {
+                        // Check if there's a streaming version of this entrypoint
+                        let streaming_tag = format!("{}_stream", self.entrypoint_tag);
+                        return Err(RunAgentError::validation(format!(
+                            "Agent returned a generator object instead of content. This entrypoint appears to be a streaming function.\n\
+                            Try using the streaming endpoint: `{}`\n\
+                            Or use `run_stream()` method instead of `run()`.",
+                            streaming_tag
+                        )));
                     }
                 }
                 // Deserialize the payload - this should extract payload from {type, payload} structure

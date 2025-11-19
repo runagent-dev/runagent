@@ -1,4 +1,4 @@
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -17,11 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 1: Simple Chat
     println!("\n1️⃣ Testing Simple Chat");
     
-    let simple_client = RunAgentClient::new(
-        agent_id, 
-        "parlant_simple", 
-        true  // local = true
-    ).await?;
+    let simple_client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "parlant_simple".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let simple_response = simple_client.run(&[
         ("message", json!("What's the weather like in Paris?"))
@@ -38,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // ############################streaming##################################
 
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -54,11 +55,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n5️⃣ Testing Streaming Chat");
     println!("{}", "-".repeat(30));
     
-    let stream_client = RunAgentClient::new(
-        agent_id,
-        "parlant_stream",
-        true
-    ).await?;
+    let stream_client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "parlant_stream".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
 
     let mut stream = stream_client.run_stream(&[
         ("message", json!("can you tell me the sum of 10 to 20."))

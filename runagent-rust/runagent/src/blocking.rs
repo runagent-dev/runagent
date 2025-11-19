@@ -12,7 +12,7 @@
 //! fn main() -> runagent::RunAgentResult<()> {
 //!     let client = RunAgentClient::new(
 //!         RunAgentClientConfig::new("agent-id", "entrypoint")
-//!             .with_api_key(Some("key".to_string()))
+//!             .with_api_key("key")
 //!     )?;
 //!
 //!     let result = client.run(&[("message", json!("Hello"))])?;
@@ -23,8 +23,10 @@
 
 use crate::client::RunAgentClient as AsyncRunAgentClient;
 use crate::types::{RunAgentError, RunAgentResult};
+use futures::Stream;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::pin::Pin;
 use tokio::runtime::Runtime;
 
 // Re-export for convenience
@@ -73,43 +75,51 @@ impl RunAgentClient {
 
     /// Execute a streaming entrypoint
     ///
-    /// Returns a vector of all chunks collected from the stream.
-    /// Note: This collects the entire stream, so it's not truly streaming.
-    /// For real streaming, use the async client.
+    /// Returns a blocking iterator that yields chunks as they arrive.
+    /// This provides true streaming - chunks are processed incrementally,
+    /// not collected all at once.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use runagent::blocking::{RunAgentClient, RunAgentClientConfig};
+    /// use serde_json::json;
+    ///
+    /// fn main() -> runagent::RunAgentResult<()> {
+    ///     let client = RunAgentClient::new(
+    ///         RunAgentClientConfig::new("agent-id", "entrypoint_stream")
+    ///             .with_api_key("key")
+    ///     )?;
+    ///
+    ///     let mut stream = client.run_stream(&[("message", json!("Hello"))])?;
+    ///     while let Some(chunk) = stream.next() {
+    ///         println!(">> {}", chunk?);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn run_stream(
         &self,
         input_kwargs: &[(&str, Value)],
-    ) -> RunAgentResult<Vec<RunAgentResult<Value>>> {
+    ) -> RunAgentResult<BlockingStream> {
         let stream = self.runtime.block_on(self.inner.run_stream(input_kwargs))?;
-        Ok(self.runtime.block_on(async {
-            use futures::StreamExt;
-            let mut results = Vec::new();
-            let mut stream = stream;
-            while let Some(item) = stream.next().await {
-                results.push(item);
-            }
-            results
-        }))
+        Ok(BlockingStream::new(stream))
     }
 
     /// Execute a streaming entrypoint with both args and kwargs
+    ///
+    /// Returns a blocking iterator that yields chunks as they arrive.
+    /// This provides true streaming - chunks are processed incrementally,
+    /// not collected all at once.
     pub fn run_stream_with_args(
         &self,
         input_args: &[Value],
         input_kwargs: &[(&str, Value)],
-    ) -> RunAgentResult<Vec<RunAgentResult<Value>>> {
+    ) -> RunAgentResult<BlockingStream> {
         let stream = self
             .runtime
             .block_on(self.inner.run_stream_with_args(input_args, input_kwargs))?;
-        Ok(self.runtime.block_on(async {
-            use futures::StreamExt;
-            let mut results = Vec::new();
-            let mut stream = stream;
-            while let Some(item) = stream.next().await {
-                results.push(item);
-            }
-            results
-        }))
+        Ok(BlockingStream::new(stream))
     }
 
     /// Get agent architecture
@@ -140,6 +150,78 @@ impl RunAgentClient {
     /// Check if this is a local client
     pub fn is_local(&self) -> bool {
         self.inner.is_local()
+    }
+}
+
+/// Blocking iterator over a streaming response
+///
+/// This iterator yields chunks as they arrive from the agent,
+/// blocking on each `next()` call until a chunk is available.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use runagent::blocking::{RunAgentClient, RunAgentClientConfig, BlockingStream};
+/// use serde_json::json;
+///
+/// fn main() -> runagent::RunAgentResult<()> {
+///     let client = RunAgentClient::new(RunAgentClientConfig {
+///         agent_id: "agent-id".to_string(),
+///         entrypoint_tag: "entrypoint_stream".to_string(),
+///         ..RunAgentClientConfig::default()
+///     })?;
+///     
+///     let mut stream = client.run_stream(&[("message", json!("Hello"))])?;
+///     while let Some(chunk) = stream.next() {
+///         match chunk {
+///             Ok(value) => println!("Chunk: {}", value),
+///             Err(e) => eprintln!("Error: {}", e),
+///         }
+///     }
+///     Ok(())
+/// }
+/// ```
+pub struct BlockingStream {
+    receiver: std::sync::mpsc::Receiver<RunAgentResult<Value>>,
+    _handle: std::thread::JoinHandle<()>, // Keep the background task alive
+}
+
+impl BlockingStream {
+    pub(crate) fn new(
+        mut stream: Pin<Box<dyn Stream<Item = RunAgentResult<Value>> + Send>>,
+    ) -> Self {
+        use futures::StreamExt;
+        use std::sync::mpsc;
+        use std::thread;
+        
+        let (tx, rx) = mpsc::channel();
+        
+        // Spawn a background task that continuously polls the stream
+        let handle = thread::spawn(move || {
+            // Create a new runtime for the background thread
+            let rt = Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async move {
+                while let Some(item) = stream.next().await {
+                    if tx.send(item).is_err() {
+                        // Receiver dropped, stop polling
+                        break;
+                    }
+                }
+            });
+        });
+        
+        Self {
+            receiver: rx,
+            _handle: handle,
+        }
+    }
+}
+
+impl Iterator for BlockingStream {
+    type Item = RunAgentResult<Value>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.receiver.recv().ok()
     }
 }
 

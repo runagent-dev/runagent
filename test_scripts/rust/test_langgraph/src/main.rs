@@ -1,4 +1,4 @@
-use runagent::client::RunAgentClient;
+use runagent::{RunAgentClient, RunAgentClientConfig};
 use serde_json::json;
 use futures::StreamExt;
 
@@ -33,7 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Test 1: Non-streaming with complex inputs
     println!("\n🚀 Test 1: Non-Streaming");
-    let client = RunAgentClient::new(agent_id, "generic", true).await?;
+    let client = RunAgentClient::new(RunAgentClientConfig {
+        agent_id: agent_id.to_string(),
+        entrypoint_tag: "generic".to_string(),
+        local: Some(true),
+        ..RunAgentClientConfig::default()
+    }).await?;
     
     let response = client.run(&[
         ("query", json!("My phone is getting too hot")),
