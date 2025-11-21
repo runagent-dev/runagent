@@ -1,0 +1,12 @@
+name: test_agno
+description: Test script for RunAgent Dart SDK with Agno agent
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  # RunAgent Dart SDK from local path
+  runagent:
+    path: ../../../runagent-dart
+
