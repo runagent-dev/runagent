@@ -26,6 +26,7 @@
       <th align="center"><a href="https://github.com/runagent-dev/runagent-js">runagent-js</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-rs">runagent-rs</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-go">runagent-go</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-dart">runagent-dart</a></th>
     </tr>
   </thead>
   <tbody>
@@ -50,6 +51,11 @@
           <img src="https://img.shields.io/github/stars/runagent-dev/runagent-go?style=social" alt="GitHub stars">
         </a>
       </td>
+      <td align="center">
+        <a href="https://pub.dev/packages/runagent">
+          <img src="https://img.shields.io/pub/total/runagent" alt="pub.dev downloads">
+        </a>
+      </td>
     </tr>
       <tr>
       <td align="center">
@@ -64,6 +70,11 @@
       <td align="center">
         <a href="https://pkg.go.dev/github.com/runagent-dev/runagent-go">
           <img src="https://pkg.go.dev/badge/github.com/runagent-dev/runagent-go.svg" alt="Go Reference">
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://pub.dev/packages/runagent">
+          <img src="https://img.shields.io/pub/v/runagent" alt="pub.dev version">
         </a>
       </td>
     </tr>
@@ -219,14 +230,15 @@ async def solve_problem_stream(query, num_solutions, constraints):
 
 **🌐 Access from any language:**
 
-RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
+RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, Dart, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
 
 <table>
 <tr>
-<td width="25%"><b>Python SDK</b></td>
-<td width="25%"><b>JavaScript SDK</b></td>
-<td width="25%"><b>Rust SDK</b></td>
-<td width="25%"><b>Go SDK</b></td>
+<td width="20%"><b>Python SDK</b></td>
+<td width="20%"><b>JavaScript SDK</b></td>
+<td width="20%"><b>Rust SDK</b></td>
+<td width="20%"><b>Go SDK</b></td>
+<td width="20%"><b>Dart SDK</b></td>
 </tr>
 <tr>
 <td valign="top">
@@ -378,6 +390,40 @@ func main() {
         if !hasMore { break }
         fmt.Print(chunk)
     }
+}
+```
+
+</td>
+<td valign="top">
+
+```dart
+import 'package:runagent/runagent.dart';
+
+void main() async {
+  final client = await RunAgentClient.create(
+    RunAgentClientConfig.create(
+      agentId: "lg-solver-123",
+      entrypointTag: "solve_problem",
+      local: true,
+    ),
+  );
+
+  final result = await client.run({
+    "query": "My laptop is slow",
+    "num_solutions": 3,
+    "constraints": [
+      {"type": "budget", "value": 100}
+    ],
+  });
+  print(result);
+
+  // Streaming
+  await for (final chunk in client.runStream({
+    "query": "Fix my phone",
+    "num_solutions": 4,
+  })) {
+    print(chunk);
+  }
 }
 ```
 
