@@ -1,0 +1,16 @@
+name: runagent
+description: RunAgent SDK for Dart/Flutter - Interact with deployed AI agents via REST and WebSocket
+version: 0.1.41
+homepage: https://github.com/runagent-dev/runagent-dart
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  http: ^1.1.0
+  web_socket_channel: ^2.4.0
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
+

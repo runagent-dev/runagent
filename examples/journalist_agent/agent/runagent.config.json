@@ -1,0 +1,32 @@
+{
+  "agent_name": "Dart SDK based journalist",
+  "description": "My AI agent",
+  "framework": "default",
+  "template": "",
+  "version": "1.0.0",
+  "created_at": "2025-11-24T14:16:50.661307",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/examples/journalist_agent/agent"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "main.py",
+        "module": "create_article",
+        "tag": "create_article"
+      },
+      {
+        "file": "main.py",
+        "module": "create_article_stream",
+        "tag": "create_article_stream"
+      }
+    ]
+  },
+  "env_vars": {},
+  "agent_id": "9fac4988-d88e-4d6c-994c-7495c11de8b9",
+  "auth_settings": {
+    "type": "api_key"
+  }
+}

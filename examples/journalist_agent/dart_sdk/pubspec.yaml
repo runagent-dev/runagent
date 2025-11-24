@@ -1,0 +1,10 @@
+name: test_journalist
+description: Test script for AI Journalist Agent with Dart SDK
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  runagent:
+    path: /home/azureuser/runagent/runagent-dart
