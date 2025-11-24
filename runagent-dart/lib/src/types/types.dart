@@ -84,7 +84,7 @@ class AgentArchitecture {
     return AgentArchitecture(
       agentId: agentIdValue is String ? agentIdValue : (agentIdValue?.toString() ?? ''),
       entrypoints: entrypointsValue is List
-          ? (entrypointsValue as List)
+          ? entrypointsValue
               .whereType<Map<String, dynamic>>()
               .map((e) => EntryPoint.fromJson(e))
               .toList()

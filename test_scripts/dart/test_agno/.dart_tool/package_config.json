@@ -45,7 +45,7 @@
     },
     {
       "name": "runagent",
-      "rootUri": "../../../../runagent-dart",
+      "rootUri": "file:///home/azureuser/.pub-cache/hosted/pub.dev/runagent-0.1.41",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },

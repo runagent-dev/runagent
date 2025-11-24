@@ -6,7 +6,5 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
-  # RunAgent Dart SDK from local path
-  runagent:
-    path: ../../../runagent-dart
+  runagent: ^0.1.41
 
