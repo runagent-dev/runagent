@@ -53,7 +53,7 @@
       </td>
       <td align="center">
         <a href="https://pub.dev/packages/runagent">
-          <img src="https://img.shields.io/pub/total/runagent" alt="pub.dev downloads">
+          <img src="https://img.shields.io/pub/dm/runagent" alt="pub.dev downloads">
         </a>
       </td>
     </tr>
