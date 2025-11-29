@@ -1,0 +1,33 @@
+{
+  "agent_name": "Agno Memory",
+  "description": "My AI agent",
+  "framework": "default",
+  "template": "",
+  "version": "1.0.0",
+  "created_at": "2025-11-28T20:59:22.479436",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/examples/agno_persistent"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "agent_print_response",
+        "tag":"agno_print_response"
+      },
+      {
+        "file": "agent.py",
+        "module": "agent_print_response_stream",
+        "tag":"agno_print_response_stream"
+      }
+    ]
+  },
+  "env_vars": {},
+  "agent_id": "c998c025-4c9f-4466-886e-94345efe654b",
+  "auth_settings": {
+    "type": "api_key"
+  },
+  "persistent_folders": ["rad"]
+}

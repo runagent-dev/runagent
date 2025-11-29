@@ -93,6 +93,13 @@ class RunAgentConfig(BaseModel):
         default_factory=lambda: {"type": "none"}, 
         description="Authentication configuration"
     )
+    
+    # Persistent storage configuration
+    persistent_folders: t.Optional[t.List[str]] = Field(
+        default_factory=list,
+        description="List of folder paths that should be persisted to /persistent mount point. "
+                   "These folders will be automatically synced to persistent storage when persistent_memory is enabled."
+    )
 
     def to_dict(self) -> dict:
         """Convert to dictionary with custom serialization"""

@@ -25,8 +25,14 @@
     ]
   },
   "env_vars": {},
-  "agent_id": "9fac4988-d88e-4d6c-994c-7495c11de8b9",
+  "agent_id": "9fac4988-d88e-4d6c-994c-7495c14de8b9",
   "auth_settings": {
     "type": "api_key"
-  }
+  },
+  "persistent_folders": [
+    ".network",
+    ".sqlite",
+    "data",
+    "embeddings"
+  ]
 }

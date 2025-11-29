@@ -22,7 +22,7 @@ class RunAgentExecutionError(Exception):
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False):
         self.sdk = RunAgentSDK()
         self.serializer = CoreSerializer()
         self.local = local
@@ -31,6 +31,10 @@ class RunAgentClient:
         self.dashboard_url = f"https://app.run-agent.ai/dashboard/agents/{self.agent_id}"
         self.agent_host = None
         self.agent_port = None
+        
+        # Persistent storage settings (set at client level)
+        self.user_id = user_id
+        self.persistent_memory = persistent_memory
         
         # FIXED: Detect if this is a streaming entrypoint
         self.is_streaming = entrypoint_tag.endswith("_stream")
@@ -68,6 +72,13 @@ class RunAgentClient:
     def run(self, *input_args, **input_kwargs):
         """
         FIXED: Smart execution - automatically uses streaming or non-streaming based on entrypoint
+        
+        Args:
+            *input_args: Positional arguments to pass to the agent
+            **input_kwargs: Keyword arguments to pass to the agent
+            
+        Note: user_id and persistent_memory are set at client initialization, not here.
+        The 'user' parameter in input_kwargs is for agent's internal session management.
         """
         # FIXED: If this is a streaming entrypoint, automatically use run_stream
         if self.is_streaming:
@@ -75,8 +86,11 @@ class RunAgentClient:
             return self.run_stream(*input_args, **input_kwargs)
         
         # Non-streaming execution (HTTP POST)
+        # Use persistent storage settings from client initialization
         response = self.rest_client.run_agent(
-            self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
+            self.agent_id, self.entrypoint_tag, 
+            input_args=input_args, input_kwargs=input_kwargs,
+            user_id=self.user_id, persistent_memory=self.persistent_memory
         )
         # Only print debug response in DISABLE_TRY_CATCH mode
         if os.getenv('DISABLE_TRY_CATCH'):
@@ -126,10 +140,20 @@ class RunAgentClient:
                 raise self._build_error_from_string(response.get("error"))
 
     def run_stream(self, *input_args, **input_kwargs):
-        """Stream agent execution results in real-time via WebSocket"""
+        """Stream agent execution results in real-time via WebSocket
+        
+        Args:
+            *input_args: Positional arguments to pass to the agent
+            **input_kwargs: Keyword arguments to pass to the agent
+            
+        Note: user_id and persistent_memory are set at client initialization, not here.
+        The 'user' parameter in input_kwargs is for agent's internal session management.
+        """
 
         socket_iterator = self.socket_client.run_stream(
-            self.agent_id, self.entrypoint_tag, input_args=input_args, input_kwargs=input_kwargs
+            self.agent_id, self.entrypoint_tag, 
+            input_args=input_args, input_kwargs=input_kwargs,
+            user_id=self.user_id, persistent_memory=self.persistent_memory
         )
 
         def _iterator():

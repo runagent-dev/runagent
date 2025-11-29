@@ -13,7 +13,7 @@
     },
     {
       "name": "runagent",
-      "version": "0.1.0",
+      "version": "0.1.41",
       "dependencies": [
         "http",
         "web_socket_channel"
@@ -26,6 +26,16 @@
         "async",
         "crypto",
         "stream_channel",
+        "web"
+      ]
+    },
+    {
+      "name": "http",
+      "version": "1.6.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
         "web"
       ]
     },
@@ -49,26 +59,17 @@
       ]
     },
     {
-      "name": "typed_data",
-      "version": "1.4.0",
+      "name": "async",
+      "version": "2.13.0",
       "dependencies": [
-        "collection"
+        "collection",
+        "meta"
       ]
     },
     {
-      "name": "collection",
-      "version": "1.19.1",
+      "name": "meta",
+      "version": "1.17.0",
       "dependencies": []
-    },
-    {
-      "name": "http",
-      "version": "1.6.0",
-      "dependencies": [
-        "async",
-        "http_parser",
-        "meta",
-        "web"
-      ]
     },
     {
       "name": "http_parser",
@@ -79,6 +80,18 @@
         "string_scanner",
         "typed_data"
       ]
+    },
+    {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
+      "name": "collection",
+      "version": "1.19.1",
+      "dependencies": []
     },
     {
       "name": "string_scanner",
@@ -104,19 +117,6 @@
     {
       "name": "path",
       "version": "1.9.1",
-      "dependencies": []
-    },
-    {
-      "name": "async",
-      "version": "2.13.0",
-      "dependencies": [
-        "collection",
-        "meta"
-      ]
-    },
-    {
-      "name": "meta",
-      "version": "1.17.0",
       "dependencies": []
     }
   ],

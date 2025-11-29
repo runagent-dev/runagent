@@ -1478,8 +1478,21 @@ class RestClient:
         input_kwargs: dict = None,
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
         async_execution: bool = False,
+        user_id: str = None,
+        persistent_memory: bool = False,
     ) -> Dict:
-        """Execute an agent with given parameters"""
+        """Execute an agent with given parameters
+        
+        Args:
+            agent_id: Agent identifier
+            entrypoint_tag: Entrypoint tag to execute
+            input_args: Input arguments
+            input_kwargs: Input keyword arguments
+            timeout_seconds: Timeout in seconds
+            async_execution: Whether to execute asynchronously
+            user_id: User ID for persistent storage
+            persistent_memory: Enable persistent storage
+        """
         try:
             console.print(f"🤖 Executing agent: [bold magenta]{agent_id}[/bold magenta]")
 
@@ -1491,6 +1504,12 @@ class RestClient:
                 "timeout_seconds": timeout_seconds,
                 "async_execution": async_execution
             }
+            
+            # Add persistent storage parameters if provided
+            if user_id is not None:
+                request_data["user_id"] = user_id
+            if persistent_memory:
+                request_data["persistent_memory"] = persistent_memory
 
             # Execute the agent
             try:
