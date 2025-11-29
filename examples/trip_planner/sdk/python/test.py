@@ -7,7 +7,7 @@ Update AGENT_ID and run!
 from runagent import RunAgentClient
 
 # UPDATE THIS!
-AGENT_ID = "be1eef6e-2700-4980-b808-e94b3394e747"
+AGENT_ID = "7ca76f5d-9524-4614-b283-d9a50db147b8"
 
 
 # ============================================
@@ -43,7 +43,7 @@ print(result)
 # stream_client = RunAgentClient(
 #     agent_id=AGENT_ID,
 #     entrypoint_tag="trip_stream",
-#     local=True
+#     local=False
 # )
 
 # print("\n📡 Streaming response:\n")

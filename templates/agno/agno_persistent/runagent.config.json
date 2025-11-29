@@ -8,7 +8,7 @@
   "template_source": {
     "repo_url": "https://github.com/runagent-dev/runagent.git",
     "author": "runagent-cli",
-    "path": "/home/azureuser/runagent/examples/agno_persistent"
+    "path": "/home/azureuser/runagent/templates/agno/agno_persistent"
   },
   "agent_architecture": {
     "entrypoints": [
@@ -25,9 +25,9 @@
     ]
   },
   "env_vars": {},
-  "agent_id": "b298c025-4c9f-4466-886e-14745efe664b",
+  "agent_id": "c778c025-4c9f-4466-886e-14845efe664b",
   "auth_settings": {
     "type": "api_key"
   },
-  "persistent_folders": ["rad"]
+  "persistent_folders": ["simi"]
 }
