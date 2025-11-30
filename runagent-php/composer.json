@@ -1,0 +1,39 @@
+{
+    "name": "runagent/runagent-php",
+    "description": "PHP SDK for RunAgent - Run AI agents locally and in the cloud",
+    "type": "library",
+    "keywords": ["ai", "agent", "runagent", "llm", "automation"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "RunAgent Team",
+            "email": "support@run-agent.ai"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5|^10.0",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "RunAgent\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RunAgent\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpstan": "phpstan analyse src --level=8"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

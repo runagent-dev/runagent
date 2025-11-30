@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  php-sdk-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: runagent-php-test
+    network_mode: host  # Use host network to access agent at 0.0.0.0:8333
+    volumes:
+      - ./examples:/app/examples
+      - ./src:/app/src
+    environment:
+      - RUNAGENT_API_KEY=${RUNAGENT_API_KEY:-}

@@ -1,0 +1,32 @@
+FROM php:8.2-cli
+
+# Install required PHP extensions
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libzip-dev \
+    unzip \
+    git \
+    && docker-php-ext-install \
+    curl \
+    sockets \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /app
+
+# Copy composer files
+COPY composer.json ./
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Copy source code
+COPY . .
+
+# Run tests
+CMD ["php", "examples/test_deployed_agent.php"]
