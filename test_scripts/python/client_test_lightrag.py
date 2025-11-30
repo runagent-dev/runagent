@@ -2,7 +2,7 @@ from runagent import RunAgentClient
 import os
 
 # Configuration
-AGENT_ID = "63751c14-0ed5-426c-ab44-aa94e3505bed"
+AGENT_ID = "63751c14-0ed5-426c-ab44-aa94e5505bed"
 LOCAL_MODE = False
 USER_ID = "rad123"
 
@@ -56,6 +56,6 @@ if __name__ == "__main__":
     # print("\n" + "="*60)
     # print("STEP 2: Query RAG")
     # print("="*60)
-    print(query_rag("how much world population right now in 2025", mode="hybrid"))
+    print(query_rag("globalization with megacity", mode="hybrid"))
     
     # print("\nDone!")

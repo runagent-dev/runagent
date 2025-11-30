@@ -25,7 +25,7 @@
     ]
   },
   "env_vars": {},
-  "agent_id": "63751c14-0ed5-426c-ab44-aa94e3505bed",
+  "agent_id": "63751c14-0ed5-426c-ab44-aa94e5505bed",
   "auth_settings": {
     "type": "api_key"
   },
