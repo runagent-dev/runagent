@@ -17,7 +17,7 @@ from .sdk import RunAgentSDK
 RunAgent = RunAgentSDK
 
 # Version info
-__version__ = "0.1.0"
+__version__ = "0.1.41"
 
 # Expose main components
 __all__ = [

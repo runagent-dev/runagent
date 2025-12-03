@@ -1,0 +1,179 @@
+---
+title: 'Installation'
+description: 'Install RunAgent CLI and SDK on your system'
+icon: 'download'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+RunAgent has two main pieces you’ll work with:
+
+- **RunAgent CLI** – to develop, test, and manage your agents
+- **RunAgent SDKs** – to call those agents from your applications
+
+You can use them together or just install the SDK for your language of choice.
+
+## Install RunAgent CLI
+
+
+<Tabs>
+  <Tab title="Python">
+  Before installing RunAgent this way, ensure you have Python 3.8+.
+  <Steps>
+  <Step title="Install RunAgent CLI & Python SDK">
+  <CodeGroup>
+    ```pip pip
+    pip install runagent
+    ```
+    ```uv uv
+    uv add runagent
+    ```
+  </CodeGroup>
+  The CLI comes bundled with the Python SDK for seamless local development.
+  </Step>
+  <Step title="Verify Installation">
+    Check that RunAgent is installed correctly:
+    ```bash
+    runagent --help
+    ```
+  </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Install RunAgent SDK
+
+Use the SDKs below to connect to your agents from different languages and runtimes.  
+Each tab shows **how to install** and **how to import/use** the client.
+
+<Tabs>
+  <Tab title="Python">
+    If you installed the CLI using `pip` or `uv`, the Python SDK is already available. To install (or add it to another project) directly:
+    <Steps>
+      <Step title="Install RunAgent Python SDK">
+        <CodeGroup>
+          ```pip pip
+          pip install runagent
+          ```
+          ```uv uv
+          uv add runagent
+          ```
+        </CodeGroup>
+      </Step>
+
+      <Step title="Import and create a client">
+        ```python Using RunAgent in Python
+        from runagent import RunAgentClient
+        ```
+      </Step>
+      {/* <Step title="You’re ready to integrate"> */}
+      {/* </Step> */}
+    </Steps>
+        Once imported, you can follow the **Python quickstart** to initialize a client and call your first agent.
+      <Tip>
+        The Python SDK is ideal for:
+        - Building and testing agents locally  
+        - Running agents inside existing Python services  
+
+      </Tip>
+  </Tab>
+  <Tab title="JavaScript">
+Before installing the SDK, ensure you have Node.js 16+.
+  <Steps>
+      <Step title="Install RunAgent JavaScript/TypeScript SDK">
+        <CodeGroup>
+          ```npm npm
+          npm install runagent
+          ```
+          ```pnpm pnpm
+          pnpm add runagent
+          ```
+          ```bun bun
+          bun add runagent
+          ```
+          ```yarn yarn
+          yarn add runagent
+          ```
+        </CodeGroup>
+      </Step>
+
+      <Step title="Import in your project">
+        ```ts Importing RunAgent in TypeScript/JavaScript
+        import { RunAgentClient } from "runagent";
+        ```
+      </Step>
+  </Steps>
+  With the import set up, jump to the **JavaScript quickstart** to see how to initialize the client and stream responses.
+  <Tip>
+        The JS/TS SDK is a good fit for:
+        - Frontend frameworks (Next.js, React, Vue, etc.)  
+        - Node.js backends and edge runtimes  
+  </Tip>
+  </Tab>
+  <Tab title="Rust">
+Before installing the SDK, ensure you have Rust 1.70+.
+  <Steps>
+  <Step title="Add RunAgent to Cargo.toml">
+    <CodeGroup>
+      ```bash cargo
+      cargo add runagent
+      ```
+      ```toml Cargo.toml
+      [dependencies]
+      runagent = "0.1.0"
+      tokio = { version = "1.0", features = ["full"] }
+      serde_json = "1.0"
+      ```
+    </CodeGroup>
+    </Step>
+
+      <Step title="Import in your project">
+        ```rust Importing RunAgent in Rust
+        use runagent::Client;
+        ```
+      </Step>
+  </Steps>
+  After importing `Client`, head over to the **Rust quickstart** to set up initialization and your first agent call.
+  <Tip>
+        The Rust SDK is designed for:
+        - High-performance backends and services  
+        - Strongly typed, async-first workloads  
+  </Tip>
+  </Tab>
+  <Tab title="Go">
+Before installing the SDK, ensure you have Go 1.19+.
+  <Steps>
+      <Step title="Install RunAgent Go SDK">
+        <CodeGroup>
+          ```bash go
+          go get github.com/runagent-dev/runagent-go
+          ```
+        </CodeGroup>
+      </Step>
+
+      <Step title="Import in your project">
+        ```go Importing RunAgent in Go
+        import "github.com/runagent-dev/runagent-go/pkg/client"
+        ```
+      </Step>
+  </Steps>
+  Once imported, follow the **Go quickstart** to initialize the client and call your first agent.
+  <Tip>
+      The Go SDK is a great match for:
+        - Cloud-native services and APIs  
+        - Concurrent, goroutine-heavy workloads 
+  </Tip>
+  </Tab>
+</Tabs>
+
+
+## Next Steps
+
+After installation, you can:
+
+1. **Initialize your first agent**: `runagent init my_agent`
+2. **Start the development server**: `runagent serve my_agent`
+3. **Connect from your application** using any of our SDKs
+4. **Deploy to production** (coming soon): `runagent deploy my_agent`
+
+<NeedHelp context="Installation" />

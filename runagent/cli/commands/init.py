@@ -46,6 +46,7 @@ console = Console()
     default=".",
     required=False,
 )
+
 def init(path, template, minimal, existing, from_template, use_auth, name, description, overwrite, **kwargs):
     """
     Initialize a new RunAgent project

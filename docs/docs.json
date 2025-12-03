@@ -8,7 +8,9 @@
     "dark": "#006AD4"
   },
   "favicon": "/favicon.ico",
-
+  "fonts": {
+    "family": "JetBrains Mono"
+  },
   "contextual": {
     "options": [
       "copy",
@@ -31,10 +33,11 @@
         "tab": "Introduction",
         "groups": [
           {
-            "group": "Introduction",
+            "group": "Get Started",
             "pages": [
-              "explanation/introduction",
-              "explanation/installation",
+              "get-started/overview",
+              "get-started/installation",
+              "get-started/quickstart",
               "explanation/key-concepts-at-a-glance",
               "explanation/why-runagent",
               "explanation/feature-overview",
@@ -227,16 +230,12 @@
       {
         "label": "Github",
         "href": "https://github.com/runagent-dev/runagent"
-      },
-      {
-        "label": "Dashboard",
-        "href": "https://run-agent.ai/dashboard"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get API Key",
-      "href": "https://run-agent.ai/profile"
+      "href": "https://run-agent.ai/signup"
     }
   },
   "footer": {

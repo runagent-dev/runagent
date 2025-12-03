@@ -1,0 +1,116 @@
+---
+title: Overview
+description: 'Deploy AI agents to production in seconds, not hours'
+icon: 'book-open'
+---
+
+import NeedHelp from '/snippets/need-help.mdx';
+
+RunAgent is a fully managed serverless platform to deploy your LLM-based AI agent to production, as well as integrate them to any application in seconds.
+
+RunAgent supports deploying agents (built with any framework like LangChain, CrewAI, Agno etc. or framework-less) and provides native SDKs for every language(including Go, Rust, JavaScript etc.), to add to your software development stack, with (mostly) 3 lines of code.
+
+
+<img
+  className="block dark:hidden"
+  src="/images/runagent_update.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/runagent_update.svg"
+  alt="Hero Dark"
+/>
+
+## Quick Actions
+
+<CardGroup cols={3}>
+  <Card title="Deploy your first agent" icon="rocket" href="/tutorials/deploy-your-first-agent">
+    Get started with a complete tutorial
+  </Card>
+  <Card title="Use frameworks" icon="code" href="/how-to/frameworks/langgraph">
+    Integrate with popular AI frameworks
+  </Card>
+  <Card title="Explore SDKs" icon="terminal" href="/reference/sdk/overview">
+    Access agents from any language
+  </Card>
+</CardGroup>
+
+
+## Key Benefits
+
+- **Deploy Agents in Seconds** – Use our powerful CLI to deploy with a single command. All deployments are sandboxed, autoscaled, and production ready by default.
+- **Integrate with Any Software** – Our native SDKs let you connect agents to any language or stack in as little as 3 lines of code. We’re expanding SDK support to all major production languages.
+- **Bi-directional Streaming, Built-in** – Real-time, bi-directional streaming between user and agent—perfect for advanced, human-in-the-loop workflows and maximum flexibility.
+- **Ecosystem of Agents & Features** – RunAgent provides batteries-included features like auth, memory, and feedback, so your agent can become more than just an LLM call.
+- **Agent-to-Agent (A2A) Compatibility** – Connect to any agent (yours or third-party) over a standardized agent-to-agent protocol.
+- **Open Source Native** – All SDKs and core infrastructure are open source. Explore, inspect, or run a local RunAgent server for full transparency and easy experimentation.
+
+
+## The Problem Every AI Developer Will Face
+
+Imagine you’ve built an incredible AI agent that helps customers pick products on your e-commerce site.
+It uses LangGraph for complex reasoning, calls multiple tools, and gives surprisingly good recommendations.
+
+Your team tries it internally. Everyone’s impressed. This thing feels like magic.
+
+## Then reality hits
+
+Now the real questions start:
+- Your frontend team wants to call it from JavaScript/TypeScript.
+- The mobile team needs it from Kotlin (and maybe Swift next quarter).
+- The backend team wants to integrate it into a C# service.
+
+On top of that, Black Friday is coming. You’re expecting tens of thousands of users to hit this agent:
+- How many servers do you need?
+- How do you handle spikes without melting your infrastructure?
+- How do you keep logs, auth, and rate limiting sane across all these codebases?
+
+Suddenly, your “cool agent demo” is now a distributed systems project.
+
+
+## The traditional approach
+
+You start gluing things together:
+- Build a REST API around your Python agent
+- Add WebSocket endpoints for streaming responses
+- Write custom middlewares for auth, rate limiting, and logging
+- Maintain separate SDKs or API wrappers for each language
+- Manually configure autoscaling, health checks, and monitoring
+
+You’re not just shipping an agent anymore — you’re maintaining a mini platform.
+
+<Danger>**Sound exhausting?** That's because it is!</Danger>
+
+## What RunAgent Actually Does
+
+RunAgent flips this model.
+
+You write your agent in Python once, and RunAgent turns it into a production-ready agent service with:
+- **Automatic APIs** - Your Python function signatures become clear API contracts. RunAgent generates REST and streaming endpoints plus language-specific SDKs (JS/TS, Kotlin, C#, etc.) so every team can call the same agent without re-implementing anything.
+- **Built-in scaling & isolation** - RunAgent handles concurrency, autoscaling, and isolation under the hood. Black Friday traffic? Each call spins up secure, sandboxed execution with the right resources — without you guessing server counts.
+- **Unified auth, logging & observability** - Every call goes through the same gateway: per-agent API keys, request logs, traces, and metrics in one place. No more scattered logs across five services.
+- **Agent-first, not endpoint-first** - You focus on the agent’s behavior and tools. RunAgent handles everything around it: deployment, APIs, scaling, and safe execution.
+
+So instead of asking:
+
+> “How do I rebuild this agent in five stacks and keep it alive on Black Friday?”
+
+you get to ask:
+
+> “What should this agent do next to make our users even happier?”
+
+That’s the shift RunAgent is designed to create.
+
+<Tip>
+With RunAgent, you stop worrying about servers, SDKs, and glue code.  
+You focus on what the agent should do for your users — RunAgent handles how it runs, scales, and connects to everything else.
+</Tip>
+
+## Next Steps
+
+- Head to the [tutorials](/tutorials/deploy-your-first-agent) guide to see the full capabilities
+- Browse our [framework guides](/how-to/frameworks/langgraph) for LangGraph, CrewAI, and more
+- Check out [core concepts](/explanation/core-concepts) to understand how it all works
+
+<NeedHelp context="Introduction" />

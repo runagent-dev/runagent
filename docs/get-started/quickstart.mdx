@@ -1,0 +1,757 @@
+---
+title: 'Quickstart'
+description: 'Deploy and call your first agent in minutes'
+icon: 'rocket'
+---
+
+You’ve just built a smart Python agent.
+
+Now you want it to work everywhere, in your web app, mobile app, backend; **without** rewriting it in every language or hand-rolling REST/WebSocket glue.
+
+
+## Deploy Your Agent to Production in Seconds
+
+
+<Steps>
+
+  <Step title="Install RunAgent CLI">
+    All methods of installing the RunAgent CLI is described at [Installation](/get-started/installation) page. To install in a pythonic environments,
+    ```
+    pip install runagent
+    ```
+  </Step>
+
+  <Step title="Initialize Your Agent">
+    We need a agent codebase to test locally and deploy in RunAgent Cloud. For simplicity, lets use a minimal agent, without any API key dependency.
+    ```bash
+    runagent init my_agent --minimal
+    ```
+    
+  This creates a new directory with everything you need to get started. To look at the files we have,
+  ```
+  my_agent/
+  ├── email_agent.py         # Your agent's functions (already defined!)
+  ├── main.py                # Your agent's functions (already defined!)
+  └── runagent.config.json   # Entrypoints already configured!
+  ```
+
+  <Accordion title="email_agent.py">
+  ```python
+import time
+import random
+import threading
+from typing import Iterator, Dict, Any, Optional
+from dataclasses import dataclass
+from enum import Enum
+
+
+class ResponseType(Enum):
+    TEXT = "text"
+    EMAIL = "email"
+    CODE = "code"
+    ANALYSIS = "analysis"
+
+
+@dataclass
+class StreamChunk:
+    """Simulates streaming response chunks"""
+    content: str
+    delta: str
+    finished: bool = False
+    
+    
+@dataclass
+class CompletionResponse:
+    """Simulates a complete AI response"""
+    content: str
+    model: str
+    usage_tokens: int
+    response_time: float
+
+
+class MockAIAgent:
+    """
+    A comprehensive mock AI agent that simulates realistic AI behavior
+    including streaming responses, processing delays, and varied outputs.
+    """
+    
+    def __init__(self, model_name: str = "mock-gpt-4", response_delay: float = 0.1):
+        self.model_name = model_name
+        self.response_delay = response_delay
+        self.conversation_history = []
+        
+        # Pre-defined response templates for different types of requests
+        self.email_templates = [
+            """Subject: {subject}
+
+Dear {recipient},
+
+I hope this email finds you well. I am writing to {purpose}.
+
+{body_content}
+
+I would appreciate your prompt response on this matter.
+
+Best regards,
+{sender}""",
+            
+            """Subject: {subject}
+
+Hello {recipient},
+
+Thank you for your time. I wanted to reach out regarding {purpose}.
+
+{body_content}
+
+Please let me know if you have any questions or need additional information.
+
+Sincerely,
+{sender}""",
+        ]
+        
+        self.code_templates = {
+            "python": """def {function_name}({params}):
+    \"\"\"
+    {description}
+    \"\"\"
+    # Implementation here
+    {implementation}
+    return result""",
+            
+            "javascript": """function {function_name}({params}) {{
+    /**
+     * {description}
+     */
+    {implementation}
+    return result;
+}}""",
+        }
+        
+        # Realistic response variations
+        self.greeting_variations = [
+            "I'll help you with that.",
+            "Let me assist you with this request.",
+            "I'd be happy to help.",
+            "Here's what I can do for you:",
+        ]
+        
+    def _simulate_thinking_delay(self, content_length: int = 100):
+        """Simulate AI processing time based on content complexity"""
+        base_delay = 0.5
+        complexity_delay = content_length / 1000  # More complex = longer delay
+        total_delay = base_delay + complexity_delay + random.uniform(0.1, 0.3)
+        time.sleep(min(total_delay, 3.0))  # Cap at 3 seconds
+        
+    def _get_email_body_content(self, subject: str, context: str = "") -> str:
+        """Generate contextual email body content"""
+        subject_lower = subject.lower()
+        
+        if "meeting" in subject_lower:
+            return """I would like to schedule a meeting to discuss the upcoming project milestones. Would you be available sometime next week? I'm flexible with timing and can accommodate your schedule.
+
+The meeting should take approximately 30-45 minutes, and we can conduct it either in person or via video call, whichever works better for you."""
+        
+        elif "follow up" in subject_lower or "followup" in subject_lower:
+            return """I wanted to follow up on our previous conversation regarding the project timeline. As discussed, I believe we should move forward with the proposed changes.
+
+Could you please confirm if you've had a chance to review the documents I shared? I'm happy to address any questions or concerns you might have."""
+        
+        elif "request" in subject_lower:
+            return """I am writing to formally request your assistance with an important matter. Your expertise in this area would be invaluable to our success.
+
+I understand you have a busy schedule, but I would greatly appreciate any time you could spare to help us move this forward."""
+        
+        else:
+            return f"""I hope you're doing well. I'm reaching out to discuss {subject.lower()} and would value your input on this matter.
+
+Your insights would be extremely helpful as we work through the next steps. Please let me know when would be a good time to connect."""
+    
+    def _generate_code_implementation(self, language: str, description: str) -> str:
+        """Generate mock code implementations"""
+        if "sort" in description.lower():
+            if language == "python":
+                return """    data = list(input_data)
+    data.sort()"""
+            else:
+                return """    let sortedData = [...inputData].sort();"""
+        
+        elif "calculate" in description.lower() or "math" in description.lower():
+            if language == "python":
+                return """    result = sum(numbers) / len(numbers)"""
+            else:
+                return """    const result = numbers.reduce((a, b) => a + b, 0) / numbers.length;"""
+        
+        else:
+            if language == "python":
+                return """    # Process the input
+    processed_data = process_input(input_data)
+    result = perform_operation(processed_data)"""
+            else:
+                return """    // Process the input
+    const processedData = processInput(inputData);
+    const result = performOperation(processedData);"""
+    
+    def chat_completion_create(self, 
+                             messages: list, 
+                             model: str = None,
+                             stream: bool = False,
+                             max_tokens: int = 1000,
+                             temperature: float = 0.7):
+        """
+        Main method to simulate AI chat completion
+        """
+        if not model:
+            model = self.model_name
+            
+        # Extract the user's message
+        user_message = ""
+        for msg in messages:
+            if msg.get("role") == "user":
+                user_message = msg.get("content", "")
+                break
+        
+        # Store in conversation history
+        self.conversation_history.extend(messages)
+        
+        # Determine response type and generate content
+        response_content = self._generate_response_content(user_message)
+        
+        if stream:
+            return self._stream_response(response_content)
+        else:
+            # Simulate processing delay
+            self._simulate_thinking_delay(len(response_content))
+            
+            return CompletionResponse(
+                content=response_content,
+                model=model,
+                usage_tokens=len(response_content.split()) + 20,  # Rough token estimate
+                response_time=random.uniform(0.8, 2.1)
+            )
+    
+    def _generate_response_content(self, user_message: str) -> str:
+        """Generate appropriate response based on user input"""
+        message_lower = user_message.lower()
+        
+        # Email generation
+        if "email" in message_lower or "write" in message_lower:
+            return self._generate_email_response(user_message)
+        
+        # Code generation
+        elif "code" in message_lower or "function" in message_lower or "python" in message_lower or "javascript" in message_lower:
+            return self._generate_code_response(user_message)
+        
+        # Analysis requests
+        elif "analyze" in message_lower or "summary" in message_lower or "explain" in message_lower:
+            return self._generate_analysis_response(user_message)
+        
+        # General conversation
+        else:
+            return self._generate_general_response(user_message)
+    
+    def _generate_email_response(self, user_message: str) -> str:
+        """Generate mock email content"""
+        greeting = random.choice(self.greeting_variations)
+        template = random.choice(self.email_templates)
+        
+        # Extract details from user message or use defaults
+        sender = "John Doe"
+        recipient = "Jane Smith"
+        subject = "Professional Inquiry"
+        purpose = "discuss an important matter"
+        
+        # Try to extract actual details from the message
+        if "sender:" in user_message.lower():
+            sender = user_message.split("sender:")[1].split("\n")[0].strip()
+        if "recipient:" in user_message.lower():
+            recipient = user_message.split("recipient:")[1].split("\n")[0].strip()
+        if "subject:" in user_message.lower():
+            subject = user_message.split("subject:")[1].split("\n")[0].strip()
+        
+        body_content = self._get_email_body_content(subject)
+        
+        email_content = template.format(
+            sender=sender,
+            recipient=recipient,
+            subject=subject,
+            purpose=purpose,
+            body_content=body_content
+        )
+        
+        return f"{greeting}\n\nHere's a professional email for you:\n\n{email_content}"
+    
+    def _generate_code_response(self, user_message: str) -> str:
+        """Generate mock code content"""
+        greeting = random.choice(self.greeting_variations)
+        
+        # Determine language
+        language = "python"
+        if "javascript" in user_message.lower() or "js" in user_message.lower():
+            language = "javascript"
+        
+        # Generate function details
+        function_name = "processData"
+        params = "data"
+        description = "Process the input data and return results"
+        
+        # Try to extract details from message
+        if "function" in user_message:
+            words = user_message.split()
+            for i, word in enumerate(words):
+                if word == "function" and i + 1 < len(words):
+                    function_name = words[i + 1].replace("(", "").replace(")", "")
+                    break
+        
+        template = self.code_templates[language]
+        implementation = self._generate_code_implementation(language, user_message)
+        
+        code_content = template.format(
+            function_name=function_name,
+            params=params,
+            description=description,
+            implementation=implementation
+        )
+        
+        return f"{greeting}\n\nHere's the {language} code you requested:\n\n```{language}\n{code_content}\n```\n\nThis function should handle your requirements. Let me know if you need any modifications!"
+    
+    def _generate_analysis_response(self, user_message: str) -> str:
+        """Generate mock analysis content"""
+        greeting = random.choice(self.greeting_variations)
+        
+        analysis_content = """Based on my analysis, here are the key findings:
+
+**Main Points:**
+- The topic you've mentioned has several important aspects to consider
+- Current trends suggest this is an area of growing importance
+- There are both opportunities and challenges to be aware of
+
+**Recommendations:**
+1. Focus on the core elements that drive the most value
+2. Consider implementing a phased approach to minimize risk
+3. Monitor key metrics to track progress and adjust strategy as needed
+
+**Next Steps:**
+- Gather additional data to validate these initial findings
+- Consult with stakeholders to ensure alignment
+- Develop a detailed implementation plan
+
+This analysis provides a solid foundation for moving forward. Would you like me to dive deeper into any specific aspect?"""
+        
+        return f"{greeting}\n\n{analysis_content}"
+    
+    def _generate_general_response(self, user_message: str) -> str:
+        """Generate general conversational response"""
+        responses = [
+            "That's an interesting question. Let me share some thoughts on that topic.",
+            "I understand what you're asking about. Here's how I'd approach this:",
+            "Thanks for bringing this up. This is definitely worth discussing.",
+            "Good point! Let me break this down for you:",
+        ]
+        
+        intro = random.choice(responses)
+        
+        # Generate contextual content based on message
+        if "?" in user_message:
+            content = """Based on the information available, there are several factors to consider. The best approach typically depends on your specific situation and goals.
+
+I'd recommend starting with the fundamentals and building from there. This gives you a solid foundation and allows for adjustments as you learn more.
+
+Is there a particular aspect you'd like to explore in more detail?"""
+        else:
+            content = """That's a valuable insight. This topic has several dimensions worth exploring further.
+
+From my perspective, the key is to balance different considerations while staying focused on your primary objectives. It's often helpful to break complex topics into smaller, manageable parts.
+
+What's your experience been with this so far?"""
+        
+        return f"{intro}\n\n{content}"
+    
+    def _stream_response(self, full_content: str) -> Iterator[StreamChunk]:
+        """Simulate streaming response with realistic timing"""
+        words = full_content.split()
+        current_content = ""
+        
+        # Initial delay
+        time.sleep(random.uniform(0.3, 0.8))
+        
+        for i, word in enumerate(words):
+            # Add word to current content
+            if current_content:
+                current_content += " " + word
+            else:
+                current_content = word
+            
+            # Create delta (just the new word)
+            delta = " " + word if current_content != word else word
+            
+            # Yield chunk
+            yield StreamChunk(
+                content=current_content,
+                delta=delta,
+                finished=False
+            )
+            
+            # Variable delay between words (simulate typing speed)
+            if random.random() < 0.1:  # 10% chance of longer pause
+                time.sleep(random.uniform(0.2, 0.5))  # Thinking pause
+            else:
+                time.sleep(random.uniform(0.02, 0.1))  # Normal typing speed
+        
+        # Final chunk
+        yield StreamChunk(
+            content=full_content,
+            delta="",
+            finished=True
+        )
+
+
+# Convenient wrapper functions to match OpenAI-style API
+class MockOpenAIClient:
+    """OpenAI-compatible mock client"""
+    
+    def __init__(self):
+        self.agent = MockAIAgent()
+        self.chat = self
+        self.completions = self
+    
+    def create(self,
+               model: str = "gpt-4",
+               messages: list = None,
+               stream: bool = False,
+               **kwargs):
+        """OpenAI-compatible create method"""
+        return self.agent.chat_completion_create(
+            messages=messages or [],
+            model=model,
+            stream=stream,
+            **kwargs
+        )
+  ```
+  </Accordion>
+
+  <Accordion title="main.py">
+  
+  ```python
+from .email_agent import MockOpenAIClient
+from typing import Iterator
+
+
+def mock_response(message, role="user"):
+    """Test the mock agent with non-streaming responses"""
+    client = MockOpenAIClient()
+
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
+    response = client.create(model="gpt-4", messages=prompt)
+
+    print(response.content)
+    print(f"\nTokens used: {response.usage_tokens}")
+    print(f"Response time: {response.response_time:.2f}s")
+
+    return response.content
+
+
+def mock_response_stream(message, role="user") -> Iterator[str]:
+    """Test the mock agent with streaming responses"""
+    client = MockOpenAIClient()
+    prompt = [
+        {
+            "role": role,
+            "content": message
+        }
+    ]
+    for chunk in client.create(
+        model="gpt-4",
+        messages=prompt,
+        stream=True
+    ):
+        if not chunk.finished:
+            yield chunk.delta
+        else:
+            yield "\n[STREAM COMPLETE]"
+
+
+# Example usage and testing
+def test_mock_agent():
+    """Test the mock agent with various scenarios"""
+
+    print("=== Testing Email Generation (Streaming) ===")
+    email_prompt = [
+        {"role": "user", "content": "Write a professional email with sender: "
+         "Alice Johnson, recipient: Mr. Daniel Smith, subject: "
+         "Request for Meeting Next Week"}
+    ]
+
+    for chunk in mock_response_stream(email_prompt):
+        print(chunk, end="", flush=True)
+
+    print("\n=== Testing Code Generation ===")
+    code_prompt = [
+        {"role": "user", "content": "Write a Python function to sort a "
+         "list of numbers"}
+    ]
+    response = mock_response(code_prompt)
+    print(response)
+
+    print("\n=== Testing Analysis ===")
+    analysis_prompt = [
+        {"role": "user", "content": "Analyze the benefits of remote work "
+         "for software teams"}
+    ]
+
+    response = mock_response(analysis_prompt)
+    print(response)
+
+
+if __name__ == "__main__":
+    test_mock_agent()
+  ```
+  </Accordion>
+
+  <Accordion title="runagent.config.json">
+ 
+  ```json
+  {
+    "agent_name": "my_agent",
+    "description": "My AI agent",
+    "framework": "default",
+    "template": "default",
+    "version": "1.0.0",
+    "created_at": "2025-01-15T10:30:00",
+    "agent_id": "f7066c98-0eb2-488c-bb37-a869a93d51ce",
+    "template_source": {
+      "repo_url": "https://github.com/runagent-dev/runagent.git",
+      "author": "runagent-cli",
+      "path": "templates/default/default"
+    },
+    "agent_architecture": {
+      "entrypoints": [
+        {
+          "file": "main.py",
+          "module": "mock_response",
+          "tag": "minimal"
+        },
+        {
+          "file": "main.py",
+          "module": "mock_response_stream",
+          "tag": "minimal_stream"
+        }
+      ]
+    },
+    "auth_settings": {
+      "type": "none"
+    },
+    "env_vars": {}
+  }
+  ```
+</Accordion>
+  
+
+  <Note>
+    **What `runagent init` created for you:**
+    - A `email_agent.py` with all implemntation logic of the agent.
+    - A `main.py` file with invokable agent functions (`mock_response` and `mock_response_stream`)
+    - A `runagent.config.json` file with entrypoints(`minimal` -> `mock_response`, `minimal_stream` -> `mock_response_stream`) already configured
+  </Note>
+  
+  
+  </Step>
+
+  <Step title="Run the Agent Locally">
+  
+  Start your agent locally to test it:
+  
+  ```bash
+  runagent serve .
+  ```
+
+You will see output similar to:
+
+```bash
+Agent Details:
+- Agent ID: f7066c98-0eb2-488c-bb37-a869a93d51ce
+- Host: 127.0.0.1
+- Port: 8451
+- Framework: default
+- Status: ready
+
+Server running at: http://127.0.0.1:8451
+API Documentation: http://127.0.0.1:8451/docs
+
+Available endpoints:
+- POST /api/v1/agents/.../execute/minimal - Run your agent
+
+INFO: Uvicorn running on http://127.0.0.1:8451 (Press CTRL+C to quit)
+  ```
+  
+  That's it! Your agent is now running and accessible through standard REST API as well as all RunAgent SDKs.
+  </Step>
+
+<Step title="Use the Agent in Your Application">
+
+Using the RunAgent SDKs, you can access your agent from any supported language. You only need the agent ID and the entrypoint tag. Your `mock_response` function now becomes accessible in multiple languages:
+
+<CodeGroup>
+
+```python Python 
+from runagent import RunAgentClient
+
+# Create a client pointing to your agent
+ra = RunAgentClient(
+    agent_id="f7066c98-0eb2-488c-bb37-a869a93d51ce",
+    entrypoint_tag="minimal",
+    local=True
+)
+
+# Call your agent
+agent_result = ra.run(
+    role="user",
+    message="Analyze the benefits of remote work for software teams"
+)
+
+print(agent_result)
+```
+
+```javascript JavaScript
+import { RunAgentClient } from 'runagent';
+
+// Create a client pointing to your agent
+const ra = new RunAgentClient({
+  agentId: 'f7066c98-0eb2-488c-bb37-a869a93d51ce',
+  entrypointTag: 'minimal',
+  local: true,
+});
+
+// Call your agent
+const analysis = await ra.run({
+    role: "user",
+    message: "Analyze the benefits of remote work for software teams"
+});
+
+console.log(analysis);
+```
+
+```rust Rust  
+use runagent::client::RunAgentClient;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a client pointing to your agent
+    let client = RunAgentClient::new(
+        "f7066c98-0eb2-488c-bb37-a869a93d51ce", 
+        "minimal", 
+        true
+    ).await?;
+    
+    // Call your agent
+    let response = client.run(&[
+        ("role", json!("user")),
+        ("message", json!("Analyze the benefits of remote work for software teams"))
+    ]).await?;
+    
+    println!("Response: {}", response);
+    Ok(())
+}
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/runagent-dev/runagent-go/pkg/client"
+)
+
+func main() {
+	// Create a client pointing to your agent
+	agentClient, err := client.NewWithAddress(
+		"f7066c98-0eb2-488c-bb37-a869a93d51ce",
+		"minimal",
+		true,
+		"localhost",
+		8453,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+	defer agentClient.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Call your agent
+	result, err := agentClient.Run(ctx, map[string]interface{}{
+		"message": "Analyze the benefits of remote work for software teams",
+		"role": "user",
+	})
+	if err != nil {
+		log.Fatalf("Failed to run agent: %v", err)
+	}
+
+	fmt.Printf("Result: %v\n", result)
+}
+```
+</CodeGroup>
+
+Notice how the same agent logic is accessible from all languages with idiomatic syntax for each.
+
+</Step>
+</Steps>
+
+That's the core workflow. You're now ready to **deploy your AI agents** and **integrate them into your applications**.
+
+## From Local Testing to Production in Seconds
+
+Once you've tested your agent locally and confirmed everything works, deploying to production is just one command away.
+
+**RunAgent Cloud** is the fastest AI agent deployment platform, designed to take your local agent from development to production instantly. No complex infrastructure setup, no deployment headaches.
+
+### Deploy to Production
+
+```bash
+runagent deploy .
+```
+
+That's it. Your agent is now live and accessible globally with:
+
+- **Automatic scaling** - Handle one request or one million
+- **Global edge network** - Low latency worldwide
+- **Zero infrastructure management** - Focus on your agent, not servers
+- **Production-ready security** - Enterprise-grade isolation and security
+
+Your deployed agent gets a production URL and agent ID. Simply update your SDK clients to use the production endpoint:
+
+```python
+# Switch from local to production
+ra = RunAgentClient(
+    agent_id="your-production-agent-id",
+    entrypoint_tag="minimal",
+    local=False  # Now pointing to RunAgent Cloud
+)
+```
+
+The same code you tested locally now runs in a fully managed production environment.
+
+<Card 
+  title="Learn More About Deployment" 
+  icon="cloud-arrow-up" 
+  href="/runagent-cloud/cloud-deployment"
+>
+  Explore advanced deployment options, environment variables, and monitoring capabilities.
+</Card>
+
+---
+
+<Note>
+Need help or hitting errors?  
+Check [Troubleshooting](/resources/troubleshooting) or ask on our [FAQ](/resources/faq)—you’ll be unblocked fast!
+</Note>
