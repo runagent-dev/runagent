@@ -10,7 +10,7 @@ node_modules/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/
 downloads/
 eggs/
 .eggs/
@@ -162,3 +162,5 @@ myvenv/
 parlant-data
 
 test.md
+
+_dist
