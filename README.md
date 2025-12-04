@@ -514,6 +514,105 @@ RunAgent Cloud provides:
 
 ---
 
+## 🧠 Persistent Memory: Revolutionary Serverless Memory System
+
+RunAgent introduces **Persistent Memory** - the fastest serverless memory system for AI agents. Unlike traditional stateless serverless architectures, RunAgent enables your agents to maintain context and state across executions, creating truly intelligent and context-aware applications.
+
+### Why Persistent Memory Matters
+
+Traditional serverless functions are stateless by design, meaning each invocation starts fresh with no memory of previous interactions. RunAgent's Persistent Memory breaks this limitation, allowing your agents to:
+
+- **Remember Context** - Maintain conversation history and user preferences across sessions
+- **Learn from Interactions** - Build upon previous executions to improve responses
+- **Stateful Workflows** - Create multi-step processes that remember where they left off
+- **Cross-Language Persistence** - Memory works seamlessly across all SDK languages (Python, JavaScript, Rust, Go, Dart)
+
+### How It Works
+
+Persistent Memory in RunAgent is designed for speed and reliability:
+
+```python
+from runagent import RunAgentClient
+
+# Create a client with persistent memory enabled
+client = RunAgentClient(
+    agent_id="my-agent-id",
+    entrypoint_tag="chat",
+    user_id="user123",           # User identifier for memory isolation
+    persistent_memory=True        # Enable persistent memory
+)
+
+# First interaction - agent learns user preferences
+result1 = client.run(message="I prefer dark mode interfaces")
+
+# Second interaction - agent remembers the preference
+result2 = client.run(message="What's my UI preference?")
+# Agent responds: "You prefer dark mode interfaces"
+```
+
+### Multi-Language Support
+
+Persistent Memory works identically across all SDKs:
+
+**Python:**
+```python
+client = RunAgentClient(
+    agent_id="agent-id",
+    entrypoint_tag="entrypoint",
+    user_id="user123",
+    persistent_memory=True
+)
+```
+
+**JavaScript:**
+```javascript
+const client = new RunAgentClient({
+  agentId: "agent-id",
+  entrypointTag: "entrypoint",
+  userId: "user123",
+  persistentMemory: true
+});
+```
+
+**Rust:**
+```rust
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_user_id("user123")
+        .with_persistent_memory(true)
+).await?;
+```
+
+**Dart:**
+```dart
+final client = await RunAgentClient.create(
+  RunAgentClientConfig.create(
+    agentId: "agent-id",
+    entrypointTag: "entrypoint",
+    userId: "user123",
+    persistentMemory: true,
+  ),
+);
+```
+
+### Key Benefits
+
+- ⚡ **Fastest Serverless Memory** - Optimized for low-latency access and updates
+- 🔒 **Secure & Isolated** - Each `user_id` has isolated memory space
+- 🌐 **Universal** - Works with any framework (LangGraph, CrewAI, Letta, etc.)
+- 📈 **Scalable** - Built on serverless infrastructure that scales automatically
+- 🔄 **Stateful Workflows** - Enable complex multi-turn conversations and workflows
+
+### Use Cases
+
+- **Conversational AI** - Maintain context across multiple user interactions
+- **Personalization** - Remember user preferences and adapt responses
+- **Multi-Step Processes** - Track progress through complex workflows
+- **Learning Systems** - Agents that improve based on interaction history
+- **Session Management** - Maintain state across distributed systems
+
+---
+
 ## 📚 Documentation
 
 - **[Getting Started](https://docs.run-agent.ai/get-started/introduction.md)** - Deploy your first agent in 5 minutes
@@ -527,7 +626,7 @@ RunAgent Cloud provides:
 
 ## 🧠 Action Memory System (Coming Soon)
 
-RunAgent is introducing **Action Memory** - a revolutionary approach to agent reliability that focuses on *how to remember* rather than *what to remember*.
+Building on our Persistent Memory foundation, RunAgent is introducing **Action Memory** - an advanced approach to agent reliability that focuses on *how to remember* rather than *what to remember*.
 
 ### How It Will Work
 
@@ -536,7 +635,7 @@ RunAgent is introducing **Action Memory** - a revolutionary approach to agent re
 - **Reliability Focus**: Learns from successful outcomes to improve future decisions
 - **Ecosystem Integration**: Works with any framework - LangGraph, CrewAI, Letta, and more
 
-This will ensure your agents become more reliable over time, regardless of which programming language or framework you use to interact with them.
+This will ensure your agents become more reliable over time, building upon the Persistent Memory system to create truly intelligent, context-aware agents.
 
 ---
 
