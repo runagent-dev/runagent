@@ -23,6 +23,8 @@ class SocketClient {
     List<dynamic> inputArgs,
     Map<String, dynamic> inputKwargs, {
     int timeoutSeconds = 600,
+    String? userId,
+    bool persistentMemory = false,
   }) async* {
     // Build WebSocket URL
     String uri;
@@ -58,12 +60,20 @@ class SocketClient {
       );
 
       // Send initial request
-      final requestData = {
+      final requestData = <String, dynamic>{
         'entrypoint_tag': entrypointTag,
         'input_args': inputArgs,
         'input_kwargs': inputKwargs,
         'timeout_seconds': timeoutSeconds,
       };
+
+      // Add persistent storage parameters if provided (matches Python SDK)
+      if (userId != null) {
+        requestData['user_id'] = userId;
+      }
+      if (persistentMemory) {
+        requestData['persistent_memory'] = persistentMemory;
+      }
 
       channel.sink.add(jsonEncode(requestData));
 

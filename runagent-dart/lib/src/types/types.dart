@@ -29,6 +29,12 @@ class RunAgentClientConfig {
   /// Enable database registry lookup (default: true for local agents)
   final bool? enableRegistry;
 
+  /// User ID for persistent memory (matches Python SDK RunAgentClient.user_id)
+  final String? userId;
+
+  /// Enable persistent memory for this user (matches Python SDK RunAgentClient.persistent_memory)
+  final bool? persistentMemory;
+
   RunAgentClientConfig({
     required this.agentId,
     required this.entrypointTag,
@@ -39,6 +45,8 @@ class RunAgentClientConfig {
     this.baseUrl,
     this.extraParams,
     this.enableRegistry,
+    this.userId,
+    this.persistentMemory,
   });
 
   /// Create a config with required fields
@@ -52,6 +60,8 @@ class RunAgentClientConfig {
     String? baseUrl,
     Map<String, dynamic>? extraParams,
     bool? enableRegistry,
+    String? userId,
+    bool? persistentMemory,
   }) {
     return RunAgentClientConfig(
       agentId: agentId,
@@ -63,6 +73,8 @@ class RunAgentClientConfig {
       baseUrl: baseUrl,
       extraParams: extraParams,
       enableRegistry: enableRegistry,
+      userId: userId,
+      persistentMemory: persistentMemory,
     );
   }
 }

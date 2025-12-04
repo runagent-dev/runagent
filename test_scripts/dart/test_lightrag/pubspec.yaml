@@ -1,0 +1,11 @@
+name: test_lightrag
+description: Test script for RunAgent Dart SDK with LightRAG agent
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  runagent:
+    path: /home/azureuser/runagent/runagent-dart
+
