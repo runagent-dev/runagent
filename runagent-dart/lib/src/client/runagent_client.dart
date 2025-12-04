@@ -15,6 +15,8 @@ class RunAgentClient {
   final RestClient restClient;
   final SocketClient socketClient;
   final Map<String, dynamic>? extraParams;
+  final String? userId;
+  final bool persistentMemory;
   
   AgentArchitecture? _architecture;
 
@@ -25,6 +27,8 @@ class RunAgentClient {
     required this.restClient,
     required this.socketClient,
     this.extraParams,
+    this.userId,
+    this.persistentMemory = false,
   });
 
   /// Create a new RunAgent client from configuration
@@ -110,6 +114,8 @@ class RunAgentClient {
       restClient: restClient,
       socketClient: socketClient,
       extraParams: config.extraParams,
+      userId: config.userId,
+      persistentMemory: config.persistentMemory ?? false,
     );
 
     // Initialize architecture and validate entrypoint
@@ -265,6 +271,8 @@ class RunAgentClient {
       entrypointTag,
       inputArgs,
       inputKwargs,
+      userId: userId,
+      persistentMemory: persistentMemory,
     );
 
     if (response['success'] == true) {
@@ -369,6 +377,8 @@ class RunAgentClient {
       entrypointTag,
       inputArgs,
       inputKwargs,
+      userId: userId,
+      persistentMemory: persistentMemory,
     );
   }
 

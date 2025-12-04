@@ -55,6 +55,8 @@ class RestClient {
     Map<String, dynamic> inputKwargs, {
     int timeoutSeconds = 300,
     bool asyncExecution = false,
+    String? userId,
+    bool persistentMemory = false,
   }) async {
     final url = Uri.parse('$baseUrl${RunAgentConstants.defaultApiPrefix}/agents/$agentId/run');
     
@@ -72,13 +74,21 @@ class RestClient {
       );
     }
 
-    final payload = {
+    final payload = <String, dynamic>{
       'entrypoint_tag': entrypointTag,
       'input_args': inputArgs,
       'input_kwargs': inputKwargs,
       'timeout_seconds': timeoutSeconds,
       'async_execution': asyncExecution,
     };
+
+    // Add persistent storage parameters if provided (matches Python SDK)
+    if (userId != null) {
+      payload['user_id'] = userId;
+    }
+    if (persistentMemory) {
+      payload['persistent_memory'] = persistentMemory;
+    }
 
     try {
       final response = await http.post(

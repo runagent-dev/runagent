@@ -1,10 +1,10 @@
 {
   "roots": [
-    "test_journalist"
+    "test_lightrag"
   ],
   "packages": [
     {
-      "name": "test_journalist",
+      "name": "test_lightrag",
       "version": "0.1.0",
       "dependencies": [
         "runagent"

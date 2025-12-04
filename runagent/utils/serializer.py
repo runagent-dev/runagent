@@ -58,6 +58,11 @@ class CoreSerializer:
             raise ValueError(f"Expected string input, got {type(json_str)}")
         
         try:
+            # Check if string is empty or whitespace only
+            if not json_str or not json_str.strip():
+                self.logger.warning("Empty JSON string provided to deserialize_object")
+                return None
+            
             deserialized_data = json.loads(json_str)
             
             if not reconstruct:
@@ -237,6 +242,11 @@ class CoreSerializer:
             if not isinstance(structured_json, str):
                 raise ValueError(f"Expected JSON string input, got {type(structured_json)}")
             
+            # Check if string is empty or whitespace only
+            if not structured_json or not structured_json.strip():
+                self.logger.warning("Empty structured JSON string provided")
+                raise ValueError("Empty structured JSON string")
+            
             structured_data = json.loads(structured_json)
             
             if not isinstance(structured_data, dict):
@@ -248,26 +258,48 @@ class CoreSerializer:
             if data_type is None or payload is None:
                 raise ValueError("Structured data must have 'type' and 'payload' keys")
             
+            # Check if payload is empty string
+            if isinstance(payload, str) and not payload.strip():
+                if data_type == "null":
+                    return None
+                elif data_type == "string":
+                    return ""
+                else:
+                    self.logger.warning(f"Empty payload for type '{data_type}', returning None")
+                    return None
+            
             # Parse payload based on type
             if data_type == "null":
                 return None
             elif data_type == "string":
                 # Payload is JSON string, parse to get the actual string
+                if not payload or not payload.strip():
+                    return ""
                 return json.loads(payload)
             elif data_type == "integer":
+                if not payload or not payload.strip():
+                    return 0
                 value = json.loads(payload)
                 return int(value)
             elif data_type == "number":
+                if not payload or not payload.strip():
+                    return 0.0
                 value = json.loads(payload)
                 return float(value)
             elif data_type == "boolean":
+                if not payload or not payload.strip():
+                    return False
                 return json.loads(payload)
             elif data_type in ("array", "object"):
                 # Parse JSON to get structured data
+                if not payload or not payload.strip():
+                    return [] if data_type == "array" else {}
                 return json.loads(payload)
             else:
                 # Unknown type, try to parse as JSON
                 self.logger.warning(f"Unknown type '{data_type}', attempting JSON parse")
+                if not payload or not payload.strip():
+                    return None
                 return json.loads(payload)
                 
         except json.JSONDecodeError as e:

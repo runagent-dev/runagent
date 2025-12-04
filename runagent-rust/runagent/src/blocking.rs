@@ -144,6 +144,16 @@ impl RunAgentClient {
         self.inner.extra_params()
     }
 
+    /// Get user ID used for persistent memory, if any
+    pub fn user_id(&self) -> Option<&str> {
+        self.inner.user_id()
+    }
+
+    /// Check if persistent memory is enabled for this client
+    pub fn persistent_memory(&self) -> bool {
+        self.inner.persistent_memory()
+    }
+
     /// Check if this is a local client
     pub fn is_local(&self) -> bool {
         self.inner.is_local()
