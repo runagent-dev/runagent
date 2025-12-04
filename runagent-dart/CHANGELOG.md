@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.43] - 2024-XX-XX
+
+### Added
+- Support for `userId` parameter in `RunAgentClientConfig` for persistent storage
+- Support for `persistentMemory` parameter in `RunAgentClientConfig` to enable persistent memory across agent executions
+- `userId` and `persistentMemory` are now passed through REST and WebSocket clients to the backend API
+
+### Changed
+- `RunAgentClientConfig` now includes optional `userId` and `persistentMemory` fields
+- `RestClient.runAgent()` now accepts and forwards `userId` and `persistentMemory` parameters
+- `SocketClient.runStream()` now accepts and forwards `userId` and `persistentMemory` parameters
+
 ## [0.1.41] - 2024-XX-XX
 
 ### Added
