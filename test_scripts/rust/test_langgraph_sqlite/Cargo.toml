@@ -1,0 +1,15 @@
+[package]
+name = "test_langgraph_sqlite"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# RunAgent Rust SDK from local path
+runagent = { path = "/home/azureuser/runagent/runagent-rust/runagent" }
+
+# Required dependencies
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+anyhow = "1.0"
+futures = "0.3"
+

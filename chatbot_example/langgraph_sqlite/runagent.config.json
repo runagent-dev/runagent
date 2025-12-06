@@ -1,0 +1,43 @@
+{
+  "agent_name": "langgraph chatbot",
+  "description": "My AI agent",
+  "framework": "default",
+  "template": "",
+  "version": "1.0.0",
+  "created_at": "2025-12-06T19:47:47.065909",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/chatbot_example/langgraph_sqlite"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "chat_response",
+        "tag": "chat"
+      },
+      {
+        "file": "agent.py",
+        "module": "chat_response_stream",
+        "tag": "chat_stream"
+      },
+      {
+        "file": "agent.py",
+        "module": "get_conversation_history",
+        "tag": "get_history"
+      },
+      {
+        "file": "agent.py",
+        "module": "list_user_threads",
+        "tag": "list_threads"
+      }
+    ]
+  },
+  "env_vars": {},
+  "agent_id": "f5dd61ef-578c-4a92-abe0-f967b7602738",
+  "auth_settings": {
+    "type": "api_key"
+  },
+  "persistent_folders": ["chat_storage"]
+}
