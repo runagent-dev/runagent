@@ -246,10 +246,23 @@ python client_test_langgraph_sqlite.py
 ### Rust Tests
 
 Run the Rust test suite:
-```bash
-cd test_scripts/rust/test_langgraph_sqlite
-cargo run
-```
+
+1. **Navigate to the test folder**:
+   ```bash
+   cd runagent/test_scripts/rust/test_langgraph_sqlite
+   ```
+
+2. **Export the API key** (required for remote deployment):
+   ```bash
+   export RUNAGENT_API_KEY="your-api-key"
+   ```
+
+3. **Run the tests**:
+   ```bash
+   cargo run
+   ```
+
+**Note**: Make sure you have the `RUNAGENT_API_KEY` environment variable set before running, as it's required for connecting to the remote agent.
 
 ## Configuration
 
