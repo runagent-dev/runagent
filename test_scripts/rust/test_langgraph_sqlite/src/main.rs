@@ -78,11 +78,11 @@ async fn main() -> runagent::RunAgentResult<()> {
     .await?;
 
     //////////////////////////// TESTS ////////////////////////////
-    // test_basic_conversation(&chat_client).await?;
+    test_basic_conversation(&chat_client).await?;
     // sleep(Duration::from_secs(2)).await;
 
-    test_streaming(&stream_client).await?;
-    sleep(Duration::from_secs(2)).await;
+    // test_streaming(&stream_client).await?;
+    // sleep(Duration::from_secs(2)).await;
 
     // test_multiple_threads(&chat_client).await?;
     // sleep(Duration::from_secs(2)).await;
@@ -110,7 +110,7 @@ async fn test_basic_conversation(chat_client: &RunAgentClient) -> runagent::RunA
 
     let result = chat_client
         .run(&[
-            ("message", json!("is it just me or AI will take over the world?")),
+            ("message", json!("what is my mother do?")),
             ("user_id", json!(USER_ID)),
             ("thread_id", json!("conversation_001")),
         ])

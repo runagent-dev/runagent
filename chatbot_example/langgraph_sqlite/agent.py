@@ -33,7 +33,8 @@ def get_sqlite_checkpointer(user_id: str) -> SqliteSaver:
     os.makedirs(STORAGE_DIR, exist_ok=True)
     
     # Create user-specific database file
-    db_path = os.path.join(STORAGE_DIR, f"{user_id}_conversations.db")
+    # db_path = os.path.join(STORAGE_DIR, f"{user_id}_conversations.db")
+    db_path = os.path.join(STORAGE_DIR, "conversations.db")
     
     # Create connection with thread safety disabled (required for LangGraph)
     conn = sqlite3.connect(db_path, check_same_thread=False)
