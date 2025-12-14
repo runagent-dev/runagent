@@ -1,0 +1,50 @@
+{
+  "agent_name": "your research paper finder",
+  "description": "find related papers from arvix",
+  "framework": "default",
+  "template": "",
+  "version": "1.0.0",
+  "created_at": "2025-12-13T17:17:05.801933",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "author": "runagent-cli",
+    "path": "/home/azureuser/runagent/examples/paper-flow-aritra"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "check_papers",
+        "tag": "check_papers"
+      },
+      {
+        "file": "agent.py",
+        "module": "check_papers_async",
+        "tag": "check_papers_async"
+      },
+      {
+        "file": "agent.py",
+        "module": "check_papers_stream",
+        "tag": "check_papers_stream"
+      },
+      {
+        "file": "agent.py",
+        "module": "check_papers_custom_topics",
+        "tag": "check_papers_custom"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENAI_API_KEY": "",
+    "USER_EMAIL": "",
+    "SMTP_SERVER": "smtp.gmail.com",
+    "SMTP_PORT": "587",
+    "SMTP_USERNAME": "",
+    "SMTP_PASSWORD": ""
+  },
+  "agent_id": "62f7a781-71bb-4d62-a68f-24dc4f2bfd0b",
+  "auth_settings": {
+    "type": "api_key"
+  },
+  "persistent_folders": ["paper_cache"]
+}
