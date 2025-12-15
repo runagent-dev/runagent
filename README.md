@@ -91,6 +91,12 @@
 
 </div>
 
+-
+- **[2025.11] 🎯 [New Feature]** Integrated RAGAS for evaluation and Langfuse for tracing. Updated the API to return retrieved contexts alongside query results to support context precision metrics.
+- **[2025.10] 🎯 [Scalability Enhancement]** Eliminated processing bottlenecks to support large-scale datasets efficiently.
+- **[2025.09] 🎯 [New Feature]** Enhanced knowledge graph extraction accuracy for open-source LLMs such as Qwen3-30B-A3B.
+- **[2025.12] 🎯 [Integration]** Integrated the PaperFlow research agent with RunAgent Serverless and RunAgent Pulse for end-to-end scheduled arXiv monitoring and notifications.
+
 ## What is RunAgent-Pulse?
 
 ### RunAgent Pulse is a Google Calendar for Your AI Agents 
