@@ -84,6 +84,17 @@
 
 ---
 
+### RunAgent Pulse – Scheduling & Orchestration
+A lightweight, **self-hosted scheduling service** designed for AI agents and developers.  
+Schedule agent executions with **second-level precision**, **natural language scheduling**, and **seamless integration with RunAgent Serverless**.  
+We’ve unveiled this as a companion project:
+
+- GitHub: `https://github.com/runagent-dev/runagent-pulse`
+
+Use it together with this repo to deploy agents (RunAgent) in our serverless cloud and then **orchestrate/schedule** them (Pulse).
+
+---
+
 ## What is RunAgent?
 
 RunAgent is an agentic ecosystem that enables developers to build AI agents once in Python using any python agentic frameworks like LangGraph, CrewAI, Letta, LlamaIndex, then access them natively from any programming language. The platform features stateful self-learning capabilities with RunAgent Memory (coming soon), allowing agents to retain context and improve it's action memory over time.
