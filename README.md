@@ -87,7 +87,8 @@
 <div align="center">
 
 <h3>🎉 News</h3>
-<p><b>We have published RunAgent Pulse</b></p>
+<h2>We have published RunAgent Pulse</h2>
+
 
 </div>
 
