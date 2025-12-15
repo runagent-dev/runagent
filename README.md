@@ -84,12 +84,15 @@
 
 ---
 
-### RunAgent Pulse – Scheduling & Orchestration
+### 📰 RunAgent Pulse – Scheduling & Orchestration
+
+> **News:** We’ve just unveiled **RunAgent Pulse**, a companion scheduler for your agents.
+
 A lightweight, **self-hosted scheduling service** designed for AI agents and developers.  
 Schedule agent executions with **second-level precision**, **natural language scheduling**, and **seamless integration with RunAgent Serverless**.  
 We’ve unveiled this as a companion project:
 
-- GitHub: `https://github.com/runagent-dev/runagent-pulse`
+- GitHub: [RunAgent-Pulse](https://github.com/runagent-dev/runagent-pulse)
 
 Use it together with this repo to deploy agents (RunAgent) in our serverless cloud and then **orchestrate/schedule** them (Pulse).
 
