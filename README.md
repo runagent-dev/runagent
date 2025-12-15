@@ -87,9 +87,11 @@
 <div align="center">
 
 <h3>🎉 News</h3>
-<p><b>RunAgent Pulse – Scheduling & Orchestration</b></p>
+<p><b> We published RunAgent Pulse – Scheduling & Orchestration</b></p>
 
 </div>
+## What is RunAgent-Pulse? ##
+### RunAgent Pulse is a Google Calendar for Your AI Agents ###
 
 A lightweight, **self-hosted scheduling service** designed for AI agents and developers.  
 Schedule agent executions with **second-level precision**, **natural language scheduling**, and **seamless integration with RunAgent Serverless**.  
