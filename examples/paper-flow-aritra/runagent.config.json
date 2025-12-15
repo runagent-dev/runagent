@@ -14,23 +14,8 @@
     "entrypoints": [
       {
         "file": "agent.py",
-        "module": "check_papers",
-        "tag": "check_papers"
-      },
-      {
-        "file": "agent.py",
         "module": "check_papers_async",
         "tag": "check_papers_async"
-      },
-      {
-        "file": "agent.py",
-        "module": "check_papers_stream",
-        "tag": "check_papers_stream"
-      },
-      {
-        "file": "agent.py",
-        "module": "check_papers_custom_topics",
-        "tag": "check_papers_custom"
       }
     ]
   },
@@ -42,7 +27,7 @@
     "SMTP_USERNAME": "",
     "SMTP_PASSWORD": ""
   },
-  "agent_id": "62f7a781-71bb-4d62-a68f-24dc4f2bfd0b",
+  "agent_id": "62f7a781-71bb-4d62-a68f-34dc4f2bfd0b",
   "auth_settings": {
     "type": "api_key"
   },

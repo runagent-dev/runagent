@@ -248,17 +248,16 @@ def run_all_tests():
     # Note: This makes real API calls and LLM requests
     print("\n" + "=" * 70)
     print("Running full integration test (this may take a minute)...")
-    print("=" * 70)
+
     print("⚠️  This will make real API calls to arXiv and OpenAI")
     response = input("Continue? (y/n): ")
     if response.lower() == 'y':
         test_basic_functionality()
     else:
         print("Skipping full integration test")
-    
-    print("\n" + "✅" * 35)
+
     print("All tests complete!")
-    print("✅" * 35)
+
 
 
 if __name__ == "__main__":
