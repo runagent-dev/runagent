@@ -87,15 +87,12 @@
 <div align="center">
 
 <h3>🎉 News</h3>
-<p><b> We published RunAgent Pulse – Scheduling & Orchestration</b></p>
+<p><b>We have published RunAgent Pulse</b></p>
 
 </div>
 
--
-- **[2025.11] 🎯 [New Feature]** Integrated RAGAS for evaluation and Langfuse for tracing. Updated the API to return retrieved contexts alongside query results to support context precision metrics.
-- **[2025.10] 🎯 [Scalability Enhancement]** Eliminated processing bottlenecks to support large-scale datasets efficiently.
-- **[2025.09] 🎯 [New Feature]** Enhanced knowledge graph extraction accuracy for open-source LLMs such as Qwen3-30B-A3B.
-- **[2025.12] 🎯 [Integration]** Integrated the PaperFlow research agent with RunAgent Serverless and RunAgent Pulse for end-to-end scheduled arXiv monitoring and notifications.
+- **[2025.12] 🎯 [New Product]** Published **RunAgent Pulse – Scheduling & Orchestration**, a self-hosted “Google Calendar for your AI agents”.
+- **[2025.12] 🎯 [Integration]** Integrated the **PaperFlow** arXiv research agent with **RunAgent Serverless** and **RunAgent Pulse** for end-to-end scheduled arXiv monitoring and email notifications.
 
 ## What is RunAgent-Pulse?
 
