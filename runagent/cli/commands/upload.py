@@ -8,7 +8,6 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from runagent import RunAgent
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
 )
@@ -50,8 +49,9 @@ def upload(path: Path, overwrite: bool):
 
     try:
         from runagent.cli.branding import print_header
+        from runagent import RunAgent
         print_header("Upload Agent")
-        
+
         sdk = RunAgent()
         
         # Check authentication

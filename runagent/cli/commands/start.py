@@ -8,7 +8,6 @@ import json
 import click
 from rich.console import Console
 
-from runagent import RunAgent
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
 )
@@ -39,8 +38,9 @@ def start(agent_id, config):
 
     try:
         from runagent.cli.branding import print_header
+        from runagent import RunAgent
         print_header("Start Remote Agent")
-        
+
         sdk = RunAgent()
 
         # Check authentication

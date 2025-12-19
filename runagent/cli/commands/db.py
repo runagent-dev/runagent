@@ -9,7 +9,6 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from runagent import RunAgent
 console = Console()
 
 
@@ -40,6 +39,7 @@ def db():
 def status(cleanup_days, agent_id):
     """Show local database status and statistics (ENHANCED with invocation stats)"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
 
         if agent_id:
@@ -172,6 +172,7 @@ def status(cleanup_days, agent_id):
 def invocations(agent_id, status, limit, output_format):
     """Show agent invocation history and statistics"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
         
         # Get invocations
@@ -282,6 +283,7 @@ def invocations(agent_id, status, limit, output_format):
 def invocation(invocation_id, output_format):
     """Show detailed information about a specific invocation"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
         
         invocation = sdk.db_service.get_invocation(invocation_id)
@@ -375,6 +377,7 @@ def invocation(invocation_id, output_format):
 def cleanup(days, agent_runs, yes):
     """Clean up old database records"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
         
         # Get count of records to be cleaned
@@ -439,6 +442,7 @@ def cleanup(days, agent_runs, yes):
 def logs(agent_id, limit, output_format):
     """Show all agent logs (no filtering)"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
         
         if agent_id:
@@ -553,6 +557,7 @@ def logs(agent_id, limit, output_format):
 def cleanup_logs(days, yes):
     """Clean up old agent logs"""
     try:
+        from runagent import RunAgent
         sdk = RunAgent()
         
         if not yes:

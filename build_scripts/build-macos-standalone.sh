@@ -1,10 +1,11 @@
 #!/bin/bash
-# Optimized macOS build script for RunAgent with Nuitka
-# Usage: ./build-macos-fast.sh
+# Standalone macOS build script for RunAgent with Nuitka
+# Usage: ./build_scripts/build-macos-standalone.sh
+# Or from root: bash build_scripts/build-macos-standalone.sh
 
 set -e  # Exit on error
 
-echo "🍎 RunAgent macOS Build Script (Optimized)"
+echo "🍎 RunAgent macOS Build Script (Standalone)"
 echo "==========================================="
 echo ""
 
@@ -28,13 +29,16 @@ fi
 PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo "✅ Python $PYTHON_VERSION found"
 
-# Navigate to project root
+# Navigate to project root (handle both direct execution and execution from root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+echo "📁 Project root: $PROJECT_ROOT"
 
 # Check if we're in the right directory
 if [ ! -f "pyproject.toml" ]; then
-    echo "❌ Error: pyproject.toml not found. Please run this script from the project root."
+    echo "❌ Error: pyproject.toml not found. Please run this script from the project root or build_scripts folder."
     exit 1
 fi
 
@@ -57,7 +61,7 @@ echo "📥 Installing dependencies..."
 pip install --upgrade pip --quiet
 pip install -e . --quiet
 pip install nuitka --quiet
-pip install ordered-set --quiet  # Nuitka dependency for better performance
+pip install ordered-set --quiet
 echo "✅ Dependencies installed"
 
 # Create entry point if it doesn't exist
@@ -77,75 +81,75 @@ EOF
 fi
 
 # Detect architecture
-ARCH=$(uname -m)
+if [ -n "$ARCH" ]; then
+    # CI/CD: Use environment variable
+    ARCH=$ARCH
+else
+    # Local: Auto-detect
+    ARCH=$(uname -m)
+fi
+
+case "$ARCH" in
+    x86_64)
+        ARCH_NAME="amd64"
+        ;;
+    arm64)
+        ARCH_NAME="arm64"
+        ;;
+    *)
+        echo "❌ Unsupported architecture: $ARCH"
+        exit 1
+        ;;
+esac
+
 echo ""
-echo "🖥️  Building for macOS ($ARCH)"
+echo "🖥️  Building for macOS-$ARCH_NAME"
 echo "⏳ This will take 5-10 minutes on first build..."
 echo ""
 
-# Clean up any previous build artifacts
-echo "🧹 Cleaning up previous build artifacts..."
-BUILD_DIR="dist"
+BUILD_DIR="dist/macos-${ARCH_NAME}"
 rm -rf "$BUILD_DIR" runagent_entry.build runagent_entry.dist runagent_entry.onefile-build
 mkdir -p "$BUILD_DIR"
 
-# Build with Nuitka
 FINAL_OUTPUT="runagent"
 
-echo "📁 Building to $BUILD_DIR/ directory (executable will be: $BUILD_DIR/$FINAL_OUTPUT)"
-echo ""
-echo "⚡ Using --standalone mode (MUCH faster startup than --onefile)"
-echo ""
+echo "🚀 Building Standalone Version (Fast Startup)..."
 
-# OPTIMIZED BUILD: NO --onefile, YES --standalone
+# STANDALONE NUITKA COMMAND
 python -m nuitka \
   --standalone \
+  --lto=yes \
   --output-dir="$BUILD_DIR" \
   --output-filename="$FINAL_OUTPUT" \
-  --include-package=runagent \
-  --include-package=click \
-  --include-package=rich \
-  --include-package=httpx \
-  --include-package=requests \
-  --include-package=yaml \
-  --include-package=pydantic \
-  --include-package=pydantic_core \
-  --include-package=git \
-  --include-package=inquirer \
-  --include-package=dotenv \
-  --include-package=typing_extensions \
-  --include-package=websockets \
-  --include-package=jsonpath_ng \
-  --include-package=fastapi \
-  --include-package=uvicorn \
-  --include-module=uvicorn.logging \
-  --include-module=uvicorn.loops \
-  --include-module=uvicorn.loops.auto \
-  --include-module=uvicorn.protocols \
-  --include-module=uvicorn.protocols.http \
-  --include-module=uvicorn.protocols.http.auto \
-  --include-module=uvicorn.protocols.http.h11_impl \
-  --include-module=uvicorn.protocols.websockets \
-  --include-module=uvicorn.protocols.websockets.auto \
-  --include-module=uvicorn.protocols.websockets.wsproto_impl \
-  --include-module=uvicorn.lifespan \
-  --include-module=uvicorn.lifespan.on \
-  --include-package=sqlalchemy \
-  --include-module=sqlalchemy.dialects.sqlite \
-  --include-module=sqlalchemy.dialects.postgresql \
   --enable-plugin=anti-bloat \
+  --python-flag=no_docstrings \
+  --python-flag=no_asserts \
+  --python-flag=no_site \
+  --python-flag=isolated \
+  --python-flag=safe_path \
+  --nofollow-import-to=examples \
+  --nofollow-import-to=templates \
+  --nofollow-import-to=test_scripts \
+  --nofollow-import-to=docs \
+  --nofollow-import-to=build_scripts \
+  --nofollow-import-to=runagent-* \
+  --nofollow-import-to=dist-* \
   --follow-imports \
   --assume-yes-for-downloads \
-  --python-flag=no_site \
   --jobs=4 \
   runagent_entry.py
+
+echo ""
+echo "🧹 Cleaning up build artifacts..."
+rm -rf "$BUILD_DIR/runagent_entry.build"
+rm -rf "$BUILD_DIR/runagent_entry.onefile-build"
+echo "✅ Cleaned up temporary files"
 
 echo ""
 echo "✅ Build complete!"
 echo ""
 
-# The binary should be in the standalone folder
-# Nuitka creates the dist folder based on the input filename (runagent_entry.py -> runagent_entry.dist)
+# The binary is in the standalone folder
 DIST_EXECUTABLE="$BUILD_DIR/runagent_entry.dist/$FINAL_OUTPUT"
 
 if [ -f "$DIST_EXECUTABLE" ]; then
@@ -168,12 +172,24 @@ EOF
     echo "✨ Success! Executable is ready"
     echo ""
     echo "📊 Binary information:"
-    ls -lh "$DIST_EXECUTABLE"
+    echo "   Distributable folder: $(du -sh $BUILD_DIR/runagent_entry.dist | cut -f1)"
+    echo "   Main binary: $(ls -lh $DIST_EXECUTABLE | awk '{print $5}')"
     echo ""
     echo "📦 Distribution structure:"
     echo "   $BUILD_DIR/runagent_entry.dist/      # Standalone folder with all dependencies"
     echo "   $BUILD_DIR/$FINAL_OUTPUT             # Wrapper script (use this!)"
     echo ""
+    
+    # Create tarball for distribution
+    echo "📦 Creating release archive..."
+    cd "$BUILD_DIR"
+    tar -czf "../runagent-macos-${ARCH_NAME}.tar.gz" runagent_entry.dist/
+    cd - > /dev/null
+    
+    TARBALL_SIZE=$(ls -lh "dist/runagent-macos-${ARCH_NAME}.tar.gz" | awk '{print $5}')
+    echo "✅ Release archive created: dist/runagent-macos-${ARCH_NAME}.tar.gz ($TARBALL_SIZE)"
+    echo ""
+    
     echo "💡 Usage:"
     echo "   $BUILD_DIR/$FINAL_OUTPUT --version"
     echo "   $BUILD_DIR/$FINAL_OUTPUT --help"
@@ -185,8 +201,8 @@ EOF
     echo "   sudo cp -r $BUILD_DIR/runagent_entry.dist /usr/local/lib/"
     echo "   sudo ln -sf /usr/local/lib/runagent_entry.dist/$FINAL_OUTPUT /usr/local/bin/runagent"
     echo ""
-    echo "📝 Note: This creates a ~50-100MB folder instead of single 400MB file"
-    echo "   But startup is 10-20x FASTER! (~1s instead of 18s)"
+    echo "📝 Note: This creates a ~100-150MB folder instead of single file"
+    echo "   But startup is 10-20x FASTER! (~1-2s instead of 15-20s)"
 else
     echo "❌ Binary file not found at $DIST_EXECUTABLE"
     echo ""

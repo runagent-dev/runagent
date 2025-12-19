@@ -163,4 +163,17 @@ parlant-data
 
 test.md
 
-_dist
+# Build artifacts
+dist/
+dist-*/
+runagent_entry.py
+runagent_entry.build/
+runagent_entry.dist/
+runagent_entry.onefile-build/
+
+# Nuitka cache
+.nuitka/
+
+# CI/CD artifacts (shouldn't be in repo)
+artifacts/
+release-assets/

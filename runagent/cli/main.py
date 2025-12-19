@@ -8,7 +8,7 @@ from .branding import print_logo
 
 from .commands.setup import setup as setup_cmd
 from .commands.config import config as config_cmd
-from .commands.teardown import teardown as teardown_cmd 
+from .commands.teardown import teardown as teardown_cmd
 from .commands.init import init as init_cmd
 from .commands.upload import upload as upload_cmd
 from .commands.start import start as start_cmd
@@ -18,6 +18,8 @@ from .commands.run import run as run_cmd
 from .commands.run_stream import run_stream as run_stream_cmd
 from .commands.db import db as db_cmd
 from .commands.whoami import whoami as whoami_cmd
+
+
 
 if not os.getenv('DISABLE_TRY_CATCH'):
     warnings.filterwarnings(
@@ -60,6 +62,7 @@ def runagent(ctx):
     if ctx.invoked_subcommand is None:
         print_logo(show_tagline=True, brand_color="cyan")
         click.echo(ctx.get_help())
+
 
 runagent.add_command(setup_cmd)
 runagent.add_command(config_cmd)

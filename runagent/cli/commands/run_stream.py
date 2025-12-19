@@ -8,7 +8,6 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from runagent.client.client import RunAgentClient, RunAgentExecutionError
 console = Console()
 
 
@@ -161,6 +160,7 @@ def run_stream(ctx, agent_id, host, port, input_file, local, tag, timeout):
     # ============================================
     
     try:
+        from runagent.client.client import RunAgentClient
         ra_client = RunAgentClient(
             agent_id=agent_id,
             local=local,

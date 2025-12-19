@@ -8,9 +8,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from runagent.sdk.server.local_server import LocalServer
 from runagent.utils.config import Config
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 console = Console()
 
 
@@ -59,18 +57,20 @@ def serve(port, host, debug, reload, no_animation, animation_style, path):
 
     try:
         from runagent.cli.branding import print_header, show_simple_serve_progress
+        from runagent.sdk.server.local_server import LocalServer
+        from runagent.sdk.deployment.middleware_sync import get_middleware_sync
         print_header("Serve Agent Locally")
-        
+
         # Show subtle progress animation (unless disabled)
         if not no_animation:
             show_simple_serve_progress("Initializing server")
-        
+
         console.print("[bold]Starting local server with auto port allocation...[/bold]")
-        
+
         # Show progress while creating server
         if not no_animation:
             show_simple_serve_progress("Creating server instance")
-        
+
         # Use the existing LocalServer.from_path method
         server = LocalServer.from_path(path, port=port, host=host)
         
