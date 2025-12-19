@@ -1,5 +1,4 @@
 from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.messages import StructuredMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 

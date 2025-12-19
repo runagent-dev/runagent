@@ -9,9 +9,8 @@ import uuid
 import subprocess
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from openai import OpenAI
-import shutil
 from pathlib import Path
 
 app = FastAPI(title="RunAgent Generator API")

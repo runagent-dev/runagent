@@ -5,7 +5,6 @@ Handles database setup, extension enabling, and connection management
 
 import os
 import asyncpg
-import asyncio
 from typing import Optional
 from loguru import logger
 

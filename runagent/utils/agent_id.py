@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
-import os
 
 
 def generate_agent_id() -> str:

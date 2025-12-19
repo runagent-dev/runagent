@@ -5,7 +5,7 @@ Remote deployment management.
 import typing as t
 from pathlib import Path
 
-from ..exceptions import AuthenticationError, ValidationError
+from ..exceptions import ValidationError
 from ..rest_client import RestClient
 
 

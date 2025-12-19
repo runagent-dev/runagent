@@ -3,28 +3,14 @@ CLI commands that use the restructured SDK internally.
 """
 import os
 import json
-import uuid
 
-from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.table import Table
 
-from runagent import RunAgent
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
-    TemplateError,
-    ValidationError,
 )
-from runagent.client.client import RunAgentClient
-from runagent.sdk.server.local_server import LocalServer
-from runagent.utils.agent import detect_framework
-from runagent.utils.animation import show_subtle_robotic_runner, show_quick_runner
-from runagent.utils.config import Config
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
-from runagent.cli.utils import add_framework_options, get_selected_framework
-from runagent.utils.enums.framework import Framework
 console = Console()
 
 
@@ -52,8 +38,9 @@ def start(agent_id, config):
 
     try:
         from runagent.cli.branding import print_header
+        from runagent import RunAgent
         print_header("Start Remote Agent")
-        
+
         sdk = RunAgent()
 
         # Check authentication

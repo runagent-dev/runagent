@@ -1,9 +1,7 @@
 import math
 import time
 import openai
-import tiktoken
 import random
-import requests
 import google.generativeai as genai
 
 import util
@@ -12,8 +10,6 @@ from log.custom_logger import log
 from prompt.agent_prompt import *
 from procoder.functional import format_prompt
 from procoder.prompt import *
-from secretary import Secretary
-from stock import Stock
 
 
 def random_init(stock_a_initial, stock_b_initial):

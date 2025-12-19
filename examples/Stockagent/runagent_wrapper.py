@@ -1,16 +1,13 @@
 """
 RunAgent Wrapper for StockAgent - RUNS REAL SIMULATION WITH FULL LOGGING
 """
-import json
 import time
-import sys
 import io
 import logging
 from typing import Dict, Any, Iterator
 from dataclasses import dataclass, asdict
 import os
 import random
-from contextlib import redirect_stdout, redirect_stderr
 
 # Import StockAgent modules
 from main import handle_action

@@ -27,10 +27,11 @@ def get_executor(
         Framework.AUTOGEN: AutogenExecutor,
         Framework.CREWAI: CrewAIExecutor,
         Framework.LANGGRAPH: LangGraphExecutor,
-        Framework.LANGCHAIN: GenericExecutor,
+        Framework.LANGCHAIN: LangChainExecutor,
         Framework.LETTA: GenericExecutor,
         Framework.LLAMAINDEX: LlamaIndexExecutor,
-        Framework.N8N: N8NExecutor
+        Framework.N8N: N8NExecutor,
+        Framework.PARLANT: ParlantExecutor
     }
     framework_executor = executor_dict.get(framework)
     if framework_executor is None:

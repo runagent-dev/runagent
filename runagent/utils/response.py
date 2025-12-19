@@ -1,6 +1,6 @@
 import json
-from jsonpath_ng import jsonpath, parse
-from typing import Any, Union, List, Dict
+from jsonpath_ng import parse
+from typing import Any, Dict
 
 def to_dict(obj: Any) -> Any:
     """

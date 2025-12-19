@@ -9,8 +9,6 @@ from rich.console import Console
 from rich.panel import Panel
 
 from runagent.cli.branding import print_header
-from runagent.sdk import RunAgent
-from runagent.sdk.db import DBService
 from runagent.utils.agent import get_agent_config, get_agent_config_with_defaults
 from runagent.utils.agent_id import generate_config_fingerprint
 
@@ -57,6 +55,7 @@ def _register_agent_core(agent_path: Path):
             raise click.ClickException("Failed to load agent configuration")
         
         # Check if agent already exists
+        from runagent.sdk.db import DBService
         db_service = DBService()
         existing_agent = db_service.get_agent(agent_id)
         

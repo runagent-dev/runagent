@@ -5,7 +5,6 @@ import os
 import json
 import tempfile
 from werkzeug.utils import secure_filename
-from typing import Dict, Any
 
 # Import DocumentManager from manage_documents
 import sys

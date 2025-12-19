@@ -1,5 +1,5 @@
 import logging
-from colorama import Fore, Style, Back
+from colorama import Fore, Style
 
 class ColoredFormatter(logging.Formatter):
     def format(self, record):

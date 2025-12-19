@@ -5,7 +5,7 @@ Respects .gitignore rules similar to Git's behavior.
 import os
 import fnmatch
 from pathlib import Path
-from typing import List, Set
+from typing import List
 
 
 class GitignoreFilter:

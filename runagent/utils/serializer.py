@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import math
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 from dataclasses import asdict
 from datetime import datetime, date, time
 from runagent.utils.schema import SafeMessage

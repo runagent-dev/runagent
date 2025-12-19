@@ -3,7 +3,6 @@
 Handles HTTP communication with device code authentication endpoints.
 """
 
-import os
 import secrets
 import typing as t
 

@@ -1,0 +1,187 @@
+name: Build Release Binaries
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build for'
+        required: true
+        type: string
+
+jobs:
+  build-macos:
+    name: Build macOS Binaries
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Build for ${{ matrix.arch }}
+        run: |
+          chmod +x build_scripts/build-macos-standalone.sh
+          bash build_scripts/build-macos-standalone.sh
+        env:
+          ARCH: ${{ matrix.arch }}
+      
+      - name: Verify build
+        run: |
+          ARCH_NAME=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }}
+          if [ ! -f "dist/runagent-macos-${ARCH_NAME}.tar.gz" ]; then
+            echo "❌ Build artifact not found!"
+            exit 1
+          fi
+          echo "✅ Build artifact verified"
+          ls -lh dist/runagent-macos-${ARCH_NAME}.tar.gz
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: runagent-macos-${{ matrix.arch }}
+          path: dist/runagent-macos-*.tar.gz
+          retention-days: 1
+
+  build-linux:
+    name: Build Linux Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev ccache patchelf
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Build for ${{ matrix.arch }}
+        run: |
+          chmod +x build_scripts/build-linux-standalone.sh
+          bash build_scripts/build-linux-standalone.sh
+        env:
+          ARCH: ${{ matrix.arch }}
+      
+      - name: Verify build
+        run: |
+          ARCH_NAME=${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64' }}
+          if [ ! -f "dist/runagent-linux-${ARCH_NAME}.tar.gz" ]; then
+            echo "❌ Build artifact not found!"
+            exit 1
+          fi
+          echo "✅ Build artifact verified"
+          ls -lh dist/runagent-linux-${ARCH_NAME}.tar.gz
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: runagent-linux-${{ matrix.arch }}
+          path: dist/runagent-linux-*.tar.gz
+          retention-days: 1
+
+  build-windows:
+    name: Build Windows Binaries
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Build for Windows
+        run: |
+          powershell -ExecutionPolicy Bypass -File build_scripts\build-windows-standalone.ps1
+      
+      - name: Verify build
+        run: |
+          if (-not (Test-Path "dist\runagent-windows-amd64.zip")) {
+            Write-Host "❌ Build artifact not found!"
+            exit 1
+          }
+          Write-Host "✅ Build artifact verified"
+          Get-Item dist\runagent-windows-amd64.zip | Format-List
+        shell: pwsh
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: runagent-windows-amd64
+          path: dist/runagent-windows-*.zip
+          retention-days: 1
+
+  upload-to-release:
+    name: Upload Binaries to Release
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      
+      - name: Display structure
+        run: |
+          echo "📦 Downloaded artifacts:"
+          ls -R artifacts/
+      
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} release-assets/ \;
+          echo "📋 Release assets:"
+          ls -lh release-assets/
+      
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.release.tag_name || inputs.tag }}
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

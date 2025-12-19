@@ -4,9 +4,7 @@ Handles document processing, insertion, and querying
 """
 
 import os
-import asyncio
 from typing import List, Dict, Optional, Any
-from pathlib import Path
 
 from lightrag import LightRAG, QueryParam
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed

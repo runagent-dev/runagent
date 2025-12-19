@@ -1,9 +1,7 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 import json
 import time
-from datetime import datetime, timezone
-import uuid
 from rich.console import Console
 from runagent.utils.serializer import CoreSerializer
 from runagent.utils.schema import WebSocketActionType, WebSocketAgentRequest
@@ -425,7 +423,6 @@ class AgentWebSocketHandler:
                     
                     try:
                         from runagent.utils.logging_utils import is_verbose_logging_enabled
-                        from datetime import datetime
                         
                         execution_data = {
                             "local_execution_id": invocation_id,
@@ -472,7 +469,6 @@ class AgentWebSocketHandler:
                     
                     try:
                         from runagent.utils.logging_utils import is_verbose_logging_enabled
-                        from datetime import datetime
                         
                         execution_data = {
                             "local_execution_id": invocation_id,

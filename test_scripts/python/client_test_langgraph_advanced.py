@@ -28,7 +28,6 @@
 ##streaming
 
 from runagent import RunAgentClient
-import asyncio
 
 
 ra_client = RunAgentClient(agent_id="7ada23ab-a092-447b-8471-b747eb1e5f9f", entrypoint_tag="generic_stream", local=True)
