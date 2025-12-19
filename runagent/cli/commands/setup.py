@@ -7,7 +7,7 @@ import os
 import click
 from rich.console import Console
 
-from runagent import RunAgent
+from runagent import RunAgentSDK
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
 )
@@ -40,7 +40,7 @@ def setup(again):
         from rich.prompt import Prompt
         from rich.panel import Panel
         
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         api_key = Config.get_api_key()
 
         # Check if already configured

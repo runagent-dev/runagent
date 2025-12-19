@@ -39,8 +39,8 @@ def db():
 def status(cleanup_days, agent_id):
     """Show local database status and statistics (ENHANCED with invocation stats)"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
 
         if agent_id:
             # Show agent-specific details including invocations
@@ -172,8 +172,8 @@ def status(cleanup_days, agent_id):
 def invocations(agent_id, status, limit, output_format):
     """Show agent invocation history and statistics"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
         
         # Get invocations
         invocations_list = sdk.db_service.list_invocations(
@@ -283,8 +283,8 @@ def invocations(agent_id, status, limit, output_format):
 def invocation(invocation_id, output_format):
     """Show detailed information about a specific invocation"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
         
         invocation = sdk.db_service.get_invocation(invocation_id)
         
@@ -377,8 +377,8 @@ def invocation(invocation_id, output_format):
 def cleanup(days, agent_runs, yes):
     """Clean up old database records"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
         
         # Get count of records to be cleaned
         all_invocations = sdk.db_service.list_invocations(limit=1000)
@@ -442,8 +442,8 @@ def cleanup(days, agent_runs, yes):
 def logs(agent_id, limit, output_format):
     """Show all agent logs (no filtering)"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
         
         if agent_id:
             # Show logs for specific agent
@@ -557,8 +557,8 @@ def logs(agent_id, limit, output_format):
 def cleanup_logs(days, yes):
     """Clean up old agent logs"""
     try:
-        from runagent import RunAgent
-        sdk = RunAgent()
+        from runagent import RunAgentSDK
+        sdk = RunAgentSDK()
         
         if not yes:
             if not click.confirm(f"⚠️ This will delete logs older than {days} days for ALL agents. Continue?"):
