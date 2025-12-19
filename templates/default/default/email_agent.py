@@ -1,7 +1,6 @@
 import time
 import random
-import threading
-from typing import Iterator, Dict, Any, Optional
+from typing import Iterator
 from dataclasses import dataclass
 from enum import Enum
 

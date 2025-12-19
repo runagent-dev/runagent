@@ -4,7 +4,6 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 # Load environment variables

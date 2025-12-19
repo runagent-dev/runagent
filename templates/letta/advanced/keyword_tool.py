@@ -9,7 +9,6 @@ def extract_keywords(text: str, num_keywords: int = 5) -> dict:
     Returns:
         dict: Dictionary containing the extracted keywords
     """
-    import os
     from langchain_openai import ChatOpenAI
     from langchain.prompts import PromptTemplate
 

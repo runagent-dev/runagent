@@ -1,8 +1,5 @@
 import argparse
 import random
-import pandas as pd
-import openai
-import tiktoken
 
 import util
 from agent import Agent

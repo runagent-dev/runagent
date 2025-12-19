@@ -1,17 +1,13 @@
 import os
 from typing import List, Dict, Any, Literal, Optional, Tuple
 from dataclasses import dataclass
-import tempfile
 
 # --- LangChain v0.2+/0.3+ imports ---
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import Qdrant
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI

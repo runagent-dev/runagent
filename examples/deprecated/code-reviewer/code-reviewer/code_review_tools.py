@@ -15,8 +15,6 @@ def analyze_code_quality(code: str, language: str = "auto") -> dict:
         dict: Quality analysis results
     """
     # ALL IMPORTS MUST BE INSIDE THE FUNCTION FOR LETTA
-    import re
-    import ast
     
     def _detect_language_internal(code: str) -> str:
         """Auto-detect programming language from code content"""

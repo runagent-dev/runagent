@@ -1,4 +1,3 @@
-import json
 import os
 import subprocess
 import sys
@@ -7,31 +6,23 @@ import uuid
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, status, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from rich.console import Console
-from enum import Enum
 from runagent.sdk.db import DBService
 from runagent.sdk.server.framework import get_executor
 from runagent.utils.agent import detect_framework, get_agent_config
-from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponseMinimal, ErrorDetail, WebSocketActionType, WebSocketAgentRequest
+from runagent.utils.schema import AgentInfo, AgentRunRequest, AgentRunResponseMinimal, ErrorDetail
 from runagent.utils.imports import PackageImporter
-from runagent.utils.schema import MessageType
 from runagent.sdk.server.socket_utils import AgentWebSocketHandler
-from runagent.utils.port import PortManager
 from runagent.utils.serializer import CoreSerializer
-from runagent.utils.logs import DatabaseLogHandler
-from runagent.sdk.deployment.middleware_sync import get_middleware_sync
 from runagent.sdk.deployment.middleware_sync import MiddlewareSyncService
 from runagent.sdk.config import SDKConfig
 
-from runagent.utils.port import PortManager
 from runagent.utils.agent import detect_framework, get_agent_config
 
 console = Console()

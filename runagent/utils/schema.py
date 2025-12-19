@@ -57,7 +57,6 @@ class AgentArchitecture(BaseModel):
             raise ValueError("All entrypoint tags must be unique")
         return v
 
-from pydantic import ConfigDict
 
 
 class RunAgentConfig(BaseModel):

@@ -1,9 +1,8 @@
 from functools import partial
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
-import json
 import requests
-from typing import Dict, List
+from typing import Dict
 import time
 import re
 import os

@@ -1,10 +1,7 @@
-import base64
 import json
 import os
 import re
-import tempfile
 import time
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -23,11 +20,6 @@ from rich.progress import (
 
 from runagent.utils.config import Config
 from runagent.constants import DEFAULT_TIMEOUT_SECONDS
-from runagent.utils.agent_id import (
-    generate_agent_id,
-    generate_agent_fingerprint,
-    get_agent_metadata
-)
 from runagent.utils.agent import get_agent_config, validate_agent
 
 console = Console()

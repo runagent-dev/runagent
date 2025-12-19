@@ -159,7 +159,6 @@ fail_under = 80
 
 [tool.ruff]
 line-length = 88
-target-version = "0.1.41"
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings

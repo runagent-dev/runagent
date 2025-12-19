@@ -3,7 +3,6 @@
 Test script to check if backend is accessible
 """
 import requests
-import sys
 
 def test_backend(url):
     """Test if backend is accessible"""

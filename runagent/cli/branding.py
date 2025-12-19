@@ -121,8 +121,6 @@ def show_serve_progress(steps: list = None):
         steps: List of (message, completed) tuples showing progress steps
     """
     from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-    from rich.live import Live
-    from rich.text import Text
     import time
     
     default_steps = [

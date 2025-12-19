@@ -1,7 +1,7 @@
 import logging
 import asyncio
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable
 
 
 class DatabaseLogHandler(logging.Handler):

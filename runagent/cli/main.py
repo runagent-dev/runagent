@@ -3,7 +3,6 @@ import click
 import warnings
 from rich.console import Console
 
-from . import commands
 from .branding import print_logo
 
 

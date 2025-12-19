@@ -1,7 +1,6 @@
 """
 Environment variables utility for merging config and .env files.
 """
-import os
 from pathlib import Path
 from typing import Dict, Any
 
