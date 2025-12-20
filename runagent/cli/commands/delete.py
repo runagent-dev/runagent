@@ -8,7 +8,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from runagent import RunAgent
+from runagent import RunAgentSDK
 console = Console()
 
 
@@ -38,7 +38,7 @@ def delete(agent_id, yes):
         from runagent.cli.branding import print_header
         print_header("Delete Agent")
         
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         
         # Get agent info first
         agent = sdk.db_service.get_agent(agent_id)

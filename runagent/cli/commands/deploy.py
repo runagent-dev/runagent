@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from runagent import RunAgent
+from runagent import RunAgentSDK
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
 )
@@ -52,7 +52,7 @@ def deploy(path: Path, overwrite: bool):
         from runagent.cli.branding import print_header
         print_header("Deploy Agent")
         
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
 
         # Check authentication
         if not sdk.is_configured():

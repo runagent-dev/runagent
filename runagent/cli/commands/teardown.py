@@ -7,7 +7,7 @@ import os
 import click
 from rich.console import Console
 
-from runagent import RunAgent
+from runagent import RunAgentSDK
 console = Console()
 
 
@@ -41,7 +41,7 @@ def teardown(yes):
         
         print_header("Complete Teardown")
         
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
 
         if not yes:
             config_status = sdk.get_config_status()

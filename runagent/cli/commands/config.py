@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from runagent import RunAgent
+from runagent import RunAgentSDK
 from runagent.sdk.exceptions import (  # RunAgentError,; ConnectionError
     AuthenticationError,
 )
@@ -93,7 +93,7 @@ def _set_api_key_direct(api_key: str):
     
     # Validate and fetch user info
     try:
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         base_url = Config.get_base_url() or DEFAULT_BASE_URL
         
         with Status("[bold cyan]Validating credentials...", spinner="dots"):
@@ -232,7 +232,7 @@ def _interactive_set_api_key():
     
     # Validate and fetch user info
     try:
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         base_url = Config.get_base_url() or DEFAULT_BASE_URL
         
         with Status("[bold cyan]Validating credentials...", spinner="dots"):
@@ -576,7 +576,7 @@ def _interactive_reset_config():
         console.print("[dim]Reset cancelled.[/dim]")
         return
     
-    sdk = RunAgent()
+    sdk = RunAgentSDK()
     sdk.config.clear()
     
     console.print(Panel(
@@ -604,7 +604,7 @@ def _reset_config_without_prompt():
     from rich.panel import Panel
     
     try:
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         sdk.config.clear()
         
         console.print(Panel(

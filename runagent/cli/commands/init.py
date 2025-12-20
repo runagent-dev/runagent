@@ -13,7 +13,7 @@ from rich.prompt import Prompt
 from runagent.cli.branding import print_header
 from runagent.cli.utils import add_framework_options, get_selected_framework, safe_prompt
 from runagent.constants import AGENT_CONFIG_FILE_NAME, TEMPLATE_REPO_URL
-from runagent.sdk import RunAgent
+from runagent.sdk import RunAgentSDK
 from runagent.sdk.exceptions import TemplateError
 from runagent.utils.agent import get_agent_config, get_agent_config_with_defaults
 from runagent.utils.agent_id import generate_agent_id, generate_config_fingerprint
@@ -65,7 +65,7 @@ def init(path, template, minimal, existing, from_template, use_auth, name, descr
     try:
         print_header("Initialize Project")
         
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         
         # Determine project path
         project_path = path.resolve()

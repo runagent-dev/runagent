@@ -38,10 +38,10 @@ def start(agent_id, config):
 
     try:
         from runagent.cli.branding import print_header
-        from runagent import RunAgent
+        from runagent import RunAgentSDK
         print_header("Start Remote Agent")
 
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
 
         # Check authentication
         if not sdk.is_configured():

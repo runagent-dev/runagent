@@ -49,10 +49,10 @@ def upload(path: Path, overwrite: bool):
 
     try:
         from runagent.cli.branding import print_header
-        from runagent import RunAgent
+        from runagent import RunAgentSDK
         print_header("Upload Agent")
 
-        sdk = RunAgent()
+        sdk = RunAgentSDK()
         
         # Check authentication
         if not sdk.is_configured():
