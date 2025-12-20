@@ -20,6 +20,8 @@ async fn main() -> runagent::RunAgentResult<()> {
         port: None,
         extra_params: None,
         enable_registry: None,
+        user_id: None,
+        persistent_memory: None,
     })
     .await?;
 

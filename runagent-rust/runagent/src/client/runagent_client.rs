@@ -54,6 +54,8 @@ pub struct RunAgentClient {
 ///         base_url: Some("http://localhost:8333/".to_string()),
 ///         extra_params: None,
 ///         enable_registry: None,
+///         user_id: None,
+///         persistent_memory: None,
 ///     }).await?;
 ///     Ok(())
 /// }
