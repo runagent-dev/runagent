@@ -55,7 +55,7 @@ class SocketClient:
         self._debug(f"  - base_socket_url: {self.base_socket_url}")
         self._debug(f"  - api_key: {'SET' if self.api_key else 'NOT SET'}")
         
-    async def run_stream_async(self, agent_id: str, entrypoint_tag: str, *input_args, **input_kwargs) -> AsyncIterator[Any]:
+    async def run_stream_async(self, agent_id: str, entrypoint_tag: str, *input_args, user_id=None, persistent_memory=False, **input_kwargs) -> AsyncIterator[Any]:
         """Stream agent execution results (async version)"""
 
         # FIXED: Build proper cloud URL with query param auth
@@ -89,6 +89,11 @@ class SocketClient:
                     "timeout_seconds": 600,  
                     "async_execution": False
                 }
+                # Add persistent storage parameters if provided
+                if user_id is not None:
+                    request_data["user_id"] = user_id
+                if persistent_memory:
+                    request_data["persistent_memory"] = persistent_memory
                 
                 self._debug(f"Sending request: {request_data}")
                 
@@ -148,7 +153,7 @@ class SocketClient:
             cleaned_msg = self._clean_error_message(error_msg)
             raise Exception(cleaned_msg)
 
-    def run_stream(self, agent_id: str, entrypoint_tag: str, input_args, input_kwargs) -> Iterator[Any]:
+    def run_stream(self, agent_id: str, entrypoint_tag: str, input_args, input_kwargs, user_id=None, persistent_memory=False) -> Iterator[Any]:
         """Stream agent execution results (sync version)"""
         from websockets.sync.client import connect
         
@@ -186,6 +191,11 @@ class SocketClient:
                     "timeout_seconds": 600,  
                     "async_execution": False
                 }
+                # Add persistent storage parameters if provided
+                if user_id is not None:
+                    request_data["user_id"] = user_id
+                if persistent_memory:
+                    request_data["persistent_memory"] = persistent_memory
                 
                 self._debug(f"Sending request: {request_data}")
                 

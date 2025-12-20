@@ -47,8 +47,19 @@ def format_error_message(error_info):
 @click.option("--tag", required=True, help="Entrypoint tag to be used")
 # @click.option("--generic-stream", is_flag=True, help="Use generic streaming mode")
 @click.option("--timeout", type=int, help="Timeout in seconds")
+@click.option(
+    "--user-id",
+    type=str,
+    help="User ID for persistent memory (matches SDK RunAgentClient.user_id)",
+)
+@click.option(
+    "--persistent-memory",
+    is_flag=True,
+    default=False,
+    help="Enable persistent memory for the given user_id",
+)
 @click.pass_context
-def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
+def run(ctx, agent_id, host, port, input_file, local, tag, timeout, user_id, persistent_memory):
     """
     Run an agent with flexible configuration options
     
@@ -199,7 +210,9 @@ def run(ctx, agent_id, host, port, input_file, local, tag, timeout):
             local=local,
             host=host,
             port=port,
-            entrypoint_tag=tag
+            entrypoint_tag=tag,
+            user_id=user_id,
+            persistent_memory=persistent_memory,
         )
 
         if tag.endswith("_stream"):

@@ -73,6 +73,8 @@ impl SocketClient {
         entrypoint_tag: &str,
         input_args: &[Value],
         input_kwargs: &HashMap<String, Value>,
+        user_id: Option<&str>,
+        persistent_memory: bool,
     ) -> RunAgentResult<Pin<Box<dyn Stream<Item = RunAgentResult<Value>> + Send>>> {
         let url = self.get_websocket_url(agent_id, entrypoint_tag)?;
 
@@ -86,7 +88,7 @@ impl SocketClient {
         let (mut write, mut read) = ws_stream.split();
 
         // Prepare start stream request with id field (as middleware expects)
-        let request_data = serde_json::json!({
+        let mut request_data = serde_json::json!({
             "id": "stream_start",
             "entrypoint_tag": entrypoint_tag,
             "input_args": input_args,
@@ -94,6 +96,21 @@ impl SocketClient {
             "timeout_seconds": 600,
             "async_execution": false
         });
+
+        // Add persistent storage parameters if provided (matches Python SDK)
+        if let Some(uid) = user_id {
+            if let Some(obj) = request_data.as_object_mut() {
+                obj.insert("user_id".to_string(), serde_json::json!(uid));
+            }
+        }
+        if persistent_memory {
+            if let Some(obj) = request_data.as_object_mut() {
+                obj.insert(
+                    "persistent_memory".to_string(),
+                    serde_json::json!(persistent_memory),
+                );
+            }
+        }
 
         // Send the request data directly (matching Python SDK format)
         let serialized_msg = serde_json::to_string(&request_data)?;

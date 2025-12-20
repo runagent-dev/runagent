@@ -23,6 +23,11 @@ pub struct RunAgentClient {
     agent_architecture: Option<Value>,
     extra_params: Option<HashMap<String, Value>>,
 
+    /// User ID for persistent memory (matches Python SDK RunAgentClient.user_id)
+    user_id: Option<String>,
+    /// Enable persistent memory for this user (matches Python SDK RunAgentClient.persistent_memory)
+    persistent_memory: bool,
+
     #[cfg(feature = "db")]
     #[allow(dead_code)] // Reserved for future use
     db_service: Option<DatabaseService>,
@@ -49,6 +54,8 @@ pub struct RunAgentClient {
 ///         base_url: Some("http://localhost:8333/".to_string()),
 ///         extra_params: None,
 ///         enable_registry: None,
+///         user_id: None,
+///         persistent_memory: None,
 ///     }).await?;
 ///     Ok(())
 /// }
@@ -90,6 +97,10 @@ pub struct RunAgentClientConfig {
     pub extra_params: Option<HashMap<String, Value>>,
     /// Enable database registry lookup (default: true for local agents)
     pub enable_registry: Option<bool>,
+    /// User ID for persistent memory
+    pub user_id: Option<String>,
+    /// Enable persistent memory for this user
+    pub persistent_memory: Option<bool>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -105,6 +116,8 @@ impl Default for RunAgentClientConfig {
             base_url: None,
             extra_params: None,
             enable_registry: None,
+            user_id: None,
+            persistent_memory: None,
         }
     }
 }
@@ -122,6 +135,8 @@ impl RunAgentClientConfig {
             base_url: None,
             extra_params: None,
             enable_registry: None,
+            user_id: None,
+            persistent_memory: None,
         }
     }
 
@@ -159,6 +174,18 @@ impl RunAgentClientConfig {
     /// Enable or disable registry lookup
     pub fn with_enable_registry(mut self, enable: bool) -> Self {
         self.enable_registry = Some(enable);
+        self
+    }
+
+    /// Set user ID for persistent memory
+    pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
+        self.user_id = Some(user_id.into());
+        self
+    }
+
+    /// Enable or disable persistent memory for this user
+    pub fn with_persistent_memory(mut self, persistent: bool) -> Self {
+        self.persistent_memory = Some(persistent);
         self
     }
 }
@@ -288,6 +315,8 @@ impl RunAgentClient {
             serializer,
             agent_architecture: None,
             extra_params: config.extra_params,
+            user_id: config.user_id,
+            persistent_memory: config.persistent_memory.unwrap_or(false),
 
             #[cfg(feature = "db")]
             db_service,
@@ -372,6 +401,8 @@ impl RunAgentClient {
                 &self.entrypoint_tag,
                 input_args,
                 &input_kwargs_map,
+                self.user_id.as_deref(),
+                self.persistent_memory,
             )
             .await?;
 
@@ -521,6 +552,8 @@ impl RunAgentClient {
                 &self.entrypoint_tag,
                 input_args,
                 &input_kwargs_map,
+                self.user_id.as_deref(),
+                self.persistent_memory,
             )
             .await
     }
@@ -553,6 +586,16 @@ impl RunAgentClient {
     /// Get any extra params supplied during initialization
     pub fn extra_params(&self) -> Option<&HashMap<String, Value>> {
         self.extra_params.as_ref()
+    }
+
+    /// Get user ID used for persistent memory, if any
+    pub fn user_id(&self) -> Option<&str> {
+        self.user_id.as_deref()
+    }
+
+    /// Check if persistent memory is enabled for this client
+    pub fn persistent_memory(&self) -> bool {
+        self.persistent_memory
     }
 
     /// Check if using local deployment

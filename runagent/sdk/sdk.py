@@ -312,6 +312,8 @@ class RunAgentSDK:
         messages: t.Optional[t.List[t.Dict[str, str]]] = None,
         config: t.Optional[t.Dict[str, t.Any]] = None,
         local: bool = True,
+        user_id: t.Optional[str] = None,
+        persistent_memory: bool = False,
     ) -> t.Dict[str, t.Any]:
         """
         Run an agent with a message or conversation.
@@ -322,6 +324,8 @@ class RunAgentSDK:
             messages: List of message objects with 'role' and 'content'
             config: Optional configuration
             local: Whether to run locally or remotely
+            user_id: User ID for persistent storage (required if persistent_memory=True)
+            persistent_memory: Enable persistent storage for this execution
 
         Returns:
             Agent execution result with proper error handling
@@ -336,6 +340,14 @@ class RunAgentSDK:
 
         if config:
             input_data["config"] = config
+
+        # Add persistent storage parameters to input_data if provided
+        if user_id is not None:
+            input_data["user_id"] = user_id
+        if persistent_memory:
+            input_data["persistent_memory"] = persistent_memory
+            if user_id is None:
+                raise ValidationError("user_id is required when persistent_memory=True")
 
         # Run the agent
         if local:

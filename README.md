@@ -26,6 +26,7 @@
       <th align="center"><a href="https://github.com/runagent-dev/runagent-js">runagent-js</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-rs">runagent-rs</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-go">runagent-go</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-dart">runagent-dart</a></th>
     </tr>
   </thead>
   <tbody>
@@ -50,6 +51,11 @@
           <img src="https://img.shields.io/github/stars/runagent-dev/runagent-go?style=social" alt="GitHub stars">
         </a>
       </td>
+      <td align="center">
+        <a href="https://pub.dev/packages/runagent">
+          <img src="https://img.shields.io/pub/dm/runagent" alt="pub.dev downloads">
+        </a>
+      </td>
     </tr>
       <tr>
       <td align="center">
@@ -66,10 +72,40 @@
           <img src="https://pkg.go.dev/badge/github.com/runagent-dev/runagent-go.svg" alt="Go Reference">
         </a>
       </td>
+      <td align="center">
+        <a href="https://pub.dev/packages/runagent">
+          <img src="https://img.shields.io/pub/v/runagent" alt="pub.dev version">
+        </a>
+      </td>
     </tr>
   </tbody>
 </table>
 </div>
+
+---
+
+<div align="center">
+
+<h3>🎉 News</h3>
+<h2>We have published RunAgent Pulse</h2>
+
+
+</div>
+
+- **[2025.12] 🎯 [New Product]** Published **RunAgent Pulse – Scheduling & Orchestration**, a self-hosted “Google Calendar for your AI agents”.
+- **[2025.12] 🎯 [Integration]** Integrated the **PaperFlow** arXiv research agent with **RunAgent Serverless** and **RunAgent Pulse** for end-to-end scheduled arXiv monitoring and email notifications.
+
+## What is RunAgent-Pulse?
+
+### RunAgent Pulse is a Google Calendar for Your AI Agents 
+
+A lightweight, **self-hosted scheduling service** designed for AI agents and developers.  
+Schedule agent executions with **second-level precision**, **natural language scheduling**, and **seamless integration with RunAgent Serverless**.  
+We’ve unveiled this as a companion project:
+
+- GitHub: [RunAgent-Pulse](https://github.com/runagent-dev/runagent-pulse)
+
+Use it together with this repo to deploy agents (RunAgent) in our serverless cloud and then **orchestrate/schedule** them (Pulse).
 
 ---
 
@@ -219,14 +255,15 @@ async def solve_problem_stream(query, num_solutions, constraints):
 
 **🌐 Access from any language:**
 
-RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
+RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, Dart, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
 
 <table>
 <tr>
-<td width="25%"><b>Python SDK</b></td>
-<td width="25%"><b>JavaScript SDK</b></td>
-<td width="25%"><b>Rust SDK</b></td>
-<td width="25%"><b>Go SDK</b></td>
+<td width="20%"><b>Python SDK</b></td>
+<td width="20%"><b>JavaScript SDK</b></td>
+<td width="20%"><b>Rust SDK</b></td>
+<td width="20%"><b>Go SDK</b></td>
+<td width="20%"><b>Dart SDK</b></td>
 </tr>
 <tr>
 <td valign="top">
@@ -382,6 +419,40 @@ func main() {
 ```
 
 </td>
+<td valign="top">
+
+```dart
+import 'package:runagent/runagent.dart';
+
+void main() async {
+  final client = await RunAgentClient.create(
+    RunAgentClientConfig.create(
+      agentId: "lg-solver-123",
+      entrypointTag: "solve_problem",
+      local: true,
+    ),
+  );
+
+  final result = await client.run({
+    "query": "My laptop is slow",
+    "num_solutions": 3,
+    "constraints": [
+      {"type": "budget", "value": 100}
+    ],
+  });
+  print(result);
+
+  // Streaming
+  await for (final chunk in client.runStream({
+    "query": "Fix my phone",
+    "num_solutions": 4,
+  })) {
+    print(chunk);
+  }
+}
+```
+
+</td>
 </tr>
 </table>
 
@@ -468,6 +539,105 @@ RunAgent Cloud provides:
 
 ---
 
+## 🧠 Persistent Memory: Revolutionary Serverless Memory System
+
+RunAgent introduces **Persistent Memory** - the fastest serverless memory system for AI agents. Unlike traditional stateless serverless architectures, RunAgent enables your agents to maintain context and state across executions, creating truly intelligent and context-aware applications.
+
+### Why Persistent Memory Matters
+
+Traditional serverless functions are stateless by design, meaning each invocation starts fresh with no memory of previous interactions. RunAgent's Persistent Memory breaks this limitation, allowing your agents to:
+
+- **Remember Context** - Maintain conversation history and user preferences across sessions
+- **Learn from Interactions** - Build upon previous executions to improve responses
+- **Stateful Workflows** - Create multi-step processes that remember where they left off
+- **Cross-Language Persistence** - Memory works seamlessly across all SDK languages (Python, JavaScript, Rust, Go, Dart)
+
+### How It Works
+
+Persistent Memory in RunAgent is designed for speed and reliability:
+
+```python
+from runagent import RunAgentClient
+
+# Create a client with persistent memory enabled
+client = RunAgentClient(
+    agent_id="my-agent-id",
+    entrypoint_tag="chat",
+    user_id="user123",           # User identifier for memory isolation
+    persistent_memory=True        # Enable persistent memory
+)
+
+# First interaction - agent learns user preferences
+result1 = client.run(message="I prefer dark mode interfaces")
+
+# Second interaction - agent remembers the preference
+result2 = client.run(message="What's my UI preference?")
+# Agent responds: "You prefer dark mode interfaces"
+```
+
+### Multi-Language Support
+
+Persistent Memory works identically across all SDKs:
+
+**Python:**
+```python
+client = RunAgentClient(
+    agent_id="agent-id",
+    entrypoint_tag="entrypoint",
+    user_id="user123",
+    persistent_memory=True
+)
+```
+
+**JavaScript:**
+```javascript
+const client = new RunAgentClient({
+  agentId: "agent-id",
+  entrypointTag: "entrypoint",
+  userId: "user123",
+  persistentMemory: true
+});
+```
+
+**Rust:**
+```rust
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_user_id("user123")
+        .with_persistent_memory(true)
+).await?;
+```
+
+**Dart:**
+```dart
+final client = await RunAgentClient.create(
+  RunAgentClientConfig.create(
+    agentId: "agent-id",
+    entrypointTag: "entrypoint",
+    userId: "user123",
+    persistentMemory: true,
+  ),
+);
+```
+
+### Key Benefits
+
+- ⚡ **Fastest Serverless Memory** - Optimized for low-latency access and updates
+- 🔒 **Secure & Isolated** - Each `user_id` has isolated memory space
+- 🌐 **Universal** - Works with any framework (LangGraph, CrewAI, Letta, etc.)
+- 📈 **Scalable** - Built on serverless infrastructure that scales automatically
+- 🔄 **Stateful Workflows** - Enable complex multi-turn conversations and workflows
+
+### Use Cases
+
+- **Conversational AI** - Maintain context across multiple user interactions
+- **Personalization** - Remember user preferences and adapt responses
+- **Multi-Step Processes** - Track progress through complex workflows
+- **Learning Systems** - Agents that improve based on interaction history
+- **Session Management** - Maintain state across distributed systems
+
+---
+
 ## 📚 Documentation
 
 - **[Getting Started](https://docs.run-agent.ai/get-started/introduction.md)** - Deploy your first agent in 5 minutes
@@ -481,7 +651,7 @@ RunAgent Cloud provides:
 
 ## 🧠 Action Memory System (Coming Soon)
 
-RunAgent is introducing **Action Memory** - a revolutionary approach to agent reliability that focuses on *how to remember* rather than *what to remember*.
+Building on our Persistent Memory foundation, RunAgent is introducing **Action Memory** - an advanced approach to agent reliability that focuses on *how to remember* rather than *what to remember*.
 
 ### How It Will Work
 
@@ -490,7 +660,7 @@ RunAgent is introducing **Action Memory** - a revolutionary approach to agent re
 - **Reliability Focus**: Learns from successful outcomes to improve future decisions
 - **Ecosystem Integration**: Works with any framework - LangGraph, CrewAI, Letta, and more
 
-This will ensure your agents become more reliable over time, regardless of which programming language or framework you use to interact with them.
+This will ensure your agents become more reliable over time, building upon the Persistent Memory system to create truly intelligent, context-aware agents.
 
 ---
 

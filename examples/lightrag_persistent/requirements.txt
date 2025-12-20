@@ -1,0 +1,3 @@
+lightrag-hku
+openai
+python-dotenv

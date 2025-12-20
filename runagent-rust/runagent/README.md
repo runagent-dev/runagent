@@ -44,6 +44,14 @@ let client = RunAgentClient::new(
     RunAgentClientConfig::new("agent-id", "entrypoint")
         .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
 ).await?;
+
+// Remote agent with persistent memory
+let client = RunAgentClient::new(
+    RunAgentClientConfig::new("agent-id", "entrypoint")
+        .with_api_key(env::var("RUNAGENT_API_KEY").unwrap())
+        .with_user_id("user123")
+        .with_persistent_memory(true)
+).await?;
 ```
 
 | Setting         | Cloud            | Local (auto discovery) | Local (explicit)  |
@@ -53,9 +61,13 @@ let client = RunAgentClient::new(
 | Base URL        | `RUNAGENT_BASE_URL` \|\| default | n/a | n/a                |
 | API Key         | `RUNAGENT_API_KEY` (required) | optional | optional          |
 | Registry        | n/a              | `true` (default)       | `false`           |
+| `user_id`       | optional         | optional               | optional          |
+| `persistent_memory` | optional (`false` default) | optional (`false` default) | optional (`false` default) |
 
 - `RUNAGENT_API_KEY`: Bearer token for remote agents (can be set via env var or `with_api_key()`).
 - `RUNAGENT_BASE_URL`: Override the default cloud endpoint (e.g. staging).
+- `user_id`: Optional user identifier for persistent storage across agent executions.
+- `persistent_memory`: Enable persistent memory to maintain state across multiple agent calls (default: `false`).
 - For local discovery, install the crate with the `db` feature and ensure the CLI has registered the agent in `~/.runagent/runagent_local.db`.
 
 ---
@@ -260,6 +272,8 @@ During initialization the client calls `/api/v1/agents/{id}/architecture` and ex
 | `.with_api_key(key)` | Set API key (overrides env var). |
 | `.with_base_url(url)` | Override default base URL. |
 | `.with_enable_registry(bool)` | Enable/disable database lookup (default: `true` for local). |
+| `.with_user_id(user_id)` | Set user ID for persistent storage. |
+| `.with_persistent_memory(bool)` | Enable persistent memory across executions (default: `false`). |
 | `.with_extra_params(params)` | Set extra parameters for future use. |
 
 ### Client Methods

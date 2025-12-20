@@ -10,8 +10,8 @@ class PortManager:
     """Utility class for managing port allocation"""
     
     DEFAULT_START_PORT = 8450
+    DEFAULT_END_PORT = 65535
     DEFAULT_HOST = "127.0.0.1"
-    MAX_PORT_ATTEMPTS = 5
     
     @staticmethod
     def is_port_available(host: str, port: int) -> bool:
@@ -29,11 +29,11 @@ class PortManager:
     @staticmethod
     def find_available_port(host: str = DEFAULT_HOST, start_port: int = DEFAULT_START_PORT) -> int:
         """Find the next available port starting from start_port"""
-        for port in range(start_port, start_port + PortManager.MAX_PORT_ATTEMPTS):
+        for port in range(start_port, PortManager.DEFAULT_END_PORT + 1):
             if PortManager.is_port_available(host, port):
                 return port
         
-        raise RuntimeError(f"No available ports found in range {start_port}-{start_port + PortManager.MAX_PORT_ATTEMPTS}")
+        raise RuntimeError(f"No available ports found in range {start_port}-{PortManager.DEFAULT_END_PORT}")
     
     @staticmethod
     def allocate_unique_address(used_ports: list = None) -> Tuple[str, int]:
@@ -44,7 +44,7 @@ class PortManager:
         # Start from default port and find the first available
         start_port = PortManager.DEFAULT_START_PORT
         
-        for port in range(start_port, start_port + PortManager.MAX_PORT_ATTEMPTS):
+        for port in range(start_port, PortManager.DEFAULT_END_PORT + 1):
             if port not in used_ports and PortManager.is_port_available(host, port):
                 console.print(f"🔌 Allocated address: [blue]{host}:{port}[/blue]")
                 return host, port

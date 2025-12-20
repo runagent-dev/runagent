@@ -10,6 +10,7 @@ pub const ENV_RUNAGENT_BASE_URL: &str = "RUNAGENT_BASE_URL";
 
 /// Default base URL for remote agents
 pub const DEFAULT_BASE_URL: &str = "https://backend.run-agent.ai";
+// pub const DEFAULT_BASE_URL: &str = "http://20.84.81.110:8335/";
 
 /// Default API prefix
 pub const DEFAULT_API_PREFIX: &str = "/api/v1";

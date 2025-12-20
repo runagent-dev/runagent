@@ -98,10 +98,39 @@ class RemoteDeployment:
     def run_agent(
         self, agent_id: str, input_data: t.Dict[str, t.Any]
     ) -> t.Dict[str, t.Any]:
-        """Run a remote agent"""
-        # This would need to be implemented in RestClient
-        # For now, return a placeholder
-        return {"success": False, "error": "Remote agent execution not yet implemented"}
+        """Run a remote agent
+        
+        Args:
+            agent_id: Agent identifier
+            input_data: Input data including messages, user_id, persistent_memory, etc.
+        
+        Returns:
+            Execution result
+        """
+        # Extract persistent storage parameters
+        user_id = input_data.pop("user_id", None)
+        persistent_memory = input_data.pop("persistent_memory", False)
+        
+        # Extract entrypoint_tag from input_data or use default
+        entrypoint_tag = input_data.pop("entrypoint_tag", "default")
+        
+        # Extract input_args and input_kwargs
+        input_args = input_data.pop("input_args", [])
+        input_kwargs = input_data.pop("input_kwargs", {})
+        
+        # Any remaining data goes to input_kwargs
+        if input_data:
+            input_kwargs.update(input_data)
+        
+        # Call RestClient's run_agent method
+        return self.client.run_agent(
+            agent_id=agent_id,
+            entrypoint_tag=entrypoint_tag,
+            input_args=input_args,
+            input_kwargs=input_kwargs,
+            user_id=user_id,
+            persistent_memory=persistent_memory,
+        )
 
     def delete_agent(self, agent_id: str) -> t.Dict[str, t.Any]:
         """Delete a remote agent"""

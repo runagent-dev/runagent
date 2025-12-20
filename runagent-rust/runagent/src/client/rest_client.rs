@@ -190,8 +190,10 @@ impl RestClient {
         entrypoint_tag: &str,
         input_args: &[Value],
         input_kwargs: &HashMap<String, Value>,
+        user_id: Option<&str>,
+        persistent_memory: bool,
     ) -> RunAgentResult<Value> {
-        let data = serde_json::json!({
+        let mut data = serde_json::json!({
             "id": "run_start",
             "entrypoint_tag": entrypoint_tag,
             "input_args": input_args,
@@ -199,6 +201,21 @@ impl RestClient {
             "timeout_seconds": 600,
             "async_execution": false
         });
+
+        // Add persistent storage parameters if provided (matches Python SDK)
+        if let Some(uid) = user_id {
+            if let Some(obj) = data.as_object_mut() {
+                obj.insert("user_id".to_string(), serde_json::json!(uid));
+            }
+        }
+        if persistent_memory {
+            if let Some(obj) = data.as_object_mut() {
+                obj.insert(
+                    "persistent_memory".to_string(),
+                    serde_json::json!(persistent_memory),
+                );
+            }
+        }
 
         let path = format!("agents/{}/run", agent_id);
         let url = self.get_url(&path)?;
