@@ -26,15 +26,15 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
+
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
+
       - name: Build for ${{ matrix.arch }}
         run: |
           chmod +x build_scripts/build-macos-standalone.sh
@@ -53,7 +53,7 @@ jobs:
           ls -lh dist/runagent-macos-${ARCH_NAME}.tar.gz
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: runagent-macos-${{ matrix.arch }}
           path: dist/runagent-macos-*.tar.gz
@@ -79,15 +79,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev ccache patchelf
-      
+
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
+
       - name: Build for ${{ matrix.arch }}
         run: |
           chmod +x build_scripts/build-linux-standalone.sh
@@ -106,7 +106,7 @@ jobs:
           ls -lh dist/runagent-linux-${ARCH_NAME}.tar.gz
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: runagent-linux-${{ matrix.arch }}
           path: dist/runagent-linux-*.tar.gz
@@ -124,15 +124,15 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
+
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~\AppData\Local\pip\Cache
           key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
+
       - name: Build for Windows
         run: |
           powershell -ExecutionPolicy Bypass -File build_scripts\build-windows-standalone.ps1
@@ -148,7 +148,7 @@ jobs:
         shell: pwsh
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: runagent-windows-amd64
           path: dist/runagent-windows-*.zip
@@ -162,7 +162,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       
