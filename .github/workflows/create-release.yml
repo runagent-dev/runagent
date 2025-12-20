@@ -148,7 +148,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      release_created: ${{ steps.create-release.outputs.release_created }}
+      release_created: ${{ steps.set-release-flag.outputs.release_created }}
 
     steps:
       - uses: actions/checkout@v4
@@ -279,7 +279,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set release created output
+      - name: Set release created flag
+        id: set-release-flag
         run: echo "release_created=true" >> $GITHUB_OUTPUT
 
   # NEW: Trigger binary builds after release is created
