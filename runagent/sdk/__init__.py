@@ -13,10 +13,6 @@ from .exceptions import (
 )
 from .sdk import RunAgentSDK
 
-
-# Version info
-__version__ = "0.1.0"
-
 # Expose main components
 __all__ = [
     "RunAgentSDK",
