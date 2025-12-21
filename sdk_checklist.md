@@ -6,7 +6,7 @@
 - **Separation of concerns**: the CLI covers deployment/orchestration; SDKs focus purely on invoking deployed agents.
 
 ### Client Initialization Contract
-- **Constructor signature** *(language-idiomatic)*: `RunAgentClient({ agent_id, entrypoint_tag, local?, host?, port?, api_key?, base_url?, extra_params? })`.
+- **Constructor signature** *(language-idiomatic)*: `RunAgentClient({ agent_id, entrypoint_tag, local?, host?, port?, api_key?, base_url?, extra_params?, user_id?, persistent_memory? })`.
 - **Required inputs**: `agent_id`, `entrypoint_tag`.
 - **Optional inputs**:
   - `local` (default `false` except Python CLI) indicates whether to auto-discover host/port for co-located agents.
@@ -14,6 +14,8 @@
   - `api_key` overrides environment configuration for cloud calls.
   - `base_url` overrides the default cloud endpoint.
   - `extra_params` is an open-ended key/value bag stored on the client for future metadata use without breaking changes (simply accept and retain it; no mandated behavior yet).
+  - `user_id` (optional string) identifies the user for persistent memory isolation. When `persistent_memory=true`, this ensures each user's state is isolated.
+  - `persistent_memory` (default `false`) enables persistent memory across agent executions, allowing agents to maintain context and state between invocations.
 
 - **Configuration precedence** (must be explicit in every SDK):
   1. Explicit constructor arguments
@@ -63,8 +65,25 @@
     "input_args": [],
     "input_kwargs": {},
     "timeout_seconds": 300,
-    "async_execution": false
+    "async_execution": false,
+    "user_id": "...",
+    "persistent_memory": false
   }
+  ```
+- **Persistent memory parameters**: Include `user_id` and `persistent_memory` in the request payload when they are set on the client. These are set at client initialization and automatically included in all `run()` calls.
+  - If `user_id` is provided (not `None`/`null`), include it in the payload.
+  - If `persistent_memory` is `true`, include it in the payload.
+  ```25:37:runagent/client/client.py
+        # Persistent storage settings (set at client level)
+        self.user_id = user_id
+        self.persistent_memory = persistent_memory
+  ```
+  ```90:94:runagent/client/client.py
+        response = self.rest_client.run_agent(
+            self.agent_id, self.entrypoint_tag, 
+            input_args=input_args, input_kwargs=input_kwargs,
+            user_id=self.user_id, persistent_memory=self.persistent_memory
+        )
   ```
 - Deserialize result payloads exactly as the Python client:
   - `data.result_data.data` (legacy structured output)
@@ -84,6 +103,21 @@
 ### WebSocket `run_stream()` Semantics
 - Endpoint: `GET wss://.../api/v1/agents/{agent_id}/run-stream`.
 - Handshake: immediately send JSON body identical to REST payload (minus `async_execution` optional).
+- **Persistent memory parameters**: Include `user_id` and `persistent_memory` in the WebSocket handshake payload when they are set on the client, matching REST behavior.
+  ```85:96:runagent/sdk/socket_client.py
+                request_data = {
+                    "entrypoint_tag": entrypoint_tag,
+                    "input_args": list(input_args),
+                    "input_kwargs": dict(input_kwargs),
+                    "timeout_seconds": 600,  
+                    "async_execution": False
+                }
+                # Add persistent storage parameters if provided
+                if user_id is not None:
+                    request_data["user_id"] = user_id
+                if persistent_memory:
+                    request_data["persistent_memory"] = persistent_memory
+  ```
 - Incoming frames: JSON objects with `type ∈ {status, data, error}`.
   - `status=stream_started` (informational), `status=stream_completed` (terminate).
   - `data` frames carry `content` (string or JSON); attempt structured deserialization first.
@@ -102,6 +136,44 @@
                 ...
   ```
 - Provide both sync iterator and async iterator variants when idiomatic for the language.
+
+### Persistent Memory
+- **Purpose**: Enable agents to maintain context and state across executions, creating stateful serverless applications.
+- **Client-level configuration**: `user_id` and `persistent_memory` are set at client initialization and persist across all `run()` and `run_stream()` calls for that client instance.
+- **User isolation**: Each `user_id` has isolated memory space. Multiple clients with the same `user_id` and `persistent_memory=true` share the same persistent state.
+- **Request payload inclusion**: Both REST and WebSocket requests must include `user_id` (when provided) and `persistent_memory` (when `true`) in the request payload.
+- **Implementation pattern**:
+  ```python
+  # Python example
+  client = RunAgentClient(
+      agent_id="agent-id",
+      entrypoint_tag="entrypoint",
+      user_id="user123",        # User identifier for memory isolation
+      persistent_memory=True    # Enable persistent memory
+  )
+  # All subsequent run()/run_stream() calls automatically include these parameters
+  ```
+  ```rust
+  // Rust example
+  let client = RunAgentClient::new(
+      RunAgentClientConfig::new("agent-id", "entrypoint")
+          .with_user_id("user123")
+          .with_persistent_memory(true)
+  ).await?;
+  ```
+- **Backend behavior**: When `persistent_memory=true`, the backend:
+  - Maps specified folders (via `persistent_folders` in agent config) to `/persistent` mount point
+  - Maintains state across VM restarts
+  - Isolates data per `user_id`
+- **Agent configuration**: Agents can specify `persistent_folders` in their `runagent.config.json` to define which folders should be persisted. These folders are automatically synced to persistent storage when `persistent_memory` is enabled.
+  ```96:101:runagent/utils/schema.py
+    persistent_folders: t.Optional[t.List[str]] = Field(
+        default_factory=list,
+        description="List of folder paths that should be persisted to /persistent mount point. "
+                   "These folders will be automatically synced to persistent storage when persistent_memory is enabled."
+    )
+  ```
+- **Getter methods**: Expose `user_id()` and `persistent_memory()` getter methods for introspection.
 
 ### Extra Params Handling
 - Accept `extra_params` at construction; store but do not mutate.
@@ -125,12 +197,16 @@
 ### Implementation Checklist (Per New SDK)
 - [ ] Build `RunAgentClient` with constructor precedence and optional local DB hook.
 - [ ] Implement REST `run()` and WebSocket `run_stream()` following payload schemas.
+- [ ] Support `user_id` and `persistent_memory` in client constructor and include them in all request payloads.
 - [ ] Surface consistent error types and messages.
 - [ ] Support explicit `api_key`, `base_url`, `host`, `port`.
 - [ ] Expose `extra_params` without opinionated behavior.
+- [ ] Add getter methods for `user_id()` and `persistent_memory()`.
 - [ ] Add environment-based helpers (`from_env`, `configure_from_env`).
 - [ ] Include README snippet showing local vs remote usage.
+- [ ] Include README example demonstrating persistent memory usage.
 - [ ] Add automated tests for success/error paths.
+- [ ] Add automated tests for persistent memory (verify `user_id` and `persistent_memory` are included in requests).
 - [ ] Audit docs to ensure new SDK mirrors this guide.
 
 ### Suggested Documentation Template For SDK Repos
@@ -138,16 +214,18 @@
 2. Configuration (env vars, constructor precedence).
 3. Local vs remote usage (with/without DB, when to set `local=true`).
 4. Authentication setup (API key instructions).
-5. Error handling reference table.
-6. Advanced topics (custom base URL, extra params, retries).
-7. Troubleshooting (common connection/auth issues).
+5. Persistent Memory (enabling persistent memory, user isolation, use cases).
+6. Error handling reference table.
+7. Advanced topics (custom base URL, extra params, retries).
+8. Troubleshooting (common connection/auth issues).
 
 ### Additional Consistency Requirements
 - **Architecture endpoint contract**: every SDK must treat `/api/v1/agents/{id}/architecture` as an envelope `{ success, data, message, error, timestamp, request_id }`, propagate backend `error.code/message/suggestion/details`, normalize the `data` payload (including `agent_id`/`agentId`, `file`, `module`, `extractor`, etc.), and throw a clear `ARCHITECTURE_MISSING` error when `data.entrypoints` is absent.
 - **Run vs. runStream guardrails**: enforce that `_stream` tags only work with `runStream()` (`STREAM_ENTRYPOINT` error with a helpful suggestion) and non-stream tags only work with `run()` (`NON_STREAM_ENTRYPOINT` error). This mirrors the CLI and prevents silent misuse.
 - **Structured error surfaces**: expose a canonical error type (`RunAgentError`/`RunAgentExecutionError`) that always carries `code`, `message`, `suggestion`, and optional `details`, and reuse the shared code taxonomy (`AUTHENTICATION_ERROR`, `PERMISSION_ERROR`, `VALIDATION_ERROR`, `CONNECTION_ERROR`, `SERVER_ERROR`, `AGENT_NOT_FOUND_LOCAL`, `AGENT_NOT_FOUND_REMOTE`, `STREAM_ENTRYPOINT`, `NON_STREAM_ENTRYPOINT`, `ARCHITECTURE_MISSING`, etc.).
-- **Diagnostics for entrypoint mismatches**: when the requested entrypoint isn’t found, log or otherwise expose the set of tags returned by the backend so developers can quickly spot typos or missing deployments.
-- **Repository hygiene**: every SDK repo must ship a `README` (installation, configuration, local vs. remote, run vs. runStream examples) and a `PUBLISH.md` (version bump instructions, build/test checklist, npm publish guidance). This keeps packaging and documentation consistent across languages.
+- **Persistent memory contract**: every SDK must support `user_id` and `persistent_memory` parameters in the client constructor, store them as client-level state, and automatically include them in all REST and WebSocket request payloads when provided. The `user_id` should be optional (nullable), and `persistent_memory` should default to `false`. Both parameters must be included in the request payload only when `user_id` is not null/None and when `persistent_memory` is `true` respectively.
+- **Diagnostics for entrypoint mismatches**: when the requested entrypoint isn't found, log or otherwise expose the set of tags returned by the backend so developers can quickly spot typos or missing deployments.
+- **Repository hygiene**: every SDK repo must ship a `README` (installation, configuration, local vs. remote, run vs. runStream examples, persistent memory usage) and a `PUBLISH.md` (version bump instructions, build/test checklist, npm publish guidance). This keeps packaging and documentation consistent across languages.
 
 ### References
 ```24:37:runagent/constants.py
