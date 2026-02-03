@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "v5+P8v51n2FlNn2j8R2KL467FtgZnjNjIa7uV2AtlmCPBAdZDRuuQFYky0249NthKyKjRgfO7JrAjIlFgCmUxw==",
+  "success": true,
+  "projectFilePath": "/home/dev/radeen/runagent/test_scripts/csharp/test_agno/test_agno.csproj",
+  "expectedPackageFiles": [
+    "/home/dev/.nuget/packages/system.io.pipelines/9.0.0/system.io.pipelines.9.0.0.nupkg.sha512",
+    "/home/dev/.nuget/packages/system.text.encodings.web/9.0.0/system.text.encodings.web.9.0.0.nupkg.sha512",
+    "/home/dev/.nuget/packages/system.text.json/9.0.0/system.text.json.9.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

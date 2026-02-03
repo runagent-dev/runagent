@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference local RunAgent SDK -->
+    <ProjectReference Include="../../../runagent-csharp/RunAgent.csproj" />
+
+    <!-- Or use NuGet package when published -->
+    <!-- <PackageReference Include="RunAgent" Version="0.1.47" /> -->
+  </ItemGroup>
+
+</Project>
