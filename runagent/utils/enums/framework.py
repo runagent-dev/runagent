@@ -15,13 +15,14 @@ class Framework(Enum):
     LLAMAINDEX = "llamaindex"
     OPENAI = "openai"
     N8N = "n8n"
+    PARLANT = "parlant"
 
     @classmethod
     def _pythonic_frameworks_cache(cls) -> t.FrozenSet['Framework']:
         return frozenset({
                 cls.AG2, cls.AGNO, cls.AUTOGEN, cls.CREWAI,
                 cls.LANGCHAIN, cls.LANGGRAPH, cls.LETTA,
-                cls.LLAMAINDEX, cls.OPENAI
+                cls.LLAMAINDEX, cls.OPENAI, cls.PARLANT
             })
 
     @classmethod

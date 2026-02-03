@@ -27,6 +27,7 @@
       <th align="center"><a href="https://github.com/runagent-dev/runagent-rs">runagent-rs</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-go">runagent-go</a></th>
       <th align="center"><a href="https://github.com/runagent-dev/runagent-dart">runagent-dart</a></th>
+      <th align="center"><a href="https://github.com/runagent-dev/runagent-csharp">runagent-csharp</a></th>
     </tr>
   </thead>
   <tbody>
@@ -56,6 +57,11 @@
           <img src="https://img.shields.io/pub/dm/runagent" alt="pub.dev downloads">
         </a>
       </td>
+      <td align="center">
+        <a href="https://www.nuget.org/packages/RunAgent">
+          <img src="https://img.shields.io/nuget/dt/RunAgent" alt="NuGet downloads">
+        </a>
+      </td>
     </tr>
       <tr>
       <td align="center">
@@ -75,6 +81,11 @@
       <td align="center">
         <a href="https://pub.dev/packages/runagent">
           <img src="https://img.shields.io/pub/v/runagent" alt="pub.dev version">
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://www.nuget.org/packages/RunAgent">
+          <img src="https://img.shields.io/nuget/v/RunAgent" alt="NuGet version">
         </a>
       </td>
     </tr>
@@ -255,15 +266,16 @@ async def solve_problem_stream(query, num_solutions, constraints):
 
 **🌐 Access from any language:**
 
-RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, Dart, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
+RunAgent offers multi-language SDKs : Rust, TypeScript, JavaScript, Go, Dart, C#/.NET, and beyond—so you can integrate seamlessly without ever rewriting your agents for different stacks.
 
 <table>
 <tr>
-<td width="20%"><b>Python SDK</b></td>
-<td width="20%"><b>JavaScript SDK</b></td>
-<td width="20%"><b>Rust SDK</b></td>
-<td width="20%"><b>Go SDK</b></td>
-<td width="20%"><b>Dart SDK</b></td>
+<td width="16.66%"><b>Python SDK</b></td>
+<td width="16.66%"><b>JavaScript SDK</b></td>
+<td width="16.66%"><b>Rust SDK</b></td>
+<td width="16.66%"><b>Go SDK</b></td>
+<td width="16.66%"><b>Dart SDK</b></td>
+<td width="16.66%"><b>C# SDK</b></td>
 </tr>
 <tr>
 <td valign="top">
@@ -453,6 +465,56 @@ void main() async {
 ```
 
 </td>
+<td valign="top">
+
+```csharp
+using RunAgent.Client;
+using RunAgent.Types;
+
+class Program
+{
+    static async Task Main()
+    {
+        var config = RunAgentClientConfig
+            .Create("lg-solver-123", "solve_problem")
+            .WithLocal(true);
+
+        var client = await RunAgentClient
+            .CreateAsync(config);
+
+        var result = await client.RunAsync(
+            new Dictionary<string, object>
+            {
+                ["query"] = "My laptop is slow",
+                ["num_solutions"] = 3,
+                ["constraints"] = new List<object>
+                {
+                    new Dictionary<string, object>
+                    {
+                        ["type"] = "budget",
+                        ["value"] = 100
+                    }
+                }
+            }
+        );
+        Console.WriteLine(result);
+
+        // Streaming
+        await foreach (var chunk in client.RunStreamAsync(
+            new Dictionary<string, object>
+            {
+                ["query"] = "Fix my phone",
+                ["num_solutions"] = 4
+            }
+        ))
+        {
+            Console.Write(chunk);
+        }
+    }
+}
+```
+
+</td>
 </tr>
 </table>
 
@@ -618,6 +680,16 @@ final client = await RunAgentClient.create(
     persistentMemory: true,
   ),
 );
+```
+
+**C#:**
+```csharp
+var config = RunAgentClientConfig
+    .Create("agent-id", "entrypoint")
+    .WithUserId("user123")
+    .WithPersistentMemory(true);
+
+var client = await RunAgentClient.CreateAsync(config);
 ```
 
 ### Key Benefits

@@ -3,8 +3,7 @@ from runagent import RunAgentClient
 ra = RunAgentClient(
     agent_id="ae29bd73-b3d3-99c8-a98f-5d7aec7ee911",
     entrypoint_tag="agno_print_response",
-    local=True,
-    port=8455
+    local=True
     )
 
 

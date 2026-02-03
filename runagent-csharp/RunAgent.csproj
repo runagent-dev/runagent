@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>RunAgent</PackageId>
+    <Version>0.1.48</Version>
+    <Authors>RunAgent Team</Authors>
+    <Company>RunAgent</Company>
+    <Description>C# SDK for RunAgent - Secured, reliable AI agent deployment at scale. Run your stack. Let us run your agents.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/runagent-dev/runagent-csharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/runagent-dev/runagent-csharp</RepositoryUrl>
+    <PackageTags>ai;agents;runagent;serverless;deployment;langgraph;crewai</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
