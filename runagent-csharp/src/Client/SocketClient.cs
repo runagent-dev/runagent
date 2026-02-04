@@ -10,7 +10,7 @@ namespace RunAgent.Client;
 /// <summary>
 /// WebSocket client for streaming RunAgent responses
 /// </summary>
-public class SocketClient : IDisposable
+public class SocketClient : IDisposable, IAsyncDisposable
 {
     private readonly string _baseUrl;
     private readonly string? _apiKey;
@@ -47,15 +47,21 @@ public class SocketClient : IDisposable
             : $"{wsBaseUrl}{Constants.ApiPrefix}/agents/{agentId}/run-stream?token={_apiKey}";
 
         _webSocket = new ClientWebSocket();
+        _webSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
 
-        // Connect to WebSocket
+        // Connect to WebSocket with timeout
         try
         {
-            await _webSocket.ConnectAsync(new Uri(uri), CancellationToken.None);
+            using var connectCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _webSocket.ConnectAsync(new Uri(uri), connectCts.Token);
         }
         catch (WebSocketException ex)
         {
             throw new ConnectionError($"WebSocket connection failed: {ex.Message}", ex);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new ConnectionError("WebSocket connection timed out after 30 seconds");
         }
 
         // Send initial request payload
@@ -95,9 +101,10 @@ public class SocketClient : IDisposable
         {
             while (_webSocket.State == WebSocketState.Open)
             {
+                using var receiveCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds + 30));
                 var result = await _webSocket.ReceiveAsync(
                     new ArraySegment<byte>(buffer),
-                    CancellationToken.None
+                    receiveCts.Token
                 );
 
                 if (result.MessageType == WebSocketMessageType.Close)
@@ -247,7 +254,7 @@ public class SocketClient : IDisposable
         return false;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         if (_webSocket != null)
         {
@@ -255,11 +262,12 @@ public class SocketClient : IDisposable
             {
                 try
                 {
-                    _webSocket.CloseAsync(
+                    using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await _webSocket.CloseAsync(
                         WebSocketCloseStatus.NormalClosure,
                         string.Empty,
-                        CancellationToken.None
-                    ).Wait(TimeSpan.FromSeconds(5));
+                        closeCts.Token
+                    );
                 }
                 catch
                 {
@@ -267,6 +275,24 @@ public class SocketClient : IDisposable
                 }
             }
             _webSocket.Dispose();
+            _webSocket = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Synchronous fallback - just dispose without waiting for graceful close
+        if (_webSocket != null)
+        {
+            try
+            {
+                _webSocket.Dispose();
+            }
+            catch
+            {
+                // Ignore dispose errors
+            }
+            _webSocket = null;
         }
     }
 }

@@ -8,7 +8,7 @@ namespace RunAgent.Client;
 /// Main client for interacting with RunAgent deployments
 /// Supports both local and remote agents with streaming and non-streaming execution
 /// </summary>
-public class RunAgentClient : IDisposable
+public class RunAgentClient : IDisposable, IAsyncDisposable
 {
     private readonly RunAgentClientConfig _config;
     private readonly RestClient _restClient;
@@ -261,6 +261,15 @@ public class RunAgentClient : IDisposable
                 $"NON_STREAM_ENTRYPOINT: Entrypoint '{_entrypointTag}' is not a streaming entrypoint. " +
                 "Use RunAsync() instead of RunStreamAsync() for non-streaming entrypoints."
             );
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _restClient?.Dispose();
+        if (_socketClient != null)
+        {
+            await _socketClient.DisposeAsync();
         }
     }
 

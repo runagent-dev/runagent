@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("test_agno")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d10db76eaa0d81348bc1c1049c5a54057a21b0c4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1c28827d1833b25d432a7585b88b680526e3484a")]
 [assembly: System.Reflection.AssemblyProductAttribute("test_agno")]
 [assembly: System.Reflection.AssemblyTitleAttribute("test_agno")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

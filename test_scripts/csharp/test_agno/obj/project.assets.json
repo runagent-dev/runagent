@@ -60,7 +60,7 @@
           "buildTransitive/net8.0/System.Text.Json.targets": {}
         }
       },
-      "RunAgent/0.1.47": {
+      "RunAgent/0.1.48": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -207,7 +207,7 @@
         "useSharedDesignerContext.txt"
       ]
     },
-    "RunAgent/0.1.47": {
+    "RunAgent/0.1.48": {
       "type": "project",
       "path": "../../../runagent-csharp/RunAgent.csproj",
       "msbuildProject": "../../../runagent-csharp/RunAgent.csproj"
@@ -215,7 +215,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "RunAgent >= 0.1.47"
+      "RunAgent >= 0.1.48"
     ]
   },
   "packageFolders": {

@@ -5,7 +5,7 @@
   },
   "projects": {
     "/home/dev/radeen/runagent/runagent-csharp/RunAgent.csproj": {
-      "version": "0.1.47",
+      "version": "0.1.48",
       "restore": {
         "projectUniqueName": "/home/dev/radeen/runagent/runagent-csharp/RunAgent.csproj",
         "projectName": "RunAgent",

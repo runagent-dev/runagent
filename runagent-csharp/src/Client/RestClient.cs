@@ -24,7 +24,15 @@ public class RestClient : IDisposable
         _apiKey = apiKey;
         _isLocal = isLocal;
 
-        _httpClient = new HttpClient
+        // Configure HttpClient with proper timeout and connection settings
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+            ConnectTimeout = TimeSpan.FromSeconds(15)
+        };
+
+        _httpClient = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(Constants.DefaultTimeoutSeconds + 10)
         };
@@ -51,7 +59,9 @@ public class RestClient : IDisposable
 
         try
         {
-            var response = await _httpClient.GetAsync(url);
+            // Add timeout specifically for this request
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await _httpClient.GetAsync(url, cts.Token);
             var content = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
