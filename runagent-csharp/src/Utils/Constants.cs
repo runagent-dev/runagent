@@ -8,7 +8,7 @@ public static class Constants
     /// <summary>
     /// Default base URL for remote RunAgent deployments
     /// </summary>
-    public const string DefaultBaseUrl = "https://backend.run-agent.ai";
+    public const string DefaultBaseUrl = "http://188.245.179.48:7333";
 
     /// <summary>
     /// API version prefix
