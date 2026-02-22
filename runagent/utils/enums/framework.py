@@ -16,6 +16,7 @@ class Framework(Enum):
     OPENAI = "openai"
     N8N = "n8n"
     PARLANT = "parlant"
+    OPENCLAW = "openclaw"
 
     @classmethod
     def _pythonic_frameworks_cache(cls) -> t.FrozenSet['Framework']:
@@ -28,7 +29,11 @@ class Framework(Enum):
     @classmethod
     def _webhook_frameworks_cache(cls) -> t.FrozenSet['Framework']:
         return frozenset({cls.N8N})
-        
+
+    @classmethod
+    def _service_frameworks_cache(cls) -> t.FrozenSet['Framework']:
+        return frozenset({cls.OPENCLAW})
+
     @classmethod
     def get_pythonic_frameworks(cls) -> t.FrozenSet['Framework']:
         """Get all pythonic frameworks (cached)"""
@@ -38,6 +43,11 @@ class Framework(Enum):
     def get_webhook_frameworks(cls) -> t.FrozenSet['Framework']:
         """Get all webhook frameworks (cached)"""
         return cls._webhook_frameworks_cache()
+    
+    @classmethod
+    def get_service_frameworks(cls) -> t.FrozenSet['Framework']:
+        """Get all service frameworks (cached)"""
+        return cls._service_frameworks_cache()
 
     @classmethod
     def get_selectable_frameworks(cls) -> t.List['Framework']:
@@ -70,6 +80,10 @@ class Framework(Enum):
         """Check if this framework is webhook"""
         return self in self.get_webhook_frameworks()
 
+    def is_service(self) -> bool:
+        """Check if this framework is service (e.g. OpenClaw)."""
+        return self in self.get_service_frameworks()
+
     def is_default(self) -> bool:
         """Check if this framework is the default"""
         return self == self.DEFAULT
@@ -83,6 +97,8 @@ class Framework(Enum):
             return "pythonic"
         elif self.is_webhook():
             return "webhook"
+        elif self.is_service():
+            return "service"
         else:
             return "unknown"
     # Class methods for string validation and conversion

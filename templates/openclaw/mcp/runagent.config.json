@@ -1,0 +1,27 @@
+{
+  "agent_name": "openclaw_mcp",
+  "description": "OpenClaw MCP Server - provides MCP interface to OpenClaw Gateway",
+  "framework": "openclaw",
+  "template": "openclaw/mcp",
+  "version": "1.0.0",
+  "created_at": "2026-02-09T00:00:00Z",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/openclaw/mcp",
+    "author": "runagent"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      {
+        "file": "agent.py",
+        "module": "run_mcp",
+        "tag": "mcp"
+      }
+    ]
+  },
+  "env_vars": {
+    "OPENCLAW_GATEWAY_URL": "",
+    "OPENCLAW_GATEWAY_TOKEN": ""
+  },
+  "agent_id": "00000000-0000-0000-0000-000000000000"
+}

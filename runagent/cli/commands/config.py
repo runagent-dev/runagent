@@ -32,7 +32,7 @@ def format_error_message(error_info):
 @click.group(invoke_without_command=True)
 @click.option("--set-api-key", help="Set API key directly (e.g., runagent config --set-api-key YOUR_KEY)")
 @click.option("--set-base-url", help="Set base URL directly (e.g., runagent config --set-base-url https://api.example.com)")
-@click.option("--register-agent", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path), help="Register a modified agent in the database")
+@click.option("--register-agent", type=str, help="Register an agent: use a path (e.g., '.') or template shortcut (e.g., 'openclaw/gateway')")
 @click.option("--delete-agent", help="Delete an agent by ID")
 @click.pass_context
 def config(ctx, set_api_key, set_base_url, register_agent, delete_agent):
@@ -65,8 +65,10 @@ def config(ctx, set_api_key, set_base_url, register_agent, delete_agent):
         return
     
     if register_agent:
-        from .register import _register_agent_core
-        return _register_agent_core(register_agent)
+        from .register import _register_agent_core, _resolve_template_path_for_registration
+        # Resolve path or template shortcut (e.g. "agno/default") to a Path
+        resolved_path, _ = _resolve_template_path_for_registration(register_agent)
+        return _register_agent_core(resolved_path)
     
     if delete_agent:
         from .delete import delete as delete_func
