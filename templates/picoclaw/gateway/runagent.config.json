@@ -1,0 +1,24 @@
+{
+  "agent_name": "picoclaw_gateway",
+  "description": "Picoclaw Gateway - ultra-light persistent AI assistant",
+  "framework": "picoclaw",
+  "template": "picoclaw/gateway",
+  "version": "1.0.0",
+  "created_at": "2026-02-16T00:00:00Z",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/picoclaw/gateway",
+    "author": "runagent"
+  },
+  "agent_architecture": {
+    "entrypoints": []
+  },
+  "persistent_folders": [
+    ".picoclaw"
+  ],
+  "metadata": {
+    "runtime": "picoclaw-gateway"
+  },
+  "agent_id": "00000000-0000-0000-0000-000000000000"
+}
+

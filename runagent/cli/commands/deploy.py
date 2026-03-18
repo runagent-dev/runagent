@@ -45,6 +45,11 @@ def _resolve_template_path(template_path: str) -> Tuple[Path, Optional[Path]]:
         Tuple of (resolved_path, temp_dir_for_cleanup)
         temp_dir_for_cleanup is None if path is local (not downloaded)
     """
+    # Support single-token aliases before path resolution
+    # e.g. "picoclaw" -> "picoclaw/gateway"
+    if template_path == "picoclaw":
+        template_path = "picoclaw/gateway"
+
     path = Path(template_path)
     
     # If path exists, use it directly
@@ -117,7 +122,7 @@ def _resolve_template_path(template_path: str) -> Tuple[Path, Optional[Path]]:
     # Path doesn't exist and doesn't look like a template
     raise click.ClickException(
         f"Path not found: {path}\n"
-        f"Use a local path or template shortcut like 'openclaw/gateway'"
+        f"Use a local path or template shortcut like 'openclaw/gateway' or 'picoclaw/gateway'"
     )
 
 
@@ -339,6 +344,11 @@ def deploy(path: str, overwrite: bool, new_id: bool):
                     or path.endswith("openclaw/gateway")
                     or path.rstrip("/").endswith("gateway") and "openclaw" in str(path)
                 )
+                is_picoclaw_gateway = (
+                    path == "picoclaw"
+                    or "picoclaw/gateway" in path
+                    or path.endswith("picoclaw/gateway")
+                )
                 
                 if is_openclaw_gateway:
                     # Fetch agent metadata and NetworkInfo to get all credentials.
@@ -421,6 +431,20 @@ def deploy(path: str, overwrite: bool, new_id: bool):
                     else:
                         console.print(f"\n[dim]You can fetch gateway info later with:[/dim]")
                         console.print(f"  [cyan]runagent status {agent_id}[/cyan]")
+
+                if is_picoclaw_gateway:
+                    console.print(f"\n[bold cyan]Picoclaw Gateway Deployment:[/bold cyan]")
+                    console.print(f"  Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+                    console.print("  Framework: [green]picoclaw[/green]")
+                    console.print("  Runtime:   [green]picoclaw-gateway[/green]")
+                    console.print("\n[dim]Inside the microVM, picoclaw uses:[/dim]")
+                    console.print("  Config:    [cyan]/root/.picoclaw/config.json[/cyan]")
+                    console.print("  Workspace: [cyan]/root/.picoclaw/workspace[/cyan]")
+                    console.print("  (backed by /persistent/.picoclaw on the VM data disk)")
+                    console.print("\n[dim]Next steps:[/dim]")
+                    console.print("  1. Configure models and channels in ~/.picoclaw/config.json")
+                    console.print("  2. Use 'picoclaw gateway' inside the VM for channel bots")
+                    console.print("  3. Rely on heartbeat/cron for periodic tasks from the workspace")
             except Exception as e:
                 # Log error but don't fail deployment
                 import traceback
