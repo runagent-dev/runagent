@@ -101,11 +101,11 @@
 <h2>Introducing OpenClaw, PicoClaw, and ZeroClaw</h2>
 
 <p>
-  <img src="./docs/images/Openclaw-logo-text-dark.png" alt="OpenClaw" height="56"/>
+  <img src="./docs/logo/Openclaw-logo-text-dark.png" alt="OpenClaw" height="56"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/picoclaw.png" alt="PicoClaw" height="56"/>
+  <img src="./docs/logo/picoclaw.png" alt="PicoClaw" height="56"/>
   &nbsp;&nbsp;&nbsp;
-  <img src="./docs/images/zeroclaw.png" alt="ZeroClaw" height="56"/>
+  <img src="./docs/logo/zeroclaw.png" alt="ZeroClaw" height="56"/>
 </p>
 
 </div>
