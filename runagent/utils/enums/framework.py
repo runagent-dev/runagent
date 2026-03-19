@@ -18,6 +18,7 @@ class Framework(Enum):
     PARLANT = "parlant"
     OPENCLAW = "openclaw"
     PICOCLAW = "picoclaw"
+    ZEROCLAW = "zeroclaw"
 
     @classmethod
     def _pythonic_frameworks_cache(cls) -> t.FrozenSet['Framework']:
@@ -33,7 +34,7 @@ class Framework(Enum):
 
     @classmethod
     def _service_frameworks_cache(cls) -> t.FrozenSet['Framework']:
-        return frozenset({cls.OPENCLAW, cls.PICOCLAW})
+        return frozenset({cls.OPENCLAW, cls.PICOCLAW, cls.ZEROCLAW})
 
     @classmethod
     def get_pythonic_frameworks(cls) -> t.FrozenSet['Framework']:

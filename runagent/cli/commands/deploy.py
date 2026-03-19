@@ -49,6 +49,8 @@ def _resolve_template_path(template_path: str) -> Tuple[Path, Optional[Path]]:
     # e.g. "picoclaw" -> "picoclaw/gateway"
     if template_path == "picoclaw":
         template_path = "picoclaw/gateway"
+    if template_path == "zeroclaw":
+        template_path = "zeroclaw/gateway"
 
     path = Path(template_path)
     
@@ -349,6 +351,11 @@ def deploy(path: str, overwrite: bool, new_id: bool):
                     or "picoclaw/gateway" in path
                     or path.endswith("picoclaw/gateway")
                 )
+                is_zeroclaw_gateway = (
+                    path == "zeroclaw"
+                    or "zeroclaw/gateway" in path
+                    or path.endswith("zeroclaw/gateway")
+                )
                 
                 if is_openclaw_gateway:
                     # Fetch agent metadata and NetworkInfo to get all credentials.
@@ -445,6 +452,20 @@ def deploy(path: str, overwrite: bool, new_id: bool):
                     console.print("  1. Configure models and channels in ~/.picoclaw/config.json")
                     console.print("  2. Use 'picoclaw gateway' inside the VM for channel bots")
                     console.print("  3. Rely on heartbeat/cron for periodic tasks from the workspace")
+                
+                if is_zeroclaw_gateway:
+                    console.print(f"\n[bold cyan]ZeroClaw Gateway Deployment:[/bold cyan]")
+                    console.print(f"  Agent ID: [bold magenta]{agent_id}[/bold magenta]")
+                    console.print("  Framework: [green]zeroclaw[/green]")
+                    console.print("  Runtime:   [green]zeroclaw-gateway[/green]")
+                    console.print("\n[dim]Inside the microVM, ZeroClaw uses:[/dim]")
+                    console.print("  Config:    [cyan]/root/.zeroclaw/config.toml[/cyan]")
+                    console.print("  Workspace: [cyan]/root/.zeroclaw/workspace[/cyan]")
+                    console.print("  (backed by /persistent/.zeroclaw on the VM data disk)")
+                    console.print("\n[dim]Next steps:[/dim]")
+                    console.print("  1. Configure providers/models/channels in ~/.zeroclaw/config.toml")
+                    console.print("  2. Run `zeroclaw service install` if you need system-managed services")
+                    console.print("  3. Bind channel identities (Telegram/Discord) as required")
             except Exception as e:
                 # Log error but don't fail deployment
                 import traceback

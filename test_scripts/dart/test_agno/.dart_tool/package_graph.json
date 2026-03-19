@@ -13,7 +13,7 @@
     },
     {
       "name": "runagent",
-      "version": "0.1.41",
+      "version": "0.1.43",
       "dependencies": [
         "http",
         "web_socket_channel"
@@ -68,7 +68,7 @@
     },
     {
       "name": "meta",
-      "version": "1.17.0",
+      "version": "1.18.2",
       "dependencies": []
     },
     {
@@ -102,7 +102,7 @@
     },
     {
       "name": "source_span",
-      "version": "1.10.1",
+      "version": "1.10.2",
       "dependencies": [
         "collection",
         "path",
