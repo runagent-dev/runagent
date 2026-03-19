@@ -101,7 +101,7 @@
 <h2>Introducing OpenClaw, PicoClaw, and ZeroClaw</h2>
 
 <p>
-  <img src="./docs/logo/Openclaw-logo-text-dark.png" alt="OpenClaw" height="56"/>
+  <img src="./docs/logo/openclaw-white.jpg" alt="OpenClaw" height="56"/>
   &nbsp;&nbsp;&nbsp;
   <img src="./docs/logo/picoclaw.png" alt="PicoClaw" height="56"/>
   &nbsp;&nbsp;&nbsp;
