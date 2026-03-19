@@ -40,8 +40,10 @@ Future<void> main() async {
   try {
     final client = await RunAgentClient.create(
       RunAgentClientConfig.create(
-        agentId: 'ae29bd73-b3d3-42c8-a98f-5d7aec7ee919',
+        agentId: 'ae29bd73-b3d3-29c8-b98f-5d7aec7cf911',
         entrypointTag: 'agno_print_response_stream',
+        local: false
+        
       ),
     );
 

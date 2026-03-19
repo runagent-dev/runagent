@@ -2,12 +2,16 @@
 Minimal RunAgent SDK Test for TripGenius
 
 Update AGENT_ID and run!
+
+Run from repo root with venv activated:
+  pip install -e .
+  python examples/trip_planner/sdk/python/test.py
 """
 
 from runagent import RunAgentClient
 
 # UPDATE THIS!
-AGENT_ID = "7ca76f5d-9524-4614-b283-d9a50db147b8"
+AGENT_ID = "9cc76f5d-9524-4614-b283-d9a50db137b8"
 
 
 # ============================================

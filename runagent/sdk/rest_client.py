@@ -1084,6 +1084,9 @@ class RestClient:
             result_data = result["data"]
             endpoint = result_data.get("endpoint")
             
+            # Extract NetworkInfo if available
+            network_info = result_data.get("network_info")
+            
             # Generate dashboard URL instead of API endpoint
             dashboard_url = f"https://app.run-agent.ai/dashboard/agents/{agent_id}"
 
@@ -1096,19 +1099,25 @@ class RestClient:
             ))
 
             # Update local deployment info
-            self._update_deployment_info(agent_id, {
+            deployment_info = {
                 "status": "deployed",
                 "endpoint": f"{self.base_url}{endpoint}",
                 "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            })
+            }
+            if network_info:
+                deployment_info["network_info"] = network_info
+            self._update_deployment_info(agent_id, deployment_info)
 
-            return {
+            return_result = {
                 "success": True,
                 "agent_id": agent_id,
                 "endpoint": f"{self.base_url}{endpoint}",
                 "dashboard_url": dashboard_url,
                 "status": "deployed",
             }
+            if network_info:
+                return_result["network_info"] = network_info
+            return return_result
         return result
 
     def deploy_agent(self, folder_path: str, metadata: Dict = None, overwrite: bool = False) -> Dict:
@@ -1285,7 +1294,11 @@ class RestClient:
                             
                             # Phase 2: Start agent (60-100%)
                             retry_progress.update(retry_task, completed=70, description="Starting agent...")
-                            start_result = self.start_agent(agent_id, {})
+                            # Extract metadata from agent config for OpenClaw gateway, etc.
+                            start_metadata = {}
+                            if isinstance(agent_config, dict) and agent_config.get('metadata'):
+                                start_metadata = agent_config.get('metadata', {}).copy()
+                            start_result = self.start_agent(agent_id, start_metadata)
                             
                             if not start_result.get("success"):
                                 return {"success": False, "error": f"Agent start failed: {start_result.get('error')}"}
@@ -1328,6 +1341,13 @@ class RestClient:
                 
                 # Phase 3: Start agent (70-100%)
                 progress.update(deploy_task, completed=75, description="Starting agent deployment...")
+                # Extract metadata from agent config if not provided
+                if metadata is None:
+                    metadata = {}
+                # Merge with metadata from agent config (e.g., runtime for OpenClaw gateway)
+                # agent_config is a dict returned by get_agent_config
+                if isinstance(agent_config, dict) and agent_config.get('metadata'):
+                    metadata = {**metadata, **agent_config.get('metadata', {})}
                 start_result = self._start_agent_core(agent_id, metadata)
                 
                 if start_result.get("success"):

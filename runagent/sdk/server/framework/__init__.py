@@ -31,7 +31,8 @@ def get_executor(
         Framework.LETTA: GenericExecutor,
         Framework.LLAMAINDEX: LlamaIndexExecutor,
         Framework.N8N: N8NExecutor,
-        Framework.PARLANT: ParlantExecutor
+        Framework.PARLANT: ParlantExecutor,
+        Framework.OPENCLAW: GenericExecutor,  # MCP uses Python; gateway uses separate runtime
     }
     framework_executor = executor_dict.get(framework)
     if framework_executor is None:

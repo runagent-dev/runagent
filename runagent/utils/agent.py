@@ -166,8 +166,12 @@ def validate_agent(
     
     if config.framework.is_pythonic():
         is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
-    else:
+    elif config.framework.is_webhook():
         is_valid, details = validate_webhook_agent(config, dynamic_loading, folder_path)
+    elif config.framework.is_service():
+        is_valid, details = validate_service_agent(config, dynamic_loading, folder_path)
+    else:
+        is_valid, details = validate_pythonic_agent(config, dynamic_loading, folder_path)
 
     return is_valid, details
 
@@ -179,6 +183,23 @@ def validate_webhook_agent(config, dynamic_loading, folder_path):
         files_found=[],
         missing_files=[],
         success_msgs=[],
+        error_msgs=[],
+        warning_msgs=[],
+    )
+
+
+def validate_service_agent(config, dynamic_loading, folder_path):
+    """Validate OpenClaw and other service-type agents."""
+    # If entrypoints exist (e.g. OpenClaw MCP), validate them like pythonic
+    if config.agent_architecture and config.agent_architecture.entrypoints:
+        return validate_pythonic_agent(config, dynamic_loading, folder_path)
+    # No entrypoints (e.g. OpenClaw Gateway) - minimal validation
+    return True, dict(
+        valid=True,
+        folder_exists=True,
+        files_found=[],
+        missing_files=[],
+        success_msgs=["Service framework detected (no entrypoints)"],
         error_msgs=[],
         warning_msgs=[],
     )
