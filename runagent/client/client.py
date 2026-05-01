@@ -189,6 +189,26 @@ class RunAgentClient:
 
         return _iterator()
 
+    def get_user_id(self) -> str | None:
+        """Get the user ID used for persistent memory, if any."""
+        return self.user_id
+
+    def get_persistent_memory(self) -> bool:
+        """Check if persistent memory is enabled for this client."""
+        return self.persistent_memory
+
+    def get_agent_id(self) -> str:
+        """Get the agent ID this client is configured for."""
+        return self.agent_id
+
+    def get_entrypoint_tag(self) -> str:
+        """Get the entrypoint tag this client is configured for."""
+        return self.entrypoint_tag
+
+    def get_extra_params(self) -> dict | None:
+        """Get any extra params supplied during initialization."""
+        return getattr(self, 'extra_params', None)
+
     def _run_stream(self, *input_args, **input_kwargs):
         """Legacy method - use run_stream instead"""
         return self.run_stream(*input_args, **input_kwargs)
