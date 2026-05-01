@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>RunAgent</PackageId>
-    <Version>0.1.48</Version>
+    <Version>0.1.49</Version>
     <Authors>RunAgent Team</Authors>
     <Company>RunAgent</Company>
     <Description>C# SDK for RunAgent - Secured, reliable AI agent deployment at scale. Run your stack. Let us run your agents.</Description>

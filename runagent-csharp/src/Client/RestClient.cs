@@ -39,7 +39,7 @@ public class RestClient : IDisposable
 
         // Set User-Agent header
         _httpClient.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("RunAgent-CSharp", "0.1.47")
+            new ProductInfoHeaderValue("RunAgent-CSharp", "0.1.49")
         );
 
         // Set Authorization header for remote calls
