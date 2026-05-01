@@ -33,6 +33,6 @@ class RunAgentConstants {
   static const String envTimeout = 'RUNAGENT_TIMEOUT';
   
   /// User agent string
-  static String userAgent() => 'runagent-dart/0.1.0';
+  static String userAgent() => 'runagent-dart/0.1.49';
 }
 
