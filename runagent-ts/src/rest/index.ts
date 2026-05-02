@@ -70,7 +70,7 @@ export class RestClient {
       if (userId) {
         requestData.user_id = userId;
       }
-      if (persistentMemory) {
+      if (persistentMemory !== undefined) {
         requestData.persistent_memory = persistentMemory;
       }
 

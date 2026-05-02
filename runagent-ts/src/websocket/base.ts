@@ -92,7 +92,7 @@ export abstract class BaseWebSocketClient {
       if (userId) {
         request.user_id = userId;
       }
-      if (persistentMemory) {
+      if (persistentMemory !== undefined) {
         request.persistent_memory = persistentMemory;
       }
 

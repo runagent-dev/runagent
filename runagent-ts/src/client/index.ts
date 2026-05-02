@@ -73,6 +73,12 @@ const getEnvVar = (name: string): string | undefined => {
   return undefined;
 };
 
+const parseEnvBool = (name: string): boolean | undefined => {
+  const val = getEnvVar(name);
+  if (val === undefined) return undefined;
+  return val.toLowerCase() === 'true' || val === '1';
+};
+
 export class RunAgentClient {
   private serializer: CoreSerializer;
   private local: boolean;
@@ -108,7 +114,7 @@ export class RunAgentClient {
     this.baseUrl = config.baseUrl ?? getEnvVar(BASE_URL_ENV);
     this.baseSocketUrl = config.baseSocketUrl;
     this._userId = config.userId ?? getEnvVar('RUNAGENT_USER_ID');
-    this._persistentMemory = config.persistentMemory ?? false;
+    this._persistentMemory = config.persistentMemory ?? parseEnvBool('RUNAGENT_PERSISTENT_MEMORY') ?? false;
 
     if (!this.baseUrl && !this.local) {
       this.baseUrl = DEFAULT_REMOTE_BASE_URL;
