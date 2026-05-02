@@ -22,7 +22,7 @@ class RunAgentExecutionError(Exception):
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False, extra_params: dict = None):
         self.sdk = RunAgentSDK()
         self.serializer = CoreSerializer()
         self.local = local
@@ -35,6 +35,7 @@ class RunAgentClient:
         # Persistent storage settings (set at client level)
         self.user_id = user_id
         self.persistent_memory = persistent_memory
+        self.extra_params = extra_params
         
         # FIXED: Detect if this is a streaming entrypoint
         self.is_streaming = entrypoint_tag.endswith("_stream")
@@ -207,7 +208,7 @@ class RunAgentClient:
 
     def get_extra_params(self) -> dict | None:
         """Get any extra params supplied during initialization."""
-        return getattr(self, 'extra_params', None)
+        return self.extra_params
 
     def _run_stream(self, *input_args, **input_kwargs):
         """Legacy method - use run_stream instead"""
