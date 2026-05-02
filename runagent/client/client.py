@@ -22,7 +22,7 @@ class RunAgentExecutionError(Exception):
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False, extra_params: dict = None):
         self.sdk = RunAgentSDK()
         self.serializer = CoreSerializer()
         self.local = local
@@ -35,6 +35,7 @@ class RunAgentClient:
         # Persistent storage settings (set at client level)
         self.user_id = user_id
         self.persistent_memory = persistent_memory
+        self.extra_params = extra_params
         
         # FIXED: Detect if this is a streaming entrypoint
         self.is_streaming = entrypoint_tag.endswith("_stream")
@@ -188,6 +189,26 @@ class RunAgentClient:
                 )
 
         return _iterator()
+
+    def get_user_id(self) -> str | None:
+        """Get the user ID used for persistent memory, if any."""
+        return self.user_id
+
+    def get_persistent_memory(self) -> bool:
+        """Check if persistent memory is enabled for this client."""
+        return self.persistent_memory
+
+    def get_agent_id(self) -> str:
+        """Get the agent ID this client is configured for."""
+        return self.agent_id
+
+    def get_entrypoint_tag(self) -> str:
+        """Get the entrypoint tag this client is configured for."""
+        return self.entrypoint_tag
+
+    def get_extra_params(self) -> dict | None:
+        """Get any extra params supplied during initialization."""
+        return self.extra_params
 
     def _run_stream(self, *input_args, **input_kwargs):
         """Legacy method - use run_stream instead"""
