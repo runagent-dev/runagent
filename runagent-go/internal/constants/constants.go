@@ -21,7 +21,9 @@ const (
 	EnvLocalAgent = "RUNAGENT_LOCAL"
 	EnvAgentHost  = "RUNAGENT_HOST"
 	EnvAgentPort  = "RUNAGENT_PORT"
-	EnvTimeout    = "RUNAGENT_TIMEOUT"
+	EnvTimeout          = "RUNAGENT_TIMEOUT"
+	EnvUserId           = "RUNAGENT_USER_ID"
+	EnvPersistentMemory = "RUNAGENT_PERSISTENT_MEMORY"
 
 	// Default values
 	DefaultBaseURL        = "https://backend.run-agent.ai"

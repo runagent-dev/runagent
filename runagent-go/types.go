@@ -18,9 +18,11 @@ type Config struct {
 	BaseURL        string
 	APIKey         string
 	TimeoutSeconds int
-	AsyncExecution *bool
-	ExtraParams    map[string]interface{}
-	HTTPClient     *http.Client
+	AsyncExecution   *bool
+	ExtraParams      map[string]interface{}
+	UserId           string `json:"user_id,omitempty"`
+	PersistentMemory *bool  `json:"persistent_memory,omitempty"`
+	HTTPClient       *http.Client
 }
 
 // RunInput describes a run invocation payload.
