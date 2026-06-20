@@ -1482,6 +1482,42 @@ class RestClient:
         
         return cleaned.strip() if cleaned.strip() else error_message
 
+    # ── Stop / Resume for stateful gateway agents ────────────────────────────
+
+    def register_managed_agent(self, agent_id: str) -> Dict:
+        """Register a gateway agent in managed_agents table for stop/resume support."""
+        try:
+            response = self.http.post(f"/agents/{agent_id}/register-managed", timeout=30)
+            if isinstance(response, dict):
+                return response
+            return response.json()
+        except Exception:
+            return {"success": False}
+
+    def stop_agent(self, agent_id: str) -> Dict:
+        """Stop a running stateful gateway agent. Syncs data, then destroys VM."""
+        try:
+            response = self.http.post(f"/managed-agents/{agent_id}/stop", timeout=60)
+            if isinstance(response, dict):
+                return response
+            return response.json()
+        except (ClientError, ServerError, ValidationError) as e:
+            return {"success": False, "message": e.message}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def resume_agent(self, agent_id: str) -> Dict:
+        """Resume a stopped stateful gateway agent with persistent storage."""
+        try:
+            response = self.http.post(f"/managed-agents/{agent_id}/resume", timeout=120)
+            if isinstance(response, dict):
+                return response
+            return response.json()
+        except (ClientError, ServerError, ValidationError) as e:
+            return {"success": False, "message": e.message}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     def run_agent(
         self,
         agent_id: str,

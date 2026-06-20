@@ -51,6 +51,8 @@ def _resolve_template_path(template_path: str) -> Tuple[Path, Optional[Path]]:
         template_path = "picoclaw/gateway"
     if template_path == "zeroclaw":
         template_path = "zeroclaw/gateway"
+    if template_path == "superbrowser":
+        template_path = "superbrowser/default"
 
     path = Path(template_path)
     
@@ -338,8 +340,7 @@ def deploy(path: str, overwrite: bool, new_id: bool):
             console.print(f"Agent ID: [bold magenta]{agent_id}[/bold magenta]")
             console.print(f"Agent URL: [link]{dashboard_url}[/link]")
             
-            # Check if this looks like an OpenClaw Gateway deployment (by path/shortcut),
-            # then display gateway URL + token + pairing info + VM IP for MCP setup.
+            # Check if this looks like a gateway deployment (by path/shortcut)
             try:
                 is_openclaw_gateway = (
                     "openclaw/gateway" in path
@@ -356,7 +357,18 @@ def deploy(path: str, overwrite: bool, new_id: bool):
                     or "zeroclaw/gateway" in path
                     or path.endswith("zeroclaw/gateway")
                 )
-                
+
+                # Register gateway agents in managed_agents for stop/resume support
+                if is_openclaw_gateway or is_picoclaw_gateway or is_zeroclaw_gateway:
+                    try:
+                        reg_result = sdk.remote.client.register_managed_agent(agent_id)
+                        if reg_result.get("success"):
+                            console.print(f"[dim]Registered for stop/resume support[/dim]")
+                        else:
+                            console.print(f"[dim yellow]Warning: managed agent registration skipped[/dim yellow]")
+                    except Exception:
+                        pass  # Non-critical
+
                 if is_openclaw_gateway:
                     # Fetch agent metadata and NetworkInfo to get all credentials.
                     # Poll a few times since serverless gateway setup runs in background.

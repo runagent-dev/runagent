@@ -1,0 +1,24 @@
+{
+  "agent_name": "superbrowser",
+  "description": "SuperBrowser - serverless stealth browser automation (the browser your agent won't get blocked on)",
+  "framework": "default",
+  "template": "superbrowser/default",
+  "version": "1.0.0",
+  "created_at": "2026-02-09T00:00:00Z",
+  "template_source": {
+    "repo_url": "https://github.com/runagent-dev/runagent.git",
+    "path": "templates/superbrowser/default",
+    "author": "runagent"
+  },
+  "agent_architecture": {
+    "entrypoints": [
+      { "file": "main.py", "module": "run", "tag": "run" }
+    ]
+  },
+  "env_vars": {},
+  "persistent_folders": [".superbrowser", ".nanobot"],
+  "metadata": {
+    "runtime": "superbrowser"
+  },
+  "agent_id": "00000000-0000-0000-0000-000000000000"
+}
