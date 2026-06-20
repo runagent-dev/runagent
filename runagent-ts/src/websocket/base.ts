@@ -57,7 +57,9 @@ export abstract class BaseWebSocketClient {
   async *runStream(
     agentId: string,
     entrypointTag: string,
-    options: RunStreamOptions = {}
+    options: RunStreamOptions = {},
+    userId?: string,
+    persistentMemory?: boolean
   ): AsyncGenerator<unknown, void, unknown> {
     const { inputArgs = null, inputKwargs = null, timeoutSeconds } = options;
     const endpoint = `${this.baseSocketUrl}/agents/${agentId}/run-stream`;
@@ -86,6 +88,13 @@ export abstract class BaseWebSocketClient {
         timeout_seconds: timeoutSeconds ?? this.timeoutSeconds,
         async_execution: false,
       };
+
+      if (userId) {
+        request.user_id = userId;
+      }
+      if (persistentMemory !== undefined) {
+        request.persistent_memory = persistentMemory;
+      }
 
       this.sendMessage(websocket, JSON.stringify(request));
 

@@ -11,6 +11,8 @@ export interface RunAgentConfig {
   timeoutSeconds?: number;
   extraParams?: Record<string, unknown>;
   enableRegistry?: boolean;
+  userId?: string;
+  persistentMemory?: boolean;
 }
   
 export interface ApiResponse<T = JsonValue> {
@@ -61,6 +63,8 @@ export interface ExecutionRequest {
   input_kwargs: Record<string, unknown>;
   timeout_seconds?: number;
   async_execution?: boolean;
+  user_id?: string;
+  persistent_memory?: boolean;
 }
   
 export interface SerializedObject {

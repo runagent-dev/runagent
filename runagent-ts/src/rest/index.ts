@@ -49,7 +49,9 @@ export class RestClient {
   async runAgent(
     agentId: string,
     entrypointTag: string,
-    options: RunAgentOptions = {}
+    options: RunAgentOptions = {},
+    userId?: string,
+    persistentMemory?: boolean
   ): Promise<ApiResponse> {
     const {
       inputArgs = [],
@@ -57,20 +59,29 @@ export class RestClient {
       timeoutSeconds = this.defaultTimeoutSeconds,
     } = options;
 
-      const requestData = {
+      const requestData: Record<string, unknown> = {
       entrypoint_tag: entrypointTag,
           input_args: inputArgs,
           input_kwargs: inputKwargs,
       timeout_seconds: timeoutSeconds,
       async_execution: false,
-      } as JsonValue;
+      };
+
+      if (userId) {
+        requestData.user_id = userId;
+      }
+      if (persistentMemory !== undefined) {
+        requestData.persistent_memory = persistentMemory;
+      }
+
+      const typedRequestData = requestData as JsonValue;
       
     const timeoutMs = timeoutSeconds * 1000 + 10_000; // Add buffer similar to Python SDK
 
       try {
         const response = await this.http.post(
         `/agents/${agentId}/run`,
-          requestData,
+          typedRequestData,
         { timeout: timeoutMs }
       );
 
