@@ -22,7 +22,7 @@ class RunAgentExecutionError(Exception):
 
 class RunAgentClient:
 
-    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False, extra_params: dict = None):
+    def __init__(self, agent_id: str, entrypoint_tag: str, local: bool = True, host: str = None, port: int = None, user_id: str = None, persistent_memory: bool = False, api_key: str = None, base_url: str = None, extra_params: dict = None):
         self.sdk = RunAgentSDK()
         self.serializer = CoreSerializer()
         self.local = local
@@ -67,8 +67,10 @@ class RunAgentClient:
         else:
             self.agent_host = None
             self.agent_port = None
-            self.rest_client = RestClient(is_local=False)
-            self.socket_client = SocketClient(is_local=False)
+            # api_key / base_url fall back to RUNAGENT_API_KEY / RUNAGENT_BASE_URL
+            # (via Config) inside RestClient/SocketClient when not passed explicitly.
+            self.rest_client = RestClient(is_local=False, api_key=api_key, base_url=base_url)
+            self.socket_client = SocketClient(is_local=False, api_key=api_key)
 
     def run(self, *input_args, **input_kwargs):
         """

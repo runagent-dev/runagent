@@ -13,7 +13,7 @@
   "agent_architecture": {
     "entrypoints": []
   },
-  "persistent_folders": ["rad/openclaw"],
+  "persistent_folders": [".openclaw"],
   "metadata": {
     "runtime": "openclaw-gateway"
   },
