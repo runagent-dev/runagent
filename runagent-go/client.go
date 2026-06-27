@@ -30,8 +30,10 @@ type RunAgentClient struct {
 	apiKey        string
 	timeoutSecs   int
 	asyncDefault  bool
-	extraParams   map[string]interface{}
-	httpClient    *http.Client
+	extraParams      map[string]interface{}
+	userId           string
+	persistentMemory bool
+	httpClient       *http.Client
 }
 
 // NewRunAgentClient creates a new client instance using the provided config.
@@ -109,17 +111,28 @@ func NewRunAgentClient(cfg Config) (*RunAgentClient, error) {
 		extra = map[string]interface{}{}
 	}
 
+	userId := firstNonEmpty(cfg.UserId, env.userId)
+
+	persistentMemory := false
+	if cfg.PersistentMemory != nil {
+		persistentMemory = *cfg.PersistentMemory
+	} else if env.persistentMemory != nil {
+		persistentMemory = *env.persistentMemory
+	}
+
 	return &RunAgentClient{
-		agentID:       cfg.AgentID,
-		entrypointTag: cfg.EntrypointTag,
-		local:         local,
-		baseRESTURL:   restBase,
-		baseSocketURL: socketBase,
-		apiKey:        apiKey,
-		timeoutSecs:   timeout,
-		asyncDefault:  asyncDefault,
-		extraParams:   extra,
-		httpClient:    httpClient,
+		agentID:          cfg.AgentID,
+		entrypointTag:    cfg.EntrypointTag,
+		local:            local,
+		baseRESTURL:      restBase,
+		baseSocketURL:    socketBase,
+		apiKey:           apiKey,
+		timeoutSecs:      timeout,
+		asyncDefault:     asyncDefault,
+		extraParams:      extra,
+		userId:           userId,
+		persistentMemory: persistentMemory,
+		httpClient:       httpClient,
 	}, nil
 }
 
@@ -147,7 +160,23 @@ func (c *RunAgentClient) Run(ctx context.Context, values ...any) (interface{}, e
 	}
 	payload := input.toAPIPayload(c.entrypointTag, c.timeoutSecs, c.asyncDefault)
 
-	body, err := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, newError(ErrorTypeValidation, "failed to serialize request", withCause(err))
+	}
+
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(raw, &bodyMap); err != nil {
+		return nil, newError(ErrorTypeValidation, "failed to prepare request body", withCause(err))
+	}
+	if c.userId != "" {
+		bodyMap["user_id"] = c.userId
+	}
+	if c.persistentMemory {
+		bodyMap["persistent_memory"] = c.persistentMemory
+	}
+
+	body, err := json.Marshal(bodyMap)
 	if err != nil {
 		return nil, newError(ErrorTypeValidation, "failed to serialize request", withCause(err))
 	}
@@ -232,7 +261,23 @@ func (c *RunAgentClient) RunStream(ctx context.Context, values ...any) (*StreamI
 	payload := input.toAPIPayload(c.entrypointTag, timeout, false)
 	payload.AsyncExecution = false
 
-	data, err := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, newError(ErrorTypeValidation, "failed to serialize stream payload", withCause(err))
+	}
+
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(raw, &bodyMap); err != nil {
+		return nil, newError(ErrorTypeValidation, "failed to prepare stream payload", withCause(err))
+	}
+	if c.userId != "" {
+		bodyMap["user_id"] = c.userId
+	}
+	if c.persistentMemory {
+		bodyMap["persistent_memory"] = c.persistentMemory
+	}
+
+	data, err := json.Marshal(bodyMap)
 	if err != nil {
 		return nil, newError(ErrorTypeValidation, "failed to serialize stream payload", withCause(err))
 	}
@@ -292,6 +337,12 @@ func (c *RunAgentClient) ExtraParams() map[string]interface{} {
 	}
 	return copyMap
 }
+
+// UserId returns the user ID for persistent memory.
+func (c *RunAgentClient) UserId() string { return c.userId }
+
+// PersistentMemory returns whether persistent memory is enabled.
+func (c *RunAgentClient) PersistentMemory() bool { return c.persistentMemory }
 
 func parseRunResponse(status int, body []byte) (interface{}, error) {
 	var envelope map[string]interface{}
@@ -424,12 +475,14 @@ func unwrapDataField(data interface{}) interface{} {
 }
 
 type envConfig struct {
-	apiKey         string
-	baseURL        string
-	host           string
-	port           int
-	timeoutSeconds int
-	local          *bool
+	apiKey           string
+	baseURL          string
+	host             string
+	port             int
+	timeoutSeconds   int
+	local            *bool
+	userId           string
+	persistentMemory *bool
 }
 
 func loadEnvConfig() envConfig {
@@ -453,6 +506,14 @@ func loadEnvConfig() envConfig {
 	if localStr := os.Getenv(constants.EnvLocalAgent); localStr != "" {
 		if local, err := strconv.ParseBool(localStr); err == nil {
 			cfg.local = &local
+		}
+	}
+
+	cfg.userId = strings.TrimSpace(os.Getenv(constants.EnvUserId))
+
+	if pmStr := os.Getenv(constants.EnvPersistentMemory); pmStr != "" {
+		if pm, err := strconv.ParseBool(pmStr); err == nil {
+			cfg.persistentMemory = &pm
 		}
 	}
 
