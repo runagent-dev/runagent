@@ -12,7 +12,8 @@
   },
   "agent_architecture": {
     "entrypoints": [
-      { "file": "main.py", "module": "run", "tag": "run" }
+      { "file": "main.py", "module": "run", "tag": "run" },
+      { "file": "main.py", "module": "run_stream", "tag": "run_stream" }
     ]
   },
   "env_vars": {},

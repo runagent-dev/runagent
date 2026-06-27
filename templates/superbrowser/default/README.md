@@ -61,6 +61,10 @@ The Python `runagent_superbrowser` package also offers a convenience wrapper:
 result (`text`, `success`, `data`, `error`, `task_id`, `mode`). `mode` is
 `auto` | `fetch` (read-only) | `browser` (interactive).
 
+For progress events, call the `run_stream` entrypoint (`entrypoint_tag="run_stream"`):
+it yields `status` / `thinking` / `tool` / `message` events and a final
+`{"type": "result", ...}` matching `run`.
+
 ## Local development
 
 For local iteration use the SuperBrowser repo directly (`npm run dev` + the
