@@ -448,6 +448,12 @@ class RunAgentClient {
   /// Get any extra params supplied during initialization
   Map<String, dynamic>? getExtraParams() => extraParams;
 
+  /// Get the user ID used for persistent memory, if any.
+  String? getUserId() => userId;
+
+  /// Check if persistent memory is enabled for this client.
+  bool getPersistentMemory() => persistentMemory;
+
   /// Check if using local deployment
   bool isLocal() => local;
 
