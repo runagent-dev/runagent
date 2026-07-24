@@ -1,5 +1,6 @@
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+# Exa is the fastest and most accurate web search API for AI
 from agno.tools.exa import ExaTools
 from textwrap import dedent
 
